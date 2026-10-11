@@ -134,3 +134,27 @@ explainable.
   nothing in pi lets the model address a tool-use id. The stall warning in
   `monitoring.ts` now routes its tail through the same `outputTail` parameter instead of
   appending its own `"Last output:"` header, so a stall and a failure look alike.
+- **The background hint is derived, not ref-counted.** Upstream's `hint.ts` kept a
+  module-level `activeHints` counter and required every caller to pair exactly one
+  `showBackgroundHint()` with one `clearBackgroundHint()`. Any exception path between the
+  two pinned `(ctrl+shift+b to run in background)` below the editor for the rest of the
+  session, with no way to clear it — `session_shutdown` did not reset the counter either.
+  The hint is now computed from the registry's foreground slots (`ForegroundSlot.hinted`),
+  so it cannot outlive the commands it describes: the slot is deleted on every exit path
+  and wholesale by `pauseAllForeground`, and the next render has nothing to show. Content
+  is diffed before the widget write, like the sidebar.
+- **The hint says what is running.** Upstream showed one static line regardless of state.
+  Which command and how long it has been going is the entire basis for deciding whether to
+  background it, so the hint now lists a row per command with its elapsed time, refreshed
+  by the sidebar's existing 1 Hz ticker (a foreground command is itself a running job, so
+  that ticker is always alive when the hint is up). The chord comes from
+  `shortcutBackground` and falls back to `/bg` when unbound — advertising a key the user
+  remapped away is worse than saying nothing.
+- `lifecycle.ts` `takeControl()`: mid-turn with no foreground command and no queued
+  message used to fall through to `"No running process to background."` — words that
+  describe an idle session while the agent is visibly working, which reads as a broken key
+  and invites a second press. That case now gets its own informational message.
+- Keybinding audit: `shift+down` was unverified upstream. Checked against pi 1.1.0's
+  action table — the built-ins are `down` (`tui.editor.cursorDown`, `tui.select.down`),
+  `ctrl+shift+down` (`tui.altScreen.nextPrompt`) and `alt+down`
+  (`app.models.reorderDown`). Nothing claims `shift+down`.

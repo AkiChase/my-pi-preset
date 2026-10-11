@@ -18,6 +18,7 @@ function harness(opts: { isIdle: boolean; hasPending: boolean; foreground?: bool
         const count = opts.foregroundCount ?? 1;
         for (let i = 1; i <= count; i++) {
             reg.foreground.set(`t${i}`, {
+                jobId: `job-t${i}`,
                 requestPause: () => {
                     paused++;
                 },
@@ -60,11 +61,22 @@ void describe("takeControl — Ctrl+Shift+B (CC-faithful, never aborts)", () => 
         assert.match(h.notices[0].msg, /current step finishes/);
     });
 
-    void it("warns when there is nothing to background and nothing queued", () => {
+    void it("warns when the session is idle with nothing to background", () => {
         const h = harness({ isIdle: true, hasPending: false, foreground: false });
         const outcome = takeControl(h.reg, h.ctx);
         assert.equal(outcome, "nothing");
         assert.equal(h.notices[0].level, "warning");
         assert.match(h.notices[0].msg, /No running process/);
+    });
+
+    void it("says the agent is working when mid-turn with no command and no queue", () => {
+        // Upstream fell through to "No running process to background." here —
+        // words that describe an idle session while the agent is visibly
+        // working, which reads as a broken key and invites a second press.
+        const h = harness({ isIdle: false, hasPending: false, foreground: false });
+        const outcome = takeControl(h.reg, h.ctx);
+        assert.equal(outcome, "nothing");
+        assert.match(h.notices[0].msg, /the agent is working, but no command is running/);
+        assert.equal(h.notices[0].level, "info", "not a warning — nothing is wrong");
     });
 });

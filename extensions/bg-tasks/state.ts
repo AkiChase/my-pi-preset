@@ -38,4 +38,7 @@ export class BackgroundRegistry {
     sidebarTimer: NodeJS.Timeout | undefined = undefined;
     /** Last rendered sidebar content — used to skip redundant widget updates. */
     lastSidebarContent: string | undefined = undefined;
+    /** Last rendered background-hint content, for the same diff-before-write
+     *  reason as the sidebar: the 1 Hz ticker redraws both. */
+    lastHintContent: string | undefined = undefined;
 }

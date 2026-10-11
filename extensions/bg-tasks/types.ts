@@ -102,6 +102,13 @@ export type BackgroundReason = "manual" | "timeout";
  *  requestPause to flip the command into the background. */
 export interface ForegroundSlot {
     requestPause: (reason: BackgroundReason) => void;
+    /** The registry job backing this command — the hint reads its command text
+     *  and start time from there rather than duplicating them. */
+    jobId: string;
+    /** Whether this command has outlived the quick-completion window and so is
+     *  advertised in the "run in background" hint. The hint is derived from
+     *  these flags, so deleting the slot inherently retires the hint. */
+    hinted?: boolean;
 }
 
 // --- Event types ---

@@ -399,7 +399,7 @@ pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDING
 
 两行的「已处理」指的是 [`pi-preset.json`](pi-preset.json) 的 `keybindings` 里那两条空数组。扩展的键本来就会赢，把被抢走的内置动作显式禁掉，图的是启动时不再报那条冲突 warning、以后也不会以为这两个内置键还能用。不想这样就把清单里那两条改成别的键，或者改成 `null` 让它从所有机器上消失。
 
-`pi-web-access` 的 `ctrl+shift+s` / `ctrl+shift+w`，以及 patty 的 `ctrl+shift+b` / `ctrl+shift+j` / `shift+down` / `ctrl+shift+x`，目前都没撞上内置动作。patty 刻意没注册 `ctrl+b`：那是内置 `tui.editor.cursorLeft` 的别名，抢过来会在启动时报冲突诊断。patty 这四个键都能在 `bg-tasks.json` 里改或设 `"off"`。
+`pi-web-access` 的 `ctrl+shift+s` / `ctrl+shift+w`，以及 patty 的 `ctrl+shift+b` / `ctrl+shift+j` / `shift+down` / `ctrl+shift+x`，对着 pi 的动作表逐个核过，都没撞上内置动作 —— `shift+down` 尤其容易让人起疑，但内置用的是 `down`（`cursorDown` / `select.down`）、`ctrl+shift+down`（`altScreen.nextPrompt`）和 `alt+down`（`models.reorderDown`），没人要 `shift+down`。patty 刻意没注册 `ctrl+b`：那是内置 `tui.editor.cursorLeft` 的别名，抢过来会在启动时报冲突诊断。patty 这四个键都能在 `bg-tasks.json` 里改或设 `"off"`。
 
 除了 `settings.json` 和 `keybindings.json` 里被清单声明的那几个键，其它配置文件都不在本仓库的管理范围内，各自的机器上自己维护。
 

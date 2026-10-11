@@ -324,6 +324,18 @@ export function takeControl(
         return "queued";
     }
 
+    // Mid-turn, no foreground command, nothing queued: the agent is streaming
+    // or running some other tool. Upstream fell through to the warning below,
+    // which says "no running process" while the agent is visibly working — the
+    // words describe an idle session and invite the user to press it again.
+    if (!ctx.isIdle()) {
+        ctx.ui.notify(
+            "Nothing to background — the agent is working, but no command is running.",
+            "info"
+        );
+        return "nothing";
+    }
+
     ctx.ui.notify("No running process to background.", "warning");
     return "nothing";
 }

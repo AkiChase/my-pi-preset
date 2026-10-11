@@ -36,6 +36,7 @@ void describe("input steering (cooperative scheduler)", () => {
         let abortCalled = false;
         const handler = registerAndGetHandler(reg, sent, resubmitted);
         reg.foreground.set("tc-steer", {
+            jobId: "job-steer",
             requestPause: (reason) => {
                 pauseReason = reason;
             },
@@ -71,6 +72,7 @@ void describe("input steering (cooperative scheduler)", () => {
         let abortCalls = 0;
         const handler = registerAndGetHandler(reg, sent, resubmitted);
         reg.foreground.set("tc-steer2", {
+            jobId: "job-steer2",
             requestPause: () => {},
         });
 
@@ -114,6 +116,7 @@ void describe("input steering (cooperative scheduler)", () => {
         const resubmitted: ResubmittedMessage[] = [];
         const handler = registerAndGetHandler(reg, sent, resubmitted);
         reg.foreground.set("tc-ext", {
+            jobId: "job-ext",
             requestPause: () => {},
         });
 

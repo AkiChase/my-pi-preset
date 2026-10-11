@@ -20,6 +20,7 @@ import {
 } from "./types.ts";
 import type { BackgroundRegistry } from "./state.ts";
 import { readBoundedTail, readLastLine } from "./output.ts";
+import { renderBackgroundHint } from "./hint.ts";
 
 // --- ID generation -------------------------------------------------------
 
@@ -276,6 +277,11 @@ function ensureSidebarTicker(reg: BackgroundRegistry, ctx: UiContext): void {
     const t = setInterval(() => {
         try {
             renderSidebar(reg, ctx);
+            // The hint shows per-command elapsed time too, and a foreground
+            // command is itself a running job — so this ticker is already alive
+            // whenever the hint is up, and is the only thing that can keep its
+            // durations from freezing at the value they had when it appeared.
+            renderBackgroundHint(reg, ctx);
         } catch {
             // The captured ctx went stale (session reload/fork/switch) — stop
             // ticking rather than throw an uncaught exception in the interval.

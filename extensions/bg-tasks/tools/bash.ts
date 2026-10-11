@@ -178,7 +178,7 @@ async function runForeground(args: {
         else signal.addEventListener("abort", onTurnAbort);
     }
 
-    const slot: ForegroundSlot = { requestPause };
+    const slot: ForegroundSlot = { requestPause, jobId: id };
     reg.foreground.set(toolCallId, slot);
 
     const job = createRunningJob({
@@ -227,7 +227,6 @@ async function runForeground(args: {
     (timeoutTimer as NodeJS.Timeout).unref();
 
     let progressPoller: { stop: () => void } | undefined;
-    let hintShown = false;
 
     const cleanup = () => {
         progressPoller?.stop();
@@ -264,10 +263,9 @@ async function runForeground(args: {
         }
 
         // Still running past the quick window — start progress polling and show
-        // the "(ctrl+shift+b to run in background)" hint, like Claude Code.
+        // the "run in background" hint, like Claude Code.
         progressPoller = streamLog(logPath, onUpdate);
-        showBackgroundHint(ctx);
-        hintShown = true;
+        showBackgroundHint(reg, ctx, toolCallId);
 
         // Race: completion vs backgrounding.
         const race = await Promise.race<
@@ -294,8 +292,11 @@ async function runForeground(args: {
     } finally {
         // Single teardown for every exit path (return, throw, background hand-off).
         cleanup();
-        if (hintShown) clearBackgroundHint(ctx);
         reg.foreground.delete(toolCallId);
+        // After the slot is gone, so the hint is derived from a registry that no
+        // longer mentions this command. Unlike upstream's paired counter, an
+        // exception path that skipped this would self-heal on the next render.
+        clearBackgroundHint(reg, ctx, toolCallId);
         if (!handedToBackground) {
             reg.jobs.delete(id);
             try { unlinkSync(logPath); } catch { /* best-effort */ }

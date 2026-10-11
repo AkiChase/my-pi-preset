@@ -162,6 +162,7 @@ void describe("backgroundActiveForeground", () => {
         const notifications: string[] = [];
         let pauseReason: string | undefined;
         reg.foreground.set("tc-manual", {
+            jobId: "job-manual",
             requestPause: (reason) => {
                 pauseReason = reason;
             },
