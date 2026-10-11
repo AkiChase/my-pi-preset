@@ -108,7 +108,11 @@ export function completionSummary(job: Job, status?: TerminalStatus): string {
     const desc = describeJob(job.name, job.command);
     if (job.kind === "monitor") {
         if (s === "killed") return `Monitor "${desc}" stopped`;
-        if (s === "failed") return `Monitor "${desc}" script failed (exit ${job.exitCode ?? "unknown"})`;
+        // Not "script failed": a ws monitor has no script, and sending the model
+        // after one is a wild goose chase. The exit code is the synthetic
+        // abnormal-close code there, and the inlined log tail carries the real
+        // reason (`[socket closed: code 1006]`).
+        if (s === "failed") return `Monitor "${desc}" failed (exit ${job.exitCode ?? "unknown"})`;
         return `Monitor "${desc}" stream ended`;
     }
     if (job.kind === "agent") {

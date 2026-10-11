@@ -9,7 +9,7 @@
 import { openSync, readSync, closeSync, statSync as fsStatSync } from "node:fs";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
-    DELIVER_FOLLOWUP,
+    DELIVER_PASSIVE,
     DELIVER_STEER,
     EVENT,
 } from "./types.ts";
@@ -71,7 +71,7 @@ export function watchStalls(args: {
                         display: true,
                         details: { jobId: args.jobId, logPath: args.logPath, command: args.command },
                     },
-                    DELIVER_FOLLOWUP
+                    DELIVER_PASSIVE
                 );
                 return;
             }

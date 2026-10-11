@@ -3,16 +3,17 @@
  * out of the tool action so its invariants are unit-testable through a fake
  * MonitorSource (no real spawning, no real sockets).
  *
- * Responsibilities: stream each batch of new log lines as a notification,
- * rate-limit a firehose, emit exactly one terminal event (on natural exit,
- * kill, timeout, or firehose), and tear the source down. The tool just
- * validates, builds a source, and hands it here.
+ * Responsibilities: coalesce new log lines into bounded stream events,
+ * throttle a firehose down to a suppressed-line count, emit exactly one
+ * terminal event (on natural exit, kill, timeout, or sustained overflow), and
+ * tear the source down. The tool just validates, builds a source, and hands it
+ * here.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { BackgroundRegistry } from "./state.ts";
 import {
-    DELIVER_FOLLOWUP,
+    DELIVER_PASSIVE,
     EVENT,
     type Job,
     type UiContext,
@@ -42,20 +43,30 @@ export function startMonitorSession(args: {
     const { id, logPath } = job;
     const {
         monitorPollMs,
+        monitorFlushMs,
+        monitorMaxLinesPerEvent,
         monitorRateWindowMs,
         monitorMaxLinesPerWindow,
+        monitorMaxOverflowWindows,
     } = reg.config;
 
     let terminalEmitted = false;
-    let finishing = false;
     let windowStart = Date.now();
     let windowLines = 0;
+    let overflowWindows = 0;
 
-    // Stream events stay live but passive (delivered as a follow-up, no wake) —
-    // they carry data the agent is actively watching and surface on the agent's
-    // next natural turn without spawning an unsolicited one. The terminal
-    // notice (stream ended / stopped / failed) is its own <task-notification>
-    // (see finishMonitor), sent the moment the source ends.
+    // Coalescing buffer. `pending` holds lines waiting for the next flush;
+    // `suppressed` counts lines deliberately not shown (over the per-event cap
+    // or over the rate budget), reported as one line instead.
+    let pending: string[] = [];
+    let suppressed = 0;
+    let flushTimer: NodeJS.Timeout | undefined;
+
+    // Stream events stay live but passive (never a wake) — they carry data the
+    // agent is actively watching and surface on its next natural turn without
+    // spawning an unsolicited one. The terminal notice (stream ended / stopped
+    // / failed) is its own <task-notification> (see finishMonitor), sent the
+    // moment the source ends.
     const emitEvent = (lines: string[]): void => {
         if (lines.length === 0) return;
         pi.sendMessage(
@@ -65,8 +76,39 @@ export function startMonitorSession(args: {
                 display: true,
                 details: { jobId: id, description, logPath, terminal: false },
             },
-            DELIVER_FOLLOWUP
+            DELIVER_PASSIVE
         );
+    };
+
+    /**
+     * Emit whatever is buffered as ONE event, bounded by
+     * monitorMaxLinesPerEvent. Returns true when something was emitted, which
+     * is how the throttle timer knows the stream is still hot.
+     */
+    const flush = (): boolean => {
+        const shown = pending.slice(0, monitorMaxLinesPerEvent);
+        suppressed += pending.length - shown.length;
+        pending = [];
+        if (suppressed > 0) {
+            // The lines are not lost, just not spent on context — say where
+            // they are, since that is the whole justification for dropping them.
+            shown.push(`[${suppressed} more lines not shown — full output in ${logPath}]`);
+            suppressed = 0;
+        }
+        if (shown.length === 0) return false;
+        emitEvent(shown);
+        return true;
+    };
+
+    /** Re-arm the throttle for as long as lines keep arriving. */
+    const armFlush = (): void => {
+        const t = setTimeout(() => {
+            if (terminalEmitted) return;
+            if (flush()) armFlush();
+            else flushTimer = undefined;
+        }, monitorFlushMs);
+        t.unref();
+        flushTimer = t;
     };
 
     const follower: MonitorFollower = followLines(
@@ -74,22 +116,42 @@ export function startMonitorSession(args: {
         (lines) => {
             if (terminalEmitted) return;
 
-            // Sliding-window firehose check.
+            // Sliding rate window. Rolling it here (rather than on a timer)
+            // means a stream that stops never escalates — correct, since there
+            // is nothing left to suppress.
             const now = Date.now();
             if (now - windowStart > monitorRateWindowMs) {
+                overflowWindows =
+                    windowLines > monitorMaxLinesPerWindow ? overflowWindows + 1 : 0;
                 windowStart = now;
                 windowLines = 0;
             }
             windowLines += lines.length;
 
-            emitEvent(lines);
+            if (windowLines > monitorMaxLinesPerWindow) {
+                // Over budget: keep counting, stop spending context. Upstream
+                // killed the monitor here instead — and killed it AFTER
+                // emitting the whole overflowing batch, so a single burst cost
+                // the full context AND the watch.
+                suppressed += lines.length;
+            } else {
+                pending.push(...lines);
+            }
 
-            // Don't trip the firehose guard while draining the final flush.
-            if (!finishing && windowLines > monitorMaxLinesPerWindow) {
+            if (overflowWindows >= monitorMaxOverflowWindows) {
                 stopMonitor(
                     "killed",
-                    `Monitor "${description}" stopped (too many events (>${monitorMaxLinesPerWindow}/${monitorRateWindowMs / 1000}s) — restart with a tighter filter)`
+                    `Monitor "${description}" stopped (over ${monitorMaxLinesPerWindow} lines/${monitorRateWindowMs / 1000}s for ${overflowWindows} windows — restart with a tighter filter)`
                 );
+                return;
+            }
+
+            // Leading edge: the first lines after a quiet period go out at once,
+            // so a slow watch reads live. Everything after them batches until
+            // the window closes.
+            if (flushTimer === undefined) {
+                flush();
+                armFlush();
             }
         },
         monitorPollMs
@@ -108,10 +170,18 @@ export function startMonitorSession(args: {
      */
     const finishMonitor = (status: TerminalStatus, summary: string): void => {
         if (terminalEmitted) return;
-        // Flush remaining lines first (while terminalEmitted is still false so
-        // the follower callback emits them), then the terminal notification.
-        finishing = true;
+        // Ordering matters three ways: the follower's final read must happen
+        // while terminalEmitted is false (or its callback drops the lines), the
+        // buffer must then be flushed EXPLICITLY rather than waiting for the
+        // throttle (or the last lines arrive after "stream ended"), and the
+        // timer must be cleared so a pending tick cannot emit after the
+        // terminal event.
         follower.stop(true);
+        if (flushTimer) {
+            clearTimeout(flushTimer);
+            flushTimer = undefined;
+        }
+        flush();
         terminalEmitted = true;
         sendTaskNotification({ reg, pi, job, status, summary, evict: false });
     };

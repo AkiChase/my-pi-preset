@@ -183,3 +183,39 @@ explainable.
     constructor body rather than using TypeScript parameter properties. pi and
     `node --test` both run these files through type stripping, which rejects
     `constructor(private readonly x)` outright — it typechecks and then fails at load.
+- **Monitor stream events are coalesced, and a firehose is suppressed rather than fatal.**
+  Upstream emitted one message per follower poll tick (200 ms), so a stream producing a
+  line per second produced a message per second — ~600 separate transcript entries for a
+  ten-minute watch, each repeating its own `◉ description` header. Its only brake was
+  `>500 lines/10 s`, and the response was to kill the monitor — *after* `emitEvent(lines)`
+  had already sent the whole overflowing batch, so a single burst cost the full context
+  AND the watch.
+  - `monitor-session.ts` now buffers lines and emits at most one event per
+    `monitorFlushMs` window. The first lines after a quiet period go out immediately
+    (leading edge), so a slow watch still reads live; everything after them batches. The
+    window can afford to be long because these events never wake the agent — they are
+    appended passively and read at its next turn — so latency costs the model nothing.
+  - Over `monitorMaxLinesPerWindow`, the session stops spending context and starts
+    counting instead, reporting one `[N more lines not shown — full output in <log>]`
+    line. The watch keeps running. Only `monitorMaxOverflowWindows` consecutive
+    over-budget windows kill it: a burst is a burst, but sustained overflow is a filter
+    that does not work.
+  - `monitorMaxLinesPerEvent` bounds a single event, since one poll tick can contain an
+    arbitrarily large write; the excess folds into the same suppressed count.
+  - Ordering trap, now covered by a test: on the exit path the buffer must be flushed
+    EXPLICITLY (and the throttle timer cleared) between `follower.stop(true)` and the
+    terminal notification. Waiting for the throttle would put the last lines after
+    "stream ended", and the `terminalEmitted` guard would drop them outright.
+- `DELIVER_FOLLOWUP` renamed to `DELIVER_PASSIVE`. The old name described a queue the
+  constant never reaches: with `triggerTurn: false`, pi's `sendCustomMessage` skips the
+  steer/followUp branch entirely and `deliverAs` is never read. The real behaviour is
+  "append to the transcript passively" — immediately when the agent is idle, at agent-run
+  settle when it is streaming. The comment now says that instead of describing
+  `agent.followUp()`.
+- `completionSummary`: a failed monitor said `script failed`. A ws monitor has no script,
+  and the exit code there is our synthetic abnormal-close code — the real reason is in the
+  inlined log tail (`[socket closed: code 1006]`). Now just `failed (exit N)`.
+  - Note: a ws disconnect ending the watch is deliberate, not a gap. `settle(1)` resolves
+    the source exit, which routes through `finishMonitor("failed", …)` to a steering
+    `<task-notification>` that wakes the agent with the close code in its tail. Whether to
+    reconnect is the agent's call, not the library's.

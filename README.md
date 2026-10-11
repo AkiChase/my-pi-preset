@@ -255,9 +255,12 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 | `stallTailBytes` | `1024` | 判断交互提示符时读多少尾字节 |
 | `monitorDefaultTimeoutMs` | `300000` | `monitor` 的默认截止时间 |
 | `monitorMaxTimeoutMs` | `3600000` | `monitor` 的硬上限 |
-| `monitorPollMs` | `200` | `monitor` 轮询间隔，同时是事件合并窗口 |
+| `monitorPollMs` | `200` | `monitor` 读日志的轮询间隔 |
+| `monitorFlushMs` | `2000` | 事件合并窗口。安静后的首批立刻发，之后窗口内攒成一条 |
+| `monitorMaxLinesPerEvent` | `50` | 单条事件最多几行，多出来的计入「未显示」 |
 | `monitorRateWindowMs` | `10000` | 刷屏检测的滑动窗口 |
-| `monitorMaxLinesPerWindow` | `500` | 一个窗口内超过这么多行就自动停掉 monitor |
+| `monitorMaxLinesPerWindow` | `500` | 一个窗口内超过这么多行就停止发内容、只报抑制条数（monitor 继续跑） |
+| `monitorMaxOverflowWindows` | `3` | 连续这么多个窗口都溢出才真的杀掉 monitor |
 | `shortcutBackground` | `["ctrl+shift+b"]` | 转后台 |
 | `shortcutTaskPanel` | `["ctrl+shift+j", "shift+down"]` | 打开任务面板 |
 | `shortcutKillLatest` | `["ctrl+shift+x"]` | kill 最近一个运行中的作业 |

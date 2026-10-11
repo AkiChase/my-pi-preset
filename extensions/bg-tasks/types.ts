@@ -127,14 +127,19 @@ export type EventName = (typeof EVENT)[keyof typeof EVENT];
  *  IS something the agent must react to now: a background job's terminal
  *  <task-notification>, a stall warning, a deadline decision. */
 export const DELIVER_STEER = { deliverAs: "steer", triggerTurn: true } as const;
-/** Queue the message behind the current turn as a PASSIVE follow-up. The agent
- *  picks it up on its next natural turn (when the user re-engages or the
- *  current turn ends) but it does NOT spawn a new turn on its own. Monitor
- *  stream events are informational and never force an unsolicited
+/** Append the message to the transcript PASSIVELY: it never wakes the agent and
+ *  never queues work. The agent reads it on its next natural turn. Monitor
+ *  stream events are informational and must not force an unsolicited
  *  acknowledgment or starve user input.
- *  NOTE: sendMessage-only — `pi.sendUserMessage` rejects `triggerTurn` and
- *  takes just `{ deliverAs: "followUp" }`. */
-export const DELIVER_FOLLOWUP = { deliverAs: "followUp", triggerTurn: false } as const;
+ *
+ *  What pi actually does with this (agent-session.ts sendCustomMessage): with
+ *  `triggerTurn: false` the steer/followUp queue branch is skipped entirely, so
+ *  `deliverAs` is never read — an idle agent gets the message appended and
+ *  rendered immediately, and a streaming one gets it appended when the agent
+ *  run settles. The field stays for shape compatibility; the name of this
+ *  constant describes the effect, because the previous name (DELIVER_FOLLOWUP)
+ *  named a queue this never reaches. */
+export const DELIVER_PASSIVE = { deliverAs: "followUp", triggerTurn: false } as const;
 
 // --- UI context ---
 export interface UiContext {

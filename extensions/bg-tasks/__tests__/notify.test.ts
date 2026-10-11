@@ -154,7 +154,7 @@ void describe("completionSummary — CC's exact strings", () => {
         );
         assert.equal(
             completionSummary(mkJob({ ...base, status: "failed", exitCode: 2 })),
-            `Monitor "API health" script failed (exit 2)`
+            `Monitor "API health" failed (exit 2)`
         );
         assert.equal(
             completionSummary(mkJob({ ...base, status: "killed" })),

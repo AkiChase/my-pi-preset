@@ -48,9 +48,29 @@ export interface BgTasksConfig {
     monitorMaxTimeoutMs: number;
     /** Monitor poll cadence; doubles as the event batch window. */
     monitorPollMs: number;
+    /**
+     * Coalescing window for stream events. The follower's poll tick batches
+     * lines that land together, but at one line per tick a 10-minute watch
+     * still produced ~600 separate messages, each repeating its own header.
+     * The first line after a quiet period is emitted immediately; everything
+     * within this window after it goes out as one message at the window's end.
+     */
+    monitorFlushMs: number;
+    /** Lines in a single emitted event; the excess is counted as suppressed. */
+    monitorMaxLinesPerEvent: number;
     monitorRateWindowMs: number;
-    /** Emitted lines per window before a monitor is auto-stopped. */
+    /**
+     * Lines per window before a monitor stops emitting content and starts
+     * reporting a suppressed count instead. It keeps running — the full output
+     * is on disk either way.
+     */
     monitorMaxLinesPerWindow: number;
+    /**
+     * Consecutive over-budget windows before the monitor is killed outright. A
+     * single burst is a burst; sustained overflow is a filter that does not
+     * work, and only that deserves losing the watch.
+     */
+    monitorMaxOverflowWindows: number;
     shortcutBackground: ShortcutBinding;
     shortcutTaskPanel: ShortcutBinding;
     shortcutKillLatest: ShortcutBinding;
@@ -73,8 +93,15 @@ export const DEFAULTS: BgTasksConfig = Object.freeze({
     monitorDefaultTimeoutMs: 300_000,
     monitorMaxTimeoutMs: 3_600_000,
     monitorPollMs: 200,
+    // 2s: these events never wake the agent (they are appended passively and
+    // read at its next turn), so a longer window costs the model nothing and
+    // cuts the message count proportionally. The leading-edge emit keeps the
+    // "something is happening" signal instant for whoever is watching.
+    monitorFlushMs: 2_000,
+    monitorMaxLinesPerEvent: 50,
     monitorRateWindowMs: 10_000,
     monitorMaxLinesPerWindow: 500,
+    monitorMaxOverflowWindows: 3,
     shortcutBackground: Object.freeze(["ctrl+shift+b"]),
     shortcutTaskPanel: Object.freeze(["ctrl+shift+j", "shift+down"]),
     shortcutKillLatest: Object.freeze(["ctrl+shift+x"]),
@@ -107,8 +134,11 @@ const NUMERIC_BOUNDS: Record<NumericKey, { min: number; max: number }> = {
     monitorDefaultTimeoutMs: { min: 1_000, max: 24 * 3_600_000 },
     monitorMaxTimeoutMs: { min: 1_000, max: 24 * 3_600_000 },
     monitorPollMs: { min: 20, max: 60_000 },
+    monitorFlushMs: { min: 0, max: 600_000 },
+    monitorMaxLinesPerEvent: { min: 1, max: 100_000 },
     monitorRateWindowMs: { min: 500, max: 600_000 },
     monitorMaxLinesPerWindow: { min: 1, max: 1_000_000 },
+    monitorMaxOverflowWindows: { min: 1, max: 1_000 },
 };
 
 const SHORTCUT_KEYS: readonly ShortcutKey[] = [
