@@ -2,11 +2,11 @@
 
 个人 [pi](https://pi.dev) 配置预设。
 
-内容很简单：一份包清单，一个同步脚本，几个自己写的扩展。在新机器上跑一条命令，pi 就装成我平时用的样子：第三方扩展备齐，自定义状态栏就位，几个扩展之间的冲突也已经处理掉。
+内容很简单：一份清单，一个同步脚本，几个自己写的扩展。在新机器上跑一条命令，pi 就装成我平时用的样子：第三方扩展备齐，自定义状态栏就位，几个扩展之间的冲突也已经处理掉，pi 本体的几个偏好和键位也一并对齐。
 
-- 清单：[`pi-packages.json`](pi-packages.json)，记录要装哪些包、装什么版本、哪些包不能装
+- 清单：[`pi-preset.json`](pi-preset.json)，记录要装哪些包、装什么版本、哪些包不能装，以及哪些 pi 设置和键位由本仓库说了算
 - 同步：[`install.sh`](install.sh) 和 [`scripts/sync.mjs`](scripts/sync.mjs)，负责把本机状态对齐到清单
-- 扩展：[`extensions/`](extensions)，本仓库自带的三个扩展，pi 安装本仓库时会自动发现
+- 扩展：[`extensions/`](extensions)，本仓库自带的四个扩展，pi 安装本仓库时会自动发现
 
 本仓库自己也是清单里的一条（`git:github.com/AkiChase/my-pi-preset`），和其他包一样被 pi 管理和更新。
 
@@ -32,14 +32,32 @@ curl -fsSL https://raw.githubusercontent.com/AkiChase/my-pi-preset/main/install.
 
 前提是机器上有 `pi`、`node`、`curl`。装完后在 pi 里 `/reload`，或者重启 pi。
 
+清单文件从 `pi-packages.json` 改名成了 `pi-preset.json`。本地还是老检出、或者手里存了老 `install.sh` 的机器上，它会去下一个已经不存在的文件并报 `could not download pi-packages.json`；`git pull` 或者重跑上面那条 curl 命令即可。
+
 ### 命令行选项
+
+同步分三个域：`packages`（走 `pi install` / `pi update` / `pi remove`）、`settings`（写 `~/.pi/agent/settings.json`）、`keybindings`（写 `~/.pi/agent/keybindings.json`）。每个域可以单独选，选中的域各自跑在两种模式之一。
 
 | 选项 | 作用 |
 | --- | --- |
+| `--sync <域>` | 要对齐哪些域，逗号分隔，可写 `all` / `none`，默认 `all` |
+| `--prune [<域>]` | 哪些域完全以清单为准，默认 `none`；裸写 `--prune` 或 `--prune all` 等于「`--sync` 选中的全部域」 |
 | `--dry-run` | 只打印计划，不做任何改动 |
-| `--prune` | 以清单为准，删掉清单里没有的包 |
 
-默认是合并模式：某台机器上临时 `pi install` 的包会保留。加上 `--prune` 之后，清单就是全集。脚本只管理用户级包，项目 `.pi/settings.json` 里的包不受影响。
+```sh
+./install.sh                             # 三个域全同步，全 merge
+./install.sh --sync settings             # 只对齐设置，不碰包
+./install.sh --prune packages            # 包以清单为准，配置仍是 merge
+./install.sh --prune                     # 三个域都以清单为准
+./install.sh --sync packages,settings --dry-run
+```
+
+两种模式：
+
+- **merge**（默认）：只对齐清单声明的那些条目，清单没提的一律不动。某台机器上临时 `pi install` 的包会保留，手改的其它设置键也会保留。
+- **prune**：那个域里清单就是全集 —— 没声明的包卸掉、没声明的设置键和键位删掉。例外是 `preserve` 白名单和 pi 自己维护的 `packages` / `lastChangelogVersion`，细节见 [声明设置和键位](#声明设置和键位)。
+
+`--prune` 里写了 `--sync` 没选的域会直接报错，不会静默忽略。脚本只管用户级的包和 agent 目录下的配置，项目 `.pi/` 里的东西不受影响。
 
 ### 用哪个 pi
 
@@ -54,7 +72,8 @@ PI_BIN=/path/to/pi ./install.sh
 ```sh
 pi update --extensions   # 更新本仓库的扩展，以及已装的包
 ./install.sh             # 清单改过之后，把这台机器对齐过去
-./install.sh --prune     # 顺手清掉清单外的包
+./install.sh --sync settings  # 只把设置对齐过去
+./install.sh --prune     # 顺手清掉清单外的包、设置键和键位
 ```
 
 pi 里只有一个本仓库自带的命令：`/statusbar`，在自定义状态栏和 pi 内置 footer 之间切换。其余扩展各自的命令、快捷键和配置文件，都在下面两节里。
@@ -75,9 +94,11 @@ pi 里只有一个本仓库自带的命令：`/statusbar`，在自定义状态�
 | [`pi-patty-bg-tasks`](#npmpi-patty-bg-tasks) | 后台任务：长命令不阻塞会话 | `~/.pi/agent/bg-tasks.json` | `ctrl+shift+b` 等，可改 |
 | [`@heyhuynhgiabuu/pi-pretty`](#npmheyhuynhgiabuupi-pretty) | 终端输出美化 | `~/.pi/agent/pi-pretty.json` | 无 |
 
-前七个是普通依赖，由 pi 从 npm 安装，来源写在 [`pi-packages.json`](pi-packages.json) 的 `packages` 里，本仓库不动它们的代码。
+前七个是普通依赖，由 pi 从 npm 安装，来源写在 [`pi-preset.json`](pi-preset.json) 的 `packages` 里，本仓库不动它们的代码。
 
 后两个（patty 和 pretty）比较特殊：它们以本仓库 npm 依赖的形式引入（见 [`package.json`](package.json)），由 `extensions/bash-unified.ts` 亲自加载，所以也被写进了清单的 `conflicts`，**不能**再当成普通 pi 包安装。否则 `bash` 这个工具会被注册两次，pi 直接报冲突、启动失败。
+
+除了包，清单还声明了 pi 本体的几个偏好：失败重试次数 `retry.maxRetries: 5`，以及把 `app.session.rename`（`ctrl+r`）和 `tui.editor.jumpForward`（`ctrl+]`）这两个被扩展抢走的内置键禁掉。格式和语义见 [声明设置和键位](#声明设置和键位)，键位这两条的来由见 [键位冲突](#键位冲突)。
 
 ### 第三方包
 
@@ -304,6 +325,24 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 
 **做了什么更改**：包住 `fetch`，把 `text/event-stream` 响应体统一成 LF 换行（末尾的 `\r` 会留到下一个字节再判定），并丢掉没有 `data:` 行的空帧。用 `Symbol.for` 记住原始 `fetch`，重复加载不会套娃。这样处理之后，被截断的流会表现为 pi 可以自动重试的 `stream ended before message_stop`，而不是一条作废的回答。
 
+#### `extensions/blocked-signal.ts` —— 告诉终端复用器「在等你」
+
+**要解决的问题**：扩展弹对话框时 pi 的这一轮还没结束，`agent_settled` 不会触发，于是所有盯着它的集成都以为 pi 还在干活。最难受的是 `ask_user_question`：问卷能在那儿挂几分钟，herdr 面板一直是 Working，cmux 也不弹通知，人在别的窗口根本不知道该回来了。
+
+pi 自己其实把信号发出来了 —— `ui_prompt_start` / `ui_prompt_end` 包住每一次阻塞式 `ctx.ui.*`（select / confirm / input / editor / custom），而且只对最外层那一次发，一进一出严格配对。问题在两边的集成都没订阅它：
+
+- herdr（0.9.1，装在 `~/.pi/agent/extensions/herdr-agent-state.ts` 的集成是第 9 版）只在**别的**扩展往 pi 事件总线上发 `herdr:blocked` 时才报 blocked，而没有任何扩展会发。它给另一个 agent 写的同类集成（`HERDR_INTEGRATION_ID=omp`，第 10 版）是直接订阅那个 agent 的 approval / ask 事件的，所以这更像是 pi 这份集成没跟上。
+- cmux（0.65.0）在它生成的 `~/.pi/agent/extensions/cmux-session.ts` 里给 `ui.confirm`、`ui.select`、`ui.input` 打了猴补丁来发 `questionAsked` 钩子，偏偏漏了 `ui.custom` 和 `ui.editor` —— 问卷正是用 `ui.custom` 画的。
+
+**做了什么更改**：订阅那对事件，转发给两个 sink，各自只在自己宿主的环境变量齐备时才启用（都不在就直接返回，不留任何监听）：
+
+- **herdr**：发 `herdr:blocked`，`{ active: true, label }` 进、`{ active: false }` 出。herdr 那边自己计数，所以每个 `true` 必须配一个 `false`，中途 `/reload`、`session_shutdown` 都做了兜底。面板因此变成 Blocked，`herdr agent wait --until blocked` 也能停住了。
+- **cmux**：cmux 没有公开接口去改面板状态，所以走文档里的 `cmux notify`（横幅 + 侧栏徽标 + 面板高亮），答完再按 id `cmux dismiss-notification` 撤掉，不用 `notify --clear`，免得连带清掉别人的通知。只对 cmux 自己没补的 `custom` 和 `editor` 发，不重复打扰；`CMUX_PI_HOOKS_DISABLED=1` 这个它自己的开关也认。面板状态仍然属于 cmux 自己那份集成（装法 `cmux hooks pi install`，注意 `PATH` 里要让 cmux 的 `pi` shim 排在前面才会自动注入）。
+
+标签尽量给得有意义：有 `title` 就用 `title`；问卷没有 `title`，所以额外听一条 `rpiv:ask-user:prompt`（只认频道名，不 import 那个包），拿第一题的 header 当标签，比如 `Auth method (+1)`；都没有就退回按种类写死的一句话。
+
+**没做的事**：pi 自己的 OSC 7501 program status 没有补。pi 对 select / confirm / input / editor 会报 `blocked`，对 `ctx.ui.custom()` 不报（1.1.0 的 `showExtensionCustom` 没调 `programStatus.setBlocked`），这是上游的坑；而 herdr 0.9.1 和 cmux 0.65.0 都不读这个协议，绕它没有收益。
+
 ## 配置扩展
 
 每个扩展自己的配置细节已经写在上面各小节里了，这里只汇总文件位置，再讲两条通用规则。
@@ -312,8 +351,8 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 
 | 文件 | 归属 |
 | --- | --- |
-| `~/.pi/agent/settings.json` | pi 本体。主题、默认 provider 和模型、已装包清单。`packages` 由 pi 维护，别手改 |
-| `~/.pi/agent/keybindings.json` | pi 本体的键位，格式见下 |
+| `~/.pi/agent/settings.json` | pi 本体。主题、默认 provider 和模型、已装包清单。`packages` 由 pi 维护，别手改；被清单声明的键由本仓库维护，见 [声明设置和键位](#声明设置和键位) |
+| `~/.pi/agent/keybindings.json` | pi 本体的键位，格式见下；被清单声明的动作 id 由本仓库维护 |
 | `~/.pi/agent/models.json` | provider 和模型定义，以及 compat 键。`pi-cache-optimizer` 的 `⚠️ compat` 指这里 |
 | `~/.pi/agent/pi-cache-optimizer-config.json` | `pi-cache-optimizer` |
 | `~/.pi/agent/pi-input-history.json` | `pi-input-history`，只存快捷键 |
@@ -322,7 +361,8 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 | `~/.pi/agent/subagents.json`、`<项目>/.pi/subagents.json` | `@tintinweb/pi-subagents`，项目覆盖全局 |
 | `~/.config/rpiv-ask-user-question/config.json` | `@juicesharp/rpiv-ask-user-question`，走 `XDG_CONFIG_HOME`，不在 agent 目录下 |
 | `~/.pi/agent/memory/` | `pi-memory` 的数据目录（不是配置），可用 `PI_MEMORY_DIR` 改写；配置只有 `PI_MEMORY_*` 环境变量 |
-| 无 | `pi-session-name` 和 `pi-patty-bg-tasks` 全部硬编码，没有任何配置入口 |
+| `~/.pi/agent/bg-tasks.json` | `pi-patty-bg-tasks`（本仓库代为加载），超时、并发、日志目录、快捷键。所有键也能用 `BG_TASKS_*` 环境变量覆盖 |
+| 无 | `pi-session-name` 全部硬编码，没有任何配置入口 |
 
 `~/.pi/agent` 这个 agent 目录可以用 `PI_CODING_AGENT_DIR` 改写，上面带这个前缀的路径都会跟着走。改完文件之后在 pi 里 `/reload`；少数影响工具 schema 的键（见 pi-subagents 那节）要重启 pi。
 
@@ -354,16 +394,18 @@ pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDING
 
 | 扩展键 | 撞上 | 结果 | 怎么处理 |
 | --- | --- | --- | --- |
-| `ctrl+r`（input-history 反向搜索） | `app.session.rename`（`ctrl+r`） | 扩展赢，rename 按不出来 | 二选一：把扩展的 `searchShortcut` 改成别的（如 `alt+r`），或改 `keybindings.json` 的 `app.session.rename` |
-| `ctrl+]`（ask-user-question 折叠浮层） | `tui.editor.jumpForward`（`ctrl+]`） | 扩展赢 | 改它的 `collapseKey`（或设 `"off"`），或把 `tui.editor.jumpForward` 挪走 |
+| `ctrl+r`（input-history 反向搜索） | `app.session.rename`（`ctrl+r`） | 扩展赢，rename 按不出来 | 已处理：清单把 `app.session.rename` 设成 `[]` 禁掉，重命名改用 `/name` |
+| `ctrl+]`（ask-user-question 折叠浮层） | `tui.editor.jumpForward`（`ctrl+]`） | 扩展赢 | 已处理：清单把 `tui.editor.jumpForward` 设成 `[]` 禁掉 |
+
+两行的「已处理」指的是 [`pi-preset.json`](pi-preset.json) 的 `keybindings` 里那两条空数组。扩展的键本来就会赢，把被抢走的内置动作显式禁掉，图的是启动时不再报那条冲突 warning、以后也不会以为这两个内置键还能用。不想这样就把清单里那两条改成别的键，或者改成 `null` 让它从所有机器上消失。
 
 `pi-web-access` 的 `ctrl+shift+s` / `ctrl+shift+w`，以及 patty 的 `ctrl+shift+b` / `ctrl+shift+j` / `shift+down` / `ctrl+shift+x`，目前都没撞上内置动作。patty 刻意没注册 `ctrl+b`：那是内置 `tui.editor.cursorLeft` 的别名，抢过来会在启动时报冲突诊断。patty 这四个键都能在 `bg-tasks.json` 里改或设 `"off"`。
 
-这些配置文件不在本仓库的管理范围内，各自的机器上自己维护。
+除了 `settings.json` 和 `keybindings.json` 里被清单声明的那几个键，其它配置文件都不在本仓库的管理范围内，各自的机器上自己维护。
 
 ## 工作方式
 
-清单的格式是「包来源 → 版本」：
+清单 [`pi-preset.json`](pi-preset.json) 分五段：
 
 ```json
 {
@@ -372,9 +414,16 @@ pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDING
     "npm:pi-session-name": "latest",
     "npm:some-tool": "^2.1.0"
   },
-  "conflicts": ["npm:pi-patty-bg-tasks", "npm:@heyhuynhgiabuu/pi-pretty"]
+  "conflicts": ["npm:pi-patty-bg-tasks", "npm:@heyhuynhgiabuu/pi-pretty"],
+  "settings": { "retry": { "maxRetries": 5 } },
+  "keybindings": { "app.session.rename": [] },
+  "preserve": { "settings": ["theme", "defaultModel"], "keybindings": [] }
 }
 ```
+
+### 包
+
+`packages` 的格式是「包来源 → 版本」：
 
 - `"latest"`（也可以写 `"*"` 或 `""`）跟随最新版本。
 - 像 `"0.1.7"` 这样的精确版本会被钉住，更新时不动它。
@@ -382,7 +431,26 @@ pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDING
 - git 来源的版本写 tag 或 commit，例如 `"v1.2.0"`。
 - `conflicts` 是绝对不能作为 pi 包安装的来源，同步时无论有没有 `--prune` 都会卸掉。同一个来源同时写进 `packages` 和 `conflicts` 会直接报错。
 
-`install.sh` 只做引导：检查 `pi` / `node` / `curl`，拿到清单和同步脚本，然后交给 [`scripts/sync.mjs`](scripts/sync.mjs)。真正的对比和安装都在同步脚本里，它通过 pi 自己的命令（`pi install` / `pi update` / `pi remove`）落地，这样写 `settings.json` 的始终只有 pi。
+### 声明设置和键位
+
+`settings` 跟 `settings.json` 长得一样，但**声明的单位是叶子**：对象递归合并到叶子，数组和标量整体替换。所以下面这段只管 `retry.maxRetries`，本机自己调过的 `retry.baseDelayMs` 不会被动：
+
+```json
+"settings": { "retry": { "maxRetries": 5 } }
+```
+
+几条规则：
+
+- **删除也是声明的一部分**。要把一个键从所有机器上摘掉，不是把它从清单里删掉，而是把值写成 `null`（`"markdown": { "mermaid": null }`）。这条墓碑留在清单里，所有机器同步过一轮后再清掉 —— 也正因为有它，本仓库不需要任何记录「上次改过什么」的状态文件。
+- **设置用嵌套，不用点号路径**。顶层键里带点会报错：`"markdown.mermaid"` 会变成一个 pi 根本不认的键。更深的键允许带点，因为真有（`modelThinkingLevels` 是用 `provider/model-4.1` 这种做键的）。
+- **`keybindings` 是平的**，一个动作 id 就是一个条目，整体替换。`"ctrl+r"` 和 `["ctrl+r"]` 算同一个值，不会因为写法不同而重写文件；`[]` 是「禁用这个动作」这个合法值，`null` 才是墓碑。
+- **`preserve` 只在 prune 模式下有意义**：列进去的路径和它底下的一切即使没声明也不会被删。这是「真·偏好、但每台机器不一样」的键的逃生口，现在里面是 `theme`、`defaultProvider`、`defaultModel`、`defaultThinkingLevel`。`preserve.settings` 的条目是**路径**，所以 `"retry.baseDelayMs"` 的点按层级解析；要保护本身带点的键，写成段数组 `["modelThinkingLevels", "openai/gpt-4.1"]`。`preserve.keybindings` 的条目则是动作 id 原文，不切点号。
+- **`packages` 和 `lastChangelogVersion` 硬保护**：这两个键是 pi 自己在写，无论哪种模式都不碰，写进清单还会报错。
+- 声明和 `preserve` 撞上同一个路径会报错，因为那是两个矛盾的意图。
+
+### 怎么落到本机
+
+`install.sh` 只做引导：检查 `pi` / `node` / `curl`，拿到清单和同步脚本，然后交给 [`scripts/sync.mjs`](scripts/sync.mjs)。包部分通过 pi 自己的命令（`pi install` / `pi update` / `pi remove`）落地，配置部分由同步脚本直接写 agent 目录下的 JSON。
 
 | 情况 | 动作 |
 | --- | --- |
@@ -391,8 +459,20 @@ pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDING
 | 清单里有，但磁盘上已经不见 | 重新安装 |
 | 未固定版本，且已安装 | 更新到最新版 |
 | 固定了精确版本 | 不动 |
-| 本机有，清单里没有 | 保留，除非加了 `--prune` |
-| 本机有，且在 `conflicts` 里 | 卸载（合并模式下也会卸） |
+| 本机有包，清单里没有 | 保留，除非该域在 `--prune` 里 |
+| 本机有包，且在 `conflicts` 里 | 卸载（merge 模式下也会卸） |
+| 声明了设置键，本机值不同或缺失 | 写成声明的值 |
+| 声明了设置键，本机值已一致 | 不动，也不重写文件 |
+| 声明成 `null` | 从本机删掉（本来就没有就什么都不做） |
+| 本机有设置键或键位，清单没声明 | 保留，除非该域在 `--prune` 里且没被 `preserve` 盖住 |
+
+写配置文件时的几个细节：
+
+- 先跑包，再写配置，并且**写之前重新读一遍文件**。`pi install` 会把 `packages` 写进 `settings.json`，按路径打补丁而不是整文件覆盖，才不会把它刚写的东西抹掉。
+- 保留现有键的顺序，新键追加到末尾；格式跟 pi 自己写的一致（两空格缩进、末尾不加换行）；内容没变就不动文件。先写临时文件再 `rename`，不会留下写到一半的 JSON。
+- 写 `settings.json` 前会拿 pi 用的那把锁（`settings.json.lock` 目录，pi 1.1.0 用 proper-lockfile 做的就是这个），所以跟正在跑的 pi 互斥。超过 10 秒的锁当残留处理。
+- 目标文件存在但 JSON 坏了就报错退出，绝不覆盖 —— 那更像是一个改到一半的手改，不是该扔掉的东西。
+- 改完在 pi 里 `/reload`。pi 正在跑的时候同步也不会丢：它存盘时也是重读文件、只合并自己改过的字段（`persistScopedSettings`）。真正会输的情况是同一个字段两边都在改。
 
 两个脚本都按步骤把日志打到 stderr，网络慢或被拦截时能看出卡在哪，不会像假死一样没有输出；`--dry-run` 的结果仍可直接管道给别的命令。每次调用 pi 最多等 10 分钟，超时只针对那个包报错。
 
@@ -400,11 +480,11 @@ pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDING
 
 放进 `extensions/` 即可，可以是单个文件（`extensions/foo.ts`），也可以是带入口的目录（`extensions/foo/index.ts`）。pi 会自动发现，不需要构建步骤。改完跑一遍 `pnpm check`，顺手更新 README 里对应的小节（这件事写进了 [`AGENTS.md`](AGENTS.md)），提交推送后，在其它机器上跑 `pi update --extensions`。
 
-扩展要用第三方 npm 包时，把它写进本仓库 `package.json` 的 `dependencies`：pi 安装 git 来源的包时会在检出目录里装一遍运行时依赖。要是这个包本身也是个 pi 扩展（像上面的 patty 和 pretty），记得同时把它加进 `pi-packages.json` 的 `conflicts`，否则两边会各注册一遍。
+扩展要用第三方 npm 包时，把它写进本仓库 `package.json` 的 `dependencies`：pi 安装 git 来源的包时会在检出目录里装一遍运行时依赖。要是这个包本身也是个 pi 扩展（像上面的 patty 和 pretty），记得同时把它加进 `pi-preset.json` 的 `conflicts`，否则两边会各注册一遍。
 
 ## 添加第三方包
 
-1. 把来源和想要的版本写进 `pi-packages.json`。
+1. 把来源和想要的版本写进 `pi-preset.json` 的 `packages`。
 2. 提交并推送。
 3. 在每台机器上跑 `./install.sh`；或者在需要的地方先 `pi install`，下次同步时会保留下来。
 
@@ -420,7 +500,7 @@ pnpm test               # 只跑 node --test
 ./install.sh --dry-run  # 看看这台机器缺什么
 ```
 
-测试用 `node --test`，没有第三方框架。全部测试都不联网、不碰 `~/.pi`：`scripts/sync.test.mjs` 会在 `PATH` 里放一个假的 `pi`。
+测试用 `node --test`，没有第三方框架。全部测试都不联网、不碰 `~/.pi`：`scripts/sync.test.mjs` 会在 `PATH` 里放一个假的 `pi`，并把 `PI_CODING_AGENT_DIR` 指到一个临时目录，所以配置读写都发生在那里。
 
 扩展 import 的 `@earendil-works/*`（pi 自己的 SDK）是 peer 依赖，运行时由 pi 提供，所以不装。类型检查和测试前会先跑 [`scripts/link-pi-sdk.mjs`](scripts/link-pi-sdk.mjs)，它在本机 pi 安装里找到这套 SDK 并软链进 `node_modules/`——类型因此永远对着真正加载这些代码的那个 pi 版本。`pnpm install` 之后链接可能被清掉，跑 `pnpm link-sdk` 重建即可；pi 装在别处时用 `PI_SDK_DIR` 或 `PI_BIN` 指过去。
 

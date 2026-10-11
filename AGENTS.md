@@ -4,8 +4,8 @@
 
 | 路径 | 作用 |
 | --- | --- |
-| `pi-packages.json` | 包清单：`packages` 要装的，`conflicts` 不能当 pi 包装的 |
-| `install.sh` + `scripts/sync.mjs` | 把本机对齐到清单 |
+| `pi-preset.json` | 清单：`packages` 要装的，`conflicts` 不能当 pi 包装的，`settings` / `keybindings` 要对齐的 pi 配置，`preserve` prune 时也不动的键 |
+| `install.sh` + `scripts/sync.mjs` | 把本机对齐到清单（三个域：packages / settings / keybindings） |
 | `extensions/` | 自带扩展，pi 自动发现 |
 | `local/` | 本机草稿：计划、笔记、临时脚本。**已 gitignore**，不进仓库，也别在这里放代码 |
 | `README.md` | 面向使用者的全部文档 |
@@ -18,8 +18,9 @@
 | 扩展的行为/命令/键位/配置 | 对应扩展小节；涉及键位看「键位冲突」 |
 | `packages` | 「这里有什么」总表 + 「第三方包」 |
 | `conflicts` / 改为本仓库代为加载 | 「由本仓库代为加载的包」 |
+| `settings` / `keybindings` / `preserve` | 「这里有什么」的清单声明段 + 「声明设置和键位」；改键位还要看「键位冲突」 |
 | `sync.mjs` 同步语义 | 「工作方式」的情况→动作表 |
-| `install.sh` 选项 | 「安装」「命令行选项」 |
+| `install.sh` / `sync.mjs` 选项 | 「安装」「命令行选项」 |
 | 新增脚本或检查手段 | 「开发」+ 本文件 |
 
 vendor 进来的第三方代码（如 `extensions/bg-tasks/`）留 PROVENANCE 说明来源与版本；之后就是本仓库的代码，直接改，不往上游合。
@@ -31,6 +32,7 @@ pnpm install            # 开发依赖
 pnpm check              # typecheck + test，提交前跑
 pnpm link-sdk           # 重建 pi SDK 软链（pnpm install 后可能需要）
 ./install.sh --dry-run
+./install.sh --sync settings --dry-run   # 只看配置会怎么变
 ```
 
 用 pnpm，不要 `package-lock.json`。别人机器上的运行时依赖由 pi 用它自己的包管理器（默认 npm）安装，不读 `pnpm-lock.yaml`：`dependencies` 保持宽松范围，`devDependencies` 不会装到那些机器上。

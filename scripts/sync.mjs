@@ -1,14 +1,24 @@
 #!/usr/bin/env node
-// Reconcile the pi packages declared in pi-packages.json with the packages
-// currently installed for the user. Changes are applied through the `pi` CLI
-// (`pi install` / `pi update` / `pi remove`) so pi stays the only writer of its
-// own settings.
+// Reconcile this machine with the preset declared in pi-preset.json.
+//
+// Three domains, each selected independently and each running in one of two
+// modes:
+//
+//   packages     -> `pi install` / `pi update` / `pi remove`
+//   settings     -> <agent-dir>/settings.json
+//   keybindings  -> <agent-dir>/keybindings.json
+//
+//   merge (default)  only the declared entries are aligned; anything the
+//                    manifest does not mention is left alone. A declared
+//                    `null` is the only way to remove something.
+//   prune            the manifest is the whole truth for that domain; entries
+//                    it does not declare are removed.
 //
 // Usage:
-//   node scripts/sync.mjs [--manifest <path>] [--prune] [--dry-run]
+//   node scripts/sync.mjs [--manifest <path>] [--sync <domains>] [--prune [<domains>]] [--dry-run]
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, rmdirSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,6 +28,17 @@ const UNPINNED = new Set(["", "*", "latest"]);
 const ANSI = /\u001B\[[0-9;]*m/g;
 const COMMAND_TIMEOUT_MS = 10 * 60 * 1000;
 
+const DOMAINS = ["packages", "settings", "keybindings"];
+
+// pi owns these two keys in settings.json: `packages` is maintained by
+// `pi install` / `pi remove`, `lastChangelogVersion` is pi's own state. They
+// can be neither declared nor pruned.
+const PI_OWNED_SETTINGS = new Set(["packages", "lastChangelogVersion"]);
+
+function resolveAgentDir() {
+  return process.env.PI_CODING_AGENT_DIR?.trim() || join(homedir(), ".pi", "agent");
+}
+
 // A tool shim (a terminal app's launcher, for example) can sit earlier on PATH
 // than pi itself and hijack these calls. Prefer an explicit path when one is
 // known, so package commands always reach the real pi.
@@ -25,8 +46,7 @@ function resolvePiCommand() {
   const fromEnv = process.env.PI_BIN?.trim();
   if (fromEnv) return fromEnv;
 
-  const agentDir = process.env.PI_CODING_AGENT_DIR?.trim() || join(homedir(), ".pi", "agent");
-  const managed = join(agentDir, "bin", "pi");
+  const managed = join(resolveAgentDir(), "bin", "pi");
   if (existsSync(managed)) return managed;
 
   return "pi";
@@ -42,12 +62,241 @@ function fail(message) {
 }
 
 // Progress goes to stderr so `--dry-run` output stays pipeable on stdout.
-function step(n, total, message) {
-  console.error(total ? `[${n}/${total}] ${message}` : `[${n}] ${message}`);
+let stepNumber = 0;
+function step(message, total) {
+  stepNumber += 1;
+  console.error(total ? `[${stepNumber}/${total}] ${message}` : `[${stepNumber}] ${message}`);
 }
 
 function info(message) {
   console.error(`  ${message}`);
+}
+
+function isPlainObject(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function deepEqual(a, b) {
+  if (a === b) return true;
+  if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) return a.length === b.length && a.every((item, index) => deepEqual(item, b[index]));
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((key) => Object.hasOwn(b, key) && deepEqual(a[key], b[key]));
+}
+
+// ---------------------------------------------------------------------------
+// Key paths
+//
+// A settings path is a list of segments. The dotted string form is just a
+// convenience: some real setting keys contain dots (`modelThinkingLevels` is
+// keyed by `provider/model-4.1`), so those must be written as an explicit
+// segment array instead.
+// ---------------------------------------------------------------------------
+
+function splitPath(value, label) {
+  if (Array.isArray(value)) {
+    if (value.length === 0 || !value.every((segment) => typeof segment === "string" && segment.length > 0)) {
+      fail(`${label} must be a non-empty array of non-empty strings`);
+    }
+    return value;
+  }
+  if (typeof value !== "string" || value.length === 0) {
+    fail(`${label} must be a key path, either "a.b" or ["a", "b"]`);
+  }
+  const segments = value.split(".");
+  if (segments.some((segment) => segment.length === 0)) fail(`${label} has an empty path segment: "${value}"`);
+  return segments;
+}
+
+function formatPath(segments) {
+  return segments.join(".");
+}
+
+function isPrefix(shorter, longer) {
+  return shorter.length <= longer.length && shorter.every((segment, index) => segment === longer[index]);
+}
+
+function overlaps(a, b) {
+  return isPrefix(a, b) || isPrefix(b, a);
+}
+
+function getPath(root, segments) {
+  let node = root;
+  for (const segment of segments) {
+    if (!isPlainObject(node) || !Object.hasOwn(node, segment)) return { found: false, value: undefined };
+    node = node[segment];
+  }
+  return { found: true, value: node };
+}
+
+function setPath(root, segments, value) {
+  let node = root;
+  for (const segment of segments.slice(0, -1)) {
+    // A scalar standing where an object is needed is replaced, which is what
+    // declaring a deeper path under it asks for.
+    if (!isPlainObject(node[segment])) node[segment] = {};
+    node = node[segment];
+  }
+  node[segments[segments.length - 1]] = value;
+}
+
+function unsetPath(root, segments) {
+  const chain = [];
+  let node = root;
+  for (const segment of segments.slice(0, -1)) {
+    if (!isPlainObject(node) || !Object.hasOwn(node, segment)) return false;
+    chain.push([node, segment]);
+    node = node[segment];
+  }
+  const last = segments[segments.length - 1];
+  if (!isPlainObject(node) || !Object.hasOwn(node, last)) return false;
+  delete node[last];
+  // A section left empty by the removal is removed too, so pruning does not
+  // leave `"retry": {}` behind.
+  for (let index = chain.length - 1; index >= 0; index -= 1) {
+    const [parent, key] = chain[index];
+    if (isPlainObject(parent[key]) && Object.keys(parent[key]).length === 0) delete parent[key];
+    else break;
+  }
+  return true;
+}
+
+// Walk to the leaves. Arrays and scalars are leaves, so they are always
+// replaced whole. `emptyObjectsAreLeaves` is on for the machine's file, where a
+// leftover empty section is something prune should clean up, and off for the
+// manifest, where `"retry": {}` declares nothing.
+function leafEntries(root, { emptyObjectsAreLeaves }) {
+  const entries = [];
+  const walk = (node, prefix) => {
+    for (const [key, value] of Object.entries(node)) {
+      const path = [...prefix, key];
+      if (isPlainObject(value) && (Object.keys(value).length > 0 || !emptyObjectsAreLeaves)) walk(value, path);
+      else entries.push({ path, value });
+    }
+  };
+  walk(root, []);
+  return entries;
+}
+
+// ---------------------------------------------------------------------------
+// Manifest
+// ---------------------------------------------------------------------------
+
+function readManifest(path) {
+  step(`reading manifest ${path}`);
+  let raw;
+  try {
+    raw = readFileSync(path, "utf8");
+  } catch (error) {
+    fail(`cannot read manifest ${path}: ${error.message}`);
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    fail(`manifest ${path} is not valid JSON: ${error.message}`);
+  }
+
+  const packages = parsed?.packages;
+  if (!packages || !isPlainObject(packages)) {
+    fail(`manifest ${path} must have an object "packages" field`);
+  }
+
+  const entries = Object.entries(packages).map(([source, version]) => {
+    if (/^-/.test(source) || !(NPM_SOURCE.test(source) || GIT_SOURCE.test(source))) {
+      fail(`unsupported source "${source}": use "npm:<name>" or "git:<host>/<path>"`);
+    }
+    const value = String(version ?? "").trim();
+    if (/^-/.test(value) || /\s/.test(value)) {
+      fail(`invalid version "${value}" for "${source}"`);
+    }
+    return UNPINNED.has(value) ? source : `${source}@${value}`;
+  });
+
+  const rawConflicts = parsed?.conflicts ?? [];
+  if (!Array.isArray(rawConflicts)) {
+    fail(`manifest ${path} field "conflicts" must be an array of sources`);
+  }
+  const conflicts = rawConflicts.map((source) => {
+    if (typeof source !== "string" || !(NPM_SOURCE.test(source) || GIT_SOURCE.test(source))) {
+      fail(`unsupported conflict source "${source}": use "npm:<name>" or "git:<host>/<path>"`);
+    }
+    if (entries.some((entry) => identityOf(entry) === identityOf(source))) {
+      fail(`"${source}" is listed in both "packages" and "conflicts"`);
+    }
+    return source;
+  });
+
+  const settings = parsed?.settings ?? {};
+  if (!isPlainObject(settings)) fail(`manifest ${path} field "settings" must be an object`);
+  // The settings block mirrors settings.json, so nesting is the only way to go
+  // deeper. A dot in a top-level key would silently create a key pi ignores.
+  // Deeper keys may contain dots, because real ones do (`modelThinkingLevels`
+  // is keyed by `provider/model-4.1`).
+  for (const key of Object.keys(settings)) {
+    if (key.includes(".")) {
+      fail(`"settings.${key}" looks like a path; nest objects instead: {"${key.split(".")[0]}": {"${key.split(".").slice(1).join(".")}": …}}`);
+    }
+  }
+  const declaredSettings = leafEntries(settings, { emptyObjectsAreLeaves: false });
+  for (const entry of declaredSettings) {
+    if (PI_OWNED_SETTINGS.has(entry.path[0])) {
+      fail(`"settings.${formatPath(entry.path)}" is maintained by pi itself and cannot be declared`);
+    }
+  }
+
+  const keybindings = parsed?.keybindings ?? {};
+  if (!isPlainObject(keybindings)) fail(`manifest ${path} field "keybindings" must be an object`);
+  for (const [action, value] of Object.entries(keybindings)) {
+    const ok =
+      value === null ||
+      (typeof value === "string" && value.length > 0) ||
+      (Array.isArray(value) && value.every((key) => typeof key === "string" && key.length > 0));
+    if (!ok) fail(`keybinding "${action}" must be a key, an array of keys, [] to disable, or null to drop it`);
+  }
+  const declaredKeybindings = Object.entries(keybindings).map(([action, value]) => ({ path: [action], value }));
+
+  const rawPreserve = parsed?.preserve ?? {};
+  if (!isPlainObject(rawPreserve)) {
+    fail(`manifest ${path} field "preserve" must be an object with "settings" and/or "keybindings" arrays`);
+  }
+  for (const key of Object.keys(rawPreserve)) {
+    if (key !== "settings" && key !== "keybindings") {
+      fail(`"preserve.${key}" is not a domain; use "settings" or "keybindings"`);
+    }
+  }
+  const preserve = { settings: [], keybindings: [] };
+  for (const domain of ["settings", "keybindings"]) {
+    const list = rawPreserve[domain] ?? [];
+    if (!Array.isArray(list)) fail(`"preserve.${domain}" must be an array`);
+    preserve[domain] = list.map((value, index) => {
+      // keybindings.json is flat and its action ids contain dots, so an entry
+      // there is one literal key, never a dotted path.
+      if (domain === "keybindings") {
+        if (typeof value !== "string" || value.length === 0) fail(`"preserve.keybindings[${index}]" must be an action id`);
+        return [value];
+      }
+      return splitPath(value, `"preserve.settings[${index}]"`);
+    });
+  }
+  for (const entry of preserve.settings) {
+    if (PI_OWNED_SETTINGS.has(entry[0])) continue; // already protected, harmless to list
+    const clash = declaredSettings.find((declared) => overlaps(entry, declared.path));
+    if (clash) fail(`"${formatPath(entry)}" is both declared in "settings" and listed in "preserve.settings"`);
+  }
+  for (const entry of preserve.keybindings) {
+    if (declaredKeybindings.some((declared) => declared.path[0] === entry[0])) {
+      fail(`"${entry[0]}" is both declared in "keybindings" and listed in "preserve.keybindings"`);
+    }
+  }
+
+  info(`${entries.length} packages declared: ${entries.join(", ")}`);
+  if (conflicts.length > 0) info(`${conflicts.length} must not be installed: ${conflicts.join(", ")}`);
+  info(`${declaredSettings.length} settings key(s) declared, ${declaredKeybindings.length} keybinding(s) declared`);
+
+  return { desired: entries, conflicts, declaredSettings, declaredKeybindings, preserve };
 }
 
 // "npm:@scope/name@1.2.3" -> { name: "@scope/name", version: "1.2.3" }
@@ -93,61 +342,14 @@ function isPinned(source) {
   return false;
 }
 
-function readManifest(path) {
-  step(1, undefined, `reading manifest ${path}`);
-  let raw;
-  try {
-    raw = readFileSync(path, "utf8");
-  } catch (error) {
-    fail(`cannot read manifest ${path}: ${error.message}`);
-  }
-
-  let parsed;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (error) {
-    fail(`manifest ${path} is not valid JSON: ${error.message}`);
-  }
-
-  const packages = parsed?.packages;
-  if (!packages || typeof packages !== "object" || Array.isArray(packages)) {
-    fail(`manifest ${path} must have an object "packages" field`);
-  }
-
-  const entries = Object.entries(packages).map(([source, version]) => {
-    if (/^-/.test(source) || !(NPM_SOURCE.test(source) || GIT_SOURCE.test(source))) {
-      fail(`unsupported source "${source}": use "npm:<name>" or "git:<host>/<path>"`);
-    }
-    const value = String(version ?? "").trim();
-    if (/^-/.test(value) || /\s/.test(value)) {
-      fail(`invalid version "${value}" for "${source}"`);
-    }
-    return UNPINNED.has(value) ? source : `${source}@${value}`;
-  });
-
-  const rawConflicts = parsed?.conflicts ?? [];
-  if (!Array.isArray(rawConflicts)) {
-    fail(`manifest ${path} field "conflicts" must be an array of sources`);
-  }
-  const conflicts = rawConflicts.map((source) => {
-    if (typeof source !== "string" || !(NPM_SOURCE.test(source) || GIT_SOURCE.test(source))) {
-      fail(`unsupported conflict source "${source}": use "npm:<name>" or "git:<host>/<path>"`);
-    }
-    if (entries.some((entry) => identityOf(entry) === identityOf(source))) {
-      fail(`"${source}" is listed in both "packages" and "conflicts"`);
-    }
-    return source;
-  });
-
-  info(`${entries.length} declared: ${entries.join(", ")}`);
-  if (conflicts.length > 0) info(`${conflicts.length} must not be installed: ${conflicts.join(", ")}`);
-  return { desired: entries, conflicts };
-}
+// ---------------------------------------------------------------------------
+// packages
+// ---------------------------------------------------------------------------
 
 // Parse `pi list`, which prints two-space indented sources with an optional
 // four-space indented install path underneath.
 function readInstalled() {
-  step(2, undefined, "reading installed packages (pi list)");
+  step("reading installed packages (pi list)");
   const result = spawnSync(PI, ["list"], { encoding: "utf8", timeout: COMMAND_TIMEOUT_MS });
   if (result.error) {
     const detail = result.error.code === "ETIMEDOUT" ? `timed out after ${COMMAND_TIMEOUT_MS / 1000}s` : result.error.message;
@@ -186,8 +388,7 @@ function readInstalled() {
   return entries;
 }
 
-function buildPlan(desired, installed, prune, conflicts = []) {
-  step(3, undefined, "comparing manifest with installed packages");
+function buildPackagePlan(desired, installed, prune, conflicts) {
   const byIdentity = new Map(installed.map((entry) => [identityOf(entry.source), entry]));
   const steps = [];
   const claimed = new Set();
@@ -201,7 +402,7 @@ function buildPlan(desired, installed, prune, conflicts = []) {
     const identity = identityOf(entry.source);
     if (!conflicting.has(identity)) continue;
     removedAsConflict.add(identity);
-    steps.push({ action: "remove", source: entry.source, reason: "bundled by this repo; must not be a pi package" });
+    steps.push({ domain: "packages", action: "remove", target: entry.source, reason: "bundled by this repo; must not be a pi package" });
   }
 
   for (const source of desired) {
@@ -210,15 +411,15 @@ function buildPlan(desired, installed, prune, conflicts = []) {
     if (existing) claimed.add(identity);
 
     if (!existing) {
-      steps.push({ action: "install", source, reason: "not installed" });
+      steps.push({ domain: "packages", action: "install", target: source, reason: "not installed" });
     } else if (existing.source !== source) {
-      steps.push({ action: "install", source, reason: `different version: ${existing.source}` });
+      steps.push({ domain: "packages", action: "install", target: source, reason: `different version: ${existing.source}` });
     } else if (!existing.installedPath) {
-      steps.push({ action: "install", source, reason: "declared but missing on disk" });
+      steps.push({ domain: "packages", action: "install", target: source, reason: "declared but missing on disk" });
     } else if (isPinned(source)) {
-      steps.push({ action: "keep", source, reason: "pinned version" });
+      steps.push({ domain: "packages", action: "keep", target: source, reason: "pinned version" });
     } else {
-      steps.push({ action: "update", source, reason: "latest" });
+      steps.push({ domain: "packages", action: "update", target: source, reason: "latest" });
     }
   }
 
@@ -227,15 +428,15 @@ function buildPlan(desired, installed, prune, conflicts = []) {
     if (claimed.has(identity) || removedAsConflict.has(identity)) continue;
     steps.push(
       prune
-        ? { action: "remove", source: entry.source, reason: "not in manifest" }
-        : { action: "keep", source: entry.source, reason: "not in manifest (merge mode)" },
+        ? { domain: "packages", action: "remove", target: entry.source, reason: "not in manifest" }
+        : { domain: "packages", action: "keep", target: entry.source, reason: "not in manifest (merge mode)" },
     );
   }
 
   return steps;
 }
 
-function run(action, source) {
+function runPi(action, source) {
   const args = action === "install" ? ["install", source] : action === "remove" ? ["remove", source] : ["update", source];
   info(`running: ${PI} ${args.join(" ")}`);
   const started = Date.now();
@@ -249,10 +450,234 @@ function run(action, source) {
   return undefined;
 }
 
+// ---------------------------------------------------------------------------
+// settings.json / keybindings.json
+// ---------------------------------------------------------------------------
+
+function readJsonFile(file, label) {
+  step(`reading ${file}${existsSync(file) ? "" : " (absent)"}`);
+  if (!existsSync(file)) return {};
+  let raw;
+  try {
+    raw = readFileSync(file, "utf8");
+  } catch (error) {
+    fail(`cannot read ${file}: ${error.message}`);
+  }
+  // A BOM is accepted by pi's own loader, so accept it here too.
+  if (raw.charCodeAt(0) === 0xfeff) raw = raw.slice(1);
+  if (raw.trim() === "") return {};
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    // Refuse rather than overwrite: a broken file is more likely a half-finished
+    // hand edit than something to throw away.
+    fail(`${file} is not valid JSON (${error.message}); fix it before syncing ${label}`);
+  }
+  if (!isPlainObject(parsed)) fail(`${file} must contain a JSON object`);
+  return parsed;
+}
+
+function render(value) {
+  return value === undefined ? "(unset)" : JSON.stringify(value);
+}
+
+// keybindings.json accepts a single key or a list, so "ctrl+r" and ["ctrl+r"]
+// mean the same thing. Compare normalized, write what the manifest says.
+function normalizeKeybinding(value) {
+  if (value === null || value === undefined) return value;
+  return Array.isArray(value) ? value : [value];
+}
+
+function buildConfigPlan({ domain, declared, current, preserve, prune, protectedTopKeys = new Set(), equals = deepEqual, flat = false }) {
+  const steps = [];
+  const declaredPaths = declared.map((entry) => entry.path);
+
+  for (const entry of declared) {
+    const existing = getPath(current, entry.path);
+    const target = formatPath(entry.path);
+    if (entry.value === null) {
+      // A tombstone: declared so it gets removed, and stays declared so every
+      // machine removes it. No state file needed to remember what we managed.
+      if (existing.found) {
+        steps.push({ domain, action: "unset", target, path: entry.path, reason: `was ${render(existing.value)} (declared null)` });
+      }
+      continue;
+    }
+    if (existing.found && equals(existing.value, entry.value)) {
+      steps.push({ domain, action: "keep", target, path: entry.path, reason: `= ${render(existing.value)}` });
+      continue;
+    }
+    steps.push({
+      domain,
+      action: "set",
+      target,
+      path: entry.path,
+      value: entry.value,
+      reason: `${render(existing.found ? existing.value : undefined)} -> ${render(entry.value)}`,
+    });
+  }
+
+  if (!prune) return steps;
+
+  // keybindings.json is flat, so its entries are whole top-level keys. Walking
+  // it to the leaves would invent dotted paths out of a malformed value.
+  const currentEntries = flat
+    ? Object.entries(current).map(([key, value]) => ({ path: [key], value }))
+    : leafEntries(current, { emptyObjectsAreLeaves: true });
+  for (const entry of currentEntries) {
+    if (protectedTopKeys.has(entry.path[0])) continue;
+    // Already handled above: the declared path either is this path, replaces the
+    // subtree it sits in, or is created inside it.
+    if (declaredPaths.some((path) => overlaps(path, entry.path))) continue;
+    const target = formatPath(entry.path);
+    if (preserve.some((path) => overlaps(path, entry.path))) {
+      steps.push({ domain, action: "preserve", target, path: entry.path, reason: `= ${render(entry.value)}` });
+      continue;
+    }
+    steps.push({ domain, action: "unset", target, path: entry.path, reason: `was ${render(entry.value)} (not declared)` });
+  }
+
+  return steps;
+}
+
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+// pi serializes its own settings writes with proper-lockfile, whose primitive is
+// `mkdir <file>.lock` (FileSettingsStorage in pi 1.1.0). Taking the same lock
+// the same way makes this write mutually exclusive with a running pi's write
+// without adding a dependency -- sync.mjs has to run straight from `curl | sh`.
+const LOCK_STALE_MS = 10_000; // proper-lockfile's default staleness window
+const LOCK_WAIT_MS = 5_000;
+
+function withLock(file, fn) {
+  const lock = `${file}.lock`;
+  const deadline = Date.now() + LOCK_WAIT_MS;
+  for (;;) {
+    try {
+      mkdirSync(lock);
+      break;
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+      let age = Number.POSITIVE_INFINITY;
+      try {
+        age = Date.now() - statSync(lock).mtimeMs;
+      } catch {
+        continue; // released while we looked; try again right away
+      }
+      if (age > LOCK_STALE_MS) {
+        try {
+          rmdirSync(lock);
+        } catch {
+          // someone else cleaned it up first
+        }
+        continue;
+      }
+      if (Date.now() > deadline) throw new Error(`${file} is locked by another process (${lock})`);
+      sleepSync(50);
+    }
+  }
+  try {
+    return fn();
+  } finally {
+    try {
+      rmdirSync(lock);
+    } catch {
+      // nothing useful to do if the lock is already gone
+    }
+  }
+}
+
+function applyConfigPlan(file, steps, label) {
+  const actionable = steps.filter((entry) => entry.action === "set" || entry.action === "unset");
+  if (actionable.length === 0) return { changed: false };
+
+  return withLock(file, () => {
+    // Re-read under the lock instead of reusing the planning snapshot: package
+    // steps ran first and `pi install` rewrites settings.json. Applying path
+    // operations to fresh content keeps pi's own keys intact.
+    let current = {};
+    if (existsSync(file)) {
+      const raw = readFileSync(file, "utf8").replace(/^\uFEFF/, "");
+      if (raw.trim() !== "") {
+        try {
+          current = JSON.parse(raw);
+        } catch (error) {
+          throw new Error(`${file} became invalid JSON (${error.message})`);
+        }
+      }
+    }
+    if (!isPlainObject(current)) throw new Error(`${file} must contain a JSON object`);
+
+    const before = JSON.stringify(current, null, 2);
+    for (const entry of actionable) {
+      if (entry.action === "set") setPath(current, entry.path, entry.value);
+      else unsetPath(current, entry.path);
+    }
+    // Same shape pi writes: two-space indent, no trailing newline.
+    const after = JSON.stringify(current, null, 2);
+    if (after === before) return { changed: false };
+
+    const tmp = `${file}.my-pi-preset.tmp`;
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(tmp, after, "utf8");
+    try {
+      renameSync(tmp, file);
+    } catch (error) {
+      rmSync(tmp, { force: true });
+      throw error;
+    }
+    info(`wrote ${file} (${actionable.length} ${label} change(s))`);
+    return { changed: true };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Command line
+// ---------------------------------------------------------------------------
+
+function parseDomains(value, label, universe = DOMAINS) {
+  const parts = String(value)
+    .split(/[,\s]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length === 0) fail(`${label} needs at least one domain: ${DOMAINS.join(", ")}, all, or none`);
+  const selected = new Set();
+  for (const part of parts) {
+    if (part === "all") {
+      // For --prune, `all` means every domain being synced, so `--sync settings
+      // --prune` does not have to repeat the domain list.
+      for (const domain of universe) selected.add(domain);
+    } else if (part === "none") {
+      selected.clear();
+    } else if (DOMAINS.includes(part)) {
+      selected.add(part);
+    } else {
+      fail(`${label}: unknown domain "${part}"; use ${DOMAINS.join(", ")}, all, or none`);
+    }
+  }
+  return selected;
+}
+
+// `--prune` on its own means every synced domain. parseArgs has no optional
+// values, so the bare flag is rewritten before parsing -- but only when it is
+// really bare, so `--prune packages` still works.
+function expandBarePrune(argv) {
+  return argv.map((arg, index) => {
+    if (arg !== "--prune") return arg;
+    const next = argv[index + 1];
+    return next === undefined || next.startsWith("-") ? "--prune=all" : arg;
+  });
+}
+
 const { values } = parseArgs({
+  args: expandBarePrune(process.argv.slice(2)),
   options: {
     manifest: { type: "string" },
-    prune: { type: "boolean", default: false },
+    sync: { type: "string" },
+    prune: { type: "string" },
     "dry-run": { type: "boolean", default: false },
     help: { type: "boolean", default: false },
   },
@@ -261,33 +686,98 @@ const { values } = parseArgs({
 if (values.help) {
   console.log(`Usage: node scripts/sync.mjs [options]
 
-  --manifest <path>  Manifest to apply (default: pi-packages.json next to this script's parent)
-  --prune            Remove user packages that are not in the manifest
-  --dry-run          Print the plan without changing anything`);
+  --manifest <path>   Manifest to apply (default: pi-preset.json next to this script's parent)
+  --sync <domains>    Domains to reconcile: packages, settings, keybindings, all, none (default: all)
+  --prune [<domains>] Domains the manifest owns completely; bare --prune, or --prune all,
+                      means every domain --sync selected (default: none)
+  --dry-run           Print the plan without changing anything
+
+In a synced domain not listed in --prune, only declared entries are touched;
+a declared null removes one entry. In a pruned domain, whatever the manifest
+does not declare is removed, except the "preserve" lists and the settings keys
+pi maintains itself (packages, lastChangelogVersion).`);
   process.exit(0);
 }
 
+const syncDomains = parseDomains(values.sync ?? "all", "--sync");
+const pruneDomains = parseDomains(values.prune ?? "none", "--prune", syncDomains);
+for (const domain of pruneDomains) {
+  if (!syncDomains.has(domain)) fail(`--prune ${domain} needs --sync to include ${domain}`);
+}
+
 const scriptDir = dirname(fileURLToPath(import.meta.url));
-const manifestPath = values.manifest ? resolve(values.manifest) : join(scriptDir, "..", "pi-packages.json");
+const manifestPath = values.manifest ? resolve(values.manifest) : join(scriptDir, "..", "pi-preset.json");
+const agentDir = resolveAgentDir();
+const settingsFile = join(agentDir, "settings.json");
+const keybindingsFile = join(agentDir, "keybindings.json");
 
-const { desired, conflicts } = readManifest(manifestPath);
-const installed = readInstalled();
-const plan = buildPlan(desired, installed, values.prune, conflicts);
+const manifest = readManifest(manifestPath);
 
-console.error(`      mode  ${values.prune ? "prune (manifest is authoritative)" : "merge (keeps other packages)"}`);
+const installed = syncDomains.has("packages") ? readInstalled() : [];
+const currentSettings = syncDomains.has("settings") ? readJsonFile(settingsFile, "settings") : {};
+const currentKeybindings = syncDomains.has("keybindings") ? readJsonFile(keybindingsFile, "keybindings") : {};
+
+step("comparing manifest with this machine");
+
+const plan = [];
+
+if (syncDomains.has("packages")) {
+  plan.push(...buildPackagePlan(manifest.desired, installed, pruneDomains.has("packages"), manifest.conflicts));
+}
+
+if (syncDomains.has("settings")) {
+  plan.push(
+    ...buildConfigPlan({
+      domain: "settings",
+      declared: manifest.declaredSettings,
+      current: currentSettings,
+      preserve: manifest.preserve.settings,
+      prune: pruneDomains.has("settings"),
+      protectedTopKeys: PI_OWNED_SETTINGS,
+    }),
+  );
+}
+
+if (syncDomains.has("keybindings")) {
+  plan.push(
+    ...buildConfigPlan({
+      domain: "keybindings",
+      declared: manifest.declaredKeybindings,
+      current: currentKeybindings,
+      preserve: manifest.preserve.keybindings,
+      prune: pruneDomains.has("keybindings"),
+      equals: (a, b) => deepEqual(normalizeKeybinding(a), normalizeKeybinding(b)),
+      flat: true,
+    }),
+  );
+}
+
+const modeLine = DOMAINS.filter((domain) => syncDomains.has(domain))
+  .map((domain) => `${domain} ${pruneDomains.has(domain) ? "prune" : "merge"}`)
+  .join(", ");
+const skipped = DOMAINS.filter((domain) => !syncDomains.has(domain));
+console.error(`      mode     ${modeLine || "nothing selected"}`);
+if (skipped.length > 0) console.error(`      skip     ${skipped.join(", ")} (not selected)`);
 console.error("");
 
-const labels = { install: "install", update: "update ", remove: "remove ", keep: "keep   " };
+const actionWidth = Math.max(...plan.map((entry) => entry.action.length), 8);
+const domainWidth = Math.max(...plan.map((entry) => entry.domain.length), 8);
+const targetWidth = Math.min(Math.max(...plan.map((entry) => entry.target.length), 8), 44);
 for (const entry of plan) {
-  console.error(`      ${labels[entry.action]} ${entry.source}${entry.reason ? `  (${entry.reason})` : ""}`);
+  const action = entry.action.padEnd(actionWidth);
+  const domain = entry.domain.padEnd(domainWidth);
+  const target = entry.target.padEnd(targetWidth);
+  console.error(`      ${action}  ${domain}  ${target}  ${entry.reason ?? ""}`.trimEnd());
 }
 
 const counts = plan.reduce((acc, entry) => ({ ...acc, [entry.action]: (acc[entry.action] ?? 0) + 1 }), {});
 console.error("");
 console.error(
-  `      ${Object.entries(counts)
-    .map(([action, count]) => `${count} ${action}`)
-    .join(", ") || "nothing to do"}`,
+  `      ${
+    Object.entries(counts)
+      .map(([action, count]) => `${count} ${action}`)
+      .join(", ") || "nothing to do"
+  }`,
 );
 
 if (values["dry-run"]) {
@@ -296,9 +786,12 @@ if (values["dry-run"]) {
   process.exit(0);
 }
 
-const stepsToRun = plan.filter((entry) => entry.action !== "keep");
+const packageSteps = plan.filter((entry) => entry.domain === "packages" && entry.action !== "keep");
+const settingsSteps = plan.filter((entry) => entry.domain === "settings" && (entry.action === "set" || entry.action === "unset"));
+const keybindingSteps = plan.filter((entry) => entry.domain === "keybindings" && (entry.action === "set" || entry.action === "unset"));
+const totalSteps = packageSteps.length + (settingsSteps.length > 0 ? 1 : 0) + (keybindingSteps.length > 0 ? 1 : 0);
 
-if (stepsToRun.length === 0) {
+if (totalSteps === 0) {
   console.error("");
   console.error("Already up to date. Nothing to do.");
   process.exit(0);
@@ -307,24 +800,41 @@ if (stepsToRun.length === 0) {
 console.error("");
 
 const failures = [];
-let index = 0;
+stepNumber = 0;
+
+// Packages go first: `pi install` writes settings.json, and the config writes
+// below re-read the file afterwards.
 for (const action of ["install", "update", "remove"]) {
-  for (const entry of plan.filter((candidate) => candidate.action === action)) {
-    index += 1;
-    step(index, stepsToRun.length, `${action} ${entry.source}`);
-    const message = run(action, entry.source);
+  for (const entry of packageSteps.filter((candidate) => candidate.action === action)) {
+    step(`${action} ${entry.target}`, totalSteps);
+    const message = runPi(action, entry.target);
     if (message) {
       console.error(`  failed: ${message}`);
-      failures.push(`${entry.source}: ${message}`);
+      failures.push(`${entry.target}: ${message}`);
     } else {
       info("ok");
     }
   }
 }
 
+for (const [label, file, steps] of [
+  ["settings", settingsFile, settingsSteps],
+  ["keybindings", keybindingsFile, keybindingSteps],
+]) {
+  if (steps.length === 0) continue;
+  step(`writing ${label} (${steps.length} key(s))`, totalSteps);
+  try {
+    const { changed } = applyConfigPlan(file, steps, label);
+    info(changed ? "ok" : "already matched on disk; nothing written");
+  } catch (error) {
+    console.error(`  failed: ${error.message}`);
+    failures.push(`${label}: ${error.message}`);
+  }
+}
+
 console.error("");
 if (failures.length > 0) {
-  console.error(`${failures.length} of ${stepsToRun.length} steps failed.`);
+  console.error(`${failures.length} of ${totalSteps} steps failed.`);
   process.exit(1);
 }
-console.error(`Done. ${stepsToRun.length} package(s) reconciled. Run /reload in pi, or restart it, to pick up changes.`);
+console.error(`Done. ${totalSteps} step(s) applied. Run /reload in pi, or restart it, to pick up changes.`);

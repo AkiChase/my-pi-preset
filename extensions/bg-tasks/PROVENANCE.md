@@ -18,7 +18,7 @@ is to rework the interaction model (notification timing, `Ctrl+B` and the hint l
 `jobs` output, `monitor` / `agent_bg` streaming), which upstream's structure is not
 converging on. Edit these files in place. Do not add `pi-patty-bg-tasks` back as a
 dependency — it registers the same tool names and would conflict (see
-`pi-packages.json` → `conflicts`).
+`pi-preset.json` → `conflicts`).
 
 ## Note on the version chosen
 
