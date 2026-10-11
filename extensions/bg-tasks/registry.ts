@@ -200,8 +200,10 @@ export function renderSidebar(reg: BackgroundRegistry, ctx: UiContext): void {
     const runningLogs = new Set<string>();
 
     for (const job of reg.jobs.values()) {
-        // Terminal jobs render no pill: their outcome is always surfaced by a
-        // <task-notification>, a kill, or a read — there is no unread state.
+        // Terminal jobs render no pill. A terminal job can linger in the
+        // registry unsurfaced (a `notify: false` failure, or a notification
+        // whose send threw), but the sidebar tracks live work; `jobs list` is
+        // where an unreported outcome shows up.
         if (isTerminalStatus(job.status)) continue;
         runningCount++;
         runningLogs.add(job.logPath);

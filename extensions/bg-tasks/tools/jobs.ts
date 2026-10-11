@@ -32,7 +32,7 @@ import {
 import { formatDuration, formatJobLine, jobLabel, oneLine, textBlock } from "../format.ts";
 import { streamLog } from "../output.ts";
 import { searchLogs } from "../log-search.ts";
-import { markNotified } from "../notify.ts";
+import { markOutcomeSurfaced } from "../notify.ts";
 import {
     ensureCompletionPromise,
     markTerminal,
@@ -58,7 +58,7 @@ export function registerJobsTool(
             "search: regex-search all job output",
             "cleanup: purge terminal jobs",
             "stats: show aggregate metrics",
-            "Completion notices for a failed job already inline the tail of its log (<output_tail>) — do NOT call 'output' just to learn why it failed. Call 'output' when that tail is truncated and you need more, or when a job's full output is the deliverable (e.g. a test report you must relay). Never call it merely to acknowledge a completed job.",
+            "Completion notices for a failed job already inline the tail of its log — do NOT call 'output' just to learn why it failed. Call 'output' when that tail is truncated and you need more, or when a job's full output is the deliverable (e.g. a test report you must relay). Never call it merely to acknowledge a completed job.",
         ],
         parameters: Type.Object({
             action: StringEnum(
@@ -114,18 +114,24 @@ export function registerJobsTool(
 // ─── list: show all jobs ─────────────────────────────────────────────────
 
 function listAction(reg: BackgroundRegistry): AgentToolResult<undefined> {
-    // Lazy eviction sweep: terminal jobs whose outcome was already surfaced
-    // (notified — via the <task-notification>, a kill, or a read) leave the
-    // live registry here. Their output logs stay on disk.
+    // Lazy eviction sweep: terminal jobs whose outcome already reached the
+    // agent (a <task-notification>, a kill, or a read) leave the live registry
+    // here. Their output logs stay on disk.
     for (const job of Array.from(reg.jobs.values())) {
-        if (isTerminalStatus(job.status) && job.notified) forget(reg, job);
+        if (isTerminalStatus(job.status) && job.outcomeSurfaced) forget(reg, job);
     }
-    const running = Array.from(reg.jobs.values()).filter(
-        (j) => j.status === "running"
-    );
+    const live = Array.from(reg.jobs.values());
+    const running = live.filter((j) => j.status === "running");
+    // Terminal jobs still in the registry are the ones nobody has been told
+    // about: `notify: false`, or a notification whose send threw. Upstream
+    // listed neither running-only nor recent-terminal covered them, so a
+    // silently-failed job was invisible everywhere — which is the one case
+    // where listing it matters most.
+    const unreported = live.filter((j) => isTerminalStatus(j.status));
     const recent = reg.recentTerminal.slice(-5).reverse();
     const lines = [
         ...running.map((j) => formatJobLine(j)),
+        ...unreported.map((j) => formatJobLine(j)),
         ...recent.map((j) => formatJobLine(j)),
     ];
     return {
@@ -149,9 +155,10 @@ async function outputAction(
     const job = findJob(reg, jobId);
     if (!job) throw new Error(`No task found with ID: ${jobId}`);
     // CC's TaskOutputTool: a successful read of a TERMINAL job's output marks
-    // it notified, suppressing the separate <task-notification>. Peeking at a
-    // still-running job does NOT mark — its completion must still notify.
-    if (isTerminalStatus(job.status)) markNotified(job);
+    // the outcome surfaced, suppressing the separate <task-notification>.
+    // Peeking at a still-running job does NOT mark — its completion must still
+    // notify.
+    if (isTerminalStatus(job.status)) markOutcomeSurfaced(job);
     const out = readLogTail(job, reg.config.outputPreviewChars).trimEnd();
     const label = jobLabel(job);
     return {
@@ -178,7 +185,7 @@ async function killAction(
     if (isTerminalStatus(job.status)) {
         throw new Error(`Job is not running: ${job.id}`);
     }
-    // terminateJobSilently latches `notified` BEFORE the kill, so the exit
+    // terminateJobSilently marks the outcome surfaced BEFORE the kill, so the exit
     // handler skips the <task-notification> — this result IS the outcome.
     terminateJobSilently(reg, job);
     renderSidebar(reg, ctx);
@@ -208,10 +215,13 @@ async function attachAction(
     if (job.status === "running" && waitForCompletion) {
         ensureCompletionPromise(job);
         // We're actively following this job — suppress its separate completion
-        // notification so the attach result is the single notification. Undone
-        // on the abort path below, so a job we detach from still reports when
-        // it ends.
-        job.notified = true;
+        // notification so the attach result is the single report. A counter,
+        // decremented in the finally below, rather than upstream's
+        // `job.notified = true` … `job.notified = false` pair: that wrote the
+        // same latch the exit callback reads, so a second attach returning
+        // would clear the first one's suppression, and an exception between
+        // the two writes left the job permanently unable to notify.
+        job.attachCount = (job.attachCount ?? 0) + 1;
 
         // Bail early if the OS process already died.
         if (job.pid > 0 && !processExists(job.pid)) {
@@ -242,12 +252,14 @@ async function attachAction(
         } finally {
             poller.stop();
             if (signal && onAbort) signal.removeEventListener("abort", onAbort);
+            job.attachCount = Math.max(0, (job.attachCount ?? 1) - 1);
         }
 
         if (job.status === "running") {
-            // Aborted before completion — we never reported the finish, so let
-            // the job's own completion notification fire later.
-            job.notified = false;
+            // Aborted before completion — we never reported the finish, so the
+            // job's own completion notification must still fire later. Nothing
+            // to undo: the suppression was scoped to the wait, and the outcome
+            // was never marked surfaced.
             return {
                 content: [
                     textBlock(
@@ -261,11 +273,10 @@ async function attachAction(
 
     const message = `${label} finished. Status: ${job.status}`;
     ctx.ui.notify(message, job.status === "failed" ? "error" : "info");
-    // The attach result IS the outcome notification — mark it notified so the
+    // The attach result IS the outcome report — mark it surfaced so the
     // <task-notification> is suppressed (CC parity). Covers both the "attached
-    // to an already-terminal job" and "waited then finished" cases; idempotent
-    // with the running-branch set above.
-    markNotified(job);
+    // to an already-terminal job" and "waited then finished" cases.
+    markOutcomeSurfaced(job);
     return {
         content: [textBlock(`${message}. Use jobs output for the full log.`)],
         details: undefined,

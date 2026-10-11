@@ -18,7 +18,7 @@ import type { BackgroundRegistry } from "./state.ts";
 import { killProcessTree, type SpawnExit } from "./spawn.ts";
 import { atConcurrencyLimit, forget, renderSidebar } from "./registry.ts";
 import { watchStalls } from "./monitoring.ts";
-import { markNotified, sendTaskNotification } from "./notify.ts";
+import { markOutcomeSurfaced, sendTaskNotification } from "./notify.ts";
 
 // --- Background-job orchestration ----------------------------------------
 
@@ -44,7 +44,7 @@ export function startBackgroundJob(args: {
     ctx: UiContext;
     job: Job;
     exit: Promise<SpawnExit>;
-    shouldNotify?: boolean;
+    notification?: NotificationOwner;
     /** Suppress the interactive-prompt stall heuristic (monitors stream their
      *  own output, so a quiet tail is normal, not a stuck prompt). */
     disablePromptStall?: boolean;
@@ -76,7 +76,7 @@ export function startBackgroundJob(args: {
             reg: args.reg,
             pi: args.pi,
             ctx: args.ctx,
-            shouldNotify: args.shouldNotify,
+            notification: args.notification,
         });
     });
     renderSidebar(args.reg, args.ctx);
@@ -86,19 +86,32 @@ export function startBackgroundJob(args: {
 // --- Terminal-state marking ----------------------------------------------
 
 /**
+ * Who is responsible for a job's terminal <task-notification>.
+ *
+ *   - "auto" (default): completeJob sends it on exit.
+ *   - "self": the caller sends its own before the exit lands (monitors, which
+ *     compose a stream-specific summary). completeJob only evicts.
+ *   - "suppressed": `bash_bg notify: false` — never sent.
+ *
+ * Upstream had one `shouldNotify: false` covering both "self" and
+ * "suppressed". The two want opposite handling: a monitor is finished and
+ * should leave the registry, while a suppressed job's outcome has reached
+ * nobody and must stay listed.
+ */
+export type NotificationOwner = "auto" | "self" | "suppressed";
+
+/**
  * Standard completion flow after a job exits — abortJob → markTerminal →
  * notify → renderSidebar. Shared by every tool's exit callback (bash,
  * bash_bg, agent_bg, monitor) as the canonical termination protocol.
  *
  * The notification is Claude Code's per-job <task-notification>, sent the
- * moment the job exits (see notify.ts). A successful send evicts the job
- * from the live registry (terminal + notified). Jobs whose outcome is
- * already known (killed silently, or read via jobs output/attach) skip the
- * notification and linger until the lazy sweep in `jobs list`. Monitors own
- * their terminal notification (monitor-session, shouldNotify: false) and are
- * evicted here once it has fired. A `shouldNotify: false` job (bash_bg
- * `notify: false`) is latched notified WITHOUT sending — "don't notify" IS
- * notified — so it evicts too and never lingers as a permanent entry.
+ * moment the job exits (see notify.ts). A job whose outcome has reached the
+ * agent — or that succeeded with notifications suppressed, which is nothing to
+ * report — is evicted from the live registry. A job that FAILED unreported
+ * (`notify: false`, or a send that threw) deliberately stays, so `jobs list`
+ * can still surface it. Upstream evicted the suppressed ones unconditionally,
+ * which made a silently-failing `notify: false` job unobservable.
  */
 export function completeJob(args: {
     job: Job;
@@ -108,7 +121,7 @@ export function completeJob(args: {
     reg: BackgroundRegistry;
     pi: ExtensionAPI;
     ctx: UiContext;
-    shouldNotify?: boolean;
+    notification?: NotificationOwner;
 }): void {
     if (isTerminalStatus(args.job.status)) return;
     // The caller passes the authoritative Job (the object held in the registry),
@@ -116,12 +129,24 @@ export function completeJob(args: {
     const finished = args.job;
     abortJob(args.reg, finished.id);
     markTerminal(finished, statusFromExit(args.code, args.signal), args.code ?? undefined);
-    if (args.shouldNotify !== false) {
+
+    const owner = args.notification ?? "auto";
+    if (owner === "auto") {
         sendTaskNotification({ reg: args.reg, pi: args.pi, job: finished });
-    } else {
-        markNotified(finished);
+    } else if (finished.outcomeSurfaced) {
+        // "self" and that send landed, or a kill already surfaced it. Done.
+        forget(args.reg, finished);
+    } else if (owner === "suppressed" && finished.status === "completed") {
+        // A success nobody asked to hear about is nothing to report, so it
+        // leaves like any other finished job instead of accumulating in the
+        // registry until someone runs `jobs list`.
         forget(args.reg, finished);
     }
+    // What is left is an outcome that reached nobody and is worth reporting: a
+    // `notify: false` job that FAILED, or a "self" send that threw. Those stay
+    // in the registry — listAction shows them and a read can still surface
+    // them. Upstream evicted them here, which is why a silently-failing
+    // `notify: false` command was unobservable.
     renderSidebar(args.reg, args.ctx);
 }
 
@@ -172,22 +197,23 @@ export function ensureCompletionPromise(job: Job): void {
 }
 
 /**
- * Mark a job "killed" and latch the notified flag, so the exit callback does
- * not emit a spurious completion notification on any termination path.
- * `markTerminal` flips status to "killed" first; `markNotified` then records
- * that the outcome needs no <task-notification> (Claude Code parity — a
- * deliberate kill is intentional cleanup the agent already knows about).
+ * Mark a job "killed" and record its outcome as already surfaced, so the exit
+ * callback does not emit a spurious completion notification on any
+ * termination path. `markTerminal` flips status to "killed" first;
+ * `markOutcomeSurfaced` then records that no <task-notification> is needed
+ * (Claude Code parity — a deliberate kill is intentional cleanup the agent
+ * already knows about).
  */
 export function markKilledSilently(job: Job): void {
     markTerminal(job, "killed");
-    markNotified(job);
+    markOutcomeSurfaced(job);
 }
 
-/** Kill a job quietly and abort its registered monitors/timers. The notified
- *  latch is set BEFORE the kill so the exit handler's notification is
+/** Kill a job quietly and abort its registered monitors/timers. The outcome is
+ *  marked surfaced BEFORE the kill so the exit handler's notification is
  *  suppressed (Ctrl+Shift+X, jobs kill, session quit). */
 export function terminateJobSilently(reg: BackgroundRegistry, job: Job): void {
-    markNotified(job);
+    markOutcomeSurfaced(job);
     terminateJob(job);
     markKilledSilently(job);
     abortJob(reg, job.id);

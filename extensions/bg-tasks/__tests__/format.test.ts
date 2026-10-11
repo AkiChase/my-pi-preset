@@ -154,7 +154,7 @@ void describe("formatJobLine", () => {
         assert.match(formatJobLine(job), /✓ completed$/);
     });
     void it("failed terminal jobs render the failed label", () => {
-        const job = makeJob({ status: "failed", notified: true });
+        const job = makeJob({ status: "failed", outcomeSurfaced: true });
         assert.match(formatJobLine(job), /✗ failed$/);
     });
     void it("running jobs show the bg label", () => {

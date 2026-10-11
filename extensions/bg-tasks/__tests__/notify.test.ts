@@ -4,8 +4,7 @@ import { BackgroundRegistry } from "../state.ts";
 import {
     buildTaskNotification,
     completionSummary,
-    escapeXml,
-    markNotified,
+    markOutcomeSurfaced,
     sendTaskNotification,
 } from "../notify.ts";
 import { completeJob } from "../lifecycle.ts";
@@ -16,7 +15,13 @@ interface Captured {
     customType: string;
     content: string;
     display?: boolean;
-    details?: { jobId?: string; status?: string; summary?: string; outputFile?: string };
+    details?: {
+        jobId?: string;
+        status?: string;
+        summary?: string;
+        outputFile?: string;
+        toolUseId?: string;
+    };
 }
 
 interface DeliverOpts {
@@ -60,61 +65,53 @@ function mkJob(over: Partial<Job>): Job {
     } as Job;
 }
 
-void describe("escapeXml", () => {
-    void it("escapes &, < and > only", () => {
-        assert.equal(escapeXml(`a & b <c> "q" 'apost'`), `a &amp; b &lt;c&gt; "q" 'apost'`);
-    });
-});
-
-void describe("buildTaskNotification — CC's exact XML", () => {
-    void it("includes tool_use_id and status when present", () => {
-        const xml = buildTaskNotification({
+void describe("buildTaskNotification — compact text", () => {
+    void it("is two lines for an outcome with no tail", () => {
+        // Upstream emitted seven lines of XML here, with <summary> duplicating
+        // details.summary verbatim. The structure travels in `details`; the
+        // text carries only what the model cannot get from there.
+        const text = buildTaskNotification({
             taskId: "job-1-1",
-            toolUseId: "tc-42",
             outputFile: "/tmp/pi-bg/job-1-1.log",
             status: "completed",
             summary: `Background command "npm test" completed (exit code 0)`,
         });
         assert.equal(
-            xml,
+            text,
             [
-                "<task-notification>",
-                "<task_id>job-1-1</task_id>",
-                "<tool_use_id>tc-42</tool_use_id>",
-                "<output_file>/tmp/pi-bg/job-1-1.log</output_file>",
-                "<status>completed</status>",
-                `<summary>Background command "npm test" completed (exit code 0)</summary>`,
-                "</task-notification>",
+                `[task job-1-1 · completed] Background command "npm test" completed (exit code 0)`,
+                "log: /tmp/pi-bg/job-1-1.log",
             ].join("\n")
         );
     });
 
-    void it("omits the tool_use_id line when there is none", () => {
-        const xml = buildTaskNotification({
-            taskId: "job-1-1",
-            outputFile: "/tmp/x.log",
-            status: "failed",
-            summary: "x",
-        });
-        assert.ok(!xml.includes("tool_use_id"));
-    });
-
-    void it("omits the status line when there is none (stall warning)", () => {
-        const xml = buildTaskNotification({
+    void it("omits the status segment when there is none (stall warning)", () => {
+        const text = buildTaskNotification({
             taskId: "job-1-1",
             outputFile: "/tmp/x.log",
             summary: "waiting",
         });
-        assert.ok(!xml.includes("<status>"));
+        assert.ok(text.startsWith("[task job-1-1] waiting"));
     });
 
-    void it("escapes the summary", () => {
-        const xml = buildTaskNotification({
+    void it("does not escape anything — there is no markup left to break", () => {
+        const text = buildTaskNotification({
             taskId: "t",
             outputFile: "f",
             summary: `a & <b>`,
         });
-        assert.ok(xml.includes("<summary>a &amp; &lt;b&gt;</summary>"));
+        assert.ok(text.includes("a & <b>"));
+    });
+
+    void it("delimits the tail so log text cannot read as our own", () => {
+        const text = buildTaskNotification({
+            taskId: "t",
+            outputFile: "f",
+            status: "failed",
+            summary: "s",
+            outputTail: "boom",
+        });
+        assert.equal(text, ["[task t · failed] s", "log: f", "--- output tail ---", "boom"].join("\n"));
     });
 });
 
@@ -197,17 +194,14 @@ void describe("sendTaskNotification — exactly-once + eviction", () => {
         assert.equal(
             m.content,
             [
-                "<task-notification>",
-                "<task_id>job-1-5</task_id>",
-                "<tool_use_id>tc-42</tool_use_id>",
-                "<output_file>/tmp/pi-bg/job-1-1.log</output_file>",
-                "<status>completed</status>",
-                `<summary>Background command "npm test" completed (exit code 0)</summary>`,
-                "</task-notification>",
+                `[task job-1-5 · completed] Background command "npm test" completed (exit code 0)`,
+                "log: /tmp/pi-bg/job-1-1.log",
             ].join("\n")
         );
-        // Details carry the structured status/summary for the TUI renderer.
+        // Details carry the structured status/summary for the TUI renderer,
+        // plus the tool-use id the model-facing text no longer repeats.
         assert.equal(m.details?.status, "completed");
+        assert.equal(m.details?.toolUseId, "tc-42");
         assert.equal(m.details?.summary, `Background command "npm test" completed (exit code 0)`);
         // Steer + triggerTurn — CC's 'next' priority, waking an idle agent.
         assert.deepEqual(deliverOptions[0], { deliverAs: "steer", triggerTurn: true });
@@ -222,7 +216,7 @@ void describe("sendTaskNotification — exactly-once + eviction", () => {
         const job = mkJob({});
         add(reg, job);
         sendTaskNotification({ reg, pi: pi as never, job });
-        assert.equal(job.notified, true);
+        assert.equal(job.outcomeSurfaced, true);
         const again = sendTaskNotification({ reg, pi: pi as never, job });
         assert.equal(again, false);
         assert.equal(messages.length, 1);
@@ -232,7 +226,7 @@ void describe("sendTaskNotification — exactly-once + eviction", () => {
         const { reg, pi, messages } = harness();
         const job = mkJob({ status: "killed" });
         add(reg, job);
-        markNotified(job); // kill path latches BEFORE the exit handler runs
+        markOutcomeSurfaced(job); // the kill path marks BEFORE the exit handler runs
         const sent = sendTaskNotification({ reg, pi: pi as never, job });
         assert.equal(sent, false);
         assert.equal(messages.length, 0);
@@ -253,10 +247,10 @@ void describe("sendTaskNotification — exactly-once + eviction", () => {
         });
         assert.equal(sent, true);
         assert.equal(reg.jobs.has("job-1-1"), true);
-        assert.ok(messages[0].content.includes("<status>completed</status>"));
+        assert.ok(messages[0].content.includes("· completed]"));
     });
 
-    void it("a failed send does not retry and does not evict (exactly-once)", () => {
+    void it("a failed send strands the job: unsurfaced, listed, and reason recorded", () => {
         const { reg, pi, messages } = harness({ deliverThrows: true });
         const job = mkJob({});
         add(reg, job);
@@ -271,8 +265,25 @@ void describe("sendTaskNotification — exactly-once + eviction", () => {
         }
         assert.equal(sent, false);
         assert.equal(messages.length, 0);
-        assert.equal(job.notified, true, "latch already set — never retried");
+        // Upstream set the latch before the send, so a throw lost the outcome
+        // permanently. The outcome must stay unsurfaced and the job listed.
+        assert.equal(job.outcomeSurfaced, undefined);
+        assert.ok(job.notifyError, "the reason is recorded for jobs list");
         assert.equal(reg.jobs.has("job-1-1"), true);
+    });
+
+    void it("skips the send while a jobs attach is waiting, without surfacing", () => {
+        const { reg, pi, messages } = harness();
+        const job = mkJob({});
+        add(reg, job);
+        job.attachCount = 1;
+        assert.equal(sendTaskNotification({ reg, pi: pi as never, job }), false);
+        assert.equal(messages.length, 0);
+        // Not surfaced: if that attach is aborted, the job must still be able
+        // to report when it ends.
+        assert.equal(job.outcomeSurfaced, undefined);
+        job.attachCount = 0;
+        assert.equal(sendTaskNotification({ reg, pi: pi as never, job }), true);
     });
 });
 
@@ -283,40 +294,66 @@ void describe("completeJob — exit-path notification", () => {
         add(reg, job);
         completeJob({ job, code: 0, reg, pi: pi as never, ctx });
         assert.equal(messages.length, 1);
-        assert.ok(messages[0].content.includes("<status>completed</status>"));
+        assert.ok(messages[0].content.includes("· completed]"));
         assert.equal(reg.jobs.has("job-9-1"), false, "evicted after the send");
     });
 
-    void it("a job read before exit (notified) exits silently and lingers", () => {
+    void it("a job read before exit exits silently and lingers", () => {
         const { reg, pi, ctx, messages } = harness();
         const job = mkJob({ id: "job-9-2", status: "running", exitCode: undefined });
         add(reg, job);
-        markNotified(job); // jobs output / attach raced the exit
+        markOutcomeSurfaced(job); // jobs output / attach raced the exit
         completeJob({ job, code: 1, reg, pi: pi as never, ctx });
         assert.equal(messages.length, 0);
         assert.equal(job.status, "failed");
         assert.equal(reg.jobs.has("job-9-2"), true);
     });
 
-    void it("shouldNotify: false + notified evicts without sending (monitor path)", () => {
+    void it('notification "self": the monitor already sent, so this evicts silently', () => {
         const { reg, pi, ctx, messages } = harness();
         const job = mkJob({ id: "job-9-3", status: "running", exitCode: undefined });
         add(reg, job);
-        markNotified(job); // monitor already sent its own terminal notification
-        completeJob({ job, code: 0, reg, pi: pi as never, ctx, shouldNotify: false });
+        markOutcomeSurfaced(job); // monitor already sent its own terminal notification
+        completeJob({ job, code: 0, reg, pi: pi as never, ctx, notification: "self" });
         assert.equal(messages.length, 0);
         assert.equal(reg.jobs.has("job-9-3"), false);
     });
 
-    void it("shouldNotify: false without prior notice still evicts (bash_bg notify: false)", () => {
+    void it('notification "self" whose send failed keeps the job listed', () => {
+        const { reg, pi, ctx, messages } = harness();
+        const job = mkJob({ id: "job-9-5", status: "running", exitCode: undefined });
+        add(reg, job);
+        // The monitor tried and threw: nothing reached the agent, so evicting
+        // here would be the same silent loss as upstream's.
+        job.notifyError = "boom";
+        completeJob({ job, code: 0, reg, pi: pi as never, ctx, notification: "self" });
+        assert.equal(messages.length, 0);
+        assert.equal(reg.jobs.has("job-9-5"), true);
+    });
+
+    void it('notification "suppressed" + FAILED stays listed instead of vanishing', () => {
         const { reg, pi, ctx, messages } = harness();
         const job = mkJob({ id: "job-9-4", status: "running", exitCode: undefined });
         add(reg, job);
-        // "Don't notify" IS notified — the job must not linger as a permanent
-        // registry entry.
-        completeJob({ job, code: 0, reg, pi: pi as never, ctx, shouldNotify: false });
+        // Upstream treated "don't notify" as "already notified" and evicted
+        // the job at exit, so a `notify: false` command that FAILED was
+        // unobservable. "Don't wake me" is not "I know how it went".
+        completeJob({ job, code: 1, reg, pi: pi as never, ctx, notification: "suppressed" });
         assert.equal(messages.length, 0);
-        assert.equal(job.notified, true);
-        assert.equal(reg.jobs.has("job-9-4"), false, "evicted — no permanent registry entry");
+        assert.equal(job.status, "failed");
+        assert.equal(job.outcomeSurfaced, undefined);
+        assert.equal(reg.jobs.has("job-9-4"), true, "still listable");
+    });
+
+    void it('notification "suppressed" + completed still evicts', () => {
+        const { reg, pi, ctx, messages } = harness();
+        const job = mkJob({ id: "job-9-6", status: "running", exitCode: undefined });
+        add(reg, job);
+        // A success nobody asked to hear about is nothing to report, so it
+        // must not accumulate in the registry waiting for a `jobs list`.
+        completeJob({ job, code: 0, reg, pi: pi as never, ctx, notification: "suppressed" });
+        assert.equal(messages.length, 0);
+        assert.equal(reg.jobs.has("job-9-6"), false);
+        assert.equal(reg.recentTerminal.at(-1)?.id, "job-9-6");
     });
 });

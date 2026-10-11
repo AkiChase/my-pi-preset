@@ -123,8 +123,8 @@ export default function (pi: ExtensionAPI): void {
 
         // Claude Code's gracefulShutdown: kill ALL running tasks on ANY
         // shutdown reason, so no orphans outlive the session. The silent-kill
-        // path latches `notified`, so no <task-notification> fires on the way
-        // out. Log files are left for the OS to clean.
+        // path marks the outcome surfaced, so no <task-notification> fires on
+        // the way out. Log files are left for the OS to clean.
         for (const job of reg.jobs.values()) {
             if (job.status === "running") {
                 terminateJobSilently(reg, job);

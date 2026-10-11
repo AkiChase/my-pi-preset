@@ -89,8 +89,8 @@ void describe("monitor-session — lifecycle via a fake source", () => {
         assert.match(h.allText(), /line-B/);
         assert.equal(h.terminals().length, 1);
         const xml = h.terminals()[0].content;
-        assert.ok(xml.includes("<status>completed</status>"));
-        assert.ok(xml.includes(`<summary>Monitor "watch" stream ended</summary>`));
+        assert.ok(xml.includes("· completed]"));
+        assert.ok(xml.includes(`Monitor "watch" stream ended`));
         // Evicted by completeJob once the notification has fired.
         assert.equal(h.reg.jobs.has(h.job.id), false);
     });
@@ -103,7 +103,7 @@ void describe("monitor-session — lifecycle via a fake source", () => {
         h.resolveExit({ code: 1, signal: null });
         await sleep(60);
         assert.equal(h.terminals().length, 1);
-        assert.ok(h.terminals()[0].content.includes("<status>failed</status>"));
+        assert.ok(h.terminals()[0].content.includes("· failed]"));
         assert.ok(h.terminals()[0].content.includes(`Monitor "watch" script failed (exit 1)`));
     });
 
@@ -115,7 +115,7 @@ void describe("monitor-session — lifecycle via a fake source", () => {
         h.resolveExit({ code: null, signal: "SIGKILL" });
         await sleep(60);
         assert.equal(h.terminals().length, 1);
-        assert.ok(h.terminals()[0].content.includes("<status>killed</status>"));
+        assert.ok(h.terminals()[0].content.includes("· killed]"));
         assert.ok(h.terminals()[0].content.includes(`Monitor "watch" stopped`));
     });
 

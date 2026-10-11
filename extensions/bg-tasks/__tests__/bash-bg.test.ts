@@ -50,7 +50,7 @@ function harness() {
 }
 
 void describe("bash_bg — timeout kill is loud", () => {
-    void it("marks the log AND sends a killed <task-notification>", async () => {
+    void it("marks the log AND sends a killed notification", async () => {
         const { tool, ctx, messages } = harness();
         // `sleep` is excluded from auto-backgrounding, and a float duration
         // slips past the blocked-sleep guard — so the timeout hits the kill
@@ -69,7 +69,7 @@ void describe("bash_bg — timeout kill is loud", () => {
 
         const terminals = messages.filter((m) => m.customType === EVENT.taskNotification);
         assert.equal(terminals.length, 1, "the agent learns its command was timeout-killed");
-        assert.ok(terminals[0].content.includes("<status>killed</status>"));
+        assert.ok(terminals[0].content.includes("· killed]"));
         assert.ok(terminals[0].content.includes("was stopped"));
         assert.match(
             readFileSync(logPath, "utf-8"),

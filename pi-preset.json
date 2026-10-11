@@ -12,5 +12,23 @@
   "conflicts": [
     "npm:pi-patty-bg-tasks",
     "npm:@heyhuynhgiabuu/pi-pretty"
-  ]
+  ],
+  "settings": {
+    "retry": {
+      "maxRetries": 5
+    }
+  },
+  "keybindings": {
+    "app.session.rename": [],
+    "tui.editor.jumpForward": []
+  },
+  "preserve": {
+    "settings": [
+      "theme",
+      "defaultProvider",
+      "defaultModel",
+      "defaultThinkingLevel"
+    ],
+    "keybindings": []
+  }
 }

@@ -145,12 +145,12 @@ export function looksLikePrompt(tail: string): boolean {
 }
 
 /**
- * Send the interactive-prompt stall warning: Claude Code's <task-notification>
- * shape WITHOUT a <status> tag (CC omits it deliberately — the job is still
- * running), followed by the output tail and remediation guidance as plain
- * text, all as ONE message content. Delivered like a completion (steer +
- * triggerTurn). Does NOT touch the job's `notified` latch — a later real
- * completion must still notify.
+ * Send the interactive-prompt stall warning: the same notification shape as a
+ * completion but WITHOUT a status segment (CC omits it deliberately — the job
+ * is still running), carrying the output tail, plus remediation guidance, all
+ * as ONE message content. Delivered like a completion (steer + triggerTurn).
+ * Does NOT touch the job's `outcomeSurfaced` latch — a later real completion
+ * must still notify.
  */
 function sendStallPrompt(
     pi: ExtensionAPI,
@@ -161,9 +161,16 @@ function sendStallPrompt(
 ): void {
     const summary = `Background command "${description}" appears to be waiting for interactive input`;
     const content =
-        buildTaskNotification({ taskId: jobId, outputFile: logPath, summary }) +
-        `\nLast output:\n${tail.trimEnd()}\n\n` +
-        `The command is likely blocked on an interactive prompt. Kill this task and re-run ` +
+        // The tail goes through buildTaskNotification rather than a separate
+        // "Last output:" header, so a stall and a failure present their output
+        // the same way.
+        buildTaskNotification({
+            taskId: jobId,
+            outputFile: logPath,
+            summary,
+            outputTail: tail.trimEnd(),
+        }) +
+        `\n\nThe command is likely blocked on an interactive prompt. Kill this task and re-run ` +
         `with piped input (e.g., \`echo y | command\`) or a non-interactive flag if one exists.`;
 
     pi.sendMessage(

@@ -60,11 +60,34 @@ export interface Job {
     toolCallId: string;
     donePromise?: Promise<void>;
     resolveDone?: () => void;
-    /** Exactly-once latch for the terminal <task-notification> (Claude Code's
-     *  `notified` flag). Set BEFORE the notification send, before a deliberate
-     *  kill, and when the agent reads the outcome via jobs output/attach — any
-     *  path that already surfaced the result suppresses the notification. */
-    notified?: boolean;
+    /**
+     * Whether the agent has seen this job's terminal outcome — by
+     * <task-notification>, by asking for the kill, or by reading it through
+     * `jobs output` / `jobs attach`. Set only AFTER the outcome actually
+     * reached the agent, so a failed send leaves it clear and the job stays
+     * listed.
+     *
+     * Upstream had a single `notified` boolean carrying three different
+     * meanings at once ("already told", "don't tell", "being read right
+     * now"), which is why a `notify: false` failure could vanish without
+     * ever being reported. Those are now three separate fields.
+     */
+    outcomeSurfaced?: boolean;
+    /**
+     * In-flight `jobs attach` waits. While above zero the terminal
+     * notification is skipped — the attach result IS the report — but the
+     * outcome is NOT marked surfaced, so detaching early still leaves the job
+     * able to notify later. A counter rather than a flag because two attaches
+     * to one job must not have the first's return cancel the second's
+     * suppression.
+     */
+    attachCount?: number;
+    /**
+     * Why the last notification send failed. The outcome is then stranded:
+     * nothing reached the agent, so `jobs list` has to show the job and say
+     * so, rather than silently dropping it.
+     */
+    notifyError?: string;
     isBackgrounded: boolean;
     /** Defaults to "shell" when absent. */
     kind?: JobKind;

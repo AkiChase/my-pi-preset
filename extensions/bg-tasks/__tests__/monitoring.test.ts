@@ -94,22 +94,20 @@ void describe("watchStalls — 45s latch (fake timers)", () => {
         advance(STALL_THRESHOLD_MS - 10_000);
         assert.equal(sent.length, 0);
 
-        // Cross the threshold — fires with CC's statusless <task-notification>.
+        // Cross the threshold — fires with the statusless notification shape.
         advance(10_000 + STALL_CHECK_INTERVAL_MS);
         assert.equal(sent.length, 1);
         const content = sent[0].content ?? "";
-        // CC omits <status> deliberately — the job is still running.
+        // No status segment: CC omits it deliberately, the job is still running.
         const expectedHead = [
-            "<task-notification>",
-            "<task_id>job-1</task_id>",
-            `<output_file>${logPath}</output_file>`,
-            `<summary>Background command "npm install" appears to be waiting for interactive input</summary>`,
-            "</task-notification>",
+            `[task job-1] Background command "npm install" appears to be waiting for interactive input`,
+            `log: ${logPath}`,
+            "--- output tail ---",
+            "installing deps",
+            "Continue? (y/n)",
         ].join("\n");
-        assert.ok(content.startsWith(expectedHead), `content starts with the XML block:\n${content}`);
-        assert.ok(!content.includes("<status>"), "no status tag on a stall warning");
-        assert.ok(!content.includes("tool_use_id"), "no tool_use_id on a stall warning");
-        assert.ok(content.includes("Last output:\ninstalling deps\nContinue? (y/n)"));
+        assert.ok(content.startsWith(expectedHead), `content starts with the notification:\n${content}`);
+        assert.ok(!content.includes("·"), "no status segment on a stall warning");
         assert.ok(content.includes("Kill this task and re-run with piped input"));
         assert.ok(content.includes("or a non-interactive flag if one exists."));
         // Same channel and delivery as completions: task-notification, steer + wake.

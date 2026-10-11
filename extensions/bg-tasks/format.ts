@@ -62,7 +62,12 @@ export function formatJobLine(job: Job): string {
     // "▶ bg (12s) (12s)". oneLine() so a multi-line command cannot break the
     // one-job-per-line contract of `jobs list` (killAction already did this).
     const command = oneLine(job.command).slice(0, PREVIEW_CHARS.line);
-    return `${head} [${kind}]: ${command} - ${statusLabel(job)}`;
+    // A stranded outcome is worth a word: this job finished and the agent was
+    // never told, so the line in `jobs list` is the only trace of it.
+    const stranded = job.notifyError
+        ? ` [notification failed: ${oneLine(job.notifyError).slice(0, PREVIEW_CHARS.line)}]`
+        : "";
+    return `${head} [${kind}]: ${command} - ${statusLabel(job)}${stranded}`;
 }
 
 /** Truncate a tail with a consistent "showing last N chars" marker. */

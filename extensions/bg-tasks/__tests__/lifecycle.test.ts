@@ -110,11 +110,11 @@ void describe("ensureCompletionPromise", () => {
 });
 
 void describe("markKilledSilently", () => {
-    void it("status=killed, notified=true", () => {
+    void it("status=killed, outcome marked surfaced", () => {
         const job = makeJob();
         markKilledSilently(job);
         assert.equal(job.status, "killed");
-        assert.equal(job.notified, true);
+        assert.equal(job.outcomeSurfaced, true);
     });
 });
 

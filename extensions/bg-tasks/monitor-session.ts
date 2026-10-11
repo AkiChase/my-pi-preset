@@ -124,7 +124,7 @@ export function startMonitorSession(args: {
         renderSidebar(reg, ctx);
     }
 
-    // Wire exit → terminal event. shouldNotify:false because the monitor owns
+    // Wire exit → terminal event. notification:"self" because the monitor owns
     // its own terminal event (no double-fire from completeJob). Monitors stream their
     // own output, so the prompt-stall heuristic is nonsensical here; the oversize
     // cap is also suppressed for persistent watches (session-length log tails are
@@ -135,7 +135,7 @@ export function startMonitorSession(args: {
         ctx,
         job,
         exit: source.exit,
-        shouldNotify: false,
+        notification: "self",
         disablePromptStall: true,
         disableOversizeKill: persistent,
         onExit: ({ code, signal }) => {

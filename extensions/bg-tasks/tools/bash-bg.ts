@@ -69,7 +69,7 @@ export function registerBashBgTool(pi: ExtensionAPI, reg: BackgroundRegistry): v
             add(reg, job);
             const jobAc = startBackgroundJob({
                 reg, pi, ctx: ctx2, job, exit: spawned.exit,
-                shouldNotify: p.notify !== false,
+                notification: p.notify === false ? "suppressed" : "auto",
             });
 
             // Optional timeout — an overrun kills commands that were never

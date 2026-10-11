@@ -1,6 +1,6 @@
 /**
  * `jobs` tool actions — kill result strings (CC's TaskStopTool), unknown-id
- * errors, read-marks-notified (CC's TaskOutputTool), and the lazy eviction
+ * errors, a read surfacing the outcome (CC's TaskOutputTool), and the lazy eviction
  * sweep in `jobs list`.
  */
 
@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { BackgroundRegistry } from "../state.ts";
 import { registerJobsTool } from "../tools/jobs.ts";
 import { add, createRunningJob } from "../registry.ts";
-import { markNotified } from "../notify.ts";
+import { markOutcomeSurfaced } from "../notify.ts";
 import type { Job, UiContext } from "../types.ts";
 
 const dir = join(tmpdir(), `pi-bg-jobs-${process.pid}`);
@@ -84,7 +84,7 @@ void describe("jobs kill — CC's TaskStopTool", () => {
             `Successfully stopped task: ${job.id} (npm run build)`
         );
         assert.equal(job.status, "killed");
-        assert.equal(job.notified, true, "latched so the exit path skips notifying");
+        assert.equal(job.outcomeSurfaced, true, "marked so the exit path skips notifying");
         assert.equal(messages.length, 0, "no <task-notification> for a deliberate kill");
     });
 
@@ -97,21 +97,21 @@ void describe("jobs kill — CC's TaskStopTool", () => {
     });
 });
 
-void describe("jobs output — read-marks-notified", () => {
-    void it("marks a terminal job notified on read", async () => {
+void describe("jobs output — a read surfaces the outcome", () => {
+    void it("marks a terminal job surfaced on read", async () => {
         const { tool, reg, ctx } = harness();
         const job = mkJob(reg, { id: `job-${process.pid}-o1` });
         job.status = "completed";
         job.exitCode = 0;
         await tool.execute("t3", { action: "output", jobId: job.id }, undefined, undefined, ctx);
-        assert.equal(job.notified, true);
+        assert.equal(job.outcomeSurfaced, true);
     });
 
     void it("does NOT mark a still-running job (peek)", async () => {
         const { tool, reg, ctx } = harness();
         const job = mkJob(reg, { id: `job-${process.pid}-o2` });
         await tool.execute("t4", { action: "output", jobId: job.id }, undefined, undefined, ctx);
-        assert.equal(job.notified, undefined, "completion must still notify later");
+        assert.equal(job.outcomeSurfaced, undefined, "completion must still notify later");
     });
 
     void it("unknown id errors with CC's exact string", async () => {
@@ -124,21 +124,89 @@ void describe("jobs output — read-marks-notified", () => {
 });
 
 void describe("jobs list — lazy sweep", () => {
-    void it("sweeps terminal+notified jobs into the recent-terminal ring", async () => {
+    void it("sweeps surfaced terminal jobs into the recent-terminal ring", async () => {
         const { tool, reg, ctx } = harness();
         const running = mkJob(reg, { id: `job-${process.pid}-l1`, command: "run-me" });
         const swept = mkJob(reg, { id: `job-${process.pid}-l3`, command: "done-read" });
         swept.status = "completed";
         swept.exitCode = 0;
-        markNotified(swept);
+        markOutcomeSurfaced(swept);
 
         const res = await tool.execute("t6", { action: "list" }, undefined, undefined, ctx);
         const text = res.content[0].text;
 
-        assert.equal(reg.jobs.has(swept.id), false, "terminal+notified evicted by the sweep");
+        assert.equal(reg.jobs.has(swept.id), false, "surfaced terminal job evicted by the sweep");
         assert.ok(text.includes("run-me"), "running job listed");
         assert.match(text, /done-read - ✓ completed\n?$/, "swept job shows as a recent terminal");
         assert.ok(running.status === "running");
+    });
+
+    void it("lists a terminal job whose outcome never reached the agent", async () => {
+        // The whole point of splitting the latch: a `notify: false` job that
+        // FAILED, or one whose notification send threw, is terminal and
+        // unsurfaced. Upstream listed only running jobs plus the recent ring,
+        // so this job appeared nowhere at all.
+        const { tool, reg, ctx } = harness();
+        const stranded = mkJob(reg, { id: `job-${process.pid}-l4`, command: "quiet-fail" });
+        stranded.status = "failed";
+        stranded.exitCode = 3;
+        stranded.notifyError = "steer queue closed";
+
+        const res = await tool.execute("t7", { action: "list" }, undefined, undefined, ctx);
+        const text = res.content[0].text;
+
+        assert.ok(reg.jobs.has(stranded.id), "not swept — nobody has been told");
+        assert.ok(text.includes("quiet-fail"), "listed despite being terminal");
+        assert.match(text, /notification failed: steer queue closed/);
+    });
+});
+
+void describe("jobs attach — suppression is scoped to the wait", () => {
+    void it("an aborted attach leaves the job able to notify later", async () => {
+        const { tool, reg, ctx } = harness();
+        const job = mkJob(reg, { id: `job-${process.pid}-a1`, command: "long-build" });
+        // ensureCompletionPromise is called inside attachAction; the job stays
+        // running, so only the abort resolves the race.
+        const ac = new AbortController();
+        const pending = tool.execute(
+            "t8",
+            { action: "attach", jobId: job.id, wait: true },
+            ac.signal,
+            () => {},
+            ctx
+        );
+        // The wait is in flight: the exit path must stay quiet, because this
+        // attach is the one that would report.
+        assert.equal(job.attachCount, 1);
+        ac.abort();
+        const res = await pending;
+
+        assert.match(res.content[0].text, /Stopped following/);
+        // Upstream wrote `job.notified = false` here, clobbering the shared
+        // latch. The counter is scoped instead, and the outcome was never
+        // surfaced, so the job's own notification can still fire.
+        assert.equal(job.attachCount, 0);
+        assert.equal(job.outcomeSurfaced, undefined);
+    });
+
+    void it("two concurrent attaches do not cancel each other's suppression", async () => {
+        const { tool, reg, ctx } = harness();
+        const job = mkJob(reg, { id: `job-${process.pid}-a2`, command: "long-build" });
+        const first = new AbortController();
+        const second = new AbortController();
+        const a = tool.execute("t9", { action: "attach", jobId: job.id, wait: true }, first.signal, () => {}, ctx);
+        const b = tool.execute("t10", { action: "attach", jobId: job.id, wait: true }, second.signal, () => {}, ctx);
+        assert.equal(job.attachCount, 2);
+
+        first.abort();
+        await a;
+        // With a boolean this would already have re-enabled notifications
+        // while the second attach was still waiting to report.
+        assert.equal(job.attachCount, 1);
+
+        second.abort();
+        await b;
+        assert.equal(job.attachCount, 0);
     });
 });
 

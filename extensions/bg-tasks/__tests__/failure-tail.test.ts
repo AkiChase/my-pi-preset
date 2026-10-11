@@ -107,35 +107,35 @@ void describe("failureTail", () => {
     });
 });
 
-void describe("buildTaskNotification — <output_tail>", () => {
-    void it("omits the element when there is no tail", () => {
-        const xml = buildTaskNotification({
+void describe("buildTaskNotification — the tail block", () => {
+    void it("omits the block when there is no tail", () => {
+        const text = buildTaskNotification({
             taskId: "b1",
             outputFile: "/tmp/b1.log",
             status: "completed",
             summary: "done",
         });
-        assert.ok(!xml.includes("<output_tail>"));
+        assert.ok(!text.includes("output tail"));
     });
-    void it("includes and escapes the tail when present", () => {
-        const xml = buildTaskNotification({
+    void it("passes the tail through verbatim — no escaping to undo", () => {
+        const text = buildTaskNotification({
             taskId: "b1",
             outputFile: "/tmp/b1.log",
             status: "failed",
             summary: "failed",
             outputTail: "error in <main> & co",
         });
-        assert.match(xml, /<output_tail>\nerror in &lt;main&gt; &amp; co\n<\/output_tail>/);
+        assert.match(text, /--- output tail ---\nerror in <main> & co$/);
     });
 });
 
 void describe("sendTaskNotification — failure carries its own output", () => {
-    void it("inlines the tail in both the XML and details", () => {
+    void it("inlines the tail in both the text and details", () => {
         const { reg, pi, messages } = harness();
         const job = mkJob({ logPath: writeLog("send-fail.log", "ERROR: boom\n") });
         sendTaskNotification({ reg, pi: pi as never, job });
         assert.equal(messages.length, 1);
-        assert.match(messages[0]!.content, /<output_tail>\nERROR: boom\n<\/output_tail>/);
+        assert.match(messages[0]!.content, /--- output tail ---\nERROR: boom$/);
         assert.equal(messages[0]!.details?.outputTail, "ERROR: boom");
     });
     void it("sends no tail for a completed job", () => {
@@ -146,7 +146,7 @@ void describe("sendTaskNotification — failure carries its own output", () => {
             logPath: writeLog("send-ok.log", "fine\n"),
         });
         sendTaskNotification({ reg, pi: pi as never, job });
-        assert.ok(!messages[0]!.content.includes("<output_tail>"));
+        assert.ok(!messages[0]!.content.includes("output tail"));
         assert.equal(messages[0]!.details?.outputTail, undefined);
     });
 });

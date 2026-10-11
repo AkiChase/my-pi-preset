@@ -82,7 +82,7 @@ void describe("monitor tool — validation", () => {
 });
 
 void describe("monitor tool — command lifecycle", () => {
-    void it("streams lines live, and sends one terminal <task-notification>", async () => {
+    void it("streams lines live, and sends one terminal notification", async () => {
         const { tool, ctx, messages } = makeHarness();
         const res = await tool.execute(
             "t4",
@@ -108,8 +108,8 @@ void describe("monitor tool — command lifecycle", () => {
         const terminals = messages.filter((m) => m.customType === EVENT.taskNotification);
         assert.equal(terminals.length, 1, "exactly one terminal notification");
         const content = (terminals[0] as unknown as { content: string }).content;
-        assert.ok(content.includes("<status>completed</status>"));
-        assert.ok(content.includes(`<summary>Monitor "test stream" stream ended</summary>`));
+        assert.ok(content.includes("· completed]"));
+        assert.ok(content.includes(`Monitor "test stream" stream ended`));
     });
 });
 

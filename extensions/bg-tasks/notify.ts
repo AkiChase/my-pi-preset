@@ -2,17 +2,24 @@
  * Task-completion notifications — Claude Code's <task-notification> engine.
  *
  * Every backgrounded job that reaches a terminal state enqueues its OWN
- * <task-notification> XML message, exactly once, the moment it exits. There
- * is no hold-and-flush and no coalescing window: pi's steer delivery queues
- * the message while the agent is streaming and delivers it at the next
- * tool-call boundary (CC's 'next' priority), or starts a turn when the agent
- * is idle (triggerTurn: true).
+ * notification message, exactly once, the moment it exits. There is no
+ * hold-and-flush and no coalescing window: pi's steer delivery queues the
+ * message while the agent is streaming and delivers it at the next tool-call
+ * boundary (CC's 'next' priority), or starts a turn when the agent is idle
+ * (triggerTurn: true).
  *
- * Exactly-once is enforced by the job's `notified` latch — a check-and-set
- * done BEFORE the send, so any path that already surfaced the outcome (a
- * jobs output/attach read, a deliberate kill) suppresses the notification.
- * A terminal job that has been notified is evicted from the live registry;
- * its output log stays on disk and the notification carries the path.
+ * Exactly-once is enforced by the job's `outcomeSurfaced` latch, set after a
+ * successful send, so any path that already surfaced the outcome (a jobs
+ * output/attach read, a deliberate kill) suppresses the notification. A
+ * terminal job whose outcome has been surfaced is evicted from the live
+ * registry; its output log stays on disk and the notification carries the
+ * path.
+ *
+ * Deviation from upstream: the latch is set AFTER the send, not before. Set
+ * before, a `sendMessage` that throws loses the outcome permanently — the job
+ * sat terminal and "notified" with nothing having reached the agent. Since
+ * `sendMessage` is synchronous there is no window for a concurrent send to
+ * slip in between, so ordering it after costs no duplicate protection.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -27,45 +34,46 @@ import { forget } from "./registry.ts";
 import { describeJob } from "./format.ts";
 import { readTailLines } from "./output.ts";
 
-/** Terminal statuses a <task-notification> can carry. */
+/** Terminal statuses a notification can carry. */
 export type TerminalStatus = "completed" | "failed" | "killed";
 
-/** Escape the XML special characters CC escapes inside element text. */
-export function escapeXml(s: string): string {
-    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
 /**
- * Build Claude Code's <task-notification> XML block, plus our `<output_tail>`
- * extension. The <tool_use_id> line is included only when a toolUseId is
- * present; the <status> line is omitted deliberately for stall warnings (CC
- * parity).
+ * Compose a job notification's model-facing text.
  *
- * Deviation from upstream: a non-successful outcome carries the tail of its
- * log inline. Upstream sent only "... failed with exit code 3", which forced
- * a `jobs output` round-trip on EVERY failure just to learn the reason.
+ * Deviation from upstream: upstream emitted Claude Code's `<task-notification>`
+ * XML block verbatim — seven lines of tags wrapping four short values, with
+ * `<summary>` duplicating `details.summary` exactly. CC needs that XML because
+ * its notification is injected as plain conversation text; here the message is
+ * a `customType` with a `details` payload and a dedicated renderer, so the
+ * structure already travels out-of-band and the tags buy nothing but tokens
+ * on every single job completion.
+ *
+ * What survives is what the model cannot get from `details`: the summary, the
+ * log path (so it can read more), and the log tail of a failure. `toolUseId`
+ * moved to `details` only — nothing in pi lets the model address a tool-use id,
+ * and the job id already identifies the task in both the tool result and here.
+ *
+ * The status segment is omitted for stall warnings (CC parity — the job is
+ * still running, so no outcome has happened yet).
  */
 export function buildTaskNotification(args: {
     taskId: string;
-    toolUseId?: string;
     outputFile: string;
     status?: TerminalStatus;
     summary: string;
-    /** Log tail for failures; "" or omitted renders no element. */
+    /** Log tail for failures; "" or omitted renders no tail block. */
     outputTail?: string;
 }): string {
-    const lines = [
-        "<task-notification>",
-        `<task_id>${escapeXml(args.taskId)}</task_id>`,
-        ...(args.toolUseId ? [`<tool_use_id>${escapeXml(args.toolUseId)}</tool_use_id>`] : []),
-        `<output_file>${escapeXml(args.outputFile)}</output_file>`,
-        ...(args.status ? [`<status>${args.status}</status>`] : []),
-        `<summary>${escapeXml(args.summary)}</summary>`,
-        ...(args.outputTail
-            ? [`<output_tail>\n${escapeXml(args.outputTail)}\n</output_tail>`]
-            : []),
-        "</task-notification>",
-    ];
+    const head = args.status
+        ? `[task ${args.taskId} · ${args.status}]`
+        : `[task ${args.taskId}]`;
+    const lines = [`${head} ${args.summary}`, `log: ${args.outputFile}`];
+    // The tail is the one field that genuinely needs its own lines, so it keeps
+    // a delimiter: without one, a log line reading like prose is
+    // indistinguishable from the notification's own text.
+    if (args.outputTail) {
+        lines.push("--- output tail ---", args.outputTail);
+    }
     return lines.join("\n");
 }
 
@@ -116,25 +124,32 @@ export function completionSummary(job: Job, status?: TerminalStatus): string {
 }
 
 /**
- * Set the notified latch (Claude Code's markTaskNotified). Idempotent. Called
- * by every path that surfaces a job's outcome WITHOUT the notification: kill
- * paths (before the kill, so the exit handler skips notifying) and terminal
- * reads (jobs output / attach).
+ * Record that the agent has seen a job's outcome (Claude Code's
+ * markTaskNotified). Idempotent. Called by every path that surfaces the
+ * outcome WITHOUT a notification: kill paths (before the kill, so the exit
+ * handler skips notifying) and terminal reads (jobs output / attach).
  */
-export function markNotified(job: Job): void {
-    job.notified = true;
+export function markOutcomeSurfaced(job: Job): void {
+    job.outcomeSurfaced = true;
+    // The outcome got through by another route, so a stale send failure is no
+    // longer worth reporting.
+    delete job.notifyError;
 }
 
 /**
- * Send a terminal job's <task-notification>, exactly once. The latch is set
- * BEFORE the send, so a concurrent consumer can never produce a duplicate;
- * if the send itself throws, the notification is lost rather than retried
- * (exactly-once), and the terminal+notified job lingers until the lazy sweep
- * in `jobs list`.
+ * Send a terminal job's notification, at most once.
  *
- * On success the job is evicted from the live registry (terminal + notified)
- * unless `evict: false` — the monitor path sends before the job is marked
- * terminal and lets completeJob evict instead.
+ * Skipped — without marking the outcome surfaced — while a `jobs attach` is
+ * waiting on the job, because that attach's result is the report. Skipped
+ * permanently once the outcome has been surfaced by any route.
+ *
+ * A send that throws records `job.notifyError` and returns false, leaving the
+ * job terminal, unsurfaced, and still in the registry so `jobs list` can
+ * report it. Upstream dropped it to a console.error and the outcome was gone.
+ *
+ * On success the job is evicted from the live registry unless `evict: false`
+ * — the monitor path sends before the job is marked terminal and lets
+ * completeJob evict instead.
  *
  * Returns true when the notification was sent.
  */
@@ -149,8 +164,8 @@ export function sendTaskNotification(args: {
     evict?: boolean;
 }): boolean {
     const { reg, pi, job } = args;
-    if (job.notified) return false;
-    job.notified = true;
+    if (job.outcomeSurfaced) return false;
+    if ((job.attachCount ?? 0) > 0) return false;
     const status = args.status ?? (job.status as TerminalStatus);
     const summary = args.summary ?? completionSummary(job, status);
     const outputTail = failureTail(job, status, reg.config);
@@ -161,7 +176,6 @@ export function sendTaskNotification(args: {
                 customType: EVENT.taskNotification,
                 content: buildTaskNotification({
                     taskId: job.id,
-                    toolUseId: job.toolCallId || undefined,
                     outputFile: job.logPath,
                     status,
                     summary,
@@ -173,15 +187,20 @@ export function sendTaskNotification(args: {
                     status,
                     summary,
                     outputFile: job.logPath,
+                    // Kept for correlation by anything reading the session log;
+                    // deliberately out of the model-facing text.
+                    ...(job.toolCallId ? { toolUseId: job.toolCallId } : {}),
                     ...(outputTail ? { outputTail } : {}),
                 },
             },
             DELIVER_STEER
         );
     } catch (err) {
+        job.notifyError = (err as Error).message || String(err);
         console.error("[bg-tasks] task notification failed:", err);
         return false;
     }
+    markOutcomeSurfaced(job);
     if (args.evict !== false) forget(reg, job);
     return true;
 }

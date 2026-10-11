@@ -143,7 +143,7 @@ void describe("renderSidebar — pill shows live progress", () => {
         });
         add(reg, job);
         job.status = "killed";
-        job.notified = true;
+        job.outcomeSurfaced = true;
 
         const { ctx, getWidget } = ctxStub();
         renderSidebar(reg, ctx);

@@ -137,7 +137,7 @@ void describe("bash tool — Claude Code tool-result strings", () => {
 
         const terminals = messages.filter((m) => m.customType === EVENT.taskNotification);
         assert.equal(terminals.length, 1);
-        assert.ok(terminals[0].content.includes("<status>killed</status>"));
+        assert.ok(terminals[0].content.includes("· killed]"));
         assert.ok(terminals[0].content.includes("was stopped"));
         assert.ok(!terminals[0].content.includes("completed"));
         assert.equal(job.status, "killed");

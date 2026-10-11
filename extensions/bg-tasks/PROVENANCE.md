@@ -100,3 +100,37 @@ explainable.
   - New `/bg-config` command: shows the source file, the overridden keys with their
     defaults, and any load warnings.
   - New tests: `__tests__/config.test.ts`, `__tests__/shortcuts.test.ts`.
+- **The `notified` latch is split into three fields.** Upstream had one boolean on `Job`
+  carrying three unrelated meanings at once: "the agent has been told", "don't tell the
+  agent" (`bash_bg notify: false`), and "a `jobs attach` is reading this right now". The
+  consequences were real, not stylistic:
+  - A `notify: false` job that FAILED was marked notified and evicted at exit, so its
+    failure reached nobody — and `jobs list` showed only running jobs plus the recent-
+    terminal ring, so it was visible nowhere at all.
+  - `sendTaskNotification` set the latch BEFORE `pi.sendMessage`, so a send that threw
+    lost the outcome permanently: the job sat terminal and "notified" with nothing
+    delivered, and the only trace was a `console.error`.
+  - `attachAction` wrote `job.notified = true` before its wait and `= false` on abort —
+    the same field the exit callback reads. Two concurrent attaches had the first's
+    return cancel the second's suppression, and a throw between the two writes left the
+    job permanently unable to notify.
+
+  Now `Job` has `outcomeSurfaced` (set only AFTER a delivery actually reached the agent),
+  `attachCount` (a counter, scoped to the wait, decremented in a `finally`), and
+  `notifyError` (why the last send failed). `completeJob`'s `shouldNotify?: boolean`
+  became `notification?: "auto" | "self" | "suppressed"`, because upstream's single
+  `false` covered both "a monitor already sent its own" and "never send one" — which want
+  opposite handling. A failed-and-unreported job stays in the registry and `jobs list`
+  lists it with `[notification failed: …]`; a suppressed job that merely *succeeded*
+  still evicts, since a success nobody asked about is nothing to report.
+- **The notification text is compact instead of XML.** Upstream emitted Claude Code's
+  `<task-notification>` block verbatim — seven lines of tags around four short values,
+  with `<summary>` duplicating `details.summary` exactly. CC needs the XML because its
+  notification is injected as plain conversation text; here the message is a `customType`
+  with a `details` payload and a dedicated renderer, so the structure already travels
+  out-of-band. What is left is what `details` cannot deliver to the model: a one-line
+  `[task <id> · <status>] <summary>`, a `log:` line, and the tail block for a failure.
+  `escapeXml` is gone (nothing left to escape) and `toolUseId` moved to `details` only —
+  nothing in pi lets the model address a tool-use id. The stall warning in
+  `monitoring.ts` now routes its tail through the same `outputTail` parameter instead of
+  appending its own `"Last output:"` header, so a stall and a failure look alike.
