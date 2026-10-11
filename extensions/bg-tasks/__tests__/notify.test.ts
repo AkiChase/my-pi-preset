@@ -161,21 +161,6 @@ void describe("completionSummary — CC's exact strings", () => {
             `Monitor "API health" stopped`
         );
     });
-    void it("agent summaries", () => {
-        const base = { kind: "agent" as const, command: "pi -p (background agent)" };
-        assert.equal(
-            completionSummary(mkJob({ ...base, status: "completed" })),
-            `Agent "pi -p (background agent)" completed`
-        );
-        assert.equal(
-            completionSummary(mkJob({ ...base, status: "failed", exitCode: 1 })),
-            `Agent "pi -p (background agent)" failed: exit code 1`
-        );
-        assert.equal(
-            completionSummary(mkJob({ ...base, status: "killed" })),
-            `Agent "pi -p (background agent)" was stopped`
-        );
-    });
 });
 
 void describe("sendTaskNotification — exactly-once + eviction", () => {

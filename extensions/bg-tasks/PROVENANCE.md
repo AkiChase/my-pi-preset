@@ -15,7 +15,7 @@ The files in this directory started as a one-time copy of the `src/` tree of
 
 There is no sync path back to upstream, and that is deliberate: the point of the copy
 is to rework the interaction model (notification timing, `Ctrl+B` and the hint line,
-`jobs` output, `monitor` / `agent_bg` streaming), which upstream's structure is not
+`jobs` output, `monitor` streaming), which upstream's structure is not
 converging on. Edit these files in place. Do not add `pi-patty-bg-tasks` back as a
 dependency — it registers the same tool names and would conflict (see
 `pi-preset.json` → `conflicts`).
@@ -219,3 +219,12 @@ explainable.
     the source exit, which routes through `finishMonitor("failed", …)` to a steering
     `<task-notification>` that wakes the agent with the close code in its tail. Whether to
     reconnect is the agent's call, not the library's.
+- **`agent_bg` removed.** It spawned a detached `pi -p` and rebuilt the session context by
+  scraping the first user message and the last assistant message, each truncated to 2000
+  characters — a guess at context. `@tintinweb/pi-subagents` (in this preset) does the same
+  job properly in-process: `inherit_context` forks the real conversation, the result comes
+  back structured instead of as a byte tail, and it supports steering, resume, worktree
+  isolation and per-agent model selection. The one behavioural difference was that the
+  detached child outlived the session, but nothing collects its result once the registry is
+  gone, so that left an orphan writing to /tmp rather than a feature. `JobKind` lost its
+  `"agent"` variant and `JOB_ID_PREFIX` its `"a"` prefix with it.

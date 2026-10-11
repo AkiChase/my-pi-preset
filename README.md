@@ -234,7 +234,7 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 
 **提供**：
 
-- 工具：`bash`（覆盖内置，新增 `run_in_background`、`timeout`、`description` 参数）、`bash_bg`（直接后台启动）、`jobs`（list / output / kill / attach / search / cleanup / stats；output 支持按字节 offset 翻页读大日志，search 支持限定单任务、忽略大小写、上下文行）、`agent_bg`（后台跑一个独立 `pi -p` 进程）、`monitor`（按事件流监听命令输出或 WebSocket）。日志默认落在 `/tmp/pi-bg/<jobId>.log`。
+- 工具：`bash`（覆盖内置，新增 `run_in_background`、`timeout`、`description` 参数）、`bash_bg`（直接后台启动）、`jobs`（list / output / kill / attach / search / cleanup / stats；output 支持按字节 offset 翻页读大日志，search 支持限定单任务、忽略大小写、上下文行）、`monitor`（按事件流监听命令输出或 WebSocket）。日志默认落在 `/tmp/pi-bg/<jobId>.log`。
 - 斜杠命令：`/bg` 转后台、`/bg-list` 任务面板、`/bg-version` 打印版本和路径、`/bg-config` 显示生效的配置、来源文件和加载警告。
 - 快捷键（默认值，可改）：`ctrl+shift+b` 转后台，`ctrl+shift+j` / `shift+down` 打开任务面板，`ctrl+shift+x` kill 最近一个运行中的作业。
 
