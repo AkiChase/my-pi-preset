@@ -1,0 +1,23 @@
+{
+  // Type checking only; pi loads the .ts files directly (jiti), there is no build step.
+  // `pnpm typecheck` links pi's own SDK packages into node_modules first (scripts/link-pi-sdk.mjs).
+  // Only .ts is checked: scripts/*.mjs are plain JS with no annotations, and checkJs there
+  // produces nothing but implicit-any noise.
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+    "strict": true,
+    "allowImportingTsExtensions": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "allowJs": true,
+    "noEmit": true
+  },
+  "include": ["extensions/**/*.ts"],
+  "exclude": ["node_modules"]
+}

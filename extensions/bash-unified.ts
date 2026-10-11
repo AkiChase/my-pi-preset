@@ -1,22 +1,24 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import * as hostSdk from "@earendil-works/pi-coding-agent";
-import patty from "pi-patty-bg-tasks";
+// Vendored from pi-patty-bg-tasks — see extensions/bg-tasks/PROVENANCE.md. It is our code now:
+// edit it in place, there is no upstream to merge back from.
+import bgTasks from "./bg-tasks/index.ts";
 // Deep import of `src`, not the package root: pretty's `pi.extensions` manifest points at
 // `./src/index.ts`, so this is the entry pi itself loads, and its `dist` build can lag.
 // There is no `exports` field blocking the subpath today; if upstream adds one, this throws
 // loudly at load time rather than silently degrading.
 import pretty from "@heyhuynhgiabuu/pi-pretty/src/index.ts";
 
-// Loads pi-patty-bg-tasks and pi-pretty as one extension so they can share `bash`.
+// Loads the vendored bg-tasks extension and pi-pretty as one extension so they can share `bash`.
 //
 // Both packages register a tool named `bash`, and pi refuses two extensions owning the
-// same tool name. Their halves are complementary: patty's bash only changes execution
+// same tool name. Their halves are complementary: bg-tasks' bash only changes execution
 // (run_in_background, auto-background on timeout, Ctrl+B), pretty's bash only changes
 // rendering and delegates execution to the SDK bash definition it is given.
 //
-// So: run patty with its `bash` registration captured instead of registered, then hand
+// So: run bg-tasks with its `bash` registration captured instead of registered, then hand
 // that definition to pretty as its "SDK" bash via pretty's `deps.sdk` injection point.
-// Pretty registers the single `bash`: patty's execute + parameters, pretty's renderers.
+// Pretty registers the single `bash`: bg-tasks' execute + parameters, pretty's renderers.
 // Every other tool, command, shortcut and event handler from both passes through as-is.
 //
 // Do not also install npm:pi-patty-bg-tasks or npm:@heyhuynhgiabuu/pi-pretty as separate
@@ -37,12 +39,12 @@ function interceptTool(pi: ExtensionAPI, name: string, onTool: (tool: ToolDef) =
 }
 
 export default async function bashUnified(pi: ExtensionAPI): Promise<void> {
-  let pattyBash: ToolDef | undefined;
-  patty(interceptTool(pi, "bash", (tool) => (pattyBash = tool)));
-  if (!pattyBash) {
-    throw new Error("bash-unified: pi-patty-bg-tasks did not register a `bash` tool; its entry point changed");
+  let capturedBash: ToolDef | undefined;
+  bgTasks(interceptTool(pi, "bash", (tool) => (capturedBash = tool)));
+  if (!capturedBash) {
+    throw new Error("bash-unified: extensions/bg-tasks did not register a `bash` tool; its entry point changed");
   }
-  const backgroundBash = pattyBash;
+  const backgroundBash = capturedBash;
 
   await pretty(
     interceptTool(pi, "bash", (tool) =>

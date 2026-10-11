@@ -7,11 +7,23 @@
   "keywords": [
     "pi-package"
   ],
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "link-sdk": "node scripts/link-pi-sdk.mjs",
+    "typecheck": "node scripts/link-pi-sdk.mjs && tsc -p tsconfig.json",
+    "test": "node scripts/link-pi-sdk.mjs && node --test --test-force-exit \"extensions/**/__tests__/*.test.ts\" \"scripts/*.test.mjs\"",
+    "check": "pnpm run typecheck && pnpm run test"
+  },
   "peerDependencies": {
+    "@earendil-works/pi-agent-core": "*",
+    "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*"
   },
   "dependencies": {
-    "@heyhuynhgiabuu/pi-pretty": "^0.6.31",
-    "pi-patty-bg-tasks": "^1.1.6"
+    "@heyhuynhgiabuu/pi-pretty": "^0.6.31"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "^5.9.3"
   }
 }
