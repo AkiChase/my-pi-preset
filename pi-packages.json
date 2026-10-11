@@ -5,6 +5,7 @@
     "npm:pi-cache-optimizer": "latest",
     "npm:pi-input-history": "latest",
     "npm:pi-web-access": "latest",
+    "npm:pi-memory": "latest",
     "npm:@tintinweb/pi-subagents": "latest",
     "npm:@juicesharp/rpiv-ask-user-question": "latest"
   },
