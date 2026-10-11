@@ -1,0 +1,15 @@
+{
+  "packages": {
+    "git:github.com/AkiChase/my-pi-extensions": "latest",
+    "npm:pi-session-name": "latest",
+    "npm:pi-cache-optimizer": "latest",
+    "npm:pi-input-history": "latest",
+    "npm:pi-web-access": "latest",
+    "npm:@tintinweb/pi-subagents": "latest",
+    "npm:@juicesharp/rpiv-ask-user-question": "latest"
+  },
+  "conflicts": [
+    "npm:pi-patty-bg-tasks",
+    "npm:@heyhuynhgiabuu/pi-pretty"
+  ]
+}

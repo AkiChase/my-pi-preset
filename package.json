@@ -9,5 +9,9 @@
   ],
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
+  },
+  "dependencies": {
+    "@heyhuynhgiabuu/pi-pretty": "^0.6.31",
+    "pi-patty-bg-tasks": "^1.1.6"
   }
 }
