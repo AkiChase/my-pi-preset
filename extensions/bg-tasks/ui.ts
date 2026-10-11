@@ -8,7 +8,7 @@
  */
 
 import type { Job, UiContext } from "./types.ts";
-import { OUTPUT_PREVIEW_CHARS, PREVIEW_CHARS } from "./types.ts";
+import { PREVIEW_CHARS } from "./types.ts";
 import type { BackgroundRegistry } from "./state.ts";
 import { formatDuration, jobLabel } from "./format.ts";
 import { terminateJobSilently } from "./lifecycle.ts";
@@ -61,7 +61,7 @@ async function showJobActions(
             options
         );
         if (action === undefined) return false;
-        if (action === "Show Output") { await showOutput(job, ctx); return true; }
+        if (action === "Show Output") { await showOutput(job, reg, ctx); return true; }
         if (action === "Kill") {
             terminateJobSilently(reg, job);
             renderSidebar(reg, ctx);
@@ -74,7 +74,7 @@ async function showJobActions(
     const options = ["Show Output", "Remove", "← Back"];
     const action = await ctx.ui.select(`${statusIcon(job)} ${name} · ${job.status}`, options);
     if (action === undefined) return false;
-    if (action === "Show Output") { await showOutput(job, ctx); return true; }
+    if (action === "Show Output") { await showOutput(job, reg, ctx); return true; }
     if (action === "Remove") {
         forget(reg, job);
         renderSidebar(reg, ctx);
@@ -84,8 +84,12 @@ async function showJobActions(
     return true;
 }
 
-async function showOutput(job: Job, ctx: UiContext): Promise<void> {
-    const out = readLogTail(job, OUTPUT_PREVIEW_CHARS);
+async function showOutput(
+    job: Job,
+    reg: BackgroundRegistry,
+    ctx: UiContext
+): Promise<void> {
+    const out = readLogTail(job, reg.config.outputPreviewChars);
     const dur = formatDuration(Date.now() - job.startTime);
     const exitLine = job.exitCode !== undefined ? `\nExit code: ${job.exitCode}` : "";
     await ctx.ui.editor(

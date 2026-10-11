@@ -74,3 +74,29 @@ explainable.
     failed.
   - New constants in `types.ts`: `FAILURE_TAIL_LINES`, `FAILURE_TAIL_CHARS`,
     `NOTIFICATION_TAIL_LINES_SHOWN`. New tests in `__tests__/failure-tail.test.ts`.
+    (These three moved into `config.ts` in the change below.)
+- **A configuration file.** Upstream had no configuration surface at all: every knob was
+  an `export const` in `types.ts`, every shortcut a hardcoded chord in `shortcuts.ts`, and
+  the log directory a `const LOG_DIR = "/tmp/pi-bg"`. A preset that follows its owner onto
+  several machines needs those to vary, and `pi.registerShortcut` takes a raw chord rather
+  than an action id — so `keybindings.json` cannot reach these keys and a config file is
+  the only way to move or release one.
+  - New `config.ts`: `DEFAULTS` (frozen), `loadConfig(agentDir?, env?)`, `BgTasksConfig`.
+    Precedence env > file > default, matching pi-pretty. `~/.pi/agent/bg-tasks.json`.
+    Synchronous because shortcut registration happens during extension load, and total
+    because a malformed config must never stop the extension loading: bad values fall back
+    with a warning, unknown keys are reported, nothing throws.
+  - The resolved config lives on `BackgroundRegistry` (`reg.config`) — `reg` already
+    reaches every tool and helper. A module-level singleton read at import time would have
+    made every test share one config and been uninjectable. Leaf helpers without a registry
+    (`watchStalls`, `followLines`, `failureTail`) take the values as parameters, defaulting
+    to `DEFAULTS`.
+  - `logPathFor`/`errPathFor` now take the registry; `LOG_DIR` is gone.
+  - `bash-params.ts` became a function of the config: two of its parameter descriptions
+    quote the timeout and the log directory, and a stale literal there is a lie told
+    straight to the model. Same for the `bash`/`bash_bg`/`monitor` tool descriptions.
+  - `registerShortcuts` returns warnings instead of throwing, so one rejected chord does
+    not cost the other three bindings.
+  - New `/bg-config` command: shows the source file, the overridden keys with their
+    defaults, and any load warnings.
+  - New tests: `__tests__/config.test.ts`, `__tests__/shortcuts.test.ts`.

@@ -20,8 +20,6 @@ import {
 import { appendFileSync, unlinkSync } from "node:fs";
 import type { BackgroundRegistry } from "../state.ts";
 import {
-    DEFAULT_TIMEOUT_MS,
-    OUTPUT_PREVIEW_CHARS,
     QUICK_COMPLETION_MS,
     type ForegroundSlot,
     type UiContext,
@@ -62,7 +60,8 @@ export function registerBashTool(
         ...originalBash,
         name: "bash",
         description:
-            "Run a bash command. Long-running commands auto-background after timeout. " +
+            `Run a bash command. Long-running commands auto-background after ` +
+            `${Math.round(reg.config.timeoutMs / 1000)}s. ` +
             "Set run_in_background=true to start in background immediately. " +
             "Use /bg to manually background a running command.",
         promptSnippet:
@@ -74,7 +73,7 @@ export function registerBashTool(
             "Check background job status with jobs action='list'.",
             "Read background output with jobs action='output'.",
         ],
-        parameters: bashParamSchema,
+        parameters: bashParamSchema(reg.config),
 
         async execute(toolCallId, params, signal, onUpdate, ctx) {
             const p = params as {
@@ -112,7 +111,7 @@ export function registerBashTool(
             return runForeground({
                 toolCallId,
                 command: p.command,
-                timeoutMs: p.timeout ? p.timeout * 1000 : DEFAULT_TIMEOUT_MS,
+                timeoutMs: p.timeout ? p.timeout * 1000 : reg.config.timeoutMs,
                 signal,
                 onUpdate,
                 ctx: bashCtx,
@@ -138,7 +137,7 @@ async function runForeground(args: {
     const { toolCallId, command, timeoutMs, signal, onUpdate, ctx, reg, pi } =
         args;
     const id = newJobId("shell", reg);
-    const logPath = logPathFor(id);
+    const logPath = logPathFor(reg, id);
 
     // Spawn WITHOUT wiring the turn signal to a process kill. Cooperative
     // steering aborts the turn (ctx.abort) to move this command to the
@@ -241,7 +240,7 @@ async function runForeground(args: {
     const finishForeground = (
         exit: SpawnExit
     ): AgentToolResult<BashToolDetails | undefined> => {
-        const output = readLogTail(job, OUTPUT_PREVIEW_CHARS);
+        const output = readLogTail(job, reg.config.outputPreviewChars);
         // A signal death (e.g. Esc-cancel killed the process group) is a
         // deliberate cancel, not a command failure — never an error result.
         if (exit.signal === null && exit.code !== 0) {
@@ -316,7 +315,7 @@ function spawnBackground(args: {
     ctx: UiContext;
 }): AgentToolResult<BashToolDetails | undefined> {
     const id = newJobId("shell", args.reg);
-    const logPath = logPathFor(id);
+    const logPath = logPathFor(args.reg, id);
 
     const spawned = spawnWithFileOutput({
         command: args.command,

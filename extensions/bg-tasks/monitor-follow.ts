@@ -14,7 +14,7 @@
  */
 
 import { closeSync, openSync, readSync, statSync } from "node:fs";
-import { MONITOR_POLL_MS } from "./types.ts";
+import { DEFAULTS } from "./config.ts";
 
 export interface MonitorFollower {
     /** Stop polling. When flush is true, do a final synchronous read and emit
@@ -31,7 +31,7 @@ export interface MonitorFollower {
 export function followLines(
     logPath: string,
     onLines: (lines: string[]) => void,
-    intervalMs: number = MONITOR_POLL_MS
+    intervalMs: number = DEFAULTS.monitorPollMs
 ): MonitorFollower {
     let offset = 0;
     let remainder = "";

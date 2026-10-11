@@ -12,11 +12,8 @@ import {
     DELIVER_FOLLOWUP,
     DELIVER_STEER,
     EVENT,
-    MAX_LOG_BYTES,
-    STALL_CHECK_INTERVAL_MS,
-    STALL_TAIL_BYTES,
-    STALL_THRESHOLD_MS,
 } from "./types.ts";
+import { DEFAULTS, type BgTasksConfig } from "./config.ts";
 import { buildTaskNotification } from "./notify.ts";
 import { describeJob } from "./format.ts";
 
@@ -42,7 +39,18 @@ export function watchStalls(args: {
     disablePromptStall?: boolean;
     /** Skip the oversize auto-kill (used for persistent monitors). */
     disableOversizeKill?: boolean;
+    /** Thresholds; defaults let tests and callers without a registry omit it. */
+    config?: Pick<
+        BgTasksConfig,
+        "maxLogBytes" | "stallCheckIntervalMs" | "stallThresholdMs" | "stallTailBytes"
+    >;
 }): () => void {
+    const {
+        maxLogBytes,
+        stallCheckIntervalMs,
+        stallThresholdMs,
+        stallTailBytes,
+    } = args.config ?? DEFAULTS;
     let lastSize = 0;
     let lastGrowth = Date.now();
     let lastPromptCheckSize = -1;
@@ -53,13 +61,13 @@ export function watchStalls(args: {
         try {
             const { size } = fsStatSync(args.logPath);
 
-            if (size > MAX_LOG_BYTES && !args.disableOversizeKill) {
+            if (size > maxLogBytes && !args.disableOversizeKill) {
                 cancelled = true;
                 if (args.onOversize) args.onOversize();
                 args.pi.sendMessage(
                     {
                         customType: EVENT.stall,
-                        content: `⚠️ Background job ${args.jobId} exceeded ${MAX_LOG_BYTES / (1024 * 1024)} MiB output. Terminated.`,
+                        content: `⚠️ Background job ${args.jobId} exceeded ${maxLogBytes / (1024 * 1024)} MiB output. Terminated.`,
                         display: true,
                         details: { jobId: args.jobId, logPath: args.logPath, command: args.command },
                     },
@@ -73,7 +81,7 @@ export function watchStalls(args: {
                 lastGrowth = Date.now();
             } else if (
                 !args.disablePromptStall &&
-                Date.now() - lastGrowth >= STALL_THRESHOLD_MS &&
+                Date.now() - lastGrowth >= stallThresholdMs &&
                 size !== lastPromptCheckSize
             ) {
                 // Output is static and past the stall threshold. Read the tail
@@ -82,8 +90,8 @@ export function watchStalls(args: {
                 lastPromptCheckSize = size;
                 const fd = openSync(args.logPath, "r");
                 try {
-                    const readStart = Math.max(0, size - STALL_TAIL_BYTES);
-                    const toRead = Math.min(size, STALL_TAIL_BYTES);
+                    const readStart = Math.max(0, size - stallTailBytes);
+                    const toRead = Math.min(size, stallTailBytes);
                     const buf = Buffer.alloc(toRead);
                     readSync(fd, buf, 0, toRead, readStart);
                     const tail = buf.toString("utf-8", 0, toRead);
@@ -106,7 +114,7 @@ export function watchStalls(args: {
     // a node:timers named import is snapshotted before mock.timers.enable.
     let timer: NodeJS.Timeout;
     const schedule = () => {
-        timer = setTimeout(tick, STALL_CHECK_INTERVAL_MS);
+        timer = setTimeout(tick, stallCheckIntervalMs);
         timer.unref();
     };
     schedule();

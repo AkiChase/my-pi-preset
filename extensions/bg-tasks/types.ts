@@ -5,39 +5,15 @@
 import type { ChildProcess } from "node:child_process";
 import type { AgentToolResult } from "@earendil-works/pi-agent-core";
 
-// --- Configuration constants ---
-export const DEFAULT_TIMEOUT_MS = 120_000;
+// --- Fixed internal constants ---
+// Configurable knobs live in config.ts; what stays here is either a rendering
+// detail with no reason to vary, or a value the interaction model depends on.
+/** How long a foreground command may finish in before the live-progress UI and
+ *  the background hint appear. Shorter and quick commands would flicker a hint;
+ *  longer and a slow command looks frozen. */
 export const QUICK_COMPLETION_MS = 2_000;
 export const FOREGROUND_TAIL_BYTES = 4_096;
-export const STALL_CHECK_INTERVAL_MS = 5_000;
-export const STALL_THRESHOLD_MS = 45_000;
-export const STALL_TAIL_BYTES = 1024;
-export const MAX_LOG_BYTES = 100 * 1024 * 1024;
-export const OUTPUT_PREVIEW_CHARS = 12_000;
-/** How much of a failed job's log is inlined into its <task-notification>.
- *  Sized to answer "why did it fail" without pasting a whole build log: the
- *  error is almost always in the last handful of lines. A model that needs
- *  more still has `jobs output` and the log path. */
-export const FAILURE_TAIL_LINES = 20;
-export const FAILURE_TAIL_CHARS = 2_000;
-/** How many of those lines the TUI renderer shows under the summary. The model
- *  gets the full tail in the XML; the user gets a glance plus the log path. */
-export const NOTIFICATION_TAIL_LINES_SHOWN = 5;
 export const RECENT_TERMINAL_KEEP = 20;
-export const MAX_CONCURRENT_JOBS = 16;
-
-// --- Monitor (streaming-event) constants ---
-/** Poll cadence for the line-accurate follower. Lines read within one tick are
- *  batched into a single event — so this doubles as the ~200ms batch window. */
-export const MONITOR_POLL_MS = 200;
-/** Default streaming watch deadline (matches Claude Code's Monitor). */
-export const MONITOR_DEFAULT_TIMEOUT_MS = 300_000;
-/** Hard ceiling on a monitor's deadline. */
-export const MONITOR_MAX_TIMEOUT_MS = 3_600_000;
-/** Sliding window for firehose detection. */
-export const MONITOR_RATE_WINDOW_MS = 10_000;
-/** Max emitted lines per window before a monitor is auto-stopped. */
-export const MONITOR_MAX_LINES_PER_WINDOW = 500;
 
 export const PREVIEW_CHARS = {
     sidebar: 25,

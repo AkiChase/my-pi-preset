@@ -14,8 +14,6 @@ import type { BackgroundRegistry } from "./state.ts";
 import {
     DELIVER_FOLLOWUP,
     EVENT,
-    MONITOR_MAX_LINES_PER_WINDOW,
-    MONITOR_RATE_WINDOW_MS,
     type Job,
     type UiContext,
 } from "./types.ts";
@@ -42,6 +40,11 @@ export function startMonitorSession(args: {
 }): void {
     const { pi, reg, ctx, job, source, description, persistent, timeoutMs } = args;
     const { id, logPath } = job;
+    const {
+        monitorPollMs,
+        monitorRateWindowMs,
+        monitorMaxLinesPerWindow,
+    } = reg.config;
 
     let terminalEmitted = false;
     let finishing = false;
@@ -66,27 +69,31 @@ export function startMonitorSession(args: {
         );
     };
 
-    const follower: MonitorFollower = followLines(logPath, (lines) => {
-        if (terminalEmitted) return;
+    const follower: MonitorFollower = followLines(
+        logPath,
+        (lines) => {
+            if (terminalEmitted) return;
 
-        // Sliding-window firehose check.
-        const now = Date.now();
-        if (now - windowStart > MONITOR_RATE_WINDOW_MS) {
-            windowStart = now;
-            windowLines = 0;
-        }
-        windowLines += lines.length;
+            // Sliding-window firehose check.
+            const now = Date.now();
+            if (now - windowStart > monitorRateWindowMs) {
+                windowStart = now;
+                windowLines = 0;
+            }
+            windowLines += lines.length;
 
-        emitEvent(lines);
+            emitEvent(lines);
 
-        // Don't trip the firehose guard while draining the final flush.
-        if (!finishing && windowLines > MONITOR_MAX_LINES_PER_WINDOW) {
-            stopMonitor(
-                "killed",
-                `Monitor "${description}" stopped (too many events (>${MONITOR_MAX_LINES_PER_WINDOW}/${MONITOR_RATE_WINDOW_MS / 1000}s) — restart with a tighter filter)`
-            );
-        }
-    });
+            // Don't trip the firehose guard while draining the final flush.
+            if (!finishing && windowLines > monitorMaxLinesPerWindow) {
+                stopMonitor(
+                    "killed",
+                    `Monitor "${description}" stopped (too many events (>${monitorMaxLinesPerWindow}/${monitorRateWindowMs / 1000}s) — restart with a tighter filter)`
+                );
+            }
+        },
+        monitorPollMs
+    );
 
     // job.stop: transient teardown invoked by the kill path. Tears down the
     // source (closes the ws socket) — the follower is stopped *and flushed* by

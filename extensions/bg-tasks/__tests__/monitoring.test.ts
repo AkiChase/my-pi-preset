@@ -8,11 +8,13 @@ import {
     looksLikePrompt,
     watchStalls,
 } from "../monitoring.ts";
-import {
-    EVENT,
-    STALL_CHECK_INTERVAL_MS,
-    STALL_THRESHOLD_MS,
-} from "../types.ts";
+import { EVENT } from "../types.ts";
+import { DEFAULTS } from "../config.ts";
+
+// watchStalls defaults to DEFAULTS when no config is passed, so the tests drive
+// its timers off the same numbers rather than re-stating them.
+const STALL_CHECK_INTERVAL_MS = DEFAULTS.stallCheckIntervalMs;
+const STALL_THRESHOLD_MS = DEFAULTS.stallThresholdMs;
 
 const TMP = join(tmpdir(), `pi-bg-stall-test-${process.pid}`);
 

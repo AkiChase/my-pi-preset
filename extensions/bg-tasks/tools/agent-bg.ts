@@ -103,7 +103,7 @@ export function registerAgentBgTool(pi: ExtensionAPI, reg: BackgroundRegistry): 
             assertJobSlot(reg);
 
             const id = newJobId("agent", reg);
-            const logPath = logPathFor(id);
+            const logPath = logPathFor(reg, id);
 
             // The prompt, truncated for display — doubles as the job name so
             // notifications and the jobs list name the actual task.

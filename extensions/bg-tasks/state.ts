@@ -5,8 +5,20 @@
  */
 
 import type { Job, ForegroundSlot } from "./types.ts";
+import { DEFAULTS, type BgTasksConfig } from "./config.ts";
 
 export class BackgroundRegistry {
+    /** Resolved configuration for this session. Threaded with the registry
+     *  because `reg` already reaches every tool and helper; the alternative —
+     *  a module-level singleton read at import time — would make tests share
+     *  one config and could not be injected. Defaults when unspecified so a
+     *  test can `new BackgroundRegistry()` without loading a file. */
+    readonly config: BgTasksConfig;
+
+    constructor(config: BgTasksConfig = DEFAULTS) {
+        this.config = config;
+    }
+
     jobs = new Map<string, Job>();
     foreground = new Map<string, ForegroundSlot>();
 

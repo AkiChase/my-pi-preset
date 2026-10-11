@@ -12,7 +12,8 @@ import { join } from "node:path";
 import { BackgroundRegistry } from "../state.ts";
 import { buildTaskNotification, failureTail, sendTaskNotification } from "../notify.ts";
 import { readTailLines } from "../output.ts";
-import { FAILURE_TAIL_CHARS, FAILURE_TAIL_LINES, type Job, type UiContext } from "../types.ts";
+import type { Job } from "../types.ts";
+import { DEFAULTS } from "../config.ts";
 
 // A real temp dir, never ~/.pi — tests must stay offline and self-contained.
 let dir: string;
@@ -79,11 +80,11 @@ void describe("readTailLines", () => {
     });
     void it("honours the char bound, keeping the END of a huge log", () => {
         const path = writeLog("huge.log", `${"x".repeat(50_000)}\nLAST LINE\n`);
-        const out = readTailLines(path, FAILURE_TAIL_LINES, FAILURE_TAIL_CHARS);
+        const out = readTailLines(path, DEFAULTS.failureTailLines, DEFAULTS.failureTailChars);
         assert.ok(out.endsWith("LAST LINE"));
         // The truncation marker readBoundedTail prepends counts as a line, so
         // allow a little slack over the raw char budget.
-        assert.ok(out.length < FAILURE_TAIL_CHARS + 200);
+        assert.ok(out.length < DEFAULTS.failureTailChars + 200);
     });
 });
 

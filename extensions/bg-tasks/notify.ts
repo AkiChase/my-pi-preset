@@ -19,10 +19,9 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
     DELIVER_STEER,
     EVENT,
-    FAILURE_TAIL_CHARS,
-    FAILURE_TAIL_LINES,
     type Job,
 } from "./types.ts";
+import { DEFAULTS, type BgTasksConfig } from "./config.ts";
 import type { BackgroundRegistry } from "./state.ts";
 import { forget } from "./registry.ts";
 import { describeJob } from "./format.ts";
@@ -77,9 +76,17 @@ export function buildTaskNotification(args: {
  * irrelevant or already the deliverable the model will read on purpose, and
  * inlining it on every success would spend context for nothing.
  */
-export function failureTail(job: Job, status: TerminalStatus): string {
+export function failureTail(
+    job: Job,
+    status: TerminalStatus,
+    config: Pick<BgTasksConfig, "failureTailLines" | "failureTailChars"> = DEFAULTS
+): string {
     if (status === "completed") return "";
-    const tail = readTailLines(job.logPath, FAILURE_TAIL_LINES, FAILURE_TAIL_CHARS);
+    const tail = readTailLines(
+        job.logPath,
+        config.failureTailLines,
+        config.failureTailChars
+    );
     return tail || "(no output)";
 }
 
@@ -146,7 +153,7 @@ export function sendTaskNotification(args: {
     job.notified = true;
     const status = args.status ?? (job.status as TerminalStatus);
     const summary = args.summary ?? completionSummary(job, status);
-    const outputTail = failureTail(job, status);
+    const outputTail = failureTail(job, status, reg.config);
 
     try {
         pi.sendMessage(

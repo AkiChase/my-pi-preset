@@ -10,8 +10,6 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@earendil-works/pi-ai";
 import type { BackgroundRegistry } from "../state.ts";
 import {
-    MONITOR_DEFAULT_TIMEOUT_MS,
-    MONITOR_MAX_TIMEOUT_MS,
     type UiContext,
 } from "../types.ts";
 import { add, createRunningJob, errPathFor, newJobId, logPathFor } from "../registry.ts";
@@ -74,7 +72,7 @@ export function registerMonitorTool(pi: ExtensionAPI, reg: BackgroundRegistry): 
                 Type.Boolean({ description: "Run for the whole session (no timeout). Stop via jobs action='kill'. Default false." })
             ),
             timeout_ms: Type.Optional(
-                Type.Number({ description: "Kill after this deadline (default 300000, max 3600000). Ignored when persistent." })
+                Type.Number({ description: `Kill after this deadline (default ${reg.config.monitorDefaultTimeoutMs}, max ${reg.config.monitorMaxTimeoutMs}). Ignored when persistent.` })
             ),
         }),
 
@@ -106,12 +104,14 @@ export function registerMonitorTool(pi: ExtensionAPI, reg: BackgroundRegistry): 
             const description = p.description.trim();
             const persistent = p.persistent === true;
             const timeoutMs = Math.min(
-                p.timeout_ms && p.timeout_ms > 0 ? p.timeout_ms : MONITOR_DEFAULT_TIMEOUT_MS,
-                MONITOR_MAX_TIMEOUT_MS
+                p.timeout_ms && p.timeout_ms > 0
+                    ? p.timeout_ms
+                    : reg.config.monitorDefaultTimeoutMs,
+                reg.config.monitorMaxTimeoutMs
             );
 
             const id = newJobId("monitor", reg);
-            const logPath = logPathFor(id);
+            const logPath = logPathFor(reg, id);
 
             // Build the event source (command or ws) behind one seam, then hand
             // it to the session, which owns the streaming/terminal lifecycle.
@@ -121,7 +121,7 @@ export function registerMonitorTool(pi: ExtensionAPI, reg: BackgroundRegistry): 
                       command: p.command!,
                       cwd: mctx.cwd,
                       logPath,
-                      errPath: errPathFor(id),
+                      errPath: errPathFor(reg, id),
                   });
 
             const job = createRunningJob({

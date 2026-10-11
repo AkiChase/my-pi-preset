@@ -12,7 +12,6 @@ import { formatDuration, jobLabel } from "./format.ts";
 import {
     isTerminalStatus,
     JOB_ID_PREFIX,
-    MAX_CONCURRENT_JOBS,
     PREVIEW_CHARS,
     RECENT_TERMINAL_KEEP,
     type Job,
@@ -45,18 +44,18 @@ export function newJobId(kind: JobKind, reg?: BackgroundRegistry): string {
     return id;
 }
 
-/** Dedicated log directory. Keeping logs in their own dir (not loose in /tmp)
- *  keeps the stale-log sweep bounded — it lists only our files. */
-export const LOG_DIR = "/tmp/pi-bg";
-
-export function logPathFor(jobId: string): string {
-    return `${LOG_DIR}/${jobId}.log`;
+/** Job log paths. The directory is configurable (`logDir`): `/tmp` is cleared
+ *  on reboot on some systems, and a log worth keeping does not belong there.
+ *  Keeping logs in their own dir (not loose in the parent) keeps any sweep
+ *  bounded — it lists only our files. */
+export function logPathFor(reg: BackgroundRegistry, jobId: string): string {
+    return `${reg.config.logDir}/${jobId}.log`;
 }
 
 /** Sibling stderr-capture path for a monitor's split output. Keeps the
  *  `.log`/`.err` naming convention in one place. */
-export function errPathFor(jobId: string): string {
-    return `${LOG_DIR}/${jobId}.err`;
+export function errPathFor(reg: BackgroundRegistry, jobId: string): string {
+    return `${reg.config.logDir}/${jobId}.err`;
 }
 
 /**
@@ -107,7 +106,7 @@ export function add(reg: BackgroundRegistry, job: Job): Job {
 export function atConcurrencyLimit(reg: BackgroundRegistry): boolean {
     let n = 0;
     for (const job of reg.jobs.values()) {
-        if (job.status === "running" && ++n >= MAX_CONCURRENT_JOBS) return true;
+        if (job.status === "running" && ++n >= reg.config.maxConcurrentJobs) return true;
     }
     return false;
 }

@@ -17,7 +17,8 @@ import { createBashToolDefinition } from "@earendil-works/pi-coding-agent";
 import { BackgroundRegistry } from "./state.ts";
 import { detectNonInteractive, terminateJobSilently } from "./lifecycle.ts";
 import { stopSidebarTicker } from "./registry.ts";
-import { EVENT, NOTIFICATION_TAIL_LINES_SHOWN } from "./types.ts";
+import { EVENT } from "./types.ts";
+import { loadConfig } from "./config.ts";
 import { registerBashTool } from "./tools/bash.ts";
 import { registerBashBgTool } from "./tools/bash-bg.ts";
 import { registerJobsTool } from "./tools/jobs.ts";
@@ -29,7 +30,17 @@ import { registerInputHandlers } from "./input.ts";
 
 /** Extension entry point. */
 export default function (pi: ExtensionAPI): void {
-    const reg = new BackgroundRegistry();
+    // Read synchronously, before anything is registered: registerShortcut and
+    // the tool descriptions below both need the resolved values, and there is
+    // no await available at extension load.
+    const { config, warnings, path: configPath } = loadConfig();
+    const reg = new BackgroundRegistry(config);
+    // Surface config problems where they will actually be seen. There is no UI
+    // context yet at load time, so stderr now (pi's log) and `/bg-version`
+    // later — a silently-ignored knob reads as "the extension is broken".
+    for (const warning of warnings) {
+        console.error(`[bg-tasks] config: ${warning}`);
+    }
 
     // ── Tool registration ─────────────────────────────────────────
     // Use the unwrapped tool *definition* so the override inherits Pi's native
@@ -43,8 +54,16 @@ export default function (pi: ExtensionAPI): void {
     registerMonitorTool(pi, reg);
 
     // ── Shortcuts / commands ──────────────────────────────────────
-    registerShortcuts(pi, reg);
-    registerCommands(pi, reg);
+    // A chord pi rejects is reported alongside the config warnings rather than
+    // thrown — one bad key must not cost the other shortcuts.
+    const shortcutWarnings = registerShortcuts(pi, reg);
+    for (const warning of shortcutWarnings) {
+        console.error(`[bg-tasks] shortcut: ${warning}`);
+    }
+    registerCommands(pi, reg, {
+        configPath,
+        warnings: [...warnings, ...shortcutWarnings],
+    });
     registerInputHandlers(pi, reg);
 
     // ── Message rendering ─────────────────────────────────────────
@@ -69,12 +88,15 @@ export default function (pi: ExtensionAPI): void {
         // a failure summary alone leaves the user with nothing to look at. Show
         // the last few lines of the inlined tail (the model gets all of it in
         // the XML); the full log is at details.outputFile.
-        const tail = details?.outputTail
-            ? details.outputTail
-                  .split("\n")
-                  .slice(-NOTIFICATION_TAIL_LINES_SHOWN)
-                  .map((l) => theme.fg("dim", `  │ ${l}`))
-            : [];
+        // `slice(-0)` is `slice(0)` — the whole array — so 0 must be handled
+        // explicitly or "show no tail" would show all of it.
+        const tail =
+            details?.outputTail && config.failureTailLinesShown > 0
+                ? details.outputTail
+                      .split("\n")
+                      .slice(-config.failureTailLinesShown)
+                      .map((l) => theme.fg("dim", `  │ ${l}`))
+                : [];
         return { render: () => [line, ...tail], invalidate: () => {} };
     };
     pi.registerMessageRenderer(EVENT.taskNotification, (message, _options, theme) =>

@@ -10,7 +10,6 @@ import { statSync as fsStatSync } from "node:fs";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
     isTerminalStatus,
-    MAX_CONCURRENT_JOBS,
     type Job,
     type JobStatus,
     type UiContext,
@@ -27,7 +26,7 @@ import { markNotified, sendTaskNotification } from "./notify.ts";
 export function assertJobSlot(reg: BackgroundRegistry): void {
     if (atConcurrencyLimit(reg)) {
         throw new Error(
-            `Max concurrent background jobs (${MAX_CONCURRENT_JOBS}) reached. ` +
+            `Max concurrent background jobs (${reg.config.maxConcurrentJobs}) reached. ` +
                 `Kill or wait for existing jobs before starting new ones.`
         );
     }
@@ -65,6 +64,7 @@ export function startBackgroundJob(args: {
         disablePromptStall: args.disablePromptStall,
         disableOversizeKill: args.disableOversizeKill,
         onOversize: () => terminateJobSilently(args.reg, args.job),
+        config: args.reg.config,
     });
     jobAc.signal.addEventListener("abort", cancelStall, { once: true });
     void args.exit.then((result) => {

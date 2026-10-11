@@ -72,7 +72,7 @@ pi 里只有一个本仓库自带的命令：`/statusbar`，在自定义状态�
 | [`pi-memory`](#npmpi-memory) | 跨会话记忆：长期记忆、日志、便签、检索 | 无（只有 `PI_MEMORY_*` 环境变量） | 无 |
 | [`@tintinweb/pi-subagents`](#npmtintinwebpi-subagents) | 子 agent 和工作流编排 | `~/.pi/agent/subagents.json` | 无（只有浮层内按键） |
 | [`@juicesharp/rpiv-ask-user-question`](#npmjuicesharprpiv-ask-user-question) | 让模型给出选项，而不是自己猜 | `~/.config/rpiv-ask-user-question/config.json` | `ctrl+]`，可改 |
-| [`pi-patty-bg-tasks`](#npmpi-patty-bg-tasks) | 后台任务：长命令不阻塞会话 | 无 | `ctrl+shift+b` 等，不可改 |
+| [`pi-patty-bg-tasks`](#npmpi-patty-bg-tasks) | 后台任务：长命令不阻塞会话 | `~/.pi/agent/bg-tasks.json` | `ctrl+shift+b` 等，可改 |
 | [`@heyhuynhgiabuu/pi-pretty`](#npmheyhuynhgiabuupi-pretty) | 终端输出美化 | `~/.pi/agent/pi-pretty.json` | 无 |
 
 前七个是普通依赖，由 pi 从 npm 安装，来源写在 [`pi-packages.json`](pi-packages.json) 的 `packages` 里，本仓库不动它们的代码。
@@ -213,11 +213,37 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 
 **提供**：
 
-- 工具：`bash`（覆盖内置，新增 `run_in_background`、`timeout`、`description` 参数）、`bash_bg`（直接后台启动）、`jobs`（list / output / kill / attach / search / cleanup / stats）、`agent_bg`（后台跑一个独立 `pi -p` 进程）、`monitor`（按事件流监听命令输出或 WebSocket）。日志落在 `/tmp/pi-bg/<jobId>.log`。
-- 斜杠命令：`/bg` 转后台、`/bg-list` 任务面板、`/bg-version` 打印版本和路径。
-- 快捷键：`ctrl+shift+b` 转后台，`ctrl+shift+j` / `shift+down` 打开任务面板，`ctrl+shift+x` kill 最近一个运行中的作业。
+- 工具：`bash`（覆盖内置，新增 `run_in_background`、`timeout`、`description` 参数）、`bash_bg`（直接后台启动）、`jobs`（list / output / kill / attach / search / cleanup / stats）、`agent_bg`（后台跑一个独立 `pi -p` 进程）、`monitor`（按事件流监听命令输出或 WebSocket）。日志默认落在 `/tmp/pi-bg/<jobId>.log`。
+- 斜杠命令：`/bg` 转后台、`/bg-list` 任务面板、`/bg-version` 打印版本和路径、`/bg-config` 显示生效的配置、来源文件和加载警告。
+- 快捷键（默认值，可改）：`ctrl+shift+b` 转后台，`ctrl+shift+j` / `shift+down` 打开任务面板，`ctrl+shift+x` kill 最近一个运行中的作业。
 
-**配置**：没有任何配置入口。超时阈值、日志上限、并发数、轮询间隔等都写死在 `extensions/bg-tasks/types.ts` 里，日志目录固定 `/tmp/pi-bg`。快捷键同样不可配（`pi.registerShortcut` 收的是原始键组合，不走 keybinding id），想换只能改 `shortcuts.ts`。没有注册 `ctrl+b`，因为那是 pi 内置的 `tui.editor.cursorLeft`，见 [键位冲突](#键位冲突)。
+**配置**：配置文件 `~/.pi/agent/bg-tasks.json`（目录跟 `PI_CODING_AGENT_DIR`），优先级是环境变量 > 配置文件 > 默认值。文件可以不存在。每个键都能用环境变量覆盖，名字是 `BG_TASKS_` 加大写蛇形：`timeoutMs` → `BG_TASKS_TIMEOUT_MS`。
+
+| 键 | 默认 | 说明 |
+| --- | --- | --- |
+| `timeoutMs` | `120000` | 前台命令跑多久后自动转后台 |
+| `logDir` | `"/tmp/pi-bg"` | 日志目录，支持开头的 `~` |
+| `maxConcurrentJobs` | `16` | 同时在跑的后台任务上限 |
+| `maxLogBytes` | `104857600` | 日志超过这个大小就杀掉任务 |
+| `outputPreviewChars` | `12000` | `jobs output` 和前台命令结束时显示多少尾部 |
+| `failureTailLines` | `20` | 失败通知内联几行日志 |
+| `failureTailChars` | `2000` | 这段尾部的字符上限 |
+| `failureTailLinesShown` | `5` | TUI 在摘要下显示其中几行，`0` 为不显示 |
+| `stallCheckIntervalMs` | `5000` | 卡死检测的轮询间隔 |
+| `stallThresholdMs` | `45000` | 日志多久没增长算可疑 |
+| `stallTailBytes` | `1024` | 判断交互提示符时读多少尾字节 |
+| `monitorDefaultTimeoutMs` | `300000` | `monitor` 的默认截止时间 |
+| `monitorMaxTimeoutMs` | `3600000` | `monitor` 的硬上限 |
+| `monitorPollMs` | `200` | `monitor` 轮询间隔，同时是事件合并窗口 |
+| `monitorRateWindowMs` | `10000` | 刷屏检测的滑动窗口 |
+| `monitorMaxLinesPerWindow` | `500` | 一个窗口内超过这么多行就自动停掉 monitor |
+| `shortcutBackground` | `["ctrl+shift+b"]` | 转后台 |
+| `shortcutTaskPanel` | `["ctrl+shift+j", "shift+down"]` | 打开任务面板 |
+| `shortcutKillLatest` | `["ctrl+shift+x"]` | kill 最近一个运行中的作业 |
+
+快捷键三项都接单个键名、键名数组，或 `"off"` 关掉。这是唯一能改这些键的途径 —— `pi.registerShortcut` 收的是原始键组合、不走 keybinding id，所以 `keybindings.json` 管不到它们。默认不注册 `ctrl+b`，那是 pi 内置的 `tui.editor.cursorLeft`，见 [键位冲突](#键位冲突)。
+
+配置文件写错不会让扩展加载失败：非法值一律回退默认值，未知键会被忽略，每条都记一句警告 —— 用 `/bg-config` 看。渲染细节（侧栏预览宽度、2 秒快速完成窗口等）仍然写死在 `extensions/bg-tasks/types.ts`，没有开放。
 
 #### `npm:@heyhuynhgiabuu/pi-pretty`
 
@@ -331,7 +357,7 @@ pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDING
 | `ctrl+r`（input-history 反向搜索） | `app.session.rename`（`ctrl+r`） | 扩展赢，rename 按不出来 | 二选一：把扩展的 `searchShortcut` 改成别的（如 `alt+r`），或改 `keybindings.json` 的 `app.session.rename` |
 | `ctrl+]`（ask-user-question 折叠浮层） | `tui.editor.jumpForward`（`ctrl+]`） | 扩展赢 | 改它的 `collapseKey`（或设 `"off"`），或把 `tui.editor.jumpForward` 挪走 |
 
-`pi-web-access` 的 `ctrl+shift+s` / `ctrl+shift+w`，以及 patty 的 `ctrl+shift+b` / `ctrl+shift+j` / `shift+down` / `ctrl+shift+x`，目前都没撞上内置动作。patty 刷意没注册 `ctrl+b`：那是内置 `tui.editor.cursorLeft` 的别名，抢过来会在启动时报冲突诊断。
+`pi-web-access` 的 `ctrl+shift+s` / `ctrl+shift+w`，以及 patty 的 `ctrl+shift+b` / `ctrl+shift+j` / `shift+down` / `ctrl+shift+x`，目前都没撞上内置动作。patty 刻意没注册 `ctrl+b`：那是内置 `tui.editor.cursorLeft` 的别名，抢过来会在启动时报冲突诊断。patty 这四个键都能在 `bg-tasks.json` 里改或设 `"off"`。
 
 这些配置文件不在本仓库的管理范围内，各自的机器上自己维护。
 

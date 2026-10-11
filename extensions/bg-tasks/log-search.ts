@@ -8,7 +8,7 @@
 
 import { createReadStream } from "node:fs";
 import { createInterface } from "node:readline";
-import { OUTPUT_PREVIEW_CHARS, PREVIEW_CHARS, type Job } from "./types.ts";
+import { PREVIEW_CHARS, type Job } from "./types.ts";
 import { readLogTail } from "./registry.ts";
 
 export interface LogSearchHit {
@@ -32,6 +32,8 @@ export interface LogSearchResult {
 interface ScanOptions {
     maxHitsPerJob: number;
     maxLineChars: number;
+    /** Tail budget for the fallback path when a log cannot be streamed. */
+    previewChars: number;
 }
 
 export async function searchLogs(args: {
@@ -39,10 +41,12 @@ export async function searchLogs(args: {
     pattern: RegExp;
     maxHitsPerJob: number;
     maxLineChars?: number;
+    previewChars: number;
 }): Promise<LogSearchResult> {
     const options: ScanOptions = {
         maxHitsPerJob: args.maxHitsPerJob,
         maxLineChars: args.maxLineChars ?? PREVIEW_CHARS.line,
+        previewChars: args.previewChars,
     };
     const jobs = [...args.jobs];
 
@@ -67,7 +71,7 @@ async function scanOneJob(
     const group: LogSearchGroup = { jobId: job.id, name: job.name, count: 0, hits: [] };
     const scanned = await streamLogFile(job, re, group, options);
     if (!scanned) {
-        scanTailText(job, re, readLogTail(job, OUTPUT_PREVIEW_CHARS), group, options);
+        scanTailText(job, re, readLogTail(job, options.previewChars), group, options);
     }
     return group;
 }

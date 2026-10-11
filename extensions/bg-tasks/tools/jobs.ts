@@ -17,7 +17,6 @@ import { StringEnum, Type } from "@earendil-works/pi-ai";
 import type { BackgroundRegistry } from "../state.ts";
 import {
     isTerminalStatus,
-    OUTPUT_PREVIEW_CHARS,
     PREVIEW_CHARS,
     type UiContext,
 } from "../types.ts";
@@ -153,7 +152,7 @@ async function outputAction(
     // it notified, suppressing the separate <task-notification>. Peeking at a
     // still-running job does NOT mark — its completion must still notify.
     if (isTerminalStatus(job.status)) markNotified(job);
-    const out = readLogTail(job, OUTPUT_PREVIEW_CHARS).trimEnd();
+    const out = readLogTail(job, reg.config.outputPreviewChars).trimEnd();
     const label = jobLabel(job);
     return {
         content: [
@@ -295,6 +294,7 @@ async function searchAction(
         pattern: re,
         maxHitsPerJob: SEARCH_DISPLAY_LIMIT_PER_JOB,
         maxLineChars: PREVIEW_CHARS.line,
+        previewChars: reg.config.outputPreviewChars,
     });
 
     if (result.totalHits === 0) {

@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { BackgroundRegistry } from "../state.ts";
-import { registerCommands } from "../commands.ts";
+import { formatConfigReport, registerCommands } from "../commands.ts";
+import { DEFAULTS } from "../config.ts";
 
 void describe("commands", () => {
     void it("/bg-version reports the loaded package version and path", async () => {
@@ -14,7 +15,10 @@ void describe("commands", () => {
             sendMessage() {},
         };
 
-        registerCommands(pi as never, new BackgroundRegistry());
+        registerCommands(pi as never, new BackgroundRegistry(), {
+            configPath: undefined,
+            warnings: [],
+        });
         await commands.get("bg-version")?.handler("", {
             ui: {
                 notify: (message: string) => notices.push(message),
@@ -24,9 +28,44 @@ void describe("commands", () => {
         assert.ok(commands.has("bg"));
         assert.ok(commands.has("bg-list"));
         assert.ok(commands.has("bg-version"));
+        assert.ok(commands.has("bg-config"));
         // Reports the preset's version, not a bg-tasks package version: vendored in, there is
         // no separate manifest for it any more.
         assert.match(notices[0] ?? "", /^my-pi-preset@\d+\.\d+\.\d+ bg-tasks loaded from /);
         assert.match(notices[0] ?? "", /extensions\/bg-tasks$/);
+    });
+});
+
+void describe("formatConfigReport", () => {
+    void it("says so plainly when nothing is overridden", () => {
+        const out = formatConfigReport({
+            reg: new BackgroundRegistry(),
+            configPath: undefined,
+            warnings: [],
+        });
+        assert.match(out, /Config file: none/);
+        assert.match(out, /Overridden: nothing/);
+    });
+
+    void it("lists only the overridden keys, with their defaults", () => {
+        // A full dump would bury the one line the user is looking for.
+        const reg = new BackgroundRegistry({ ...DEFAULTS, timeoutMs: 600_000 });
+        const out = formatConfigReport({
+            reg,
+            configPath: "/tmp/agent/bg-tasks.json",
+            warnings: [],
+        });
+        assert.match(out, /Config file: \/tmp\/agent\/bg-tasks\.json/);
+        assert.match(out, /timeoutMs: 600000 {2}\(default 120000\)/);
+        assert.ok(!out.includes("maxConcurrentJobs"));
+    });
+
+    void it("surfaces load warnings", () => {
+        const out = formatConfigReport({
+            reg: new BackgroundRegistry(),
+            configPath: undefined,
+            warnings: ["timeoutMs: expected a number"],
+        });
+        assert.match(out, /Warnings:\n {2}• timeoutMs: expected a number/);
     });
 });

@@ -1,12 +1,18 @@
 /**
  * Keyboard shortcut registration.
  *
+ * Defaults:
  *   - Ctrl+Shift+B: move the foreground bash to background
  *   - Ctrl+Shift+J / Shift+Down: open the background task manager
  *   - Ctrl+Shift+X: kill the most recent running job
  *
+ * All three are configurable (`shortcutBackground`, `shortcutTaskPanel`,
+ * `shortcutKillLatest`), including `"off"`, because `registerShortcut` takes a
+ * raw chord rather than an action id — pi's `keybindings.json` cannot reach
+ * these, so the config file is the only way to change or release a key.
+ *
  * Note: Ctrl+B is reserved by pi for `tui.editor.cursorLeft` (built-in
- * keybinding), so the background shortcut lives on Ctrl+Shift+B. Registering
+ * keybinding), so the background shortcut defaults to Ctrl+Shift+B. Binding
  * Ctrl+B anyway triggers pi's startup "extension shortcut conflict" diagnostic
  * and breaks cursor-left in the editor.
  */
@@ -21,33 +27,65 @@ import {
 import { renderSidebar } from "./registry.ts";
 import { jobLabel } from "./format.ts";
 import { openBgListPanel } from "./ui.ts";
+import type { ShortcutBinding } from "./config.ts";
 
-/** Register all shortcuts. */
+/**
+ * Register all shortcuts. Returns the problems encountered, for the same
+ * reporting path as config warnings — a key pi rejects (an unknown chord, or
+ * one another extension already took) must not abort the rest of the
+ * registration, or one typo would cost every shortcut.
+ */
 export function registerShortcuts(
     pi: ExtensionAPI,
     reg: BackgroundRegistry
-): void {
-    // Background shortcut — Ctrl+Shift+B. Ctrl+B itself is pi's built-in
-    // cursor-left binding and must not be claimed (see header note).
-    pi.registerShortcut("ctrl+shift+b", {
-        description: "Background the current foreground process",
-        handler: async (ctx) => handleCtrlB(reg, ctx),
-    });
+): string[] {
+    const warnings: string[] = [];
 
-    pi.registerShortcut("ctrl+shift+j", {
-        description: "Open background task manager",
-        handler: async (ctx) => openBgListPanel(reg, ctx),
-    });
+    const bind = (
+        keys: ShortcutBinding,
+        configKey: string,
+        description: string,
+        handler: Parameters<ExtensionAPI["registerShortcut"]>[1]["handler"]
+    ): void => {
+        for (const key of keys) {
+            try {
+                // A configured chord is an arbitrary string, while registerShortcut
+                // takes pi's KeyId union. Validating the union here would mean
+                // duplicating pi's key table and letting it drift; instead the
+                // cast hands the string to pi, which rejects an invalid chord —
+                // and that rejection is exactly what the catch below reports.
+                pi.registerShortcut(
+                    key as Parameters<ExtensionAPI["registerShortcut"]>[0],
+                    { description, handler }
+                );
+            } catch (err) {
+                warnings.push(
+                    `${configKey}: could not bind "${key}" (${(err as Error).message})`
+                );
+            }
+        }
+    };
 
-    pi.registerShortcut("shift+down", {
-        description: "Open background task manager",
-        handler: async (ctx) => openBgListPanel(reg, ctx),
-    });
+    bind(
+        reg.config.shortcutBackground,
+        "shortcutBackground",
+        "Background the current foreground process",
+        async (ctx) => handleCtrlB(reg, ctx)
+    );
+    bind(
+        reg.config.shortcutTaskPanel,
+        "shortcutTaskPanel",
+        "Open background task manager",
+        async (ctx) => openBgListPanel(reg, ctx)
+    );
+    bind(
+        reg.config.shortcutKillLatest,
+        "shortcutKillLatest",
+        "Kill the most recent running background job",
+        async (ctx) => handleCtrlX(reg, ctx)
+    );
 
-    pi.registerShortcut("ctrl+shift+x", {
-        description: "Kill the most recent running background job",
-        handler: async (ctx) => handleCtrlX(reg, ctx),
-    });
+    return warnings;
 }
 
 /**
