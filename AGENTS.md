@@ -6,7 +6,7 @@
 | --- | --- |
 | `pi-preset.json` | 清单：`packages` 要装的，`conflicts` 不能当 pi 包装的，`settings` / `keybindings` 要对齐的 pi 配置，`preserve` prune 时也不动的键 |
 | `install.sh` + `scripts/sync.mjs` | 把本机对齐到清单（三个域：packages / settings / keybindings） |
-| `extensions/` | 自带扩展，pi 自动发现 |
+| `extensions/` | 自带扩展。加载范围由 `package.json` 的 `pi.extensions`（`extensions/*.ts`）声明，**不是** pi 自动发现；子目录不加载 |
 | `local/` | 本机草稿：计划、笔记、临时脚本。**已 gitignore**，不进仓库，也别在这里放代码 |
 | `README.md` | 面向使用者的全部文档 |
 
@@ -15,6 +15,7 @@
 | 改了什么 | 同步更新 README |
 | --- | --- |
 | 增删扩展 | 「这里有什么」总表 + 「本仓库自带的扩展」 |
+| `package.json` 的 `pi.extensions` | 「添加扩展」 |
 | 扩展的行为/命令/键位/配置 | 对应扩展小节；涉及键位看「键位冲突」 |
 | `packages` | 「这里有什么」总表 + 「第三方包」 |
 | `conflicts` / 改为本仓库代为加载 | 「由本仓库代为加载的包」 |
@@ -23,7 +24,7 @@
 | `install.sh` / `sync.mjs` 选项 | 「安装」「命令行选项」 |
 | 新增脚本或检查手段 | 「开发」+ 本文件 |
 
-vendor 进来的第三方代码（如 `extensions/bg-tasks/`）留 PROVENANCE 说明来源与版本；之后就是本仓库的代码，直接改，不往上游合。
+vendor 进来的第三方代码（如 `extensions/bg-tasks/`）留 PROVENANCE 说明来源与版本；之后就是本仓库的代码，直接改，不往上游合。vendor 目录带 `index.ts` 时尤其小心：pi 的自动发现会把它当成独立扩展再加载一遍，工具和快捷键全部冲突 —— `package.json` 的 `pi.extensions` 声明和 `scripts/pi-manifest.test.mjs` 就是为此存在，别拿掉。
 
 ## 命令
 
@@ -43,6 +44,7 @@ pnpm link-sdk           # 重建 pi SDK 软链（pnpm install 后可能需要）
 
 - `tsconfig.json`：`noEmit` + strict，只检查 `extensions/**/*.ts`。别用 `any` / `@ts-ignore` 糊，必须压制时写明原因。
 - 测试用 `node --test`，放 `extensions/<ext>/__tests__/*.test.ts` 或 `scripts/*.test.mjs`。必须离线、不碰 `~/.pi`。
+- `scripts/pi-manifest.test.mjs`：`pi.extensions` 要盖全顶层 `extensions/*.ts`、不得包含子目录；新增 `skills/` 等资源目录也得在 `pi` 里声明。
 
 ## 约定
 

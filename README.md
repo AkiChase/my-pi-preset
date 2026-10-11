@@ -300,6 +300,8 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 
 两个实现细节：pretty 会用自己的 `promptSnippet` 覆盖 patty 的，模型会看不到后台任务提示，所以这里把那句补回去；patty 哪天改了入口、不再注册 `bash`，扩展会直接抛错，不静默退回 pi 原生 bash。
 
+**和 vendor 目录的关系**：patty 的代码 vendor 在 `extensions/bg-tasks/`，由本扩展当库 import。pi 的自动发现会把 `extensions/` 下**带 `index.ts` 的子目录也当成一个独立扩展**，于是 `bg-tasks` 会被再加载一遍，`bash` / `bash_bg` / `jobs` / `monitor` 和四个快捷键全部注册两次，启动时一片冲突警告。挡住这件事的是 [`package.json`](package.json) 里的 `pi.extensions` 声明（只列 `extensions/*.ts`），见 [添加扩展](#添加扩展)。
+
 #### `extensions/status-bar.ts` —— 统一状态栏
 
 **要解决的问题**：pi 把所有扩展 `setStatus()` 的内容塞在 footer 下面共用的一行里，各写各的，装得越多越乱。自定义 footer 是唯一能统一排版的入口，代价是必须自己把那些状态画出来，否则它们会直接消失。
@@ -481,7 +483,17 @@ pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDING
 
 ## 添加扩展
 
-放进 `extensions/` 即可，可以是单个文件（`extensions/foo.ts`），也可以是带入口的目录（`extensions/foo/index.ts`）。pi 会自动发现，不需要构建步骤。改完跑一遍 `pnpm check`，顺手更新 README 里对应的小节（这件事写进了 [`AGENTS.md`](AGENTS.md)），提交推送后，在其它机器上跑 `pi update --extensions`。
+放一个 `.ts` 文件进 `extensions/` 即可，不需要构建步骤。改完跑一遍 `pnpm check`，顺手更新 README 里对应的小节（这件事写进了 [`AGENTS.md`](AGENTS.md)），提交推送后，在其它机器上跑 `pi update --extensions`。
+
+加载的范围由 [`package.json`](package.json) 的 `pi.extensions` 声明，而不是自动发现：
+
+```json
+"pi": { "extensions": ["extensions/*.ts"] }
+```
+
+这条 glob 不跨目录，所以顶层每个 `.ts` 都会自动加载，而 `extensions/` 下的子目录一律不会。必须这么写：pi 的自动发现会把任何 `extensions/<name>/index.ts` 也当成独立扩展，`extensions/bg-tasks/`（vendor 进来、由 `bash-unified.ts` 当库 import 的那份）会因此被加载两遍、工具和快捷键全部冲突。`scripts/pi-manifest.test.mjs` 盯着这件事。
+
+两个后果：真想加一个目录式扩展（`extensions/foo/index.ts`），得把它单独列进 `pi.extensions`；有了这段声明，pi 对 `skills/` / `prompts/` / `themes/` 的自动发现也一并关掉，将来真要放这些资源，同样得在 `pi` 里声明（测试会提醒）。
 
 扩展要用第三方 npm 包时，把它写进本仓库 `package.json` 的 `dependencies`：pi 安装 git 来源的包时会在检出目录里装一遍运行时依赖。要是这个包本身也是个 pi 扩展（像上面的 patty 和 pretty），记得同时把它加进 `pi-preset.json` 的 `conflicts`，否则两边会各注册一遍。
 
@@ -503,7 +515,7 @@ pnpm test               # 只跑 node --test
 ./install.sh --dry-run  # 看看这台机器缺什么
 ```
 
-测试用 `node --test`，没有第三方框架。全部测试都不联网、不碰 `~/.pi`：`scripts/sync.test.mjs` 会在 `PATH` 里放一个假的 `pi`，并把 `PI_CODING_AGENT_DIR` 指到一个临时目录，所以配置读写都发生在那里。
+测试用 `node --test`，没有第三方框架。全部测试都不联网、不碰 `~/.pi`：`scripts/sync.test.mjs` 会在 `PATH` 里放一个假的 `pi`，并把 `PI_CODING_AGENT_DIR` 指到一个临时目录，所以配置读写都发生在那里。`scripts/pi-manifest.test.mjs` 只读本仓库的 `package.json`，校验 `pi.extensions` 还盖得住所有顶层扩展、且没把 `extensions/` 下的子目录放进来。
 
 扩展 import 的 `@earendil-works/*`（pi 自己的 SDK）是 peer 依赖，运行时由 pi 提供，所以不装。类型检查和测试前会先跑 [`scripts/link-pi-sdk.mjs`](scripts/link-pi-sdk.mjs)，它在本机 pi 安装里找到这套 SDK 并软链进 `node_modules/`——类型因此永远对着真正加载这些代码的那个 pi 版本。`pnpm install` 之后链接可能被清掉，跑 `pnpm link-sdk` 重建即可；pi 装在别处时用 `PI_SDK_DIR` 或 `PI_BIN` 指过去。
 
