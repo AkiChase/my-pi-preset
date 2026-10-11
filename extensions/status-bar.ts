@@ -25,7 +25,11 @@ import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 // Layout (width permitting):
 //   ~/tools/pi-trellis  main ●2 +1 ↑2   session name
 //   ▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 39% 157k/400k (auto)        mp-messages·claude-opus-5·medium
-//   ↑112 ↓30k R5.3M W260k  $0.42   ⛁ 95% 19/20   ⚙ 2 jobs
+//   ↑112 ↓30k R5.3M W260k H83% $0.42   ⛁ 96% 1.2M/1.3M   ⚙ 2 jobs
+//
+// `H` is the hit rate of the latest request; ⛁ is pi-cache-optimizer's session
+// running total, which is why it carries the token pair the percentage comes
+// from.
 //
 // Before the first response nothing has a value yet, so the spend line draws a
 // dim skeleton (`↑– ↓– $–  │  ⛁ –`) instead of collapsing to whichever single
@@ -192,16 +196,32 @@ function collectUsage(entries: Iterable<any>): { totals: UsageTotals; latestCach
 	return { totals, latestCacheHitRate };
 }
 
+/** Inverse of a "1.21M" / "12.3k" / "840" token count. Null when unparseable. */
+function parseTokenCount(text: string): number | null {
+	const match = /^([\d.]+)([kKM]?)$/.exec(text);
+	if (!match) return null;
+	const value = Number.parseFloat(match[1]);
+	if (!Number.isFinite(value)) return null;
+	const scale = match[2] === "M" ? 1_000_000 : match[2] === "k" || match[2] === "K" ? 1000 : 1;
+	return Math.round(value * scale);
+}
+
 /**
  * Compress pi-cache-optimizer's status into one chip. Its text is
  * "· <Label> <hits>/<reqs>·<cached>/<total> <pct>%·write <n>" with an optional
  * "Cache Optimizer disabled · " prefix and " ⚠️ compat" suffix.
  *
- * The chip keeps the percentage *and* the request counter, because the
- * percentage alone is ambiguous: the upstream extension reports 0% both for
- * "nothing cached" and for "no requests yet" (it hardcodes 0 when
- * totalInputTokens is 0). `percent` is therefore null whenever the number is
- * not meaningful yet -- the caller paints those states dim instead of red.
+ * The chip shows the percentage next to the *token* pair it is computed from
+ * (cachedInput/totalInput), not the request counter: `34/35` measures a
+ * different thing (upstream counts a request as a hit on a single cached
+ * token -- `stats-store.ts`, `cacheRead > 0`), it rides close to 100% in any
+ * long session, and sitting beside `96%` it reads as that percentage's own
+ * numerator/denominator. The token pair genuinely is that.
+ *
+ * `percent` is null whenever the number is not a measurement: upstream
+ * hardcodes 0% when totalInputTokens is 0, so 0% would otherwise conflate
+ * "nothing cached" with "nothing sent". The caller paints those states dim
+ * rather than letting them borrow the error color.
  */
 export function parseCacheStatus(status: string): { chip: string; percent: number | null } {
 	const text = sanitize(status);
@@ -211,23 +231,32 @@ export function parseCacheStatus(status: string): { chip: string; percent: numbe
 
 	if (disabled) return { chip: `⛁ off${suffix}`, percent: null };
 
-	// "<hits>/<reqs>·" -- plain integers followed by the interpunct separator, so
-	// the token pair ("12.3k/20.0k") never matches.
-	const requests = /\s(\d+)\/(\d+)·/.exec(text);
-	const total = requests ? Number(requests[2]) : null;
-	const percents = [...text.matchAll(/(\d+(?:\.\d+)?)%/g)];
-	const last = percents.at(-1);
+	// The token pair is the one immediately preceding the percentage; that
+	// adjacency is what tells it apart from the request counter before it.
+	const stats = /([\d.]+[kKM]?)\/([\d.]+[kKM]?) (\d+(?:\.\d+)?)%/.exec(text);
+	if (!stats) {
+		// Unrecognized shape: keep a bare percentage if there is one, else the text.
+		const loose = [...text.matchAll(/(\d+(?:\.\d+)?)%/g)].at(-1);
+		if (!loose) return { chip: text, percent: null };
+		const percent = Math.round(Number(loose[1]));
+		return { chip: `⛁ ${percent}%${suffix}`, percent };
+	}
 
-	// No requests on record: the percentage is a placeholder, not a measurement.
-	if (total === 0) return { chip: `⛁ ${NO_VALUE}${suffix}`, percent: null };
-	if (!last) return { chip: text, percent: null }; // Unrecognized shape: show it verbatim.
+	const [, cached, total, pct] = stats;
+	// Upstream formats every count in millions ("0.012M/0.020M"); re-format through
+	// the footer's own scale so the pair matches the R/W numbers beside it.
+	const cachedTokens = parseTokenCount(cached);
+	const totalTokens = parseTokenCount(total);
+	// A zero denominator means nothing has been sent yet, so the percentage
+	// upstream reports is a placeholder rather than a hit rate.
+	if (totalTokens === 0) return { chip: `⛁ ${NO_VALUE}${suffix}`, percent: null };
 
-	const percent = Math.round(Number(last[1]));
-	const counter = requests ? ` ${requests[1]}/${requests[2]}` : "";
-	return { chip: `⛁ ${percent}%${counter}${suffix}`, percent };
+	const percent = Math.round(Number(pct));
+	const pair = cachedTokens !== null && totalTokens !== null ? `${formatTokens(cachedTokens)}/${formatTokens(totalTokens)}` : `${cached}/${total}`;
+	return { chip: `⛁ ${percent}% ${pair}${suffix}`, percent };
 }
 
-/** Hit-rate coloring, shared by the CH% field and the cache chip. */
+/** Hit-rate coloring, shared by the H field and the cache chip. */
 function hitRateColor(percent: number): ThemeColor {
 	if (percent >= 80) return "success";
 	if (percent >= 50) return "warning";
@@ -359,7 +388,7 @@ export default function (pi: ExtensionAPI) {
 			// Right after compaction the token count is unknown until the next
 			// response; show the shape of the bar without inventing a number.
 			if (percent === null || tokens === null) {
-				return `${paint("borderMuted", BAR_EMPTY.repeat(BAR_WIDTH))} ${paint("muted", "?")}${paint("borderMuted", "/")}${paint("dim", formatTokens(window))}`;
+				return `${paint("borderMuted", BAR_EMPTY.repeat(BAR_WIDTH))}  ${paint("muted", "?")}${paint("borderMuted", "/")}${paint("dim", formatTokens(window))}`;
 			}
 
 			const clamped = Math.max(0, Math.min(100, percent));
@@ -370,7 +399,9 @@ export default function (pi: ExtensionAPI) {
 			const bar = paint(level, BAR_FILLED.repeat(filled)) + paint("borderMuted", BAR_EMPTY.repeat(BAR_WIDTH - filled));
 			const pct = theme.style(`${clamped.toFixed(0)}%`, { fg: level, bold: true });
 			const used = `${paint("text", formatTokens(tokens))}${paint("borderMuted", "/")}${paint("dim", formatTokens(window))}`;
-			return `${bar} ${pct} ${used}`;
+			// Two spaces after the track: the bar is a solid shape and a single space
+			// lets the percentage read as its last cell.
+			return `${bar}  ${pct} ${used}`;
 		};
 
 		const modelLabel = (): string => {
@@ -456,7 +487,10 @@ export default function (pi: ExtensionAPI) {
 				if (totals.cacheRead) tokenParts.push(field("R", formatTokens(totals.cacheRead), "success"));
 				if (totals.cacheWrite) tokenParts.push(field("W", formatTokens(totals.cacheWrite), "warning"));
 				if ((totals.cacheRead || totals.cacheWrite) && latestCacheHitRate !== undefined) {
-					tokenParts.push(field("CH", `${latestCacheHitRate.toFixed(0)}%`, hitRateColor(latestCacheHitRate)));
+					// `H` is the hit rate of the *latest* request, while the ⛁ chip is the
+					// session running total -- the chip's token pair is what marks it as
+					// cumulative. Single-letter label so it stays in the ↑ ↓ R W $ family.
+					tokenParts.push(field("H", `${latestCacheHitRate.toFixed(0)}%`, hitRateColor(latestCacheHitRate)));
 				}
 				if (totals.cost) {
 					const amount = totals.cost >= 1 ? totals.cost.toFixed(2) : totals.cost.toFixed(3);
