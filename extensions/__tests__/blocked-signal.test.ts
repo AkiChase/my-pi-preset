@@ -95,7 +95,7 @@ describe("watchPrompts", () => {
     });
     fake.fire("ui_prompt_start", start("custom"));
 
-    assert.deepEqual(sink.calls, ["block:custom:Auth method (+1)"]);
+    assert.deepEqual(sink.calls, ["block:custom:Auth method"]);
   });
 
   it("does not reuse a stale ask-user label for the next prompt", () => {
@@ -243,8 +243,9 @@ describe("label helpers", () => {
     assert.equal(sanitizeLabel("x".repeat(80))?.length, 60);
   });
 
-  it("falls back from header to question text", () => {
+  it("falls back from header to question text, and ignores the other questions", () => {
     assert.equal(askUserLabel({ questions: [{ question: "Which library?" }] }), "Which library?");
+    assert.equal(askUserLabel({ questions: [{ header: "Auth method" }, { header: "Library" }] }), "Auth method");
     assert.equal(askUserLabel({ questions: [] }), undefined);
     assert.equal(askUserLabel(undefined), undefined);
   });

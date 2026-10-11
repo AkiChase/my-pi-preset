@@ -234,7 +234,7 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 
 **提供**：
 
-- 工具：`bash`（覆盖内置，新增 `run_in_background`、`timeout`、`description` 参数）、`bash_bg`（直接后台启动）、`jobs`（list / output / kill / attach / search / cleanup / stats）、`agent_bg`（后台跑一个独立 `pi -p` 进程）、`monitor`（按事件流监听命令输出或 WebSocket）。日志默认落在 `/tmp/pi-bg/<jobId>.log`。
+- 工具：`bash`（覆盖内置，新增 `run_in_background`、`timeout`、`description` 参数）、`bash_bg`（直接后台启动）、`jobs`（list / output / kill / attach / search / cleanup / stats；output 支持按字节 offset 翻页读大日志，search 支持限定单任务、忽略大小写、上下文行）、`agent_bg`（后台跑一个独立 `pi -p` 进程）、`monitor`（按事件流监听命令输出或 WebSocket）。日志默认落在 `/tmp/pi-bg/<jobId>.log`。
 - 斜杠命令：`/bg` 转后台、`/bg-list` 任务面板、`/bg-version` 打印版本和路径、`/bg-config` 显示生效的配置、来源文件和加载警告。
 - 快捷键（默认值，可改）：`ctrl+shift+b` 转后台，`ctrl+shift+j` / `shift+down` 打开任务面板，`ctrl+shift+x` kill 最近一个运行中的作业。
 
@@ -337,9 +337,9 @@ pi 自己其实把信号发出来了 —— `ui_prompt_start` / `ui_prompt_end` 
 **做了什么更改**：订阅那对事件，转发给两个 sink，各自只在自己宿主的环境变量齐备时才启用（都不在就直接返回，不留任何监听）：
 
 - **herdr**：发 `herdr:blocked`，`{ active: true, label }` 进、`{ active: false }` 出。herdr 那边自己计数，所以每个 `true` 必须配一个 `false`，中途 `/reload`、`session_shutdown` 都做了兜底。面板因此变成 Blocked，`herdr agent wait --until blocked` 也能停住了。
-- **cmux**：cmux 没有公开接口去改面板状态，所以走文档里的 `cmux notify`（横幅 + 侧栏徽标 + 面板高亮），答完再按 id `cmux dismiss-notification` 撤掉，不用 `notify --clear`，免得连带清掉别人的通知。只对 cmux 自己没补的 `custom` 和 `editor` 发，不重复打扰；`CMUX_PI_HOOKS_DISABLED=1` 这个它自己的开关也认。面板状态仍然属于 cmux 自己那份集成（装法 `cmux hooks pi install`，注意 `PATH` 里要让 cmux 的 `pi` shim 排在前面才会自动注入）。
+- **cmux**：只在**没有** herdr 的时候才挂上 —— herdr 自己会把 `pi needs attention: <cwd>` 这种 toast 转发给它所在的终端（实测：面板变 blocked 时 cmux 真的弹了通知，而光打一个 BEL 什么都不弹），叠上去就是一次提问响两声。pi 直接跑在 cmux 面板里时才用这个 sink：走文档里的 `cmux notify`（横幅+侧栏徽标+面板高亮），答完按 id `cmux dismiss-notification` 撤掉，不用 `notify --clear`，免得连带清掉别人的通知。只对 cmux 自己没补的 `custom` 和 `editor` 发；`CMUX_PI_HOOKS_DISABLED=1` 这个它自己的开关也认。面板状态仍然属于 cmux 自己那份集成（装法 `cmux hooks pi install`，注意 `PATH` 里要让 cmux 的 `pi` shim 排在前面才会自动注入）。
 
-标签尽量给得有意义：有 `title` 就用 `title`；问卷没有 `title`，所以额外听一条 `rpiv:ask-user:prompt`（只认频道名，不 import 那个包），拿第一题的 header 当标签，比如 `Auth method (+1)`；都没有就退回按种类写死的一句话。
+标签尽量给得有意义：有 `title` 就用 `title`；问卷没有 `title`，所以额外听一条 `rpiv:ask-user:prompt`（只认频道名，不 import 那个包），拿第一题的 header 当标签，比如 `Auth method`；都没有就退回按种类写死的一句话。
 
 **没做的事**：pi 自己的 OSC 7501 program status 没有补。pi 对 select / confirm / input / editor 会报 `blocked`，对 `ctx.ui.custom()` 不报（1.1.0 的 `showExtensionCustom` 没调 `programStatus.setBlocked`），这是上游的坑；而 herdr 0.9.1 和 cmux 0.65.0 都不读这个协议，绕它没有收益。
 

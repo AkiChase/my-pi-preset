@@ -158,3 +158,28 @@ explainable.
   action table — the built-ins are `down` (`tui.editor.cursorDown`, `tui.select.down`),
   `ctrl+shift+down` (`tui.altScreen.nextPrompt`) and `alt+down`
   (`app.models.reorderDown`). Nothing claims `shift+down`.
+- **`jobs output` can page.** Upstream had `readBoundedTail(logPath, maxChars)` and no
+  offset parameter at all, so the middle of a large log was simply unreachable through the
+  tool — a job whose interesting output was not at the end could not be read. `output.ts`
+  gains `readLogSlice(logPath, {offset, limit})` returning `{text, start, end, size}`;
+  omitting `offset` keeps the tail default. Offsets are bytes, so paging stays O(limit) on
+  a 100 MiB log; the cost is a possible U+FFFD at a range seam, which `readBoundedTail`
+  already risked. Each result states its byte range, flags the bytes it skipped (a bare
+  tail otherwise reads as the whole log), and names the offset to continue from.
+- **`jobs` validates the parameters each action needs.** Upstream wrote `p.jobId!` and let
+  the omission surface wherever it landed: `No task found with ID: undefined` for output, a
+  TypeError for the others. The schema cannot express "required for these actions only"
+  (one flat object is shared by all seven), so `required(value, name, action)` checks it
+  explicitly and the parameter descriptions state the dependency.
+- **`jobs search` can be narrowed, relaxed, and given context.** Upstream searched every
+  log in the session, case-sensitively, returning bare matching lines. Added: `jobId` to
+  scope the scan to one job (and a hard error on an unknown id, rather than silently
+  scanning everything), `ignoreCase`, and `context` for surrounding lines. Context is
+  collected by a `ContextCollector` sliding window during the existing single-pass stream,
+  so a second read of the log is never needed; only DISPLAYED hits collect it, leaving the
+  reported match count unaffected. Hits render in grep's convention — `:` for the match,
+  `-` for context.
+  - Note for future edits in this file: `ContextCollector` assigns its fields in the
+    constructor body rather than using TypeScript parameter properties. pi and
+    `node --test` both run these files through type stripping, which rejects
+    `constructor(private readonly x)` outright — it typechecks and then fails at load.

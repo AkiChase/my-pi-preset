@@ -3,10 +3,10 @@
  *
  * Actions:
  *   - list: show all jobs (running + recently terminal)
- *   - output: read a job's log tail (non-blocking peek)
+ *   - output: read a job's log — tail by default, or any byte range
  *   - kill: terminate a job
  *   - attach: follow a job's live output and wait for it to finish
- *   - search: regex-search all job output
+ *   - search: regex-search job output, optionally scoped to one job
  *   - cleanup: purge terminal jobs
  *   - stats: aggregate metrics
  */
@@ -18,6 +18,7 @@ import type { BackgroundRegistry } from "../state.ts";
 import {
     isTerminalStatus,
     PREVIEW_CHARS,
+    type Job,
     type UiContext,
 } from "../types.ts";
 import { processExists } from "../spawn.ts";
@@ -30,8 +31,8 @@ import {
     renderSidebar,
 } from "../registry.ts";
 import { formatDuration, formatJobLine, jobLabel, oneLine, textBlock } from "../format.ts";
-import { streamLog } from "../output.ts";
-import { searchLogs } from "../log-search.ts";
+import { readLogSlice, streamLog } from "../output.ts";
+import { searchLogs, type LogSearchHit } from "../log-search.ts";
 import { markOutcomeSurfaced } from "../notify.ts";
 import {
     ensureCompletionPromise,
@@ -52,10 +53,10 @@ export function registerJobsTool(
         promptSnippet: "Inspect and manage background jobs",
         promptGuidelines: [
             "list: show all jobs",
-            "output: show the log tail for one job",
+            "output: show a job's log. Defaults to the tail; to page through a large log pass offset (bytes) — each result reports the byte range it covers and the offset to continue from. limit caps one page.",
             "kill: terminate a job",
             "attach: follow a job's live output and wait for it to finish (use output for a non-blocking peek)",
-            "search: regex-search all job output",
+            "search: regex-search job output. Narrow to one job with jobId, match case-insensitively with ignoreCase, and see surrounding lines with context.",
             "cleanup: purge terminal jobs",
             "stats: show aggregate metrics",
             "Completion notices for a failed job already inline the tail of its log — do NOT call 'output' just to learn why it failed. Call 'output' when that tail is truncated and you need more, or when a job's full output is the deliverable (e.g. a test report you must relay). Never call it merely to acknowledge a completed job.",
@@ -73,13 +74,42 @@ export function registerJobsTool(
                 ] as const,
                 { description: "Action to perform" }
             ),
-            jobId: Type.Optional(Type.String({ description: "Job ID" })),
+            // The action/parameter dependencies live in these descriptions
+            // because the schema is one flat object — every action shares it.
+            // execute() validates them explicitly so a missing jobId fails
+            // with a sentence instead of a lookup error from three frames down.
+            jobId: Type.Optional(
+                Type.String({
+                    description:
+                        "Job ID. Required for output, kill and attach; optional for search, where it limits the scan to one job.",
+                })
+            ),
             pattern: Type.Optional(
-                Type.String({ description: "Regex pattern for search" })
+                Type.String({ description: "Regex pattern. Required for search." })
             ),
             wait: Type.Optional(
                 Type.Boolean({
                     description: "Whether attach should wait for completion (default: true)",
+                })
+            ),
+            offset: Type.Optional(
+                Type.Number({
+                    description:
+                        "output: byte offset to read from. Omit for the tail (the usual case); pass the nextOffset from a previous result to page forward.",
+                })
+            ),
+            limit: Type.Optional(
+                Type.Number({
+                    description: `output: maximum bytes to return (default ${reg.config.outputPreviewChars}).`,
+                })
+            ),
+            ignoreCase: Type.Optional(
+                Type.Boolean({ description: "search: match case-insensitively." })
+            ),
+            context: Type.Optional(
+                Type.Number({
+                    description:
+                        "search: lines of context to show before and after each match (default 0).",
                 })
             ),
         }),
@@ -90,18 +120,29 @@ export function registerJobsTool(
                 jobId?: string;
                 pattern?: string;
                 wait?: boolean;
+                offset?: number;
+                limit?: number;
+                ignoreCase?: boolean;
+                context?: number;
             };
             switch (p.action) {
                 case "list":
                     return listAction(reg);
                 case "output":
-                    return await outputAction(reg, p.jobId!);
+                    return outputAction(reg, required(p.jobId, "jobId", "output"), {
+                        offset: p.offset,
+                        limit: p.limit,
+                    });
                 case "kill":
-                    return await killAction(reg, p.jobId!, ctx);
+                    return await killAction(reg, required(p.jobId, "jobId", "kill"), ctx);
                 case "attach":
-                    return await attachAction(reg, p.jobId!, p.wait ?? true, signal, onUpdate, ctx);
+                    return await attachAction(reg, required(p.jobId, "jobId", "attach"), p.wait ?? true, signal, onUpdate, ctx);
                 case "search":
-                    return await searchAction(reg, p.pattern ?? "");
+                    return await searchAction(reg, required(p.pattern, "pattern", "search"), {
+                        jobId: p.jobId,
+                        ignoreCase: p.ignoreCase ?? false,
+                        contextLines: p.context ?? 0,
+                    });
                 case "cleanup":
                     return cleanupAction(reg, ctx);
                 case "stats":
@@ -109,6 +150,22 @@ export function registerJobsTool(
             }
         },
     });
+}
+
+// ─── parameter validation ─────────────────────────────────────
+
+/**
+ * Demand a parameter the chosen action needs. Upstream wrote `p.jobId!` and let
+ * the omission surface as whatever the downstream lookup happened to say —
+ * `No task found with ID: undefined` for output, a TypeError for others. The
+ * schema cannot express "required for these actions only" (it is one flat
+ * object shared by all seven), so the check belongs here, named.
+ */
+function required<T>(value: T | undefined, name: string, action: string): T {
+    if (value === undefined || value === "") {
+        throw new Error(`jobs action '${action}' requires ${name}`);
+    }
+    return value;
 }
 
 // ─── list: show all jobs ─────────────────────────────────────────────────
@@ -148,10 +205,11 @@ function listAction(reg: BackgroundRegistry): AgentToolResult<undefined> {
 
 // ─── output: read a job's log tail ───────────────────────────────────────
 
-async function outputAction(
+function outputAction(
     reg: BackgroundRegistry,
-    jobId: string
-): Promise<AgentToolResult<undefined>> {
+    jobId: string,
+    page: { offset?: number; limit?: number }
+): AgentToolResult<undefined> {
     const job = findJob(reg, jobId);
     if (!job) throw new Error(`No task found with ID: ${jobId}`);
     // CC's TaskOutputTool: a successful read of a TERMINAL job's output marks
@@ -159,16 +217,34 @@ async function outputAction(
     // Peeking at a still-running job does NOT mark — its completion must still
     // notify.
     if (isTerminalStatus(job.status)) markOutcomeSurfaced(job);
-    const out = readLogTail(job, reg.config.outputPreviewChars).trimEnd();
+
+    const limit = page.limit ?? reg.config.outputPreviewChars;
+    const slice = readLogSlice(job.logPath, { offset: page.offset, limit });
     const label = jobLabel(job);
+    if (!slice || slice.text.length === 0) {
+        const where = page.offset === undefined ? "yet " : `at offset ${page.offset} `;
+        return {
+            content: [
+                textBlock(`No output ${where}for ${label} (${job.status}). Log: ${job.logPath}`),
+            ],
+            details: undefined,
+        };
+    }
+
+    // Say exactly which bytes these are and how to reach the rest. Upstream
+    // printed a bare tail with no indication that anything was missing, which
+    // reads as the whole log.
+    const head = `Output for ${label} (${job.status}) — bytes ${slice.start}-${slice.end} of ${slice.size}`;
+    const before =
+        slice.start > 0
+            ? `[${slice.start} earlier bytes not shown — read them with offset=0]\n`
+            : "";
+    const after =
+        slice.end < slice.size
+            ? `\n[${slice.size - slice.end} more bytes — continue with offset=${slice.end}]`
+            : "";
     return {
-        content: [
-            textBlock(
-                out
-                    ? `Output for ${label} (${job.status})\n${out}`
-                    : `No output yet for ${label} (${job.status}). Log: ${job.logPath}`
-            ),
-        ],
+        content: [textBlock(`${head}\n${before}${slice.text.trimEnd()}${after}`)],
         details: undefined,
     };
 }
@@ -289,37 +365,56 @@ const SEARCH_DISPLAY_LIMIT_PER_JOB = 20;
 
 async function searchAction(
     reg: BackgroundRegistry,
-    pattern: string
+    pattern: string,
+    opts: { jobId?: string; ignoreCase: boolean; contextLines: number }
 ): Promise<AgentToolResult<undefined>> {
-    if (!pattern) throw new Error("search action requires a pattern");
-
     let re: RegExp;
     try {
-        re = new RegExp(pattern);
+        // Non-global on purpose: .test() on a global regex advances lastIndex
+        // and would skip every other match.
+        re = new RegExp(pattern, opts.ignoreCase ? "i" : "");
     } catch (err) {
         throw new Error(`Invalid regex: ${(err as Error).message}`);
     }
 
+    // Scoping to one job is the difference between reading four lines and
+    // reading every log in the session; upstream could only do the latter.
+    let jobs: Job[];
+    let scope: string;
+    if (opts.jobId) {
+        const job = findJob(reg, opts.jobId);
+        if (!job) throw new Error(`No task found with ID: ${opts.jobId}`);
+        jobs = [job];
+        scope = jobLabel(job);
+    } else {
+        jobs = [...Array.from(reg.jobs.values()), ...reg.recentTerminal];
+        scope = "any job log";
+    }
+
     const result = await searchLogs({
-        jobs: [...Array.from(reg.jobs.values()), ...reg.recentTerminal],
+        jobs,
         pattern: re,
         maxHitsPerJob: SEARCH_DISPLAY_LIMIT_PER_JOB,
         maxLineChars: PREVIEW_CHARS.line,
         previewChars: reg.config.outputPreviewChars,
+        contextLines: opts.contextLines,
     });
 
+    const flags = opts.ignoreCase ? "i" : "";
     if (result.totalHits === 0) {
         return {
-            content: [textBlock(`No matches for /${pattern}/ in any job log.`)],
+            content: [textBlock(`No matches for /${pattern}/${flags} in ${scope}.`)],
             details: undefined,
         };
     }
 
     const blocks = result.groups.map((group) => {
         const headLabel = group.name ? `${group.name} (${group.jobId})` : group.jobId;
-        const body = group.hits
-            .map((h) => `  ${h.path}:${h.line}: ${h.text}`)
-            .join("\n");
+        const body = group.hits.map((h) => formatHit(h)).join(
+            // Blank line between hits only when they carry context, so
+            // context-free output stays as dense as it was.
+            opts.contextLines > 0 ? "\n\n" : "\n"
+        );
         const more = group.count > group.hits.length
             ? `\n  ... and ${group.count - group.hits.length} more`
             : "";
@@ -329,11 +424,25 @@ async function searchAction(
     return {
         content: [
             textBlock(
-                `Found ${result.totalHits} matches for /${pattern}/ across ${result.groups.length} job(s):\n\n${blocks.join("\n\n")}`
+                `Found ${result.totalHits} matches for /${pattern}/${flags} across ${result.groups.length} job(s):\n\n${blocks.join("\n\n")}`
             ),
         ],
         details: undefined,
     };
+}
+
+/** grep -C's convention: `:` marks the matching line, `-` marks context. */
+function formatHit(hit: LogSearchHit): string {
+    const rows: string[] = [];
+    const before = hit.before ?? [];
+    before.forEach((text, i) => {
+        rows.push(`  ${hit.path}:${hit.line - before.length + i}- ${text}`);
+    });
+    rows.push(`  ${hit.path}:${hit.line}: ${hit.text}`);
+    (hit.after ?? []).forEach((text, i) => {
+        rows.push(`  ${hit.path}:${hit.line + i + 1}- ${text}`);
+    });
+    return rows.join("\n");
 }
 
 // ─── cleanup ─────────────────────────────────────────────────────────────

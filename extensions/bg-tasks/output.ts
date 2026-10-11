@@ -31,6 +31,69 @@ export function readBoundedTail(logPath: string, maxChars: number): string {
     }
 }
 
+/**
+ * A byte range of a log file, with the context needed to ask for the next one.
+ *
+ * Offsets are BYTES, not characters: the file is read with positional reads so
+ * a 100 MiB log costs O(limit), and a byte offset is the only thing that can
+ * be resumed cheaply. A range boundary can therefore land mid-codepoint, which
+ * shows up as a single U+FFFD at the seam — the same trade `readBoundedTail`
+ * has always made, and harmless for logs.
+ */
+export interface LogSlice {
+    text: string;
+    /** Byte offset where this slice starts. */
+    start: number;
+    /** Byte offset just past this slice — pass it back as `offset` to continue. */
+    end: number;
+    /** Total size of the log in bytes. */
+    size: number;
+}
+
+/**
+ * Read `limit` bytes of a log, starting at `offset` — or the LAST `limit`
+ * bytes when `offset` is undefined.
+ *
+ * The tail default is what upstream's `readBoundedTail` did and the only thing
+ * it could do: there was no offset parameter at all, so the middle of a large
+ * log was unreachable and a job whose interesting output was not at the end
+ * simply could not be read through the tool.
+ *
+ * Returns undefined when the file is missing or empty, which callers render as
+ * a no-output note.
+ */
+export function readLogSlice(
+    logPath: string,
+    opts: { offset?: number; limit: number }
+): LogSlice | undefined {
+    let fd: number;
+    try {
+        fd = openSync(logPath, "r");
+    } catch {
+        return undefined;
+    }
+    try {
+        const { size } = fstatSync(fd);
+        if (size === 0) return undefined;
+        const limit = Math.max(1, Math.floor(opts.limit));
+        // Clamp rather than error: an offset past the end is the normal result
+        // of paging to the bottom of a log that has since been truncated.
+        const start =
+            opts.offset === undefined
+                ? Math.max(0, size - limit)
+                : Math.min(Math.max(0, Math.floor(opts.offset)), size);
+        const toRead = Math.min(limit, size - start);
+        if (toRead <= 0) return { text: "", start, end: start, size };
+        const buf = Buffer.alloc(toRead);
+        readSync(fd, buf, 0, toRead, start);
+        return { text: buf.toString("utf-8"), start, end: start + toRead, size };
+    } catch {
+        return undefined;
+    } finally {
+        closeSync(fd);
+    }
+}
+
 // Terminal escape/control sequences stripped from a progress line so the
 // sidebar shows clean text and crafted job output cannot inject escapes. The
 // leading \u001b (ESC) is essential — without it these would eat literal

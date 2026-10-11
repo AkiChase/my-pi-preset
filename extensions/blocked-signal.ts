@@ -68,9 +68,8 @@ export function askUserLabel(payload: unknown): string | undefined {
   const questions = (payload as { questions?: unknown })?.questions;
   if (!Array.isArray(questions) || questions.length === 0) return undefined;
   const first = questions[0] as { header?: unknown; question?: unknown };
-  const label = sanitizeLabel(first?.header) ?? sanitizeLabel(first?.question);
-  if (!label) return undefined;
-  return questions.length > 1 ? `${label} (+${questions.length - 1})` : label;
+  // Just the first header. A "(+2)" suffix for the other tabs only reads as noise in a pane badge.
+  return sanitizeLabel(first?.header) ?? sanitizeLabel(first?.question);
 }
 
 export function promptLabel(event: UIPromptStartEvent, askLabel: string | undefined): string {
@@ -208,8 +207,13 @@ export function watchPrompts(pi: ExtensionAPI, sinks: PromptSink[]): void {
 
 export default function (pi: ExtensionAPI) {
   const sinks: PromptSink[] = [];
-  if (herdrPresent()) sinks.push(createHerdrSink(pi));
-  const cliPath = cmuxCliPath();
+  const underHerdr = herdrPresent();
+  if (underHerdr) sinks.push(createHerdrSink(pi));
+  // herdr already forwards its own "<agent> needs attention: <cwd>" toast to whatever terminal it
+  // runs in (verified: a blocked pane raises a cmux notification, while a bare BEL raises none), so
+  // adding ours on top would notify twice for one prompt. The cmux sink is for pi running directly
+  // in a cmux pane.
+  const cliPath = underHerdr ? undefined : cmuxCliPath();
   if (cliPath) sinks.push(createCmuxSink(cliRunner(cliPath)));
   if (sinks.length === 0) return;
   watchPrompts(pi, sinks);
