@@ -17,7 +17,7 @@ import { createBashToolDefinition } from "@earendil-works/pi-coding-agent";
 import { BackgroundRegistry } from "./state.ts";
 import { detectNonInteractive, terminateJobSilently } from "./lifecycle.ts";
 import { stopSidebarTicker } from "./registry.ts";
-import { EVENT } from "./types.ts";
+import { EVENT, NOTIFICATION_TAIL_LINES_SHOWN } from "./types.ts";
 import { registerBashTool } from "./tools/bash.ts";
 import { registerBashBgTool } from "./tools/bash-bg.ts";
 import { registerJobsTool } from "./tools/jobs.ts";
@@ -56,7 +56,7 @@ export default function (pi: ExtensionAPI): void {
         theme: { fg(colour: string, text: string): string }
     ) => {
         const details = message.details as
-            | { status?: string; summary?: string }
+            | { status?: string; summary?: string; outputTail?: string }
             | undefined;
         const colour =
             details?.status === "completed"
@@ -65,7 +65,17 @@ export default function (pi: ExtensionAPI): void {
                   ? "error"
                   : "warning";
         const line = theme.fg(colour, `● ${details?.summary ?? String(message.content)}`);
-        return { render: () => [line], invalidate: () => {} };
+        // A backgrounded job's output never appears anywhere else in the TUI, so
+        // a failure summary alone leaves the user with nothing to look at. Show
+        // the last few lines of the inlined tail (the model gets all of it in
+        // the XML); the full log is at details.outputFile.
+        const tail = details?.outputTail
+            ? details.outputTail
+                  .split("\n")
+                  .slice(-NOTIFICATION_TAIL_LINES_SHOWN)
+                  .map((l) => theme.fg("dim", `  │ ${l}`))
+            : [];
+        return { render: () => [line, ...tail], invalidate: () => {} };
     };
     pi.registerMessageRenderer(EVENT.taskNotification, (message, _options, theme) =>
         renderTaskNotification(message, theme)

@@ -16,10 +16,17 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { DELIVER_STEER, EVENT, type Job } from "./types.ts";
+import {
+    DELIVER_STEER,
+    EVENT,
+    FAILURE_TAIL_CHARS,
+    FAILURE_TAIL_LINES,
+    type Job,
+} from "./types.ts";
 import type { BackgroundRegistry } from "./state.ts";
 import { forget } from "./registry.ts";
 import { describeJob } from "./format.ts";
+import { readTailLines } from "./output.ts";
 
 /** Terminal statuses a <task-notification> can carry. */
 export type TerminalStatus = "completed" | "failed" | "killed";
@@ -30,9 +37,14 @@ export function escapeXml(s: string): string {
 }
 
 /**
- * Build Claude Code's exact <task-notification> XML block. The <tool_use_id>
- * line is included only when a toolUseId is present; the <status> line is
- * omitted deliberately for stall warnings (CC parity).
+ * Build Claude Code's <task-notification> XML block, plus our `<output_tail>`
+ * extension. The <tool_use_id> line is included only when a toolUseId is
+ * present; the <status> line is omitted deliberately for stall warnings (CC
+ * parity).
+ *
+ * Deviation from upstream: a non-successful outcome carries the tail of its
+ * log inline. Upstream sent only "... failed with exit code 3", which forced
+ * a `jobs output` round-trip on EVERY failure just to learn the reason.
  */
 export function buildTaskNotification(args: {
     taskId: string;
@@ -40,6 +52,8 @@ export function buildTaskNotification(args: {
     outputFile: string;
     status?: TerminalStatus;
     summary: string;
+    /** Log tail for failures; "" or omitted renders no element. */
+    outputTail?: string;
 }): string {
     const lines = [
         "<task-notification>",
@@ -48,9 +62,25 @@ export function buildTaskNotification(args: {
         `<output_file>${escapeXml(args.outputFile)}</output_file>`,
         ...(args.status ? [`<status>${args.status}</status>`] : []),
         `<summary>${escapeXml(args.summary)}</summary>`,
+        ...(args.outputTail
+            ? [`<output_tail>\n${escapeXml(args.outputTail)}\n</output_tail>`]
+            : []),
         "</task-notification>",
     ];
     return lines.join("\n");
+}
+
+/**
+ * The log tail to inline for a terminal job, or "" when none should be.
+ *
+ * Only non-successful outcomes get one: a completed job's output is either
+ * irrelevant or already the deliverable the model will read on purpose, and
+ * inlining it on every success would spend context for nothing.
+ */
+export function failureTail(job: Job, status: TerminalStatus): string {
+    if (status === "completed") return "";
+    const tail = readTailLines(job.logPath, FAILURE_TAIL_LINES, FAILURE_TAIL_CHARS);
+    return tail || "(no output)";
 }
 
 /**
@@ -116,6 +146,7 @@ export function sendTaskNotification(args: {
     job.notified = true;
     const status = args.status ?? (job.status as TerminalStatus);
     const summary = args.summary ?? completionSummary(job, status);
+    const outputTail = failureTail(job, status);
 
     try {
         pi.sendMessage(
@@ -127,6 +158,7 @@ export function sendTaskNotification(args: {
                     outputFile: job.logPath,
                     status,
                     summary,
+                    outputTail,
                 }),
                 display: true,
                 details: {
@@ -134,6 +166,7 @@ export function sendTaskNotification(args: {
                     status,
                     summary,
                     outputFile: job.logPath,
+                    ...(outputTail ? { outputTail } : {}),
                 },
             },
             DELIVER_STEER

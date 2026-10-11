@@ -40,6 +40,37 @@ explainable.
   (`export { default } from "./src/index.ts"`) was dropped as redundant.
 - Not registered as a pi extension directly. `extensions/bash-unified.ts` imports it and
   re-registers its `bash` tool through `@heyhuynhgiabuu/pi-pretty`'s renderers.
-- Type-checked under this repo's stricter `tsconfig.json` (`noUncheckedIndexedAccess`,
-  `verbatimModuleSyntax`, `noImplicitOverride`, `noFallthroughCasesInSwitch`), which
-  upstream does not enable.
+- Type-checked under this repo's `tsconfig.json` (`verbatimModuleSyntax`,
+  `noImplicitOverride`, `noFallthroughCasesInSwitch`), which upstream does not enable.
+  `noUncheckedIndexedAccess` is deliberately *not* enabled: `bash-unified.ts` deep-imports
+  pi-pretty's `src/*.ts`, so those sources join the program and `skipLibCheck` (which only
+  covers `.d.ts`) cannot exclude them — the flag is not globally enableable here.
+- `commands.ts`: `/bg-version` reads the preset's `package.json`. After flattening,
+  upstream's `../package.json` pointed at a nonexistent `extensions/package.json`.
+- `format.ts` `formatJobLine()`: dropped the duplicate duration suffix (upstream appended
+  its own on top of the one `statusLabel()` already embeds, printing `▶ bg (12s) (12s)`),
+  and routed the command through `oneLine()` so a multi-line command cannot break the
+  one-job-per-line contract of `jobs list`. `__tests__/format.test.ts` had codified the
+  doubled duration as an assertion; it now asserts the single-duration form.
+- `tools/jobs.ts` `statsAction()`: labels aligned with `padEnd()` instead of hand-counted
+  spaces (upstream's `Total started:` and `Currently running:` were in different columns),
+  and `Total CPU time` renamed to `Total elapsed` — the underlying `totalDurationMs` is
+  summed wall clock, not CPU time.
+- **Failure notifications inline the log tail.** Upstream's `<task-notification>` for a
+  failed job carried only `"... failed with exit code N"`, and `tools/jobs.ts`'s
+  `promptGuidelines` told the model to *"call 'output' on a FAILED job"* — so every single
+  failure cost a guaranteed extra `jobs output` round-trip just to learn the reason.
+  Now:
+  - `output.ts` gains `readTailLines(logPath, maxLines, maxChars)` — ANSI-stripped,
+    blank-dropping, `\r`-collapsing tail reader (a progress bar would otherwise spend the
+    whole budget and push the error out of the window).
+  - `notify.ts` gains `failureTail(job, status)` and emits an `<output_tail>` element
+    (upstream's XML had no such element) plus `details.outputTail`. Successful jobs get
+    nothing, so a success costs no extra context.
+  - `index.ts` `renderTaskNotification` renders the last `NOTIFICATION_TAIL_LINES_SHOWN`
+    lines dimmed under the summary — a backgrounded job's output appears nowhere else in
+    the TUI, so a bare failure line left the user with nothing to look at.
+  - `promptGuidelines` inverted accordingly: do NOT call `output` just to learn why a job
+    failed.
+  - New constants in `types.ts`: `FAILURE_TAIL_LINES`, `FAILURE_TAIL_CHARS`,
+    `NOTIFICATION_TAIL_LINES_SHOWN`. New tests in `__tests__/failure-tail.test.ts`.

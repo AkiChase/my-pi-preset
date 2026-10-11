@@ -57,11 +57,12 @@ export function statusLabel(job: Job, duration?: string): string {
 export function formatJobLine(job: Job): string {
     const head = job.name ? `${job.name} (${job.id})` : job.id;
     const kind = job.kind ?? "shell";
-    const duration =
-        job.status === "running"
-            ? ` (${formatDuration(Date.now() - job.startTime)})`
-            : "";
-    return `${head} [${kind}]: ${job.command.slice(0, PREVIEW_CHARS.line)} - ${statusLabel(job)}${duration}`;
+    // No separate duration suffix: statusLabel() already embeds the elapsed time
+    // for running jobs, and upstream v2.0.0 appended it a second time, printing
+    // "▶ bg (12s) (12s)". oneLine() so a multi-line command cannot break the
+    // one-job-per-line contract of `jobs list` (killAction already did this).
+    const command = oneLine(job.command).slice(0, PREVIEW_CHARS.line);
+    return `${head} [${kind}]: ${command} - ${statusLabel(job)}`;
 }
 
 /** Truncate a tail with a consistent "showing last N chars" marker. */

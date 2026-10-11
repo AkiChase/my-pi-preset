@@ -58,6 +58,38 @@ export function readLastLine(logPath: string, scanBytes = 2_048): string {
 }
 
 /**
+ * The last `maxLines` non-empty lines of a log, ANSI-stripped and bounded by
+ * `maxChars` of trailing bytes — what a failure notification inlines so the
+ * model can see *why* a job failed without a second `jobs output` round-trip.
+ *
+ * Progress-bar redraws (`\r`) collapse to their final segment, same as
+ * readLastLine: a 500-frame download bar would otherwise eat the whole budget
+ * and push the actual error out of the window.
+ *
+ * Returns "" when there is no output at all (a job can fail having printed
+ * nothing — e.g. exec failure), which callers render as a plain no-output note.
+ */
+export function readTailLines(
+    logPath: string,
+    maxLines: number,
+    maxChars: number
+): string {
+    const tail = readBoundedTail(logPath, maxChars);
+    if (tail === "(no output yet)") return "";
+    const lines = tail
+        .replace(ANSI_CSI, "")
+        .replace(ANSI_OSC, "")
+        .split(/[\r\n]+/)
+        .map((l) => l.replace(CONTROL_CHARS, "").replace(/\t/g, " ").trimEnd())
+        .filter((l) => l.trim().length > 0);
+    if (lines.length === 0) return "";
+    // When readBoundedTail truncated, its marker line stays in — it is useful
+    // signal ("there is more above"), and the partial line right after it is
+    // cheap enough to keep rather than risk dropping a real error line.
+    return lines.slice(-maxLines).join("\n");
+}
+
+/**
  * Poll a log file tail at `intervalMs` (default 1000ms). Calls `onUpdate`
  * only when content changes. Returns a handle with `stop()`.
  *

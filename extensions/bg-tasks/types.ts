@@ -14,6 +14,15 @@ export const STALL_THRESHOLD_MS = 45_000;
 export const STALL_TAIL_BYTES = 1024;
 export const MAX_LOG_BYTES = 100 * 1024 * 1024;
 export const OUTPUT_PREVIEW_CHARS = 12_000;
+/** How much of a failed job's log is inlined into its <task-notification>.
+ *  Sized to answer "why did it fail" without pasting a whole build log: the
+ *  error is almost always in the last handful of lines. A model that needs
+ *  more still has `jobs output` and the log path. */
+export const FAILURE_TAIL_LINES = 20;
+export const FAILURE_TAIL_CHARS = 2_000;
+/** How many of those lines the TUI renderer shows under the summary. The model
+ *  gets the full tail in the XML; the user gets a glance plus the log path. */
+export const NOTIFICATION_TAIL_LINES_SHOWN = 5;
 export const RECENT_TERMINAL_KEEP = 20;
 export const MAX_CONCURRENT_JOBS = 16;
 

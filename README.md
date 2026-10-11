@@ -72,7 +72,7 @@ pi 里只有一个本仓库自带的命令：`/statusbar`，在自定义状态�
 | [`pi-memory`](#npmpi-memory) | 跨会话记忆：长期记忆、日志、便签、检索 | 无（只有 `PI_MEMORY_*` 环境变量） | 无 |
 | [`@tintinweb/pi-subagents`](#npmtintinwebpi-subagents) | 子 agent 和工作流编排 | `~/.pi/agent/subagents.json` | 无（只有浮层内按键） |
 | [`@juicesharp/rpiv-ask-user-question`](#npmjuicesharprpiv-ask-user-question) | 让模型给出选项，而不是自己猜 | `~/.config/rpiv-ask-user-question/config.json` | `ctrl+]`，可改 |
-| [`pi-patty-bg-tasks`](#npmpi-patty-bg-tasks) | 后台任务：长命令不阻塞会话 | 无 | `ctrl+b` 等，不可改 |
+| [`pi-patty-bg-tasks`](#npmpi-patty-bg-tasks) | 后台任务：长命令不阻塞会话 | 无 | `ctrl+shift+b` 等，不可改 |
 | [`@heyhuynhgiabuu/pi-pretty`](#npmheyhuynhgiabuupi-pretty) | 终端输出美化 | `~/.pi/agent/pi-pretty.json` | 无 |
 
 前七个是普通依赖，由 pi 从 npm 安装，来源写在 [`pi-packages.json`](pi-packages.json) 的 `packages` 里，本仓库不动它们的代码。
@@ -213,11 +213,11 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 
 **提供**：
 
-- 工具：`bash`（覆盖内置，新增 `run_in_background`、`timeout`、`description` 参数）、`bash_bg`（直接后台启动）、`jobs`（list / output / kill / attach / search / cleanup / stats）、`job_decide`（超时作业裁决）、`agent_bg`（后台跑一个独立 `pi -p` 进程）、`monitor`（按事件流监听命令输出或 WebSocket）。日志落在 `/tmp/pi-bg/<jobId>.log`。
+- 工具：`bash`（覆盖内置，新增 `run_in_background`、`timeout`、`description` 参数）、`bash_bg`（直接后台启动）、`jobs`（list / output / kill / attach / search / cleanup / stats）、`agent_bg`（后台跑一个独立 `pi -p` 进程）、`monitor`（按事件流监听命令输出或 WebSocket）。日志落在 `/tmp/pi-bg/<jobId>.log`。
 - 斜杠命令：`/bg` 转后台、`/bg-list` 任务面板、`/bg-version` 打印版本和路径。
-- 快捷键：`ctrl+b` / `ctrl+shift+b` 转后台，`ctrl+shift+j` / `shift+down` 打开任务面板，`ctrl+shift+x` kill 最近一个运行中的作业。
+- 快捷键：`ctrl+shift+b` 转后台，`ctrl+shift+j` / `shift+down` 打开任务面板，`ctrl+shift+x` kill 最近一个运行中的作业。
 
-**配置**：没有任何配置入口。超时阈值、日志上限、并发数、轮询间隔等都写死在 `src/types.ts` 里，日志目录固定 `/tmp/pi-bg`。快捷键同样不可配（`pi.registerShortcut` 收的是原始键组合，不走 keybinding id），想换只能改源码，或者用别名 `ctrl+shift+b`。`ctrl+b` 和 pi 内置的 `tui.editor.cursorLeft` 冲突，见 [键位冲突](#键位冲突)。
+**配置**：没有任何配置入口。超时阈值、日志上限、并发数、轮询间隔等都写死在 `extensions/bg-tasks/types.ts` 里，日志目录固定 `/tmp/pi-bg`。快捷键同样不可配（`pi.registerShortcut` 收的是原始键组合，不走 keybinding id），想换只能改 `shortcuts.ts`。没有注册 `ctrl+b`，因为那是 pi 内置的 `tui.editor.cursorLeft`，见 [键位冲突](#键位冲突)。
 
 #### `npm:@heyhuynhgiabuu/pi-pretty`
 
@@ -316,7 +316,7 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 
 ### 键位冲突
 
-扩展用 `pi.registerShortcut("ctrl+b", …)` 注册快捷键，收的是原始键组合，不是动作 id。所以 `keybindings.json` 改不了扩展的键，要换只能看那个扩展自己有没有开放配置项。
+扩展用 `pi.registerShortcut("ctrl+shift+b", …)` 注册快捷键，收的是原始键组合，不是动作 id。所以 `keybindings.json` 改不了扩展的键，要换只能看那个扩展自己有没有开放配置项。
 
 pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDINGS_FOR_EXTENSION_CONFLICTS`）分三种情况：
 
@@ -324,22 +324,14 @@ pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDING
 - 撞上非保留的内置动作：扩展赢，内置动作在编辑器里按不出来，启动时报一条非致命 warning。
 - 两个扩展抢同一个键：后加载的赢，同样只有 warning。
 
-当前这套组合里，已知的冲突有三处。仲裁规则在上面，表格里「结果」一列就是按它推出来的：
+当前这套组合里，已知的冲突有两处。仲裁规则在上面，表格里「结果」一列就是按它推出来的：
 
 | 扩展键 | 撞上 | 结果 | 怎么处理 |
 | --- | --- | --- | --- |
-| `ctrl+b`（patty 转后台） | `tui.editor.cursorLeft`（`left`, `ctrl+b`） | 扩展赢，`ctrl+b` 不再左移光标 | patty 的键不可配。在 `keybindings.json` 里把内置收窄成 `["left"]`（`left` 照常用）；或者只用别名 `ctrl+shift+b` |
 | `ctrl+r`（input-history 反向搜索） | `app.session.rename`（`ctrl+r`） | 扩展赢，rename 按不出来 | 二选一：把扩展的 `searchShortcut` 改成别的（如 `alt+r`），或改 `keybindings.json` 的 `app.session.rename` |
 | `ctrl+]`（ask-user-question 折叠浮层） | `tui.editor.jumpForward`（`ctrl+]`） | 扩展赢 | 改它的 `collapseKey`（或设 `"off"`），或把 `tui.editor.jumpForward` 挪走 |
 
-`pi-web-access` 的 `ctrl+shift+s` / `ctrl+shift+w`，以及 patty 的 `ctrl+shift+j` / `shift+down` / `ctrl+shift+x`，目前都没撞上内置动作。
-
-想消掉 patty 那条 warning，最小改动是：
-
-```json
-// ~/.pi/agent/keybindings.json
-{ "tui.editor.cursorLeft": ["left"] }
-```
+`pi-web-access` 的 `ctrl+shift+s` / `ctrl+shift+w`，以及 patty 的 `ctrl+shift+b` / `ctrl+shift+j` / `shift+down` / `ctrl+shift+x`，目前都没撞上内置动作。patty 刷意没注册 `ctrl+b`：那是内置 `tui.editor.cursorLeft` 的别名，抢过来会在启动时报冲突诊断。
 
 这些配置文件不在本仓库的管理范围内，各自的机器上自己维护。
 

@@ -120,7 +120,20 @@ void describe("formatJobLine", () => {
             toolCallId: "tc-1",
             isBackgrounded: true,
         };
-        assert.match(formatJobLine(job), /^job-1-1 \[shell\]: sleep 60 - ▶ bg \(5s\) \(5s\)$/);
+        assert.match(formatJobLine(job), /^job-1-1 \[shell\]: sleep 60 - ▶ bg \(5s\)$/);
+    });
+    void it("shows the duration exactly once", () => {
+        // Regression: upstream appended its own duration on top of the one
+        // statusLabel() already embeds, printing "▶ bg (5s) (5s)".
+        const job = makeJob({ status: "running", isBackgrounded: true });
+        const matches = formatJobLine(job).match(/\(\d+m?\d*s\)/g) ?? [];
+        assert.equal(matches.length, 1);
+    });
+    void it("collapses a multi-line command to one line", () => {
+        const job = makeJob({ command: "make\n  all", status: "running" });
+        const line = formatJobLine(job);
+        assert.ok(!line.includes("\n"));
+        assert.ok(line.includes("make all"));
     });
     void it("named jobs show the name first", () => {
         const job: Job = {

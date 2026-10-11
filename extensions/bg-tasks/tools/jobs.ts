@@ -59,7 +59,7 @@ export function registerJobsTool(
             "search: regex-search all job output",
             "cleanup: purge terminal jobs",
             "stats: show aggregate metrics",
-            "Completion notices are informational — call 'output' on a FAILED job, or on any job whose output is the deliverable (e.g. a test/build you must report). Don't call it just to acknowledge a completed job.",
+            "Completion notices for a failed job already inline the tail of its log (<output_tail>) — do NOT call 'output' just to learn why it failed. Call 'output' when that tail is truncated and you need more, or when a job's full output is the deliverable (e.g. a test report you must relay). Never call it merely to acknowledge a completed job.",
         ],
         parameters: Type.Object({
             action: StringEnum(
@@ -348,16 +348,24 @@ function cleanupAction(
 
 function statsAction(reg: BackgroundRegistry): AgentToolResult<undefined> {
     const s = getStats(reg);
-    const lines = [
-        `Total started:   ${s.totalStarted}`,
-        `Currently running: ${s.running}`,
-        `Completed:        ${s.completed}`,
-        `Failed:           ${s.failed}`,
-        `Killed:           ${s.killed}`,
-        `Recent terminal:  ${s.recentTerminal}`,
-        `Average duration: ${formatDuration(s.averageDurationMs)}`,
-        `Total CPU time:   ${formatDuration(s.totalDurationMs)}`,
+    // padEnd instead of hand-counted spaces: upstream v2.0.0 hardcoded them and
+    // "Total started:" / "Currently running:" ended up in different columns.
+    // "Total elapsed", not "Total CPU time" — totalDurationMs is summed wall
+    // clock (terminalDurationMs), which for parallel jobs exceeds CPU time.
+    const rows: [string, string][] = [
+        ["Total started", String(s.totalStarted)],
+        ["Currently running", String(s.running)],
+        ["Completed", String(s.completed)],
+        ["Failed", String(s.failed)],
+        ["Killed", String(s.killed)],
+        ["Recent terminal", String(s.recentTerminal)],
+        ["Average duration", formatDuration(s.averageDurationMs)],
+        ["Total elapsed", formatDuration(s.totalDurationMs)],
     ];
+    const width = Math.max(...rows.map(([label]) => label.length)) + 1;
+    const lines = rows.map(
+        ([label, value]) => `${`${label}:`.padEnd(width + 1)}${value}`
+    );
     return {
         content: [textBlock("Background Jobs Stats:\n" + lines.join("\n"))],
         details: undefined,
