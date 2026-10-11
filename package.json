@@ -1,9 +1,9 @@
 {
-  "name": "my-pi-extensions",
+  "name": "my-pi-preset",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "My personal pi extensions",
+  "description": "My personal pi preset: packages manifest, sync script and extensions",
   "keywords": [
     "pi-package"
   ],

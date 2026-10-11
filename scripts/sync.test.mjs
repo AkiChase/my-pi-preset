@@ -52,13 +52,13 @@ const OTHER = "npm:other-tool";
 
 // 1. Default mode is a merge: an extra installed package is kept, not removed.
 {
-  const list = ["User packages:", "  git:github.com/AkiChase/my-pi-extensions", "    /p/git", `  ${OTHER}`, "    /p/other"].join("\n");
-  const { calls, stderr } = run({ manifest: { "git:github.com/AkiChase/my-pi-extensions": "latest" }, listOutput: list });
-  assert.deepEqual(calls, ["update git:github.com/AkiChase/my-pi-extensions"]);
+  const list = ["User packages:", "  git:github.com/AkiChase/my-pi-preset", "    /p/git", `  ${OTHER}`, "    /p/other"].join("\n");
+  const { calls, stderr } = run({ manifest: { "git:github.com/AkiChase/my-pi-preset": "latest" }, listOutput: list });
+  assert.deepEqual(calls, ["update git:github.com/AkiChase/my-pi-preset"]);
   assert.match(stderr, /merge mode/);
   assert.match(stderr, new RegExp(`${OTHER}.*merge mode`));
-  assert.match(stderr, /\[1\/1\] update git:github\.com\/AkiChase\/my-pi-extensions/);
-  assert.match(stderr, /running: .*pi update git:github\.com\/AkiChase\/my-pi-extensions/);
+  assert.match(stderr, /\[1\/1\] update git:github\.com\/AkiChase\/my-pi-preset/);
+  assert.match(stderr, /running: .*pi update git:github\.com\/AkiChase\/my-pi-preset/);
   console.log("PASS merge mode keeps unlisted packages");
 }
 
@@ -96,9 +96,9 @@ const OTHER = "npm:other-tool";
 
 // 6. ssh and https forms of one repository are treated as the same package.
 {
-  const list = ["User packages:", "  git:git@github.com:AkiChase/my-pi-extensions.git", "    /p/git"].join("\n");
-  const { calls } = run({ manifest: { "git:https://github.com/AkiChase/my-pi-extensions": "latest" }, listOutput: list });
-  assert.deepEqual(calls, ["install git:https://github.com/AkiChase/my-pi-extensions"]);
+  const list = ["User packages:", "  git:git@github.com:AkiChase/my-pi-preset.git", "    /p/git"].join("\n");
+  const { calls } = run({ manifest: { "git:https://github.com/AkiChase/my-pi-preset": "latest" }, listOutput: list });
+  assert.deepEqual(calls, ["install git:https://github.com/AkiChase/my-pi-preset"]);
   console.log("PASS ssh and https identities match");
 }
 

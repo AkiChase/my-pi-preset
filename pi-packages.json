@@ -1,6 +1,6 @@
 {
   "packages": {
-    "git:github.com/AkiChase/my-pi-extensions": "latest",
+    "git:github.com/AkiChase/my-pi-preset": "latest",
     "npm:pi-session-name": "latest",
     "npm:pi-cache-optimizer": "latest",
     "npm:pi-input-history": "latest",

@@ -13,7 +13,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 // says must not be dispatched anyway. A truncated stream then surfaces as pi's retryable
 // "Anthropic stream ended before message_stop" instead.
 
-const ORIGINAL_FETCH = Symbol.for("my-pi-extensions.sse-normalize.originalFetch");
+const ORIGINAL_FETCH = Symbol.for("my-pi-preset.sse-normalize.originalFetch");
 
 type PatchedGlobal = typeof globalThis & { [ORIGINAL_FETCH]?: typeof fetch };
 

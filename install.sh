@@ -6,14 +6,14 @@
 # the manifest by calling `pi install` / `pi update` / `pi remove`.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/AkiChase/my-pi-extensions/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/AkiChase/my-pi-preset/main/install.sh | sh
 #   ./install.sh --dry-run
 #   ./install.sh --prune
 #
 # Options are passed through to sync.mjs: --dry-run, --prune.
 set -eu
 
-REPO="AkiChase/my-pi-extensions"
+REPO="AkiChase/my-pi-preset"
 RAW="https://raw.githubusercontent.com/${REPO}/main"
 
 log() {
