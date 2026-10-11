@@ -24,15 +24,21 @@ import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 //
 // Layout (width permitting):
 //   ~/tools/pi-trellis  main ●2 +1 ↑2   session name
-//   ▰▰▰▰▰▰░░░░░░░░ 39% 157k/400k (auto)        mp-messages·claude-opus-5·medium
-//   ↑112 ↓30k R5.3M W260k  $0.42   ⛁95%   ⚙ 2 jobs
+//   ▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 39% 157k/400k (auto)        mp-messages·claude-opus-5·medium
+//   ↑112 ↓30k R5.3M W260k  $0.42   ⛁ 95% 19/20   ⚙ 2 jobs
+//
+// Before the first response nothing has a value yet, so the spend line draws a
+// dim skeleton (`↑– ↓– $–  │  ⛁ –`) instead of collapsing to whichever single
+// chip happens to exist -- a lone red `⛁0%` reads as an error when it only
+// means "no requests yet".
 
 const CACHE_STATUS_KEY = "pi-cache-stats";
 const GIT_REFRESH_MS = 3000;
 const GIT_TIMEOUT_MS = 2000;
 const BAR_WIDTH = 14;
 const BAR_FILLED = "▰";
-const BAR_EMPTY = "░";
+const BAR_EMPTY = "▱";
+const NO_VALUE = "–";
 
 /**
  * Thinking level gets the same color pi uses for its thinking indicator, so the
@@ -188,30 +194,37 @@ function collectUsage(entries: Iterable<any>): { totals: UsageTotals; latestCach
 
 /**
  * Compress pi-cache-optimizer's status into one chip. Its text is
- * "· <Label> cache <hits>/<reqs>·<cached>/<total> <pct>%·write <n>" with an
- * optional "Cache Optimizer disabled · " prefix and " ⚠️ compat" suffix.
- * Only the percentage and those two markers survive; the full breakdown stays
- * available through the extension's own commands.
+ * "· <Label> <hits>/<reqs>·<cached>/<total> <pct>%·write <n>" with an optional
+ * "Cache Optimizer disabled · " prefix and " ⚠️ compat" suffix.
+ *
+ * The chip keeps the percentage *and* the request counter, because the
+ * percentage alone is ambiguous: the upstream extension reports 0% both for
+ * "nothing cached" and for "no requests yet" (it hardcodes 0 when
+ * totalInputTokens is 0). `percent` is therefore null whenever the number is
+ * not meaningful yet -- the caller paints those states dim instead of red.
  */
-export function cacheChipText(status: string): string {
+export function parseCacheStatus(status: string): { chip: string; percent: number | null } {
 	const text = sanitize(status);
 	const disabled = /cache optimizer disabled/i.test(text);
-	const compat = text.includes("compat");
+	const compat = /compat/.test(text);
+	const suffix = compat ? " ⚠" : "";
+
+	if (disabled) return { chip: `⛁ off${suffix}`, percent: null };
+
+	// "<hits>/<reqs>·" -- plain integers followed by the interpunct separator, so
+	// the token pair ("12.3k/20.0k") never matches.
+	const requests = /\s(\d+)\/(\d+)·/.exec(text);
+	const total = requests ? Number(requests[2]) : null;
 	const percents = [...text.matchAll(/(\d+(?:\.\d+)?)%/g)];
 	const last = percents.at(-1);
 
-	let chip: string;
-	if (disabled) chip = "⛁off";
-	else if (last) chip = `⛁${Math.round(Number(last[1]))}%`;
-	else return text; // Unrecognized shape: show it verbatim rather than lose it.
+	// No requests on record: the percentage is a placeholder, not a measurement.
+	if (total === 0) return { chip: `⛁ ${NO_VALUE}${suffix}`, percent: null };
+	if (!last) return { chip: text, percent: null }; // Unrecognized shape: show it verbatim.
 
-	return compat ? `${chip}⚠` : chip;
-}
-
-/** Percentage embedded in a cache chip, for coloring. Null when there is none. */
-function cacheChipPercent(chip: string): number | null {
-	const match = /⛁(\d+)%/.exec(chip);
-	return match ? Number(match[1]) : null;
+	const percent = Math.round(Number(last[1]));
+	const counter = requests ? ` ${requests[1]}/${requests[2]}` : "";
+	return { chip: `⛁ ${percent}%${counter}${suffix}`, percent };
 }
 
 /** Hit-rate coloring, shared by the CH% field and the cache chip. */
@@ -391,9 +404,10 @@ export default function (pi: ExtensionAPI) {
 			for (const [key, text] of statuses) {
 				if (!text?.trim()) continue;
 				if (key === CACHE_STATUS_KEY) {
-					const chip = cacheChipText(text);
-					const percent = cacheChipPercent(chip);
-					chips.push(paint(percent === null ? "muted" : hitRateColor(percent), chip));
+					const { chip, percent } = parseCacheStatus(text);
+					// `dim` for "no measurement yet" / "off": those states are not a
+					// bad hit rate and must not borrow the error color.
+					chips.push(paint(percent === null ? "dim" : hitRateColor(percent), chip));
 					continue;
 				}
 				// Foreign text: `muted` rather than `dim` so a status that another
@@ -452,7 +466,10 @@ export default function (pi: ExtensionAPI) {
 				// Groups are separated by a rule so the eye can tell pi's own numbers
 				// from text that belongs to another extension.
 				const groups: string[] = [];
-				if (tokenParts.length) groups.push(tokenParts.join(" "));
+				// Nothing spent yet: keep the line at its full shape with dim
+				// placeholders, so the first response fills values in instead of
+				// pushing a third line into existence.
+				groups.push(tokenParts.length ? tokenParts.join(" ") : paint("dim", `↑${NO_VALUE} ↓${NO_VALUE} $${NO_VALUE}`));
 				groups.push(...renderChips());
 
 				const lines = [line1, line2];
