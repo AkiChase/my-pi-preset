@@ -4,8 +4,8 @@
 
 | 路径 | 作用 |
 | --- | --- |
-| `pi-preset.json` | 清单：`packages` 要装的，`conflicts` 不能当 pi 包装的，`settings` / `keybindings` 要对齐的 pi 配置，`preserve` prune 时也不动的键 |
-| `install.sh` + `scripts/sync.mjs` | 把本机对齐到清单（三个域：packages / settings / keybindings） |
+| `pi-preset.json` | 清单：`packages` 要装的，`conflicts` 不能当 pi 包装的，`settings` / `keybindings` / `files` 要对齐的本机配置，`preserve` prune 时也不动的键 |
+| `install.sh` + `scripts/sync.mjs` | 把本机对齐到清单（四个域：packages / settings / keybindings / files） |
 | `extensions/` | 自带扩展。加载范围由 `package.json` 的 `pi.extensions`（`extensions/*.ts`）声明，**不是** pi 自动发现；子目录不加载 |
 | `local/` | 本机草稿：计划、笔记、临时脚本。**已 gitignore**，不进仓库，也别在这里放代码 |
 | `README.md` | 面向使用者的全部文档 |
@@ -19,7 +19,7 @@
 | 扩展的行为/命令/键位/配置 | 对应扩展小节；涉及键位看「键位冲突」 |
 | `packages` | 「这里有什么」总表 + 「第三方包」 |
 | `conflicts` / 改为本仓库代为加载 | 「由本仓库代为加载的包」 |
-| `settings` / `keybindings` / `preserve` | 「这里有什么」的清单声明段 + 「声明设置和键位」；改键位还要看「键位冲突」 |
+| `settings` / `keybindings` / `files` / `preserve` | 「这里有什么」的清单声明段 + 「声明设置和键位」「声明扩展的配置文件」；改键位还要看「键位冲突」 |
 | `sync.mjs` 同步语义 | 「工作方式」的情况→动作表 |
 | `install.sh` / `sync.mjs` 选项 | 「安装」「命令行选项」 |
 | 新增脚本或检查手段 | 「开发」+ 本文件 |

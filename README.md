@@ -36,7 +36,7 @@ curl -fsSL https://raw.githubusercontent.com/AkiChase/my-pi-preset/main/install.
 
 ### 命令行选项
 
-同步分三个域：`packages`（走 `pi install` / `pi update` / `pi remove`）、`settings`（写 `~/.pi/agent/settings.json`）、`keybindings`（写 `~/.pi/agent/keybindings.json`）。每个域可以单独选，选中的域各自跑在两种模式之一。
+同步分四个域：`packages`（走 `pi install` / `pi update` / `pi remove`）、`settings`（写 `~/.pi/agent/settings.json`）、`keybindings`（写 `~/.pi/agent/keybindings.json`）、`files`（写 agent 目录下各扩展自己的配置文件，比如 `pi-input-history.json`）。每个域可以单独选，选中的域各自跑在两种模式之一。
 
 | 选项 | 作用 |
 | --- | --- |
@@ -45,17 +45,17 @@ curl -fsSL https://raw.githubusercontent.com/AkiChase/my-pi-preset/main/install.
 | `--dry-run` | 只打印计划，不做任何改动 |
 
 ```sh
-./install.sh                             # 三个域全同步，全 merge
+./install.sh                             # 四个域全同步，全 merge
 ./install.sh --sync settings             # 只对齐设置，不碰包
 ./install.sh --prune packages            # 包以清单为准，配置仍是 merge
-./install.sh --prune                     # 三个域都以清单为准
+./install.sh --prune                     # 四个域都以清单为准
 ./install.sh --sync packages,settings --dry-run
 ```
 
 两种模式：
 
 - **merge**（默认）：只对齐清单声明的那些条目，清单没提的一律不动。某台机器上临时 `pi install` 的包会保留，手改的其它设置键也会保留。
-- **prune**：那个域里清单就是全集 —— 没声明的包卸掉、没声明的设置键和键位删掉。例外是 `preserve` 白名单和 pi 自己维护的 `packages` / `lastChangelogVersion`，细节见 [声明设置和键位](#声明设置和键位)。
+- **prune**：那个域里清单就是全集 —— 没声明的包卸掉、没声明的设置键和键位删掉；`files` 域下则把声明过的文件当全集，没声明的键删掉（没声明过的文件仍然一个字也不碰）。例外是 `preserve` 白名单和 pi 自己维护的 `packages` / `lastChangelogVersion`，细节见 [声明设置和键位](#声明设置和键位)。
 
 `--prune` 里写了 `--sync` 没选的域会直接报错，不会静默忽略。脚本只管用户级的包和 agent 目录下的配置，项目 `.pi/` 里的东西不受影响。
 
@@ -75,7 +75,6 @@ pi update --extensions   # 更新本仓库的扩展，以及已装的包
 ./install.sh --sync settings  # 只把设置对齐过去
 ./install.sh --prune     # 顺手清掉清单外的包、设置键和键位
 ```
-
 pi 里只有一个本仓库自带的命令：`/statusbar`，在自定义状态栏和 pi 内置 footer 之间切换。其余扩展各自的命令、快捷键和配置文件，都在下面两节里。
 
 ## 这里有什么
@@ -86,7 +85,7 @@ pi 里只有一个本仓库自带的命令：`/statusbar`，在自定义状态�
 | --- | --- | --- | --- |
 | [`pi-session-name`](#npmpi-session-name) | 自动生成会话标题，同步到终端标题栏 | 无 | 无 |
 | [`pi-cache-optimizer`](#npmpi-cache-optimizer) | 提高缓存命中率，显示命中统计 | `~/.pi/agent/pi-cache-optimizer-config.json` | 无 |
-| [`pi-input-history`](#npmpi-input-history) | 跨会话的输入历史，模糊反向搜索 | `~/.pi/agent/pi-input-history.json` | `ctrl+r`，可改 |
+| [`pi-input-history`](#npmpi-input-history) | 跨会话的输入历史，模糊反向搜索 | `~/.pi/agent/pi-input-history.json`，由清单声明 | `alt+r`，可改 |
 | [`pi-web-access`](#npmpi-web-access) | 联网：搜索、抓取、PDF、GitHub、视频 | `~/.pi/agent/web-search.json` | `ctrl+shift+s` 等，可改 |
 | [`pi-memory`](#npmpi-memory) | 跨会话记忆：长期记忆、日志、便签、检索 | 无（只有 `PI_MEMORY_*` 环境变量） | 无 |
 | [`@tintinweb/pi-subagents`](#npmtintinwebpi-subagents) | 子 agent 和工作流编排 | `~/.pi/agent/subagents.json` | 无（只有浮层内按键） |
@@ -98,7 +97,7 @@ pi 里只有一个本仓库自带的命令：`/statusbar`，在自定义状态�
 
 后两个（patty 和 pretty）比较特殊：它们以本仓库 npm 依赖的形式引入（见 [`package.json`](package.json)），由 `extensions/bash-unified.ts` 亲自加载，所以也被写进了清单的 `conflicts`，**不能**再当成普通 pi 包安装。否则 `bash` 这个工具会被注册两次，pi 直接报冲突、启动失败。
 
-除了包，清单还声明了 pi 本体的几个偏好：失败重试次数 `retry.maxRetries: 5`，以及把 `app.session.rename`（`ctrl+r`）和 `tui.editor.jumpForward`（`ctrl+]`）这两个被扩展抢走的内置键禁掉。格式和语义见 [声明设置和键位](#声明设置和键位)，键位这两条的来由见 [键位冲突](#键位冲突)。
+除了包，清单还声明了两类本机配置：pi 本体的几个偏好 —— 失败重试次数 `retry.maxRetries: 5`，以及把被扩展抢走的内置键 `tui.editor.jumpForward`（`ctrl+]`）禁掉；以及 `pi-input-history` 的搜索键 `searchShortcut: "alt+r"`。格式和语义见 [声明设置和键位](#声明设置和键位)，键位那条的来由见 [键位冲突](#键位冲突)。
 
 ### 第三方包
 
@@ -135,7 +134,7 @@ pi 里只有一个本仓库自带的命令：`/statusbar`，在自定义状态�
 
 pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个扩展在会话启动时把当前目录下历史会话里的输入（去重后最近 100 条）灌进编辑器历史，↑/↓ 能直接翻到上个会话的 prompt。另外提供一个反向搜索浮层，模糊匹配，刚输入的内容也能立刻搜到。
 
-**提供**：全局快捷键 `ctrl+r` 打开反向搜索浮层。浮层内：`ctrl+r` / `↑` 更旧，`ctrl+s` / `↓` 更新，`ctrl+k` / `ctrl+j` 滚动预览，`Enter` 填入，`Esc` 或 `ctrl+g` 取消。没有工具和斜杠命令。
+**提供**：全局快捷键 `alt+r` 打开反向搜索浮层。浮层内：`alt+r` / `↑` 更旧，`ctrl+s` / `↓` 更新，`ctrl+k` / `ctrl+j` 滚动预览，`Enter` 填入，`Esc` 或 `ctrl+g` 取消。没有工具和斜杠命令。
 
 **配置**：配置文件 `~/.pi/agent/pi-input-history.json`，四个键位都可以改，改完 `/reload`：
 
@@ -148,7 +147,7 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 }
 ```
 
-历史条数（固定 100）和去重行为不可配置。默认的 `ctrl+r` 会撞 pi 的 `app.session.rename`，见 [键位冲突](#键位冲突)。
+历史条数（固定 100）和去重行为不可配置。`alt+r` 这条声明在清单里（`files` 域），同步到每台机器；其余三个键保持上游默认值，没有写进清单。扩展自己的默认值是 `ctrl+r`，会撞 pi 的 `app.session.rename`，所以才改到 `alt+r`，见 [键位冲突](#键位冲突)。
 
 #### `npm:pi-web-access`
 
@@ -358,9 +357,10 @@ pi 自己其实把信号发出来了 —— `ui_prompt_start` / `ui_prompt_end` 
 | --- | --- |
 | `~/.pi/agent/settings.json` | pi 本体。主题、默认 provider 和模型、已装包清单。`packages` 由 pi 维护，别手改；被清单声明的键由本仓库维护，见 [声明设置和键位](#声明设置和键位) |
 | `~/.pi/agent/keybindings.json` | pi 本体的键位，格式见下；被清单声明的动作 id 由本仓库维护 |
+| `~/.pi/agent/<名字>.json` | 各扩展自己的配置文件，见上表；其中被清单 `files` 域声明的由本仓库维护，见 [声明扩展的配置文件](#声明扩展的配置文件) |
 | `~/.pi/agent/models.json` | provider 和模型定义，以及 compat 键。`pi-cache-optimizer` 的 `⚠️ compat` 指这里 |
 | `~/.pi/agent/pi-cache-optimizer-config.json` | `pi-cache-optimizer` |
-| `~/.pi/agent/pi-input-history.json` | `pi-input-history`，只存快捷键 |
+| `~/.pi/agent/pi-input-history.json` | `pi-input-history`，只存快捷键；其中 `searchShortcut` 由清单声明 |
 | `~/.pi/agent/web-search.json` | `pi-web-access`，provider、key、命令开关、快捷键都在这 |
 | `~/.pi/agent/pi-pretty.json` | `@heyhuynhgiabuu/pi-pretty` |
 | `~/.pi/agent/subagents.json`、`<项目>/.pi/subagents.json` | `@tintinweb/pi-subagents`，项目覆盖全局 |
@@ -382,7 +382,6 @@ pi 自己其实把信号发出来了 —— `ui_prompt_start` / `ui_prompt_end` 
   "tui.editor.jumpForward": []
 }
 ```
-
 在 pi 里跑 `/hotkeys` 能看到当前生效的键位，完整的动作列表在 pi 文档的 `docs/keybindings.md`。
 
 ### 键位冲突
@@ -395,22 +394,23 @@ pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDING
 - 撞上非保留的内置动作：扩展赢，内置动作在编辑器里按不出来，启动时报一条非致命 warning。
 - 两个扩展抢同一个键：后加载的赢，同样只有 warning。
 
-当前这套组合里，已知的冲突有两处。仲裁规则在上面，表格里「结果」一列就是按它推出来的：
+当前这套组合里，已知的冲突有一处。仲裁规则在上面，表格里「结果」一列就是按它推出来的：
 
 | 扩展键 | 撞上 | 结果 | 怎么处理 |
 | --- | --- | --- | --- |
-| `ctrl+r`（input-history 反向搜索） | `app.session.rename`（`ctrl+r`） | 扩展赢，rename 按不出来 | 已处理：清单把 `app.session.rename` 设成 `[]` 禁掉，重命名改用 `/name` |
 | `ctrl+]`（ask-user-question 折叠浮层） | `tui.editor.jumpForward`（`ctrl+]`） | 扩展赢 | 已处理：清单把 `tui.editor.jumpForward` 设成 `[]` 禁掉 |
 
-两行的「已处理」指的是 [`pi-preset.json`](pi-preset.json) 的 `keybindings` 里那两条空数组。扩展的键本来就会赢，把被抢走的内置动作显式禁掉，图的是启动时不再报那条冲突 warning、以后也不会以为这两个内置键还能用。不想这样就把清单里那两条改成别的键，或者改成 `null` 让它从所有机器上消失。
+「已处理」指的是 [`pi-preset.json`](pi-preset.json) 的 `keybindings` 里那条空数组。扩展的键本来就会赢，把被抢走的内置动作显式禁掉，图的是启动时不再报那条冲突 warning、以后也不会以为这个内置键还能用。不想这样就把清单里那条改成别的键，或者改成 `null` 让它从所有机器上消失。
+
+曾经还有第二处：input-history 的反向搜索默认是 `ctrl+r`，正好是 `app.session.rename`（重命名会话）。当时的做法也是把重命名禁掉。现在清单直接把 `searchShortcut` 改成了 `alt+r`（`files` 域，见 [配置文件在哪](#配置文件在哪)），`ctrl+r` 没人抢了，重命名也就回到了 pi 的默认行为。
 
 `pi-web-access` 的 `ctrl+shift+s` / `ctrl+shift+w`，以及 patty 的 `ctrl+shift+b` / `ctrl+shift+j` / `shift+down` / `ctrl+shift+x`，对着 pi 的动作表逐个核过，都没撞上内置动作 —— `shift+down` 尤其容易让人起疑，但内置用的是 `down`（`cursorDown` / `select.down`）、`ctrl+shift+down`（`altScreen.nextPrompt`）和 `alt+down`（`models.reorderDown`），没人要 `shift+down`。patty 刻意没注册 `ctrl+b`：那是内置 `tui.editor.cursorLeft` 的别名，抢过来会在启动时报冲突诊断。patty 这四个键都能在 `bg-tasks.json` 里改或设 `"off"`。
 
-除了 `settings.json` 和 `keybindings.json` 里被清单声明的那几个键，其它配置文件都不在本仓库的管理范围内，各自的机器上自己维护。
+可管理范围就是清单里声明了的那几项：`settings.json` 的 `retry.maxRetries`、`keybindings.json` 的 `tui.editor.jumpForward`、`pi-input-history.json` 的 `searchShortcut`。其余配置文件、其余键都不在本仓库的管理范围内，各自的机器上自己维护。
 
 ## 工作方式
 
-清单 [`pi-preset.json`](pi-preset.json) 分五段：
+清单 [`pi-preset.json`](pi-preset.json) 分六段：
 
 ```json
 {
@@ -421,7 +421,8 @@ pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDING
   },
   "conflicts": ["npm:pi-patty-bg-tasks", "npm:@heyhuynhgiabuu/pi-pretty"],
   "settings": { "retry": { "maxRetries": 5 } },
-  "keybindings": { "app.session.rename": [] },
+  "keybindings": { "tui.editor.jumpForward": [] },
+  "files": { "pi-input-history.json": { "searchShortcut": "alt+r" } },
   "preserve": { "settings": ["theme", "defaultModel"], "keybindings": [] }
 }
 ```
@@ -453,6 +454,24 @@ pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDING
 - **`packages` 和 `lastChangelogVersion` 硬保护**：这两个键是 pi 自己在写，无论哪种模式都不碰，写进清单还会报错。
 - 声明和 `preserve` 撞上同一个路径会报错，因为那是两个矛盾的意图。
 
+### 声明扩展的配置文件
+
+`files` 域管的是 agent 目录下那些扩展自己的 JSON（`pi-input-history.json`、`bg-tasks.json`、`web-search.json` …）。键就是文件名，值就是那个文件的内容，语义与 `settings` 完全一致：叶子级合并、`null` 是墓碑、顶层键不能带点。
+
+```json
+"files": {
+  "pi-input-history.json": { "searchShortcut": "alt+r" }
+}
+```
+
+几条规则：
+
+- **只能是 agent 目录下的文件名**，不带路径。`~/.config/rpiv-ask-user-question/config.json` 这种不在 agent 目录里的配置暂不支持 —— 多一个根目录就得多一套 XDG 解析。带 `/`、`..` 或不是 `.json` 的名字会报错。
+- **几个文件硬保护**：`settings.json` / `keybindings.json` 有自己的域；`auth.json` 放凭证；`trust.json` / `models-store.json` 是 pi 本机的状态；`models.json` 会被 `pi-cache-optimizer` 在它自己的事务锁下重写，从这边打叶子补丁会撞上。写进 `files` 会直接报错。
+- **`--prune` 只作用在 `files` 声明过的文件上**。清单没提的文件永远不被读、不被写、不被删；而被声明过的文件在 prune 下就是「全文以清单为准」，所以只把清单当「改其中几个键」用。（声明了但本机不存在的文件，同步时会直接建出来，不存在「不碰」这个选项。）
+- **`preserve.files` 按文件名分组**：`"preserve": { "files": { "pi-input-history.json": ["scrollUpShortcut"] } }`。保护一个没人声明的文件里的键等于什么都没保护，所以那种写法会报错。
+- 自动写入只关心键与值：两空格缩进，保留现有键的顺序（新键追加到末尾），跟 pi 自己写文件的习惯一致。
+
 ### 怎么落到本机
 
 `install.sh` 只做引导：检查 `pi` / `node` / `curl`，拿到清单和同步脚本，然后交给 [`scripts/sync.mjs`](scripts/sync.mjs)。包部分通过 pi 自己的命令（`pi install` / `pi update` / `pi remove`）落地，配置部分由同步脚本直接写 agent 目录下的 JSON。
@@ -470,6 +489,8 @@ pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDING
 | 声明了设置键，本机值已一致 | 不动，也不重写文件 |
 | 声明成 `null` | 从本机删掉（本来就没有就什么都不做） |
 | 本机有设置键或键位，清单没声明 | 保留，除非该域在 `--prune` 里且没被 `preserve` 盖住 |
+| 扩展配置文件被 `files` 声明，本机没这个文件 | 建出来，只写声明的键 |
+| 扩展配置文件未被 `files` 声明 | 永远不碰 |
 
 写配置文件时的几个细节：
 

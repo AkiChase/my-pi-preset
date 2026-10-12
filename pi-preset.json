@@ -19,8 +19,12 @@
     }
   },
   "keybindings": {
-    "app.session.rename": [],
     "tui.editor.jumpForward": []
+  },
+  "files": {
+    "pi-input-history.json": {
+      "searchShortcut": "alt+r"
+    }
   },
   "preserve": {
     "settings": [

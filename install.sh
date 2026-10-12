@@ -4,7 +4,8 @@
 # Everything is declared in pi-preset.json; this script only bootstraps and then
 # hands over to scripts/sync.mjs, which reconciles the machine with the manifest:
 # packages through `pi install` / `pi update` / `pi remove`, and the declared
-# settings and keybindings by writing the agent directory's JSON files.
+# settings, keybindings and extension config files by writing the agent
+# directory's JSON files.
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/AkiChase/my-pi-preset/main/install.sh | sh

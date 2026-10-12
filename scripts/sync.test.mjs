@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,9 +23,11 @@ function run({
   conflicts,
   settings,
   keybindings,
+  files,
   preserve,
   settingsFile,
   keybindingsFile,
+  seedFiles,
   listOutput = "User packages:",
   args = [],
 }) {
@@ -47,6 +49,7 @@ function run({
         ...(conflicts ? { conflicts } : {}),
         ...(settings ? { settings } : {}),
         ...(keybindings ? { keybindings } : {}),
+        ...(files ? { files } : {}),
         ...(preserve ? { preserve } : {}),
       },
       null,
@@ -56,6 +59,7 @@ function run({
   // Seeded as raw text so a deliberately broken file can be tested too.
   if (settingsFile !== undefined) writeFileSync(join(agentDir, "settings.json"), settingsFile);
   if (keybindingsFile !== undefined) writeFileSync(join(agentDir, "keybindings.json"), keybindingsFile);
+  for (const [name, text] of Object.entries(seedFiles ?? {})) writeFileSync(join(agentDir, name), text);
 
   const result = spawnSync("node", [syncScript, "--manifest", join(box, "pi-preset.json"), ...args], {
     encoding: "utf8",
@@ -83,6 +87,8 @@ function run({
     status: result.status,
     settingsText: readBack("settings.json"),
     keybindingsText: readBack("keybindings.json"),
+    // The box is removed below, so every file has to be captured up front.
+    fileTexts: Object.fromEntries(readdirSync(agentDir).map((name) => [name, readBack(name)])),
   };
   rmSync(box, { recursive: true, force: true });
   return out;
@@ -429,6 +435,132 @@ const ONE = { "npm:pi-session-name": "latest" };
 }
 
 // ---------------------------------------------------------------------------
+// files (extension config files in the agent directory)
+// ---------------------------------------------------------------------------
+
+// 25b. A declared key is written into an extension config file that does not
+//      exist yet.
+{
+  const { fileTexts, stderr } = run({
+    manifest: {},
+    files: { "pi-input-history.json": { searchShortcut: "alt+r" } },
+    args: ["--sync", "files"],
+  });
+  assert.deepEqual(JSON.parse(fileTexts["pi-input-history.json"]), { searchShortcut: "alt+r" });
+  // The plan names the file, not just the key.
+  assert.match(stderr, /set\s+files\s+pi-input-history\.json:searchShortcut/);
+  console.log("PASS an extension config file is created with the declared key");
+}
+
+// 25c. Merge mode leaves the file's other keys alone, including keys the
+//      extension itself may have written.
+{
+  const { fileTexts } = run({
+    manifest: {},
+    files: { "pi-input-history.json": { searchShortcut: "alt+r" } },
+    seedFiles: { "pi-input-history.json": JSON.stringify({ searchShortcut: "ctrl+r", newerShortcut: "ctrl+s" }) },
+    args: ["--sync", "files"],
+  });
+  assert.deepEqual(JSON.parse(fileTexts["pi-input-history.json"]), { searchShortcut: "alt+r", newerShortcut: "ctrl+s" });
+  console.log("PASS merge mode keeps undeclared keys in an extension config file");
+}
+
+// 25d. Prune mode reaches only declared files, and still respects preserve.
+//      A file the manifest never mentions is not even read.
+{
+  const { fileTexts, stderr } = run({
+    manifest: {},
+    files: { "pi-input-history.json": { searchShortcut: "alt+r" } },
+    preserve: { files: { "pi-input-history.json": ["scrollUpShortcut"] } },
+    seedFiles: {
+      "pi-input-history.json": JSON.stringify({ newerShortcut: "ctrl+s", scrollUpShortcut: "ctrl+k" }),
+      "bg-tasks.json": JSON.stringify({ timeoutMs: 60000 }),
+    },
+    args: ["--sync", "files", "--prune"],
+  });
+  assert.deepEqual(JSON.parse(fileTexts["pi-input-history.json"]), { scrollUpShortcut: "ctrl+k", searchShortcut: "alt+r" });
+  assert.deepEqual(JSON.parse(fileTexts["bg-tasks.json"]), { timeoutMs: 60000 });
+  assert.doesNotMatch(stderr, /bg-tasks\.json/);
+  console.log("PASS prune mode reaches declared files only");
+}
+
+// 25e. A declared null removes a key from an extension config file.
+{
+  const { fileTexts } = run({
+    manifest: {},
+    files: { "pi-input-history.json": { searchShortcut: null } },
+    seedFiles: { "pi-input-history.json": JSON.stringify({ searchShortcut: "alt+r", newerShortcut: "ctrl+s" }) },
+    args: ["--sync", "files"],
+  });
+  assert.deepEqual(JSON.parse(fileTexts["pi-input-history.json"]), { newerShortcut: "ctrl+s" });
+  console.log("PASS a declared null removes a key from an extension config file");
+}
+
+// 25f. A file with its own domain, or one holding pi's state, is rejected.
+for (const [name, pattern] of [
+  ["settings.json", /use the "settings" domain/],
+  ["keybindings.json", /use the "keybindings" domain/],
+  ["auth.json", /holds credentials/],
+  ["models.json", /pi-cache-optimizer/],
+]) {
+  const { status, stderr } = run({ manifest: {}, files: { [name]: { a: 1 } }, args: ["--sync", "files"] });
+  assert.equal(status, 1);
+  assert.match(stderr, pattern);
+  console.log(`PASS "files.${name}" is rejected`);
+}
+
+// 25g. A path, a traversal, or a non-JSON name is rejected: this domain writes
+//      inside the agent directory only.
+for (const name of ["sub/dir.json", "../escape.json", "notjson", ".hidden.json"]) {
+  const { status, stderr } = run({ manifest: {}, files: { [name]: { a: 1 } }, args: ["--sync", "files"] });
+  assert.equal(status, 1);
+  assert.match(stderr, /must be a plain "<name>\.json" file name/);
+  console.log(`PASS "files.${name}" is rejected`);
+}
+
+// 25h. Preserving a key in a file nobody declares protects nothing, so it is
+//      an error rather than a silently useless entry.
+{
+  const { status, stderr } = run({
+    manifest: {},
+    files: { "pi-input-history.json": { searchShortcut: "alt+r" } },
+    preserve: { files: { "bg-tasks.json": ["timeoutMs"] } },
+    args: ["--sync", "files"],
+  });
+  assert.equal(status, 1);
+  assert.match(stderr, /names a file that "files" does not declare/);
+  console.log("PASS preserving a key in an undeclared file is rejected");
+}
+
+// 25i. Declaring and preserving the same key in one file is contradictory.
+{
+  const { status, stderr } = run({
+    manifest: {},
+    files: { "pi-input-history.json": { searchShortcut: "alt+r" } },
+    preserve: { files: { "pi-input-history.json": ["searchShortcut"] } },
+    args: ["--sync", "files"],
+  });
+  assert.equal(status, 1);
+  assert.match(stderr, /both declared and preserved/);
+  console.log("PASS a declared-and-preserved key in a file is rejected");
+}
+
+// 25j. A broken extension config file is reported, not overwritten.
+{
+  const broken = "{ oops";
+  const { fileTexts, status, stderr } = run({
+    manifest: {},
+    files: { "pi-input-history.json": { searchShortcut: "alt+r" } },
+    seedFiles: { "pi-input-history.json": broken },
+    args: ["--sync", "files"],
+  });
+  assert.equal(status, 1);
+  assert.equal(fileTexts["pi-input-history.json"], broken);
+  assert.match(stderr, /not valid JSON/);
+  console.log("PASS a broken extension config file is not overwritten");
+}
+
+// ---------------------------------------------------------------------------
 // domain selection
 // ---------------------------------------------------------------------------
 
@@ -445,7 +577,7 @@ const ONE = { "npm:pi-session-name": "latest" };
   });
   assert.deepEqual(calls, ["update npm:pi-session-name"]);
   assert.equal(settingsText, seeded);
-  assert.match(stderr, /skip\s+settings, keybindings/);
+  assert.match(stderr, /skip\s+settings, keybindings, files/);
   console.log("PASS --sync packages touches nothing else");
 }
 

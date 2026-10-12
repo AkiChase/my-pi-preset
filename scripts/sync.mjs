@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 // Reconcile this machine with the preset declared in pi-preset.json.
 //
-// Three domains, each selected independently and each running in one of two
+// Four domains, each selected independently and each running in one of two
 // modes:
 //
 //   packages     -> `pi install` / `pi update` / `pi remove`
 //   settings     -> <agent-dir>/settings.json
 //   keybindings  -> <agent-dir>/keybindings.json
+//   files        -> <agent-dir>/<name>.json, one per extension that reads one
 //
 //   merge (default)  only the declared entries are aligned; anything the
 //                    manifest does not mention is left alone. A declared
@@ -28,12 +29,34 @@ const UNPINNED = new Set(["", "*", "latest"]);
 const ANSI = /\u001B\[[0-9;]*m/g;
 const COMMAND_TIMEOUT_MS = 10 * 60 * 1000;
 
-const DOMAINS = ["packages", "settings", "keybindings"];
+const DOMAINS = ["packages", "settings", "keybindings", "files"];
 
 // pi owns these two keys in settings.json: `packages` is maintained by
 // `pi install` / `pi remove`, `lastChangelogVersion` is pi's own state. They
 // can be neither declared nor pruned.
 const PI_OWNED_SETTINGS = new Set(["packages", "lastChangelogVersion"]);
+
+// The `files` domain writes extension config files in the agent directory, so
+// it must be a plain file name there -- no directory part, no traversal.
+// `~/.config/...` configs (rpiv-ask-user-question) are deliberately out of
+// scope: a second root would need its own XDG resolution.
+const FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*\.json$/;
+
+// Files `files` must not touch, each for its own reason:
+//   settings.json / keybindings.json  have their own domain
+//   auth.json                         credentials, never in a git manifest
+//   trust.json / models-store.json    pi's own per-machine state
+//   models.json                       pi-cache-optimizer rewrites it under its
+//                                     own transaction lock, which a leaf patch
+//                                     from here would race
+const UNMANAGEABLE_FILES = new Map([
+  ["settings.json", 'use the "settings" domain'],
+  ["keybindings.json", 'use the "keybindings" domain'],
+  ["auth.json", "holds credentials"],
+  ["trust.json", "is pi's per-machine state"],
+  ["models-store.json", "is pi's per-machine state"],
+  ["models.json", "is rewritten by pi-cache-optimizer under its own lock"],
+]);
 
 function resolveAgentDir() {
   return process.env.PI_CODING_AGENT_DIR?.trim() || join(homedir(), ".pi", "agent");
@@ -258,16 +281,36 @@ function readManifest(path) {
   }
   const declaredKeybindings = Object.entries(keybindings).map(([action, value]) => ({ path: [action], value }));
 
+  // One block per extension config file in the agent directory. Same leaf
+  // semantics as `settings`, so a file this repo does not fully own can still
+  // have one key declared.
+  const rawFiles = parsed?.files ?? {};
+  if (!isPlainObject(rawFiles)) fail(`manifest ${path} field "files" must be an object keyed by file name`);
+  const declaredFiles = Object.entries(rawFiles).map(([name, block]) => {
+    if (!FILE_NAME.test(name)) {
+      fail(`"files.${name}" must be a plain "<name>.json" file name in the agent directory`);
+    }
+    const reason = UNMANAGEABLE_FILES.get(name);
+    if (reason) fail(`"files.${name}" cannot be managed here: ${name} ${reason}`);
+    if (!isPlainObject(block)) fail(`"files.${name}" must be an object mirroring that file`);
+    for (const key of Object.keys(block)) {
+      if (key.includes(".")) {
+        fail(`"files.${name}.${key}" looks like a path; nest objects instead`);
+      }
+    }
+    return { file: name, declared: leafEntries(block, { emptyObjectsAreLeaves: false }) };
+  });
+
   const rawPreserve = parsed?.preserve ?? {};
   if (!isPlainObject(rawPreserve)) {
-    fail(`manifest ${path} field "preserve" must be an object with "settings" and/or "keybindings" arrays`);
+    fail(`manifest ${path} field "preserve" must be an object with "settings", "keybindings" and/or "files" entries`);
   }
   for (const key of Object.keys(rawPreserve)) {
-    if (key !== "settings" && key !== "keybindings") {
-      fail(`"preserve.${key}" is not a domain; use "settings" or "keybindings"`);
+    if (key !== "settings" && key !== "keybindings" && key !== "files") {
+      fail(`"preserve.${key}" is not a domain; use "settings", "keybindings" or "files"`);
     }
   }
-  const preserve = { settings: [], keybindings: [] };
+  const preserve = { settings: [], keybindings: [], files: {} };
   for (const domain of ["settings", "keybindings"]) {
     const list = rawPreserve[domain] ?? [];
     if (!Array.isArray(list)) fail(`"preserve.${domain}" must be an array`);
@@ -292,11 +335,34 @@ function readManifest(path) {
     }
   }
 
+  // `preserve.files` is keyed by file name, because prune only ever reaches a
+  // file the manifest declares. Preserving a key in a file nobody declares
+  // would protect it from nothing, so it is a manifest error rather than a
+  // silently useless entry.
+  const rawPreserveFiles = rawPreserve.files ?? {};
+  if (!isPlainObject(rawPreserveFiles)) {
+    fail(`"preserve.files" must be an object keyed by file name, each value an array of key paths`);
+  }
+  for (const [name, list] of Object.entries(rawPreserveFiles)) {
+    const target = declaredFiles.find((entry) => entry.file === name);
+    if (!target) fail(`"preserve.files.${name}" names a file that "files" does not declare`);
+    if (!Array.isArray(list)) fail(`"preserve.files.${name}" must be an array`);
+    preserve.files[name] = list.map((value, index) => splitPath(value, `"preserve.files.${name}[${index}]"`));
+    for (const entry of preserve.files[name]) {
+      const clash = target.declared.find((declared) => overlaps(entry, declared.path));
+      if (clash) fail(`"${formatPath(entry)}" in ${name} is both declared and preserved`);
+    }
+  }
+
   info(`${entries.length} packages declared: ${entries.join(", ")}`);
   if (conflicts.length > 0) info(`${conflicts.length} must not be installed: ${conflicts.join(", ")}`);
   info(`${declaredSettings.length} settings key(s) declared, ${declaredKeybindings.length} keybinding(s) declared`);
+  if (declaredFiles.length > 0) {
+    const summary = declaredFiles.map((entry) => `${entry.file} (${entry.declared.length})`).join(", ");
+    info(`${declaredFiles.length} extension config file(s) declared: ${summary}`);
+  }
 
-  return { desired: entries, conflicts, declaredSettings, declaredKeybindings, preserve };
+  return { desired: entries, conflicts, declaredSettings, declaredKeybindings, declaredFiles, preserve };
 }
 
 // "npm:@scope/name@1.2.3" -> { name: "@scope/name", version: "1.2.3" }
@@ -489,13 +555,13 @@ function normalizeKeybinding(value) {
   return Array.isArray(value) ? value : [value];
 }
 
-function buildConfigPlan({ domain, declared, current, preserve, prune, protectedTopKeys = new Set(), equals = deepEqual, flat = false }) {
+function buildConfigPlan({ domain, declared, current, preserve, prune, protectedTopKeys = new Set(), equals = deepEqual, flat = false, targetPrefix = "" }) {
   const steps = [];
   const declaredPaths = declared.map((entry) => entry.path);
 
   for (const entry of declared) {
     const existing = getPath(current, entry.path);
-    const target = formatPath(entry.path);
+    const target = `${targetPrefix}${formatPath(entry.path)}`;
     if (entry.value === null) {
       // A tombstone: declared so it gets removed, and stays declared so every
       // machine removes it. No state file needed to remember what we managed.
@@ -530,7 +596,7 @@ function buildConfigPlan({ domain, declared, current, preserve, prune, protected
     // Already handled above: the declared path either is this path, replaces the
     // subtree it sits in, or is created inside it.
     if (declaredPaths.some((path) => overlaps(path, entry.path))) continue;
-    const target = formatPath(entry.path);
+    const target = `${targetPrefix}${formatPath(entry.path)}`;
     if (preserve.some((path) => overlaps(path, entry.path))) {
       steps.push({ domain, action: "preserve", target, path: entry.path, reason: `= ${render(entry.value)}` });
       continue;
@@ -590,7 +656,7 @@ function withLock(file, fn) {
   }
 }
 
-function applyConfigPlan(file, steps, label) {
+function applyConfigPlan(file, steps) {
   const actionable = steps.filter((entry) => entry.action === "set" || entry.action === "unset");
   if (actionable.length === 0) return { changed: false };
 
@@ -629,7 +695,7 @@ function applyConfigPlan(file, steps, label) {
       rmSync(tmp, { force: true });
       throw error;
     }
-    info(`wrote ${file} (${actionable.length} ${label} change(s))`);
+    info(`wrote ${file} (${actionable.length} change(s))`);
     return { changed: true };
   });
 }
@@ -687,7 +753,8 @@ if (values.help) {
   console.log(`Usage: node scripts/sync.mjs [options]
 
   --manifest <path>   Manifest to apply (default: pi-preset.json next to this script's parent)
-  --sync <domains>    Domains to reconcile: packages, settings, keybindings, all, none (default: all)
+  --sync <domains>    Domains to reconcile: packages, settings, keybindings, files, all, none
+                      (default: all)
   --prune [<domains>] Domains the manifest owns completely; bare --prune, or --prune all,
                       means every domain --sync selected (default: none)
   --dry-run           Print the plan without changing anything
@@ -695,7 +762,9 @@ if (values.help) {
 In a synced domain not listed in --prune, only declared entries are touched;
 a declared null removes one entry. In a pruned domain, whatever the manifest
 does not declare is removed, except the "preserve" lists and the settings keys
-pi maintains itself (packages, lastChangelogVersion).`);
+pi maintains itself (packages, lastChangelogVersion). Pruning "files" reaches
+only the files "files" declares; a file the manifest never mentions is never
+read, written or removed.`);
   process.exit(0);
 }
 
@@ -716,6 +785,12 @@ const manifest = readManifest(manifestPath);
 const installed = syncDomains.has("packages") ? readInstalled() : [];
 const currentSettings = syncDomains.has("settings") ? readJsonFile(settingsFile, "settings") : {};
 const currentKeybindings = syncDomains.has("keybindings") ? readJsonFile(keybindingsFile, "keybindings") : {};
+const fileTargets = syncDomains.has("files")
+  ? manifest.declaredFiles.map((entry) => {
+      const path = join(agentDir, entry.file);
+      return { ...entry, path, current: readJsonFile(path, `files ${entry.file}`) };
+    })
+  : [];
 
 step("comparing manifest with this machine");
 
@@ -749,6 +824,21 @@ if (syncDomains.has("keybindings")) {
       equals: (a, b) => deepEqual(normalizeKeybinding(a), normalizeKeybinding(b)),
       flat: true,
     }),
+  );
+}
+
+for (const target of fileTargets) {
+  plan.push(
+    ...buildConfigPlan({
+      domain: "files",
+      declared: target.declared,
+      current: target.current,
+      preserve: manifest.preserve.files[target.file] ?? [],
+      prune: pruneDomains.has("files"),
+      // The plan table lists every domain together, so a bare "searchShortcut"
+      // would not say which file it lives in.
+      targetPrefix: `${target.file}:`,
+    }).map((entry) => ({ ...entry, file: target.path })),
   );
 }
 
@@ -787,9 +877,18 @@ if (values["dry-run"]) {
 }
 
 const packageSteps = plan.filter((entry) => entry.domain === "packages" && entry.action !== "keep");
-const settingsSteps = plan.filter((entry) => entry.domain === "settings" && (entry.action === "set" || entry.action === "unset"));
-const keybindingSteps = plan.filter((entry) => entry.domain === "keybindings" && (entry.action === "set" || entry.action === "unset"));
-const totalSteps = packageSteps.length + (settingsSteps.length > 0 ? 1 : 0) + (keybindingSteps.length > 0 ? 1 : 0);
+const isWrite = (entry) => entry.action === "set" || entry.action === "unset";
+// One write step per file, in the order they are applied.
+const writeTargets = [
+  ["settings", settingsFile, plan.filter((entry) => entry.domain === "settings" && isWrite(entry))],
+  ["keybindings", keybindingsFile, plan.filter((entry) => entry.domain === "keybindings" && isWrite(entry))],
+  ...fileTargets.map((target) => [
+    target.file,
+    target.path,
+    plan.filter((entry) => entry.domain === "files" && entry.file === target.path && isWrite(entry)),
+  ]),
+].filter(([, , steps]) => steps.length > 0);
+const totalSteps = packageSteps.length + writeTargets.length;
 
 if (totalSteps === 0) {
   console.error("");
@@ -817,14 +916,10 @@ for (const action of ["install", "update", "remove"]) {
   }
 }
 
-for (const [label, file, steps] of [
-  ["settings", settingsFile, settingsSteps],
-  ["keybindings", keybindingsFile, keybindingSteps],
-]) {
-  if (steps.length === 0) continue;
+for (const [label, file, steps] of writeTargets) {
   step(`writing ${label} (${steps.length} key(s))`, totalSteps);
   try {
-    const { changed } = applyConfigPlan(file, steps, label);
+    const { changed } = applyConfigPlan(file, steps);
     info(changed ? "ok" : "already matched on disk; nothing written");
   } catch (error) {
     console.error(`  failed: ${error.message}`);
