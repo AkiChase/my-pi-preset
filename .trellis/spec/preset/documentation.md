@@ -1,5 +1,9 @@
 # Documentation Maintenance
 
+## 文档语言
+
+项目文档使用中文，Trellis task 的 `prd.md`、`design.md`、`implement.md`、研究记录及 JSONL 上下文的 `reason` 说明也一样。技术名称、路径、命令和结构键不翻译；代码、代码注释和提交信息仍用英文。完整适用范围见 [Repository Guidelines](./repository-guidelines.md#文档语言)。这项规则不要求批量翻译历史文档或修改自动生成文件。
+
 ## Project Policy: Code Changes Require README Changes
 
 [README.md](../../../README.md) is the complete user-facing reference, written in Chinese. Any changed preset behavior, command, keybinding, configuration, dependency or check command must update the relevant section in the same change. Do not hide a user-visible change in comments, provenance or task notes alone.

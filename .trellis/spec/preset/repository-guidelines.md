@@ -32,8 +32,12 @@ Paths below are relative to the repository root.
 
 A vendor directory with `index.ts` must stay behind the top-level wrapper. Explicit discovery and [pi-manifest.test.mjs](../../../scripts/pi-manifest.test.mjs) prevent it loading again independently; never remove that guard. See [Extension Guidelines](./extension-guidelines.md).
 
+## 文档语言
+
+本项目文档使用中文，包括 `.trellis/spec/` 规范、`.trellis/tasks/` 中的 PRD、设计、实施计划、研究记录，以及开发者日志和自行维护的来源说明。新建或修改文档时遵守此规则；不要求批量翻译历史文档，也不手改 Trellis 自动生成的工作流、集成文件或第三方原文。文件名、路径、标识符、命令、JSON/JSONL 结构键和原文引用保持原样。
+
 ## Language and Comments
 
-**Project policy:** code, comments, commit messages and specs are English; README is Chinese. The old Chinese custom AGENTS rules have moved here, not into a second rule file.
+代码、代码注释和提交信息仍使用英文；文档语言遵循上面的中文规则。项目约定统一维护在本规范层，不另建一份规则文件。
 
 Explain **why**, not just what: identify the pi/third-party behavior and version where relevant, and what breaks without the workaround. [bash-unified.ts](../../../extensions/bash-unified.ts) explains pretty's source-entry import and shared bash ownership; [blocked-signal.ts](../../../extensions/blocked-signal.ts) documents host notification gaps. Verify current code/assertions when historical comments or provenance describe an older model; do not turn those comments into new contracts.
