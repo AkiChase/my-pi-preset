@@ -560,7 +560,7 @@ pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDING
 
 ## 添加扩展
 
-放一个 `.ts` 文件进 `extensions/` 即可，不需要构建步骤。改完跑一遍 `pnpm check`，顺手更新 README 里对应的小节（这件事写进了 [`AGENTS.md`](AGENTS.md)），提交推送后，在其它机器上跑 `pi update --extensions`。
+放一个 `.ts` 文件进 `extensions/` 即可，不需要构建步骤。改完跑一遍 `pnpm check`，同时更新 README 里对应的小节，提交推送后，在其它机器上跑 `pi update --extensions`。
 
 加载的范围由 [`package.json`](package.json) 的 `pi.extensions` 声明，而不是自动发现：
 
@@ -600,4 +600,4 @@ pnpm test               # 只跑 node --test
 
 另外注意：别人机器上的运行时依赖由 pi 安装，用的是 pi 自己配置的包管理器（默认 npm），它不读 `pnpm-lock.yaml`。所以 `dependencies` 保持宽松范围；`devDependencies` 不会被装到那些机器上。
 
-仓库约定、以及「改了什么就得同步改哪一节文档」的对照表在 [`AGENTS.md`](AGENTS.md)。
+改动扩展、清单、同步行为或检查命令时，必须同步更新 README 对应的小节。

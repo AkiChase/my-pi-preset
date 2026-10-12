@@ -1,0 +1,57 @@
+diff --git a/AGENTS.md b/AGENTS.md
+index bf124ec..6555664 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -7,8 +7,13 @@
+ | `pi-preset.json` | 清单：`packages` 要装的，`conflicts` 不能当 pi 包装的，`settings` / `keybindings` / `files` 要对齐的本机配置，`preserve` prune 时也不动的键 |
+ | `install.sh` + `scripts/sync.mjs` | 把本机对齐到清单（四个域：packages / settings / keybindings / files）；`--dev` 仅将本仓库来源切到当前 git 检出 |
+ | `extensions/` | 自带扩展。加载范围由 `package.json` 的 `pi.extensions`（`extensions/*.ts`）声明，**不是** pi 自动发现；子目录不加载 |
+-| `local/` | 本机草稿：计划、笔记、临时脚本。**已 gitignore**，不进仓库，也别在这里放代码 |
++| `local/` | 本机草稿：笔记、临时脚本。**已 gitignore**，不进仓库，也别在这里放代码；任务计划/PRD 改放 `.trellis/tasks/` |
+ | `README.md` | 面向使用者的全部文档 |
++| `.trellis/` | Trellis 工作流：`workflow.md` 流程、`spec/` 编码规范、`tasks/` 任务（PRD + jsonl 上下文）、`workspace/` 开发者日志、`scripts/` 任务脚本 |
++| `.pi/` | 项目级 pi 配置，`settings.json` 只装 `git:github.com/AkiChase/pi-trellis`（Trellis 的 pi 集成 + `trellis-*` 子代理）。`.pi/git/` 是 pi 克隆的包，自带 gitignore |
++| `.cursor/` | Trellis 生成的 Cursor 集成（agents / hooks / commands / skills），由 `trellis update` 维护，别手改 |
++
++`.trellis/`、`.pi/`、`.cursor/` 都是开发工作流用的，不属于 preset 本身：不进 `pi-preset.json`，不进 `package.json` 的 `pi` 声明，也不写进 README。
+ 
+ ## 铁律：改代码就得改 README
+ 
+@@ -55,3 +60,37 @@ pnpm link-sdk           # 重建 pi SDK 软链（pnpm install 后可能需要）
+ 
+ - 注释写**为什么**：多数代码在绕 pi 或第三方扩展的具体行为，点明哪个版本的什么行为、不这么做会怎样。
+ - 代码/注释/提交信息用英文，README 和本文件用中文。
++
++## Trellis
++
++非琐碎改动走 `.trellis/workflow.md`：先建任务写 PRD，再 `task.py start` 激活，完成后 `finish` + `archive`。
++
++```sh
++python3 .trellis/scripts/task.py list
++python3 .trellis/scripts/task.py start <task>     # 需要会话身份；pi 外手动跑时设 TRELLIS_CONTEXT_ID
++python3 .trellis/scripts/task.py current --source
++```
++
++- `.trellis/spec/` 会被注入 `trellis-implement` / `trellis-check` 子代理，内容必须写本仓库的真实约定（与本文件一致），别留模板占位。
++- 下面 `TRELLIS:START` / `TRELLIS:END` 之间由 `trellis update` 覆盖，自己的规则写在块外。
++<!-- TRELLIS:START -->
++# Trellis Instructions
++
++These instructions are for AI assistants working in this project.
++
++This project is managed by Trellis. The working knowledge you need lives under `.trellis/`:
++
++- `.trellis/workflow.md` — development phases, when to create tasks, skill routing
++- `.trellis/spec/` — package- and layer-scoped coding guidelines (read before writing code in a given layer)
++- `.trellis/workspace/` — per-developer journals and session traces
++- `.trellis/tasks/` — active and archived tasks (PRDs, research, jsonl context)
++
++If a Trellis command is available on your platform (e.g. `/trellis:finish-work`, `/trellis:continue`), prefer it over manual steps. Not every platform exposes every command.
++
++If you're using Codex or another agent-capable tool, additional project-scoped helpers may live in:
++- `.agents/skills/` — reusable Trellis skills
++- `.codex/agents/` — optional custom subagents
++
++Managed by Trellis. Edits outside this block are preserved; edits inside may be overwritten by a future `trellis update`.
++
++<!-- TRELLIS:END -->
