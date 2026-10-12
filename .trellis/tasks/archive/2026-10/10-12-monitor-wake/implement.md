@@ -12,6 +12,8 @@
 
 仍待用户确认的流程项：提交本任务改动，然后按工作流 finish／archive 和记录会话；不自动启动后续 task。
 
+**收尾更新：** 用户已批准提交并合并，工作提交 `75e5278`、`85c6189` 已进入 `main` 并由用户 push。用户随后要求收尾，本任务已归档，单独记录归档与日志提交；后续 task 未启动。
+
 ## 实施顺序
 
 先完成本任务并验证，再做 `10-12-subagents-task-ux`，不并行改相同产品文件。开始实现前读取 [research/follow-up-boundary.md](research/follow-up-boundary.md)，不提前改名 bg-tasks、抽共享面板或设计 agent backend。

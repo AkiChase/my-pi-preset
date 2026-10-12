@@ -85,4 +85,4 @@
 
 ## 当前状态
 
-最新方案已实现，19 条验收对应的离线检查通过。独立审查发现的三项产品缺陷和一处测试覆盖缺口已修复并复核，`pnpm check` 为 325/325，无 force-exit 回归为 308/308。详细结论见 [review-validation.md](review-validation.md)。当前仍为 `in_progress`，等待提交与收尾确认；后续 subagents-task-ux 的实施顺序不变。
+最新方案已实现，19 条验收对应的离线检查通过。独立审查发现的三项产品缺陷和一处测试覆盖缺口已修复并复核，`pnpm check` 为 325/325，无 force-exit 回归为 308/308。详细结论见 [review-validation.md](review-validation.md)。工作提交 `75e5278`、`85c6189` 已合并回 `main` 并由用户 push；本任务已完成、归档，本会话指针已清除。后续 subagents-task-ux 的实施顺序不变，本会话未启动其实现。

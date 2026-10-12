@@ -6,7 +6,7 @@
 
 - 原共享 shell `spawn.ts`、任务面板交互、快捷键/input、注册表、manifest 未修改；monitor 内部 helper 保持嵌套，不新增自动加载入口。
 - 对新增的 typed monitor 载荷、共享 `handleOversize`、双流 source 和 Job 状态／结果标记边界进行了直接阅读。
-- 新增中文 [monitor-contract.md](../../spec/preset/monitor-contract.md)，并由 preset 索引和扩展规范链接，记录可迁移的接口、验证矩阵和错误／正确例子。该规范不替代独立实现审查；如审查发现问题，同步调整实现与规范。
+- 新增中文 [monitor-contract.md](../../../../spec/preset/monitor-contract.md)，并由 preset 索引和扩展规范链接，记录可迁移的接口、验证矩阵和错误／正确例子。该规范不替代独立实现审查；如审查发现问题，同步调整实现与规范。
 - 直接阅读发现 `types.ts` 的投递常量注释仍称 monitor 被动、不唤醒；已作注释修正，明确 monitor 使用 steer，Pi 1.1.0 接收边界为整批 assistant 工具结束后。常量及执行逻辑未改变。
 
 ## 独立重跑结果
@@ -57,4 +57,4 @@
 
 首次三项产品缺陷和后续测试覆盖缺口均已修复、独立核实。当前 19 条验收的离线实现与测试通过，代码 ready to finish；真实 Agent 回复／真实网络 WebSocket 未作端到端体验验证，不承诺端到端送达或每条事件独立回复。
 
-未提交、finish 或 archive，当前任务仍为 `in_progress`。后续 task 的规划可能由另一会话继续更新，本会话没有修改其文件；实施顺序仍为先当前 monitor，再后续 subagents-task-ux。
+工作提交 `75e5278`、`85c6189` 已合并回 `main` 并由用户 push；用户要求收尾后，当前任务已 completed 并归档，本会话指针已清除。后续 task 的规划由另一会话维护，本会话没有修改其文件或启动其实现；执行顺序仍为先当前 monitor，再后续 subagents-task-ux。
