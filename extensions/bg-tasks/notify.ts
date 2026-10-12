@@ -11,9 +11,8 @@
  * Exactly-once is enforced by the job's `outcomeSurfaced` latch, set after a
  * successful send, so any path that already surfaced the outcome (a jobs
  * output/attach read, a deliberate kill) suppresses the notification. A
- * terminal job whose outcome has been surfaced is evicted from the live
- * registry; its output log stays on disk and the notification carries the
- * path.
+ * terminal records stay until the age-based session sweep. Logs remain on disk
+ * and every notification carries their absolute path.
  *
  * Deviation from upstream: the latch is set AFTER the send, not before. Set
  * before, a `sendMessage` that throws loses the outcome permanently — the job
@@ -30,7 +29,6 @@ import {
 } from "./types.ts";
 import { DEFAULTS, type BgTasksConfig } from "./config.ts";
 import type { BackgroundRegistry } from "./state.ts";
-import { forget } from "./registry.ts";
 import { describeJob } from "./format.ts";
 import { readTailLines } from "./output.ts";
 
@@ -144,9 +142,7 @@ export function markOutcomeSurfaced(job: Job): void {
  * job terminal, unsurfaced, and still in the registry so `jobs list` can
  * report it. Upstream dropped it to a console.error and the outcome was gone.
  *
- * On success the job is evicted from the live registry unless `evict: false`
- * — the monitor path sends before the job is marked terminal and lets
- * completeJob evict instead.
+ * Delivery does not affect metadata retention.
  *
  * Returns true when the notification was sent.
  */
@@ -158,7 +154,6 @@ export function sendTaskNotification(args: {
     status?: TerminalStatus;
     /** Explicit summary (monitors compose their own). */
     summary?: string;
-    evict?: boolean;
 }): boolean {
     const { reg, pi, job } = args;
     if (job.outcomeSurfaced) return false;
@@ -198,6 +193,5 @@ export function sendTaskNotification(args: {
         return false;
     }
     markOutcomeSurfaced(job);
-    if (args.evict !== false) forget(reg, job);
     return true;
 }

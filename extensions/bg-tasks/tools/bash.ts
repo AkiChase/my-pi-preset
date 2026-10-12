@@ -33,6 +33,7 @@ import {
     markStarted,
     newJobId,
     logPathFor,
+    renderSidebar,
     readLogTail,
 } from "../registry.ts";
 import {
@@ -192,6 +193,7 @@ async function runForeground(args: {
     // Foreground jobs are tracked for the sidebar / Ctrl+Shift+B but not counted
     // as "started" until they actually move to the background (see below).
     reg.jobs.set(id, job);
+    renderSidebar(reg, ctx);
 
     // Promote the running command to a tracked background job (cooperative
     // steering / Ctrl+Shift+B / auto-bg timeout). Idempotent.
@@ -299,6 +301,7 @@ async function runForeground(args: {
         clearBackgroundHint(reg, ctx, toolCallId);
         if (!handedToBackground) {
             reg.jobs.delete(id);
+            renderSidebar(reg, ctx);
             try { unlinkSync(logPath); } catch { /* best-effort */ }
         }
     }

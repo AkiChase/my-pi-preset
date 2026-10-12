@@ -22,12 +22,12 @@ function harness(opts?: { rejectKey?: string }) {
 }
 
 void describe("registerShortcuts", () => {
-    void it("binds the four default chords", () => {
+    void it("binds only the two default chords", () => {
         const { pi, bound } = harness();
         const warnings = registerShortcuts(pi as never, new BackgroundRegistry());
         assert.deepEqual(
             bound.map((b) => b.key),
-            ["ctrl+shift+b", "ctrl+shift+j", "shift+down", "ctrl+shift+x"]
+            ["ctrl+shift+b", "shift+down"]
         );
         assert.deepEqual(warnings, []);
     });
@@ -55,7 +55,7 @@ void describe("registerShortcuts", () => {
         registerShortcuts(pi as never, reg);
         assert.deepEqual(
             bound.map((b) => b.key),
-            ["ctrl+shift+b", "ctrl+shift+x"]
+            ["ctrl+shift+b"]
         );
     });
 
@@ -65,7 +65,7 @@ void describe("registerShortcuts", () => {
         const warnings = registerShortcuts(pi as never, new BackgroundRegistry());
         assert.deepEqual(
             bound.map((b) => b.key),
-            ["ctrl+shift+b", "ctrl+shift+j", "ctrl+shift+x"]
+            ["ctrl+shift+b"]
         );
         assert.equal(warnings.length, 1);
         assert.match(warnings[0]!, /shortcutTaskPanel: could not bind "shift\+down"/);

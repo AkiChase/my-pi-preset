@@ -67,14 +67,15 @@ void describe("statusFromExit", () => {
 void describe("markTerminal idempotency", () => {
     void it("a second call after completion is ignored", () => {
         const job = makeJob();
-        markTerminal(job, "completed", 0);
-        markTerminal(job, "failed", 1);
+        const reg = new BackgroundRegistry();
+        markTerminal(reg, job, "completed", 0);
+        markTerminal(reg, job, "failed", 1);
         assert.equal(job.status, "completed");
         assert.equal(job.exitCode, 0);
     });
     void it("killed → killed", () => {
         const job = makeJob();
-        markTerminal(job, "killed");
+        markTerminal(new BackgroundRegistry(), job, "killed");
         assert.equal(job.status, "killed");
     });
 });
@@ -112,7 +113,7 @@ void describe("ensureCompletionPromise", () => {
 void describe("markKilledSilently", () => {
     void it("status=killed, outcome marked surfaced", () => {
         const job = makeJob();
-        markKilledSilently(job);
+        markKilledSilently(new BackgroundRegistry(), job);
         assert.equal(job.status, "killed");
         assert.equal(job.outcomeSurfaced, true);
     });

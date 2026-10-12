@@ -166,7 +166,7 @@ export function startMonitorSession(args: {
     /**
      * Emit exactly one terminal <task-notification> for the monitor. Sent
      * before the job is marked terminal (onExit runs ahead of completeJob), so
-     * the status/summary are explicit and eviction is left to completeJob.
+     * the status/summary are explicit. Retention is independent of delivery.
      */
     const finishMonitor = (status: TerminalStatus, summary: string): void => {
         if (terminalEmitted) return;
@@ -183,7 +183,7 @@ export function startMonitorSession(args: {
         }
         flush();
         terminalEmitted = true;
-        sendTaskNotification({ reg, pi, job, status, summary, evict: false });
+        sendTaskNotification({ reg, pi, job, status, summary });
     };
 
     /** Forced stop (timeout / firehose). Emits a terminal event, then routes
@@ -224,6 +224,14 @@ export function startMonitorSession(args: {
             }
         },
     });
+
+    // A session switch may clear the registry before source.exit resolves.
+    // Abort must therefore stop follower/throttle resources itself, not rely on
+    // the stale exit callback to flush them later. Silent kills already latched
+    // the outcome, so this cannot emit a second terminal notification.
+    jobAc.signal.addEventListener("abort", () => {
+        if (!terminalEmitted) finishMonitor("killed", completionSummary(job, "killed"));
+    }, { once: true });
 
     // Deadline (skipped for persistent watches). Cleared when the job aborts
     // (natural exit or kill) so a short monitor doesn't keep a live timer +

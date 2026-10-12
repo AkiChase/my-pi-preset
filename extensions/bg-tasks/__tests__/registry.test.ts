@@ -1,168 +1,109 @@
-/**
- * registry.ts / 검색·정리·통계 기능 테스트.
- */
-
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BackgroundRegistry } from "../state.ts";
-import {
-    add,
-    cleanupTerminal,
-    findJob,
-    forget,
-    getStats,
-    newJobId,
-} from "../registry.ts";
-import type { Job } from "../types.ts";
+import { add, createRunningJob, findJob, getStats, logPathFor, newJobId, startRegistrySweep, stopRegistrySweep, sweepTerminal } from "../registry.ts";
+import { completeJob, markTerminal, terminateJobSilently } from "../lifecycle.ts";
+import { TERMINAL_RETENTION_MS, REGISTRY_SWEEP_MS, type UiContext } from "../types.ts";
 
-const TMP = "/tmp/pi-patty-test";
-
-function makeJob(overrides: Partial<Job> = {}): Job {
-    return {
-        id: "job-test-1",
-        command: "echo hi",
-        pid: 1,
-        startTime: Date.now(),
-        status: "running",
-        logPath: "/tmp/test",
-        toolCallId: "tc-1",
-        isBackgrounded: false,
-        ...overrides,
-    };
+const ctx = { ui: { setStatus() {}, setWidget() {}, notify() {}, theme: { fg: (_c: string, t: string) => t } } } as unknown as UiContext;
+function job(reg: BackgroundRegistry, id = "job-1") {
+    return add(reg, createRunningJob({ id, command: "echo hi", pid: 0, logPath: "/tmp/test", toolCallId: "t" }));
 }
-
-void describe("newJobId", () => {
-    void it("kind prefix + 8 random base36 chars (CC's typed task ids)", () => {
+void describe("registry IDs and lookup", () => {
+    void it("uses random typed IDs and resolves only retained records", () => {
         assert.match(newJobId("shell"), /^b[0-9a-z]{8}$/);
         assert.match(newJobId("monitor"), /^m[0-9a-z]{8}$/);
-    });
-    void it("random — consecutive ids differ", () => {
         assert.notEqual(newJobId("shell"), newJobId("shell"));
+        const reg = new BackgroundRegistry();
+        const j = job(reg);
+        assert.equal(findJob(reg, j.id), j);
+        assert.equal(findJob(reg, "unknown"), undefined);
+        assert.ok(logPathFor(reg, j.id).startsWith("/"));
     });
 });
-
-void describe("findJob", () => {
-    void it("정확한 ID 매치", () => {
-        const reg = new BackgroundRegistry();
-        const job = makeJob({ id: "job-1" });
-        reg.jobs.set("job-1", job);
-        assert.equal(findJob(reg, "job-1"), job);
-    });
-    void it("recentTerminal에서 찾기", () => {
-        const reg = new BackgroundRegistry();
-        const job = makeJob({ id: "job-old", status: "completed" });
-        reg.recentTerminal.push(job);
-        assert.equal(findJob(reg, "job-old"), job);
-    });
-    void it("unknown id returns undefined", () => {
-        const reg = new BackgroundRegistry();
-        assert.equal(findJob(reg, "nope"), undefined);
-    });
-});
-
-void describe("add / forget 카운터", () => {
-    void it("add는 totalStarted 증가", () => {
-        const reg = new BackgroundRegistry();
-        add(reg, makeJob({ id: "job-1" }));
-        add(reg, makeJob({ id: "job-2" }));
-        assert.equal(reg.totalStarted, 2);
-    });
-    void it("forget + completed 카운터 증가", () => {
-        const reg = new BackgroundRegistry();
-        const job = makeJob({ id: "job-1", status: "completed", exitCode: 0 });
-        add(reg, job);
-        forget(reg, job);
-        assert.equal(reg.completedCount, 1);
-        assert.equal(reg.totalStarted, 1); // add에서 증가한 값 유지.
-        assert.equal(reg.totalDurationMs >= 0, true);
-        assert.equal(reg.jobs.size, 0);
-        assert.equal(reg.recentTerminal.length, 1);
-    });
-    void it("forget + failed 카운터 증가", () => {
-        const reg = new BackgroundRegistry();
-        const job = makeJob({ id: "job-2", status: "failed", exitCode: 1 });
-        add(reg, job);
-        forget(reg, job);
-        assert.equal(reg.failedCount, 1);
-    });
-    void it("forget + killed increments the lifetime killed counter", () => {
-        const reg = new BackgroundRegistry();
-        const job = makeJob({ id: "job-3", status: "killed" });
-        add(reg, job);
-        forget(reg, job);
-        assert.equal(reg.killedCount, 1);
-        assert.equal(reg.completedCount, 0);
-        assert.equal(reg.failedCount, 0);
-        assert.equal(getStats(reg).killed, 1);
-    });
-    void it("recentTerminal 링은 20개에서 멈춤", () => {
-        const reg = new BackgroundRegistry();
-        for (let i = 0; i < 25; i++) {
-            const job = makeJob({ id: `job-${i}`, status: "completed" });
-            add(reg, job);
-            forget(reg, job);
-        }
-        assert.equal(reg.recentTerminal.length, 20);
-    });
-});
-
-void describe("cleanupTerminal", () => {
-    void it("종료된 잡 + 로그 파일 제거", () => {
-        try {
-            rmSync(TMP, { recursive: true, force: true });
-        } catch {
-            /* ignore */
-        }
-        mkdirSync(TMP, { recursive: true });
-        const logPath = join(TMP, "cleanup.log");
-        writeFileSync(logPath, "x".repeat(2048));
-
-        const reg = new BackgroundRegistry();
-        const job = makeJob({
-            id: "job-cleanup",
-            status: "completed",
-            logPath,
+void describe("terminal transitions own lifetime counters", () => {
+    for (const status of ["completed", "failed", "killed"] as const) {
+        void it(`${status} is counted once and time freezes at the first transition`, () => {
+            const reg = new BackgroundRegistry();
+            const j = job(reg);
+            j.startTime = Date.now() - 5000;
+            markTerminal(reg, j, status, status === "completed" ? 0 : 1);
+            const endedAt = j.endedAt;
+            markTerminal(reg, j, "failed", 9);
+            assert.equal(j.endedAt, endedAt);
+            assert.equal(j.status, status);
+            assert.equal(reg.jobs.size, 1, "completion does not evict");
+            const s = getStats(reg);
+            assert.equal(s.completed + s.failed + s.killed, 1);
+            assert.equal(s.totalStarted, 1);
+            assert.equal(s.running, 0);
+            assert.equal(s.totalDurationMs, status === "killed" ? 0 : (endedAt ?? 0) - j.startTime);
         });
-        add(reg, job);
-        reg.jobs.set(job.id, job);
-
-        const result = cleanupTerminal(reg);
-        assert.equal(result.purged >= 1, true);
-        assert.equal(result.bytesReclaimed >= 2048, true);
-        assert.equal(reg.jobs.size, 0);
-        assert.equal(reg.recentTerminal.length, 0);
-
-        rmSync(TMP, { recursive: true, force: true });
+    }
+    void it("silent kill followed by late exit cannot double-count or overwrite endedAt", () => {
+        const reg = new BackgroundRegistry();
+        const j = job(reg);
+        const ac = new AbortController();
+        reg.jobAborts.set(j.id, ac);
+        terminateJobSilently(reg, j);
+        const endedAt = j.endedAt;
+        completeJob({ reg, job: j, code: 1, pi: { sendMessage() { throw new Error("must not notify"); } } as never, ctx });
+        assert.equal(reg.killedCount, 1);
+        assert.equal(reg.failedCount, 0);
+        assert.equal(j.endedAt, endedAt);
+        assert.equal(ac.signal.aborted, true);
+        assert.equal(reg.jobAborts.size, 0);
+    });
+    void it("foreground entries do not affect background lifetime metrics", () => {
+        const reg = new BackgroundRegistry();
+        const j = job(reg);
+        j.isBackgrounded = false;
+        markTerminal(reg, j, "killed");
+        assert.equal(reg.killedCount, 0);
     });
 });
-
-void describe("getStats", () => {
-    void it("빈 registry", () => {
-        const reg = new BackgroundRegistry();
-        const s = getStats(reg);
-        assert.equal(s.totalStarted, 0);
-        assert.equal(s.running, 0);
-        assert.equal(s.completed, 0);
-        assert.equal(s.failed, 0);
-        assert.equal(s.averageDurationMs, 0);
+void describe("age-based metadata sweep", () => {
+    void it("expires all terminal statuses after ten minutes, never live jobs or log files", () => {
+        const dir = mkdtempSync(join(tmpdir(), "pi-retention-"));
+        try {
+            const reg = new BackgroundRegistry();
+            const now = Date.now();
+            const live = job(reg, "live");
+            for (const status of ["completed", "failed", "killed"] as const) {
+                const j = job(reg, status);
+                j.logPath = join(dir, `${status}.log`);
+                writeFileSync(j.logPath, "final output");
+                markTerminal(reg, j, status);
+                j.endedAt = now - TERMINAL_RETENTION_MS;
+            }
+            const fresh = job(reg, "fresh");
+            markTerminal(reg, fresh, "completed");
+            fresh.endedAt = now - TERMINAL_RETENTION_MS + 1;
+            assert.equal(sweepTerminal(reg, now), 3);
+            assert.equal(reg.jobs.size, 2);
+            assert.equal(findJob(reg, "completed"), undefined);
+            assert.equal(findJob(reg, live.id), live);
+            assert.ok(existsSync(join(dir, "completed.log")));
+            assert.equal(sweepTerminal(reg, now), 0);
+            assert.equal(reg.completedCount, 2, "sweeping does not change counters");
+        } finally { rmSync(dir, { recursive: true, force: true }); }
     });
-    void it("집계 정확", () => {
+    void it("sweeps every sixty seconds and releases the timer idempotently", (t) => {
+        t.mock.timers.enable({ apis: ["setInterval", "Date"], now: 1_000_000 });
         const reg = new BackgroundRegistry();
-        add(reg, makeJob({ id: "j1", status: "completed" }));
-        add(reg, makeJob({ id: "j2", status: "completed" }));
-        add(reg, makeJob({ id: "j3", status: "failed" }));
-        const s = getStats(reg);
-        assert.equal(s.totalStarted, 3);
-        assert.equal(s.completed, 0); // add 안 한 상태, 다음 forget에서 올라감
-        assert.equal(s.failed, 0);
-        // running은 map에 남은 것만 카운트.
-        forget(reg, reg.jobs.get("j1")!);
-        forget(reg, reg.jobs.get("j2")!);
-        forget(reg, reg.jobs.get("j3")!);
-        const s2 = getStats(reg);
-        assert.equal(s2.completed, 2);
-        assert.equal(s2.failed, 1);
+        const j = job(reg);
+        markTerminal(reg, j, "completed");
+        startRegistrySweep(reg);
+        t.mock.timers.tick(TERMINAL_RETENTION_MS - 1);
+        assert.ok(reg.jobs.has(j.id));
+        t.mock.timers.tick(1);
+        assert.equal(reg.jobs.has(j.id), false);
+        assert.equal(REGISTRY_SWEEP_MS, 60_000);
+        stopRegistrySweep(reg);
+        stopRegistrySweep(reg);
+        assert.equal(reg.sweepTimer, undefined);
     });
 });

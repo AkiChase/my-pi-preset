@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { BackgroundRegistry } from "../state.ts";
 import { add, createRunningJob } from "../registry.ts";
 import { startMonitorSession } from "../monitor-session.ts";
+import { terminateJobSilently } from "../lifecycle.ts";
 import type { MonitorSource } from "../monitor-source.ts";
 import type { SpawnExit } from "../spawn.ts";
 import { EVENT, type UiContext } from "../types.ts";
@@ -92,8 +93,30 @@ void describe("monitor-session — lifecycle via a fake source", () => {
         const xml = h.terminals()[0].content;
         assert.ok(xml.includes("· completed]"));
         assert.ok(xml.includes(`Monitor "watch" stream ended`));
-        // Evicted by completeJob once the notification has fired.
-        assert.equal(h.reg.jobs.has(h.job.id), false);
+        // Completion notification does not evict metadata before retention.
+        assert.equal(h.reg.jobs.has(h.job.id), true);
+        assert.equal(h.reg.completedCount, 1);
+        assert.ok(h.job.endedAt);
+    });
+
+    void it("metadata reset aborts a persistent monitor without leaving a follower or buffered emit", async () => {
+        const logPath = join(dir, "reset.log");
+        writeFileSync(logPath, "");
+        const h = harness(logPath, { ...DEFAULTS, monitorPollMs: 20, monitorFlushMs: 50 });
+        h.start({ persistent: true });
+        appendFileSync(logPath, "before-reset\n");
+        await sleep(30);
+        terminateJobSilently(h.reg, h.job);
+        h.reg.jobs.clear();
+        const messages = h.messages.length;
+        appendFileSync(logPath, "after-reset\n");
+        await sleep(70);
+        h.resolveExit({ code: 1, signal: "SIGTERM" });
+        await sleep(20);
+        assert.equal(h.messages.length, messages);
+        assert.equal(h.terminals().length, 0);
+        assert.equal(h.reg.jobAborts.size, 0);
+        assert.equal(h.isStopped(), true);
     });
 
     void it("maps a non-zero exit to a failure terminal", async () => {

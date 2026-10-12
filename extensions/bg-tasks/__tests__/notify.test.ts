@@ -7,7 +7,7 @@ import {
     markOutcomeSurfaced,
     sendTaskNotification,
 } from "../notify.ts";
-import { completeJob } from "../lifecycle.ts";
+import { completeJob, ensureCompletionPromise, terminateJobSilently } from "../lifecycle.ts";
 import { add } from "../registry.ts";
 import { EVENT, type Job, type UiContext } from "../types.ts";
 
@@ -163,8 +163,8 @@ void describe("completionSummary — CC's exact strings", () => {
     });
 });
 
-void describe("sendTaskNotification — exactly-once + eviction", () => {
-    void it("sends the XML with steer delivery and evicts the job", () => {
+void describe("sendTaskNotification — exactly-once + retention", () => {
+    void it("sends compact text with steer delivery without evicting the job", () => {
         const { reg, pi, messages, deliverOptions } = harness();
         const job = mkJob({ id: "job-1-5", status: "completed", exitCode: 0 });
         add(reg, job);
@@ -190,10 +190,8 @@ void describe("sendTaskNotification — exactly-once + eviction", () => {
         assert.equal(m.details?.summary, `Background command "npm test" completed (exit code 0)`);
         // Steer + triggerTurn — CC's 'next' priority, waking an idle agent.
         assert.deepEqual(deliverOptions[0], { deliverAs: "steer", triggerTurn: true });
-        // Evicted: terminal + notified leaves the live registry.
-        assert.equal(reg.jobs.has("job-1-5"), false);
-        assert.equal(reg.recentTerminal.length, 1);
-        assert.equal(reg.completedCount, 1);
+        assert.equal(reg.jobs.has("job-1-5"), true);
+        assert.equal(reg.completedCount, 0, "sending does not count transitions");
     });
 
     void it("latches exactly-once: a second send is a no-op", () => {
@@ -218,7 +216,7 @@ void describe("sendTaskNotification — exactly-once + eviction", () => {
         assert.equal(reg.jobs.has("job-1-1"), true, "lingers for the lazy sweep");
     });
 
-    void it("evict: false keeps the job in the registry (monitor path)", () => {
+    void it("the monitor's pre-transition send retains its record", () => {
         const { reg, pi, messages } = harness();
         const job = mkJob({ status: "running" as Job["status"] });
         add(reg, job);
@@ -228,7 +226,6 @@ void describe("sendTaskNotification — exactly-once + eviction", () => {
             job,
             status: "completed",
             summary: `Monitor "watch" stream ended`,
-            evict: false,
         });
         assert.equal(sent, true);
         assert.equal(reg.jobs.has("job-1-1"), true);
@@ -273,6 +270,28 @@ void describe("sendTaskNotification — exactly-once + eviction", () => {
 });
 
 void describe("completeJob — exit-path notification", () => {
+    void it("terminal transition releases hooks and freezes counters even when send fails", () => {
+        const { reg, pi, ctx } = harness({ deliverThrows: true });
+        const job = mkJob({ status: "running", exitCode: undefined, startTime: Date.now() - 5000 });
+        add(reg, job);
+        job.stop = () => {};
+        ensureCompletionPromise(job);
+        const error = console.error;
+        console.error = () => {};
+        try { completeJob({ reg, job, code: 1, pi: pi as never, ctx }); }
+        finally { console.error = error; }
+        assert.equal(reg.failedCount, 1);
+        assert.ok(job.endedAt);
+        assert.equal(job.stop, undefined);
+        assert.equal(job.donePromise, undefined);
+        const elapsed = reg.totalDurationMs;
+        terminateJobSilently(reg, job);
+        completeJob({ reg, job, code: 0, pi: pi as never, ctx });
+        assert.equal(reg.totalDurationMs, elapsed);
+        assert.equal(reg.failedCount, 1);
+        assert.equal(reg.killedCount, 0);
+    });
+
     void it("sends the <task-notification> the moment the job exits", () => {
         const { reg, pi, ctx, messages } = harness();
         const job = mkJob({ id: "job-9-1", status: "running", exitCode: undefined });
@@ -280,7 +299,9 @@ void describe("completeJob — exit-path notification", () => {
         completeJob({ job, code: 0, reg, pi: pi as never, ctx });
         assert.equal(messages.length, 1);
         assert.ok(messages[0].content.includes("· completed]"));
-        assert.equal(reg.jobs.has("job-9-1"), false, "evicted after the send");
+        assert.equal(reg.jobs.has("job-9-1"), true, "retained after the send");
+        assert.equal(reg.completedCount, 1);
+        assert.ok(job.endedAt);
     });
 
     void it("a job read before exit exits silently and lingers", () => {
@@ -294,14 +315,14 @@ void describe("completeJob — exit-path notification", () => {
         assert.equal(reg.jobs.has("job-9-2"), true);
     });
 
-    void it('notification "self": the monitor already sent, so this evicts silently', () => {
+    void it('notification "self": the monitor already sent, so this retains silently', () => {
         const { reg, pi, ctx, messages } = harness();
         const job = mkJob({ id: "job-9-3", status: "running", exitCode: undefined });
         add(reg, job);
         markOutcomeSurfaced(job); // monitor already sent its own terminal notification
         completeJob({ job, code: 0, reg, pi: pi as never, ctx, notification: "self" });
         assert.equal(messages.length, 0);
-        assert.equal(reg.jobs.has("job-9-3"), false);
+        assert.equal(reg.jobs.has("job-9-3"), true);
     });
 
     void it('notification "self" whose send failed keeps the job listed', () => {
@@ -330,15 +351,14 @@ void describe("completeJob — exit-path notification", () => {
         assert.equal(reg.jobs.has("job-9-4"), true, "still listable");
     });
 
-    void it('notification "suppressed" + completed still evicts', () => {
+    void it('notification "suppressed" + completed retains without notification', () => {
         const { reg, pi, ctx, messages } = harness();
         const job = mkJob({ id: "job-9-6", status: "running", exitCode: undefined });
         add(reg, job);
-        // A success nobody asked to hear about is nothing to report, so it
-        // must not accumulate in the registry waiting for a `jobs list`.
+        // Suppression affects delivery only, not ten-minute retention.
         completeJob({ job, code: 0, reg, pi: pi as never, ctx, notification: "suppressed" });
         assert.equal(messages.length, 0);
-        assert.equal(reg.jobs.has("job-9-6"), false);
-        assert.equal(reg.recentTerminal.at(-1)?.id, "job-9-6");
+        assert.equal(reg.jobs.has("job-9-6"), true);
+        assert.equal(reg.completedCount, 1);
     });
 });

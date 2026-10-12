@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readLastLine } from "../output.ts";
 import { BackgroundRegistry } from "../state.ts";
-import { add, renderSidebar, createRunningJob } from "../registry.ts";
+import { add, renderSidebar, createRunningJob, stopSidebarTicker } from "../registry.ts";
 import type { UiContext } from "../types.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "pi-progress-"));
@@ -60,94 +60,48 @@ void describe("readLastLine — live progress source", () => {
     });
 });
 
-void describe("renderSidebar — pill shows live progress", () => {
+void describe("renderSidebar — footer only", () => {
     function ctxStub() {
-        let widget: string[] | undefined;
+        const widgets: unknown[] = [];
+        const statuses: (string | undefined)[] = [];
         const ctx = {
             ui: {
                 notify() {},
-                setWidget: (_n: string, c: string[] | undefined) => { widget = c; },
-                setStatus() {},
+                setWidget: (...args: unknown[]) => widgets.push(args),
+                setStatus: (_name: string, content: string | undefined) => statuses.push(content),
                 theme: { fg: (_c: string, t: string) => t },
             },
         } as unknown as UiContext;
-        return { ctx, getWidget: () => widget };
+        return { ctx, widgets, statuses };
     }
-
-    void it("renders the latest output line, not just the command", () => {
+    void it("counts background shell and monitor separately, excludes foreground and terminal", () => {
         const reg = new BackgroundRegistry();
-        const logPath = tmpLog("job.log", "starting up\n{\"indexed\":8540629,\"status\":\"grey\"}\n");
-        const job = createRunningJob({
-            id: "job-1-1",
-            command: "for i in $(seq 1 20); do poll; sleep 30; done",
-            pid: 123,
-            logPath,
-            toolCallId: "t",
-        });
-        add(reg, job);
-
-        const { ctx, getWidget } = ctxStub();
-        renderSidebar(reg, ctx);
-
-        const pill = getWidget()?.[0] ?? "";
-        assert.match(pill, /indexed":8540629/, "shows the latest output line");
-        assert.doesNotMatch(pill, /seq 1 20/, "not the raw command once there is output");
+        for (const [id, background, kind] of [["shell", true, "shell"], ["monitor", true, "monitor"], ["foreground", false, "shell"]] as const) {
+            add(reg, createRunningJob({ id, isBackgrounded: background, kind, command: "build", pid: 0, logPath: "/tmp/missing", toolCallId: id }));
+        }
+        const { ctx, widgets, statuses } = ctxStub();
+        try {
+            renderSidebar(reg, ctx);
+            assert.equal(statuses.at(-1), "▶ 1 tasks · ◉ 1 monitors · shift+down");
+            assert.equal(widgets.length, 0, "never writes a background task widget");
+            renderSidebar(reg, ctx);
+            assert.equal(statuses.length, 1, "unchanged status is diffed");
+            for (const job of reg.jobs.values()) job.status = "completed";
+            renderSidebar(reg, ctx);
+            assert.equal(statuses.at(-1), undefined);
+            assert.equal(reg.sidebarTimer, undefined);
+        } finally { stopSidebarTicker(reg); }
     });
-
-    void it("falls back to the command when there is no output yet", () => {
+    void it("foreground-only work does not appear in the footer", () => {
         const reg = new BackgroundRegistry();
-        const logPath = tmpLog("empty-job.log", "");
-        const job = createRunningJob({
-            id: "job-1-2",
-            command: "npm run build",
-            pid: 124,
-            logPath,
-            toolCallId: "t",
-        });
-        add(reg, job);
-
-        const { ctx, getWidget } = ctxStub();
-        renderSidebar(reg, ctx);
-        assert.match(getWidget()?.[0] ?? "", /npm run build/);
-    });
-
-    void it("renders no pill for terminal jobs", () => {
-        const reg = new BackgroundRegistry();
-        const logPath = tmpLog("done-job.log", "done\n");
-        const job = createRunningJob({
-            id: "job-1-3",
-            command: "npm test",
-            pid: 125,
-            logPath,
-            toolCallId: "t",
-        });
-        add(reg, job);
-        job.status = "completed";
-        job.exitCode = 0;
-
-        const { ctx, getWidget } = ctxStub();
-        renderSidebar(reg, ctx);
-        assert.equal(getWidget(), undefined, "no pills — a terminal job's outcome is always surfaced elsewhere");
-        assert.equal(reg.sidebarTimer, undefined, "no ticker without running jobs");
-    });
-
-    void it("hides terminal jobs once notified", () => {
-        const reg = new BackgroundRegistry();
-        const logPath = tmpLog("notified-job.log", "done\n");
-        const job = createRunningJob({
-            id: "job-1-4",
-            command: "npm test",
-            pid: 126,
-            logPath,
-            toolCallId: "t",
-        });
-        add(reg, job);
-        job.status = "killed";
-        job.outcomeSurfaced = true;
-
-        const { ctx, getWidget } = ctxStub();
-        renderSidebar(reg, ctx);
-        assert.equal(getWidget(), undefined, "no pills at all — widget cleared");
+        add(reg, createRunningJob({ id: "fg", isBackgrounded: false, command: "build", pid: 0, logPath: "/tmp/missing", toolCallId: "t" }));
+        const { ctx, widgets, statuses } = ctxStub();
+        try {
+            renderSidebar(reg, ctx);
+            assert.deepEqual(statuses, []);
+            assert.deepEqual(widgets, []);
+            assert.ok(reg.sidebarTimer, "foreground hint still has a duration ticker");
+        } finally { stopSidebarTicker(reg); }
     });
 });
 

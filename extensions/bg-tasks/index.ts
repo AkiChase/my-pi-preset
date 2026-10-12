@@ -15,7 +15,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createBashToolDefinition } from "@earendil-works/pi-coding-agent";
 import { BackgroundRegistry } from "./state.ts";
 import { detectNonInteractive, terminateJobSilently } from "./lifecycle.ts";
-import { stopSidebarTicker } from "./registry.ts";
+import { startRegistrySweep, stopRegistrySweep, stopSidebarTicker } from "./registry.ts";
 import { EVENT } from "./types.ts";
 import { loadConfig } from "./config.ts";
 import { registerBashTool } from "./tools/bash.ts";
@@ -106,7 +106,24 @@ export default function (pi: ExtensionAPI): void {
     // ── Session start ─────────────────────────────────────────────
     // Claude Code parity: the registry is purely in-memory — no persistence,
     // no revival. Every session starts with an empty registry.
-    pi.on("session_start", async (_event, _ctx) => {
+    pi.on("session_start", async (_event, ctx) => {
+        // A fresh context cannot reuse a panel/ticker captured from the prior
+        // session. Shutdown normally runs first; this is the switch fallback.
+        stopSidebarTicker(reg);
+        stopRegistrySweep(reg);
+        reg.closePanel?.();
+        for (const job of reg.jobs.values()) {
+            if (job.status === "running") terminateJobSilently(reg, job);
+        }
+        reg.jobs.clear();
+        reg.foreground.clear();
+        reg.completedCount = reg.failedCount = reg.killedCount = 0;
+        reg.totalStarted = reg.totalDurationMs = 0;
+        reg.lastSidebarContent = reg.lastHintContent = undefined;
+        // RPC/print contexts also provide harmless widget/status implementations.
+        ctx.ui?.setStatus("background-jobs", undefined);
+        ctx.ui?.setWidget("bg-hint", undefined);
+        startRegistrySweep(reg);
         reg.nonInteractive = detectNonInteractive(
             process.argv,
             Boolean(process.stdin.isTTY)
@@ -117,6 +134,8 @@ export default function (pi: ExtensionAPI): void {
     pi.on("session_shutdown", async (_event, _ctx) => {
         // Stop the live-duration ticker so the interval doesn't outlive the session.
         stopSidebarTicker(reg);
+        stopRegistrySweep(reg);
+        reg.closePanel?.();
 
         // Claude Code's gracefulShutdown: kill ALL running tasks on ANY
         // shutdown reason, so no orphans outlive the session. The silent-kill

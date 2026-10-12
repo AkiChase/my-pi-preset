@@ -16,7 +16,7 @@ import {
 } from "./types.ts";
 import type { BackgroundRegistry } from "./state.ts";
 import { killProcessTree, type SpawnExit } from "./spawn.ts";
-import { atConcurrencyLimit, forget, renderSidebar } from "./registry.ts";
+import { atConcurrencyLimit, renderSidebar } from "./registry.ts";
 import { watchStalls } from "./monitoring.ts";
 import { markOutcomeSurfaced, sendTaskNotification } from "./notify.ts";
 
@@ -68,6 +68,9 @@ export function startBackgroundJob(args: {
     });
     jobAc.signal.addEventListener("abort", cancelStall, { once: true });
     void args.exit.then((result) => {
+        // Session replacement clears the map; an old process's late exit must
+        // not notify or mutate counters belonging to the new session.
+        if (args.reg.jobs.get(args.job.id) !== args.job) return;
         args.onExit?.(result);
         completeJob({
             job: args.job,
@@ -89,14 +92,11 @@ export function startBackgroundJob(args: {
  * Who is responsible for a job's terminal <task-notification>.
  *
  *   - "auto" (default): completeJob sends it on exit.
- *   - "self": the caller sends its own before the exit lands (monitors, which
- *     compose a stream-specific summary). completeJob only evicts.
+ *   - "self": the caller sends its own stream-specific summary.
  *   - "suppressed": `bash_bg notify: false` — never sent.
  *
- * Upstream had one `shouldNotify: false` covering both "self" and
- * "suppressed". The two want opposite handling: a monitor is finished and
- * should leave the registry, while a suppressed job's outcome has reached
- * nobody and must stay listed.
+ * Notification ownership does not affect retention: all terminal records stay
+ * for ten minutes, whether or not their outcome reached the agent.
  */
 export type NotificationOwner = "auto" | "self" | "suppressed";
 
@@ -105,13 +105,7 @@ export type NotificationOwner = "auto" | "self" | "suppressed";
  * notify → renderSidebar. Shared by every tool's exit callback (bash,
  * bash_bg, monitor) as the canonical termination protocol.
  *
- * The notification is Claude Code's per-job <task-notification>, sent the
- * moment the job exits (see notify.ts). A job whose outcome has reached the
- * agent — or that succeeded with notifications suppressed, which is nothing to
- * report — is evicted from the live registry. A job that FAILED unreported
- * (`notify: false`, or a send that threw) deliberately stays, so `jobs list`
- * can still surface it. Upstream evicted the suppressed ones unconditionally,
- * which made a silently-failing `notify: false` job unobservable.
+ * Notifications never evict metadata; the session sweep owns retention.
  */
 export function completeJob(args: {
     job: Job;
@@ -128,25 +122,10 @@ export function completeJob(args: {
     // so no lookup is needed.
     const finished = args.job;
     abortJob(args.reg, finished.id);
-    markTerminal(finished, statusFromExit(args.code, args.signal), args.code ?? undefined);
-
-    const owner = args.notification ?? "auto";
-    if (owner === "auto") {
+    markTerminal(args.reg, finished, statusFromExit(args.code, args.signal), args.code ?? undefined);
+    if ((args.notification ?? "auto") === "auto") {
         sendTaskNotification({ reg: args.reg, pi: args.pi, job: finished });
-    } else if (finished.outcomeSurfaced) {
-        // "self" and that send landed, or a kill already surfaced it. Done.
-        forget(args.reg, finished);
-    } else if (owner === "suppressed" && finished.status === "completed") {
-        // A success nobody asked to hear about is nothing to report, so it
-        // leaves like any other finished job instead of accumulating in the
-        // registry until someone runs `jobs list`.
-        forget(args.reg, finished);
     }
-    // What is left is an outcome that reached nobody and is worth reporting: a
-    // `notify: false` job that FAILED, or a "self" send that threw. Those stay
-    // in the registry — listAction shows them and a read can still surface
-    // them. Upstream evicted them here, which is why a silently-failing
-    // `notify: false` command was unobservable.
     renderSidebar(args.reg, args.ctx);
 }
 
@@ -155,16 +134,24 @@ export function completeJob(args: {
  * terminal jobs are ignored. The proc reference is dropped explicitly for GC.
  */
 export function markTerminal(
+    reg: BackgroundRegistry,
     job: Job,
     status: JobStatus,
     exitCode?: number
 ): void {
-    if (isTerminalStatus(job.status)) {
-        return;
-    }
+    if (isTerminalStatus(job.status) || !isTerminalStatus(status)) return;
     job.status = status;
     job.exitCode = exitCode;
+    job.endedAt = Date.now();
+    if (job.isBackgrounded) {
+        if (status === "completed") reg.completedCount++;
+        else if (status === "failed") reg.failedCount++;
+        else reg.killedCount++;
+        // Preserve the existing average's success/failure denominator.
+        if (status !== "killed") reg.totalDurationMs += job.endedAt - job.startTime;
+    }
     delete job.proc;
+    delete job.stop;
     if (job.resolveDone) {
         job.resolveDone();
         delete job.resolveDone;
@@ -204,18 +191,19 @@ export function ensureCompletionPromise(job: Job): void {
  * (Claude Code parity — a deliberate kill is intentional cleanup the agent
  * already knows about).
  */
-export function markKilledSilently(job: Job): void {
-    markTerminal(job, "killed");
+export function markKilledSilently(reg: BackgroundRegistry, job: Job): void {
+    markTerminal(reg, job, "killed");
     markOutcomeSurfaced(job);
 }
 
 /** Kill a job quietly and abort its registered monitors/timers. The outcome is
  *  marked surfaced BEFORE the kill so the exit handler's notification is
- *  suppressed (Ctrl+Shift+X, jobs kill, session quit). */
+ *  suppressed (panel x, jobs kill, session quit). */
 export function terminateJobSilently(reg: BackgroundRegistry, job: Job): void {
+    if (isTerminalStatus(job.status)) return;
     markOutcomeSurfaced(job);
     terminateJob(job);
-    markKilledSilently(job);
+    markKilledSilently(reg, job);
     abortJob(reg, job.id);
 }
 

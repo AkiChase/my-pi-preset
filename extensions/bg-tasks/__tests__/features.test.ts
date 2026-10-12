@@ -1,7 +1,7 @@
 /**
  * 신규 기능 통합 테스트:
  *   - jobs.search 정규식 검색
- *   - jobs.cleanup 종료된 잡 일괄 제거
+ *   - registry expiry without log deletion
  *   - jobs.stats 집계 메트릭
  *   - bash_bg의 --name 라벨
  *
@@ -17,11 +17,11 @@ import { killProcessTree, processExists } from "../spawn.ts";
 import { BackgroundRegistry } from "../state.ts";
 import {
     add,
-    cleanupTerminal,
-    forget,
+    sweepTerminal,
     getStats,
     newJobId,
 } from "../registry.ts";
+import { markTerminal } from "../lifecycle.ts";
 import { formatJobLine } from "../format.ts";
 import type { Job } from "../types.ts";
 
@@ -36,7 +36,7 @@ function makeJob(overrides: Partial<Job> = {}): Job {
         status: "completed",
         logPath: "/tmp/x",
         toolCallId: "tc-1",
-        isBackgrounded: false,
+        isBackgrounded: true,
         ...overrides,
     };
 }
@@ -110,7 +110,7 @@ void describe("jobs.search 정규식 검색", () => {
     });
 });
 
-void describe("jobs.cleanup", () => {
+void describe("metadata expiry", () => {
     void it("실행 중 잡은 보존, 종료된 잡은 제거", () => {
         try {
             rmSync(TMP, { recursive: true, force: true });
@@ -138,13 +138,14 @@ void describe("jobs.cleanup", () => {
             makeJob({
                 id: "job-dead",
                 status: "completed",
+                endedAt: 0,
                 logPath: deadLog,
             })
         );
 
-        const result = cleanupTerminal(reg);
-        // 종료된 잡 + recentTerminal (0개) → 1개 정리.
-        assert.equal(result.purged, 1);
+        const removed = sweepTerminal(reg);
+        assert.equal(removed, 1);
+        assert.equal(readFileSync(deadLog, "utf-8"), "finished", "logs survive metadata expiry");
         // 라이브 잡은 살아있다.
         assert.ok(reg.jobs.has("job-live"));
         assert.ok(!reg.jobs.has("job-dead"));
@@ -160,10 +161,8 @@ void describe("jobs.stats", () => {
         add(reg, makeJob({ id: "j2", status: "running" }));
         const live1 = reg.jobs.get("j1")!;
         const live2 = reg.jobs.get("j2")!;
-        live1.status = "completed";
-        forget(reg, live1);
-        live2.status = "failed";
-        forget(reg, live2);
+        markTerminal(reg, live1, "completed");
+        markTerminal(reg, live2, "failed");
         add(reg, makeJob({ id: "j3", status: "running" }));
 
         const s = getStats(reg);
@@ -184,7 +183,7 @@ void describe("killProcessTree + processExists 안전성", () => {
     });
 });
 
-void describe("add/forget 라이프사이클", () => {
+void describe("add/sweep lifecycle", () => {
     void it("중복 add는 멱등하지 않음 (counter 누적)", () => {
         const reg = new BackgroundRegistry();
         const job = makeJob({ id: "j1" });
@@ -193,11 +192,13 @@ void describe("add/forget 라이프사이클", () => {
         assert.equal(reg.totalStarted, 2);
         assert.equal(reg.jobs.size, 1);
     });
-    void it("forget 후 동일 ID 재등록 가능", () => {
+    void it("an expired ID can be re-registered", () => {
         const reg = new BackgroundRegistry();
-        const j = makeJob({ id: "j1" });
+        const j = makeJob({ id: "j1", status: "running", isBackgrounded: true });
         add(reg, j);
-        forget(reg, j);
+        markTerminal(reg, j, "completed");
+        j.endedAt = 0;
+        sweepTerminal(reg);
         const j2 = makeJob({ id: "j1", status: "running" });
         add(reg, j2);
         assert.equal(reg.jobs.size, 1);

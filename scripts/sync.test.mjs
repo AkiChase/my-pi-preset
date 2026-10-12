@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -632,5 +632,250 @@ for (const name of ["sub/dir.json", "../escape.json", "notjson", ".hidden.json"]
   assert.match(stderr, /nothing selected/);
   console.log("PASS --sync none does nothing");
 }
+
+// ---------------------------------------------------------------------------
+// Local development source switching (stateful mock, no real pi or network)
+// ---------------------------------------------------------------------------
+
+const SELF = "git:github.com/AkiChase/my-pi-preset";
+const REMOTE_VARIANTS = [
+  SELF,
+  `${SELF}@v1.2.0`,
+  "git:git@github.com:AkiChase/my-pi-preset.git@main",
+  "https://github.com/AkiChase/my-pi-preset.git",
+  "ssh://git@github.com/AkiChase/my-pi-preset.git@main",
+];
+const STATEFUL_PI = `#!/usr/bin/env node
+import { readFileSync, writeFileSync, appendFileSync } from "node:fs";
+const args = process.argv.slice(2);
+appendFileSync(process.env.PI_CALLS_FILE, JSON.stringify(args) + "\\n");
+const file = process.env.PI_STATE_FILE;
+const settings = JSON.parse(readFileSync(file, "utf8"));
+if (args[0] === "--version") console.log("test-pi");
+else if (args[0] === "list") {
+  console.log("User packages:");
+  for (const source of settings.packages ?? []) {
+    console.log("  " + source);
+    console.log("    " + (source.startsWith("/") ? source : process.env.PI_REMOTE_PATH || "/mock/installed"));
+  }
+  console.log("Project packages:");
+  console.log("  " + process.env.PI_PROJECT_SOURCE);
+  console.log("    /mock/project");
+} else {
+  if (args[0] === "remove" && args[1] === process.env.PI_FAIL_REMOVE) process.exit(7);
+  if (args[0] === "remove") settings.packages = settings.packages.filter(source => source !== args[1]);
+  else if (args[0] === "install" && !settings.packages.includes(args[1])) settings.packages.push(args[1]);
+  writeFileSync(file, JSON.stringify(settings));
+}
+`;
+
+function withCheckout(check, { pkg, git = true, downloaded = false, manifest } = {}) {
+  const box = realpathSync(mkdtempSync(join(tmpdir(), "sync-dev-test-")));
+  const root = join(box, "checkout with spaces");
+  const agentDir = join(box, "agent");
+  const pi = join(box, "mock-pi.mjs");
+  const callsFile = join(box, "calls.jsonl");
+  mkdirSync(join(root, "scripts"), { recursive: true });
+  mkdirSync(join(root, "extensions"));
+  mkdirSync(agentDir);
+  if (git) mkdirSync(join(root, ".git"));
+  cpSync(syncScript, join(root, "scripts", "sync.mjs"));
+  cpSync(resolve(scriptDir, "..", "install.sh"), join(root, "install.sh"));
+  const manifestPath = join(root, "pi-preset.json");
+  const manifestText = JSON.stringify(manifest ?? {
+    packages: { [SELF]: "latest", "npm:pi-session-name": "latest", "git:github.com/example/third-party": "latest" },
+    conflicts: ["npm:bundled"],
+    settings: { retry: { maxRetries: 5 } },
+    keybindings: { "tui.editor.jumpForward": [] },
+    files: { "pi-input-history.json": { searchShortcut: "alt+r" } },
+    preserve: { settings: ["theme"] },
+  });
+  writeFileSync(manifestPath, manifestText);
+  writeFileSync(join(root, "package.json"), JSON.stringify(pkg ?? { name: "my-pi-preset", pi: { extensions: ["extensions/*.ts"] } }));
+  writeFileSync(pi, STATEFUL_PI);
+  chmodSync(pi, 0o755);
+  const settingsFile = join(agentDir, "settings.json");
+  const seed = (packages) => writeFileSync(settingsFile, JSON.stringify({ packages, theme: "dark" }));
+  seed([]);
+  const execute = (args = [], { installer = false, stdin = false, cwd = box, extraEnv = {} } = {}) => {
+    writeFileSync(callsFile, "");
+    const script = downloaded ? join(box, "sync.mjs") : join(root, "scripts", "sync.mjs");
+    if (downloaded) cpSync(syncScript, script);
+    const command = installer ? "sh" : process.execPath;
+    const commandArgs = installer
+      ? stdin ? ["-s", "--", ...args] : [join(root, "install.sh"), ...args]
+      : [script, "--manifest", manifestPath, ...args];
+    const result = spawnSync(command, commandArgs, {
+      encoding: "utf8",
+      cwd, // By default cwd is outside the checkout; --dev must use the script's root.
+      input: stdin ? readFileSync(join(root, "install.sh"), "utf8") : undefined,
+      env: {
+        ...process.env,
+        PI_BIN: pi,
+        PI_CODING_AGENT_DIR: agentDir,
+        PI_CALLS_FILE: callsFile,
+        PI_STATE_FILE: settingsFile,
+        PI_PROJECT_SOURCE: root,
+        ...extraEnv,
+      },
+    });
+    const calls = readFileSync(callsFile, "utf8").trim().split("\n").filter(Boolean).map(line => JSON.parse(line));
+    return { ...result, calls, actions: calls.filter(([action]) => action !== "list" && action !== "--version") };
+  };
+  try {
+    check({ root, execute, seed, settingsFile, agentDir, manifestPath, manifestText });
+  } finally {
+    rmSync(box, { recursive: true, force: true });
+  }
+}
+
+// All installed git spellings/refs of this repo must be removed before install,
+// but unrelated npm/git sources still use their original update behavior.
+for (const remote of REMOTE_VARIANTS) {
+  withCheckout(({ root, execute, seed, settingsFile, manifestPath, manifestText }) => {
+    seed([remote, "npm:pi-session-name", "git:github.com/example/third-party", OTHER]);
+    const result = execute(["--dev"], { installer: true });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(result.actions, [
+      ["remove", remote], ["install", root], ["update", "npm:pi-session-name"], ["update", "git:github.com/example/third-party"],
+    ]);
+    assert.equal(readFileSync(manifestPath, "utf8"), manifestText);
+    assert.deepEqual(JSON.parse(readFileSync(settingsFile, "utf8")), {
+      packages: ["npm:pi-session-name", "git:github.com/example/third-party", OTHER, root], theme: "dark", retry: { maxRetries: 5 },
+    });
+    const repeated = execute(["--dev", "--sync", "packages"]);
+    assert.equal(repeated.status, 0, repeated.stderr);
+    assert.deepEqual(repeated.actions, [["update", "npm:pi-session-name"], ["update", "git:github.com/example/third-party"]]);
+    assert.match(repeated.stderr, /local checkout; loaded in place/);
+  });
+}
+console.log("PASS --dev switches git spellings/refs to a space-containing checkout and is repeatable");
+
+// Switching back is also explicit in merge mode. Source-switch removals alone
+// move earlier; bundled conflicts and prune removals keep their old order.
+withCheckout(({ root, execute, seed }) => {
+  seed([root, "npm:pi-session-name", "git:github.com/example/third-party", "npm:bundled", OTHER]);
+  const result = execute(["--sync", "packages", "--prune", "packages"], { installer: true });
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.actions, [
+    ["remove", root], ["install", SELF], ["update", "npm:pi-session-name"], ["update", "git:github.com/example/third-party"],
+    ["remove", "npm:bundled"], ["remove", OTHER],
+  ]);
+  assert.deepEqual(execute(["--sync", "packages"]).actions, [
+    ["update", SELF], ["update", "npm:pi-session-name"], ["update", "git:github.com/example/third-party"],
+  ]);
+});
+console.log("PASS normal install switches back to remote, repeats, and preserves third-party/prune order");
+
+for (const dev of [true, false]) {
+  withCheckout(({ root, execute, seed }) => {
+    seed([root, ...REMOTE_VARIANTS]);
+    const result = execute([...(dev ? ["--dev"] : []), "--sync", "packages"]);
+    assert.equal(result.status, 0, result.stderr);
+    const removals = result.actions.filter(([action]) => action === "remove");
+    assert.deepEqual(removals, (dev ? REMOTE_VARIANTS : [root]).map(source => ["remove", source]));
+    assert.equal(result.actions.some(([action, source]) => action === "install" && source === root), false);
+    assert.equal(result.actions.some(([action, source]) => action === "update" && source === root), false);
+  });
+}
+console.log("PASS both sources installed removes only the opposite source without updating local code");
+
+for (const dev of [true, false]) {
+  withCheckout(({ root, execute, seed, settingsFile, agentDir }) => {
+    const opposite = dev ? SELF : root;
+    seed([opposite]);
+    const before = readFileSync(settingsFile, "utf8");
+    const result = execute(dev ? ["--dev"] : [], { extraEnv: { PI_FAIL_REMOVE: opposite } });
+    assert.equal(result.status, 1);
+    assert.deepEqual(result.actions, [["remove", opposite]]);
+    assert.match(result.stderr, /source switch aborted/);
+    assert.equal(readFileSync(settingsFile, "utf8"), before);
+    assert.deepEqual(readdirSync(agentDir), ["settings.json"]);
+  });
+}
+console.log("PASS failed source removal aborts before installing packages or writing configs");
+
+for (const dev of [true, false]) {
+  withCheckout(({ root, execute, seed, settingsFile, agentDir, manifestPath, manifestText }) => {
+    seed([dev ? SELF : root]);
+    const before = readFileSync(settingsFile, "utf8");
+    const result = execute([...(dev ? ["--dev"] : []), "--dry-run"], { installer: true });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(result.actions, []);
+    assert.equal(readFileSync(settingsFile, "utf8"), before);
+    assert.deepEqual(readdirSync(agentDir), ["settings.json"]);
+    assert.equal(readFileSync(manifestPath, "utf8"), manifestText);
+    assert.match(result.stderr, /switch this repo between remote and dev sources/);
+  });
+}
+console.log("PASS source switching dry-run performs no package actions or writes");
+
+for (const dev of [true, false]) {
+  for (const domain of ["settings", "keybindings", "files", "none"]) {
+    withCheckout(({ root, execute, seed, settingsFile }) => {
+      seed([root, SELF]);
+      const result = execute([...(dev ? ["--dev"] : []), "--sync", domain]);
+      assert.equal(result.status, 0, result.stderr);
+      assert.deepEqual(result.calls, []);
+      assert.deepEqual(JSON.parse(readFileSync(settingsFile, "utf8")).packages, [root, SELF]);
+    });
+  }
+}
+console.log("PASS unselected package domain never lists, installs, removes or switches sources");
+
+// A different local checkout must stay untouched: local and git identities
+// must not become global aliases merely because --dev knows this repository.
+withCheckout(({ root, execute, seed }) => {
+  const otherCheckout = `${root}-other`;
+  seed([SELF, otherCheckout]);
+  const result = execute(["--dev", "--sync", "packages"]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.actions, [
+    ["remove", SELF], ["install", root], ["install", "npm:pi-session-name"], ["install", "git:github.com/example/third-party"],
+  ]);
+  assert.match(result.stderr, /other.*merge mode/);
+});
+console.log("PASS dev override does not alias unrelated local checkouts");
+
+withCheckout(({ root, execute, seed }) => {
+  seed([SELF]);
+  const result = execute(["--dev", "--sync", "packages"], { extraEnv: { PI_REMOTE_PATH: root } });
+  assert.equal(result.status, 1);
+  assert.deepEqual(result.actions, []);
+  assert.match(result.stderr, /cannot use pi's managed git checkout/);
+});
+console.log("PASS --dev refuses to remove the checkout it would load as a local package");
+
+for (const options of [
+  { downloaded: true },
+  { git: false },
+  { pkg: { name: "other-package", pi: { extensions: ["extensions/*.ts"] } } },
+  { pkg: { name: "my-pi-preset" } },
+  { pkg: { name: "my-pi-preset", pi: { extensions: ["extensions"] } } },
+  { manifest: { packages: ONE } },
+  { manifest: { packages: { [SELF]: "latest", [`${SELF}.git`]: "main" } } },
+  { manifest: { packages: { [SELF]: "latest", "./local-thing": "latest" } } },
+]) {
+  withCheckout(({ execute }) => {
+    const result = execute(["--dev"]);
+    assert.equal(result.status, 1, result.stderr);
+    assert.deepEqual(result.calls, []);
+    assert.match(result.stderr, /requires|unsupported source/);
+  }, options);
+}
+console.log("PASS --dev rejects downloaded scripts, invalid checkouts/manifests and manifest local sources");
+
+// stdin has no installer path even if the shell happens to start inside the
+// checkout. Do not mistake dirname("sh") or dirname("-s") for a local script.
+withCheckout(({ root, execute }) => {
+  for (const cwd of [undefined, root]) {
+    const result = execute(["--dev"], { installer: true, stdin: true, ...(cwd ? { cwd } : {}) });
+    assert.equal(result.status, 1);
+    assert.deepEqual(result.calls, []);
+    assert.match(result.stderr, /--dev requires a local/);
+    assert.doesNotMatch(result.stdout, /downloading/);
+  }
+});
+console.log("PASS piped installer rejects --dev before downloading or running pi");
 
 console.log("\nAll sync checks passed.");

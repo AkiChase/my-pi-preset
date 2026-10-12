@@ -7,7 +7,6 @@
  *   - kill: terminate a job
  *   - attach: follow a job's live output and wait for it to finish
  *   - search: regex-search job output, optionally scoped to one job
- *   - cleanup: purge terminal jobs
  *   - stats: aggregate metrics
  */
 
@@ -23,11 +22,8 @@ import {
 } from "../types.ts";
 import { processExists } from "../spawn.ts";
 import {
-    cleanupTerminal,
     findJob,
-    forget,
     getStats,
-    readLogTail,
     renderSidebar,
 } from "../registry.ts";
 import { formatDuration, formatJobLine, jobLabel, oneLine, textBlock } from "../format.ts";
@@ -35,6 +31,7 @@ import { readLogSlice, streamLog } from "../output.ts";
 import { searchLogs, type LogSearchHit } from "../log-search.ts";
 import { markOutcomeSurfaced } from "../notify.ts";
 import {
+    abortJob,
     ensureCompletionPromise,
     markTerminal,
     terminateJobSilently,
@@ -49,7 +46,7 @@ export function registerJobsTool(
         name: "jobs",
         label: "Background Jobs",
         description:
-            "Manage background jobs: list, output, kill, attach, search, cleanup, and stats.",
+            "Manage background jobs: list, output, kill, attach, search, and stats.",
         promptSnippet: "Inspect and manage background jobs",
         promptGuidelines: [
             "list: show all jobs",
@@ -57,7 +54,6 @@ export function registerJobsTool(
             "kill: terminate a job",
             "attach: follow a job's live output and wait for it to finish (use output for a non-blocking peek)",
             "search: regex-search job output. Narrow to one job with jobId, match case-insensitively with ignoreCase, and see surrounding lines with context.",
-            "cleanup: purge terminal jobs",
             "stats: show aggregate metrics",
             "Completion notices for a failed job already inline the tail of its log — do NOT call 'output' just to learn why it failed. Call 'output' when that tail is truncated and you need more, or when a job's full output is the deliverable (e.g. a test report you must relay). Never call it merely to acknowledge a completed job.",
         ],
@@ -69,7 +65,6 @@ export function registerJobsTool(
                     "kill",
                     "attach",
                     "search",
-                    "cleanup",
                     "stats",
                 ] as const,
                 { description: "Action to perform" }
@@ -116,7 +111,7 @@ export function registerJobsTool(
 
         async execute(_toolCallId, params, signal, onUpdate, ctx): Promise<AgentToolResult<undefined>> {
             const p = params as {
-                action: "list" | "output" | "kill" | "attach" | "search" | "cleanup" | "stats";
+                action: "list" | "output" | "kill" | "attach" | "search" | "stats";
                 jobId?: string;
                 pattern?: string;
                 wait?: boolean;
@@ -143,8 +138,6 @@ export function registerJobsTool(
                         ignoreCase: p.ignoreCase ?? false,
                         contextLines: p.context ?? 0,
                     });
-                case "cleanup":
-                    return cleanupAction(reg, ctx);
                 case "stats":
                     return statsAction(reg);
             }
@@ -159,7 +152,7 @@ export function registerJobsTool(
  * the omission surface as whatever the downstream lookup happened to say —
  * `No task found with ID: undefined` for output, a TypeError for others. The
  * schema cannot express "required for these actions only" (it is one flat
- * object shared by all seven), so the check belongs here, named.
+ * object shared by all six), so the check belongs here, named.
  */
 function required<T>(value: T | undefined, name: string, action: string): T {
     if (value === undefined || value === "") {
@@ -171,26 +164,8 @@ function required<T>(value: T | undefined, name: string, action: string): T {
 // ─── list: show all jobs ─────────────────────────────────────────────────
 
 function listAction(reg: BackgroundRegistry): AgentToolResult<undefined> {
-    // Lazy eviction sweep: terminal jobs whose outcome already reached the
-    // agent (a <task-notification>, a kill, or a read) leave the live registry
-    // here. Their output logs stay on disk.
-    for (const job of Array.from(reg.jobs.values())) {
-        if (isTerminalStatus(job.status) && job.outcomeSurfaced) forget(reg, job);
-    }
     const live = Array.from(reg.jobs.values());
-    const running = live.filter((j) => j.status === "running");
-    // Terminal jobs still in the registry are the ones nobody has been told
-    // about: `notify: false`, or a notification whose send threw. Upstream
-    // listed neither running-only nor recent-terminal covered them, so a
-    // silently-failed job was invisible everywhere — which is the one case
-    // where listing it matters most.
-    const unreported = live.filter((j) => isTerminalStatus(j.status));
-    const recent = reg.recentTerminal.slice(-5).reverse();
-    const lines = [
-        ...running.map((j) => formatJobLine(j)),
-        ...unreported.map((j) => formatJobLine(j)),
-        ...recent.map((j) => formatJobLine(j)),
-    ];
+    const lines = live.sort((a, b) => b.startTime - a.startTime).map(formatJobLine);
     return {
         content: [
             textBlock(
@@ -301,7 +276,9 @@ async function attachAction(
 
         // Bail early if the OS process already died.
         if (job.pid > 0 && !processExists(job.pid)) {
-            markTerminal(job, "failed");
+            markTerminal(reg, job, "failed");
+            abortJob(reg, job.id);
+            renderSidebar(reg, ctx);
         }
 
         onUpdate?.({
@@ -387,7 +364,7 @@ async function searchAction(
         jobs = [job];
         scope = jobLabel(job);
     } else {
-        jobs = [...Array.from(reg.jobs.values()), ...reg.recentTerminal];
+        jobs = Array.from(reg.jobs.values());
         scope = "any job log";
     }
 
@@ -445,25 +422,6 @@ function formatHit(hit: LogSearchHit): string {
     return rows.join("\n");
 }
 
-// ─── cleanup ─────────────────────────────────────────────────────────────
-
-function cleanupAction(
-    reg: BackgroundRegistry,
-    ctx: UiContext
-): AgentToolResult<undefined> {
-    const { purged, bytesReclaimed } = cleanupTerminal(reg);
-    renderSidebar(reg, ctx);
-    const kb = Math.round(bytesReclaimed / 1024);
-    return {
-        content: [
-            textBlock(
-                `Cleaned up ${purged} terminal job(s). Reclaimed ${kb} KiB of disk.`
-            ),
-        ],
-        details: undefined,
-    };
-}
-
 // ─── stats ───────────────────────────────────────────────────────────────
 
 function statsAction(reg: BackgroundRegistry): AgentToolResult<undefined> {
@@ -478,7 +436,6 @@ function statsAction(reg: BackgroundRegistry): AgentToolResult<undefined> {
         ["Completed", String(s.completed)],
         ["Failed", String(s.failed)],
         ["Killed", String(s.killed)],
-        ["Recent terminal", String(s.recentTerminal)],
         ["Average duration", formatDuration(s.averageDurationMs)],
         ["Total elapsed", formatDuration(s.totalDurationMs)],
     ];

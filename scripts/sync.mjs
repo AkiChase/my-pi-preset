@@ -16,10 +16,10 @@
 //                    it does not declare are removed.
 //
 // Usage:
-//   node scripts/sync.mjs [--manifest <path>] [--sync <domains>] [--prune [<domains>]] [--dry-run]
+//   node scripts/sync.mjs [--manifest <path>] [--dev] [--sync <domains>] [--prune [<domains>]] [--dry-run]
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, rmdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, rmdirSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,6 +30,7 @@ const ANSI = /\u001B\[[0-9;]*m/g;
 const COMMAND_TIMEOUT_MS = 10 * 60 * 1000;
 
 const DOMAINS = ["packages", "settings", "keybindings", "files"];
+const SELF_IDENTITY = "git:github.com/akichase/my-pi-preset";
 
 // pi owns these two keys in settings.json: `packages` is maintained by
 // `pi install` / `pi remove`, `lastChangelogVersion` is pi's own state. They
@@ -365,6 +366,43 @@ function readManifest(path) {
   return { desired: entries, conflicts, declaredSettings, declaredKeybindings, declaredFiles, preserve };
 }
 
+// The local override is deliberately outside readManifest: arbitrary local
+// sources in a published manifest must remain invalid. Derive the root from
+// this script, not cwd or --manifest, so a downloaded script cannot register
+// its temporary directory as a package.
+function checkoutRoot() {
+  const root = resolve(dirname(realpathSync(fileURLToPath(import.meta.url))), "..");
+  try {
+    const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+    if (
+      pkg.name !== "my-pi-preset" ||
+      !isPlainObject(pkg.pi) ||
+      !Array.isArray(pkg.pi.extensions) ||
+      !pkg.pi.extensions.includes("extensions/*.ts") ||
+      !existsSync(join(root, ".git")) ||
+      !statSync(join(root, "extensions")).isDirectory() ||
+      !statSync(join(root, "install.sh")).isFile() ||
+      !statSync(join(root, "pi-preset.json")).isFile()
+    ) return undefined;
+    return root;
+  } catch {
+    return undefined;
+  }
+}
+
+function selfPackageMode(manifest, dev) {
+  const root = checkoutRoot();
+  if (dev && !root) fail("--dev requires a local my-pi-preset git checkout with package.json and its pi manifest");
+  const selfEntries = manifest.desired.filter((source) => identityOf(source) === SELF_IDENTITY);
+  if (dev && selfEntries.length !== 1) fail("--dev requires exactly one my-pi-preset git source in packages");
+  if (!root || selfEntries.length !== 1) return undefined;
+  if (dev) {
+    manifest.desired = manifest.desired.map((source) => source === selfEntries[0] ? root : source);
+    info(`dev source: ${root} (third-party sources unchanged)`);
+  }
+  return { root, dev };
+}
+
 // "npm:@scope/name@1.2.3" -> { name: "@scope/name", version: "1.2.3" }
 function parseNpmSpec(spec) {
   const match = spec.match(/^(@?[^@]+(?:\/[^@]+)?)(?:@(.+))?$/);
@@ -454,10 +492,29 @@ function readInstalled() {
   return entries;
 }
 
-function buildPackagePlan(desired, installed, prune, conflicts) {
-  const byIdentity = new Map(installed.map((entry) => [identityOf(entry.source), entry]));
+function buildPackagePlan(desired, installed, prune, conflicts, selfMode) {
   const steps = [];
   const claimed = new Set();
+  const switchedSources = new Set();
+
+  // Git and local paths have distinct pi identities. Remove only the opposite
+  // source for this checkout, even in merge mode, before installing the desired
+  // one; otherwise both copies register the same tools during /reload.
+  for (const entry of installed) {
+    const opposite = selfMode && (selfMode.dev ? SELF_IDENTITY : identityOf(selfMode.root));
+    if (!opposite || identityOf(entry.source) !== opposite) continue;
+    // pi remove deletes a managed git checkout. Running --dev inside that
+    // checkout would delete the very local package we are about to register.
+    if (selfMode.dev && entry.installedPath && resolve(entry.installedPath) === selfMode.root) {
+      fail("--dev cannot use pi's managed git checkout; clone the repo into a separate working directory first");
+    }
+    switchedSources.add(entry.source);
+    steps.push({
+      domain: "packages", action: "remove", target: entry.source, beforeInstall: true,
+      reason: "switch this repo between remote and dev sources",
+    });
+  }
+  const byIdentity = new Map(installed.filter((entry) => !switchedSources.has(entry.source)).map((entry) => [identityOf(entry.source), entry]));
 
   // Packages this repo bundles as its own npm dependencies and loads itself. Leaving
   // them installed as pi packages registers their tools twice, which pi rejects as a
@@ -466,7 +523,7 @@ function buildPackagePlan(desired, installed, prune, conflicts) {
   const removedAsConflict = new Set();
   for (const entry of installed) {
     const identity = identityOf(entry.source);
-    if (!conflicting.has(identity)) continue;
+    if (!conflicting.has(identity) || switchedSources.has(entry.source)) continue;
     removedAsConflict.add(identity);
     steps.push({ domain: "packages", action: "remove", target: entry.source, reason: "bundled by this repo; must not be a pi package" });
   }
@@ -478,6 +535,10 @@ function buildPackagePlan(desired, installed, prune, conflicts) {
 
     if (!existing) {
       steps.push({ domain: "packages", action: "install", target: source, reason: "not installed" });
+    } else if (selfMode?.dev && source === selfMode.root) {
+      // pi 1.1.0 loads local directories in place without installing dependencies
+      // or updating them. pnpm install and edits belong to the checkout owner.
+      steps.push({ domain: "packages", action: "keep", target: source, reason: "local checkout; loaded in place" });
     } else if (existing.source !== source) {
       steps.push({ domain: "packages", action: "install", target: source, reason: `different version: ${existing.source}` });
     } else if (!existing.installedPath) {
@@ -491,7 +552,7 @@ function buildPackagePlan(desired, installed, prune, conflicts) {
 
   for (const entry of installed) {
     const identity = identityOf(entry.source);
-    if (claimed.has(identity) || removedAsConflict.has(identity)) continue;
+    if (claimed.has(identity) || removedAsConflict.has(identity) || switchedSources.has(entry.source)) continue;
     steps.push(
       prune
         ? { domain: "packages", action: "remove", target: entry.source, reason: "not in manifest" }
@@ -742,6 +803,7 @@ const { values } = parseArgs({
   args: expandBarePrune(process.argv.slice(2)),
   options: {
     manifest: { type: "string" },
+    dev: { type: "boolean", default: false },
     sync: { type: "string" },
     prune: { type: "string" },
     "dry-run": { type: "boolean", default: false },
@@ -757,6 +819,8 @@ if (values.help) {
                       (default: all)
   --prune [<domains>] Domains the manifest owns completely; bare --prune, or --prune all,
                       means every domain --sync selected (default: none)
+  --dev               Load this repo from the executing script's git checkout; third-party
+                      packages remain remote. Requires a local checkout.
   --dry-run           Print the plan without changing anything
 
 In a synced domain not listed in --prune, only declared entries are touched;
@@ -781,6 +845,7 @@ const settingsFile = join(agentDir, "settings.json");
 const keybindingsFile = join(agentDir, "keybindings.json");
 
 const manifest = readManifest(manifestPath);
+const selfMode = selfPackageMode(manifest, values.dev);
 
 const installed = syncDomains.has("packages") ? readInstalled() : [];
 const currentSettings = syncDomains.has("settings") ? readJsonFile(settingsFile, "settings") : {};
@@ -797,7 +862,7 @@ step("comparing manifest with this machine");
 const plan = [];
 
 if (syncDomains.has("packages")) {
-  plan.push(...buildPackagePlan(manifest.desired, installed, pruneDomains.has("packages"), manifest.conflicts));
+  plan.push(...buildPackagePlan(manifest.desired, installed, pruneDomains.has("packages"), manifest.conflicts, selfMode));
 }
 
 if (syncDomains.has("settings")) {
@@ -901,10 +966,20 @@ console.error("");
 const failures = [];
 stepNumber = 0;
 
+// Source-switch removals are a prerequisite, not ordinary prune removals. A
+// failed removal must abort before any install (or config write), rather than
+// leaving both copies registered. Unrelated steps keep their original order.
+for (const entry of packageSteps.filter((candidate) => candidate.beforeInstall)) {
+  step(`remove ${entry.target}`, totalSteps);
+  const message = runPi("remove", entry.target);
+  if (message) fail(`source switch aborted: ${message}; no packages were installed`);
+  info("ok");
+}
+
 // Packages go first: `pi install` writes settings.json, and the config writes
 // below re-read the file afterwards.
 for (const action of ["install", "update", "remove"]) {
-  for (const entry of packageSteps.filter((candidate) => candidate.action === action)) {
+  for (const entry of packageSteps.filter((candidate) => candidate.action === action && !candidate.beforeInstall)) {
     step(`${action} ${entry.target}`, totalSteps);
     const message = runPi(action, entry.target);
     if (message) {

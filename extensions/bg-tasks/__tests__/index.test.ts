@@ -105,6 +105,20 @@ void describe("session_start — registry is born empty (no revival)", () => {
         assert.equal(res.content[0].text, "No background jobs");
         assert.equal(h.appendedEntries.length, 0, "no state snapshot is written");
     });
+    void it("session replacement stops old tasks and starts an empty registry", async () => {
+        const h = startExtension();
+        await h.handlers.get("session_start")!({}, {});
+        const bash = h.tools.get("bash")!;
+        await bash.execute("switch-test", { command: WATCH_CMD, run_in_background: true }, undefined, undefined, uiCtx);
+        assert.ok(liveMarkedProcesses() > 0);
+        await h.handlers.get("session_start")!({ reason: "new" }, uiCtx);
+        await sleep(200);
+        const list = await h.tools.get("jobs")!.execute("new-list", { action: "list" }, undefined, undefined, uiCtx);
+        assert.equal(list.content[0].text, "No background jobs");
+        assert.equal(liveMarkedProcesses(), 0);
+        assert.equal(h.messages.filter((m) => m.customType === EVENT.taskNotification).length, 0);
+        await h.handlers.get("session_shutdown")!({}, {});
+    });
 });
 
 void describe("session_shutdown — kills running tasks on ANY reason", () => {

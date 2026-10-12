@@ -8,7 +8,7 @@
 - 同步：[`install.sh`](install.sh) 和 [`scripts/sync.mjs`](scripts/sync.mjs)，负责把本机状态对齐到清单
 - 扩展：[`extensions/`](extensions)，本仓库自带的四个扩展，pi 安装本仓库时会自动发现
 
-本仓库自己也是清单里的一条（`git:github.com/AkiChase/my-pi-preset`），和其他包一样被 pi 管理和更新。
+本仓库自己也是清单里的一条（`git:github.com/AkiChase/my-pi-preset`），默认和其他包一样从远程安装、被 pi 管理和更新。本地开发可用 `./install.sh --dev` 只把本仓库切换为当前检出，第三方包仍按清单使用远程来源。
 
 ## 安装
 
@@ -32,6 +32,24 @@ curl -fsSL https://raw.githubusercontent.com/AkiChase/my-pi-preset/main/install.
 
 前提是机器上有 `pi`、`node`、`curl`。装完后在 pi 里 `/reload`，或者重启 pi。
 
+### 测试本地修改
+
+普通 `./install.sh` 即使用了本地清单，装的仍是远程版；未提交、未推送的扩展修改不会被加载。想直接测试当前检出：
+
+```sh
+pnpm install               # 先装本地运行时和开发依赖；pi 不会替本地包装依赖
+./install.sh --dev --dry-run
+./install.sh --dev
+```
+
+然后在 pi 里执行 `/reload`，用 `/bg-version` 确认路径指向当前检出的 `extensions/bg-tasks`，而不是 `~/.pi/agent/git/`。没有构建或复制步骤，改本地文件后再 `/reload` 即可。
+
+`--dev` 的路径取自执行的 `scripts/sync.mjs` 所在的 git 检出，不取当前工作目录；带空格的路径也支持。它只在内存中替换本仓库的来源，**不改 `pi-preset.json`**。第三方包、配置、域选择和 prune 的语义都不变。切换时会先移除用户级远程注册（包括不同 URL 写法和 ref），再注册本地绝对路径；两份已同时存在时只移除相反来源。本地已经注册则保留，不调 `pi update`。
+
+测试完，在同一个检出执行普通 `./install.sh`，会先移除这个检出的本地注册，再安装或更新清单里的远程版；随后 `/reload`。任一来源切换的移除失败都会中止，避免继续安装造成重复工具注册。切换只在 `packages` 域被选中时发生；`--sync settings` / `--sync none` 不会切换来源，`--dry-run` 不执行安装、更新、移除或配置写入。
+
+`--dev` 必须从本仓库完整的独立 git 检出执行；不要在 pi 管理的 `~/.pi/agent/git/` 克隆中使用，否则移除远程来源会删掉当前检出，脚本会拒绝这种切换。下载的单文件或 `curl | sh` 也不支持，脚本会报错而不是把临时目录装进去。脚本仍只管用户级包，不修改项目 `.pi/`，也不会移除另一条本地检出路径；如手动安装过这些来源，需自行检查重复注册。
+
 清单文件从 `pi-packages.json` 改名成了 `pi-preset.json`。本地还是老检出、或者手里存了老 `install.sh` 的机器上，它会去下一个已经不存在的文件并报 `could not download pi-packages.json`；`git pull` 或者重跑上面那条 curl 命令即可。
 
 ### 命令行选项
@@ -42,10 +60,12 @@ curl -fsSL https://raw.githubusercontent.com/AkiChase/my-pi-preset/main/install.
 | --- | --- |
 | `--sync <域>` | 要对齐哪些域，逗号分隔，可写 `all` / `none`，默认 `all` |
 | `--prune [<域>]` | 哪些域完全以清单为准，默认 `none`；裸写 `--prune` 或 `--prune all` 等于「`--sync` 选中的全部域」 |
+| `--dev` | 只把本仓库替换为执行脚本所在 git 检出的绝对路径，第三方包仍用远程；只在同步 `packages` 时切换 |
 | `--dry-run` | 只打印计划，不做任何改动 |
 
 ```sh
-./install.sh                             # 四个域全同步，全 merge
+./install.sh                             # 四个域全同步，全 merge；本仓库用远程
+./install.sh --dev                       # 本仓库用当前检出，第三方包仍用远程
 ./install.sh --sync settings             # 只对齐设置，不碰包
 ./install.sh --prune packages            # 包以清单为准，配置仍是 merge
 ./install.sh --prune                     # 四个域都以清单为准
@@ -54,7 +74,7 @@ curl -fsSL https://raw.githubusercontent.com/AkiChase/my-pi-preset/main/install.
 
 两种模式：
 
-- **merge**（默认）：只对齐清单声明的那些条目，清单没提的一律不动。某台机器上临时 `pi install` 的包会保留，手改的其它设置键也会保留。
+- **merge**（默认）：只对齐清单声明的那些条目，清单没提的一律不动（`conflicts` 和本仓库 dev/远程来源切换除外，避免重复注册）。某台机器上临时 `pi install` 的包会保留，手改的其它设置键也会保留。
 - **prune**：那个域里清单就是全集 —— 没声明的包卸掉、没声明的设置键和键位删掉；`files` 域下则把声明过的文件当全集，没声明的键删掉（没声明过的文件仍然一个字也不碰）。例外是 `preserve` 白名单和 pi 自己维护的 `packages` / `lastChangelogVersion`，细节见 [声明设置和键位](#声明设置和键位)。
 
 `--prune` 里写了 `--sync` 没选的域会直接报错，不会静默忽略。脚本只管用户级的包和 agent 目录下的配置，项目 `.pi/` 里的东西不受影响。
@@ -95,7 +115,7 @@ pi 里只有一个本仓库自带的命令：`/statusbar`，在自定义状态�
 
 前七个是普通依赖，由 pi 从 npm 安装，来源写在 [`pi-preset.json`](pi-preset.json) 的 `packages` 里，本仓库不动它们的代码。
 
-后两个（patty 和 pretty）比较特殊：它们以本仓库 npm 依赖的形式引入（见 [`package.json`](package.json)），由 `extensions/bash-unified.ts` 亲自加载，所以也被写进了清单的 `conflicts`，**不能**再当成普通 pi 包安装。否则 `bash` 这个工具会被注册两次，pi 直接报冲突、启动失败。
+后两个（patty 和 pretty）比较特殊：patty 已拷贝为本仓库的代码，pretty 是本仓库的 npm 运行时依赖（见 [`package.json`](package.json)）；两者由 `extensions/bash-unified.ts` 亲自加载，所以也被写进了清单的 `conflicts`，**不能**再当成普通 pi 包安装。否则 `bash` 这个工具会被注册两次，pi 直接报冲突、启动失败。
 
 除了包，清单还声明了两类本机配置：pi 本体的几个偏好 —— 失败重试次数 `retry.maxRetries: 5`，以及把被扩展抢走的内置键 `tui.editor.jumpForward`（`ctrl+]`）禁掉；以及 `pi-input-history` 的搜索键 `searchShortcut: "alt+r"`。格式和语义见 [声明设置和键位](#声明设置和键位)，键位那条的来由见 [键位冲突](#键位冲突)。
 
@@ -229,13 +249,31 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 
 > 来源：[npm](https://www.npmjs.com/package/pi-patty-bg-tasks) · [GitHub](https://github.com/patty-io/pi-patty-bg-tasks)
 
-把 Claude Code 的后台任务体验搬到 pi：长命令不再卡住会话。它覆盖内置 `bash`，跑超过 120 秒的命令自动转入后台，并提供整套作业管理。作业状态写进 session 条目，重开会话能恢复还在跑的作业；退出 pi 时统一清理。
+把 Claude Code 的后台任务体验搬到 pi：长命令不再卡住会话。本仓库使用的是一次性拷贝后独立修改的 fork（来源见 [`PROVENANCE.md`](extensions/bg-tasks/PROVENANCE.md)），不是 npm 包依赖。它覆盖内置 `bash`，跑超过 120 秒的命令自动转入后台。注册表只属于当前会话，不持久化、不恢复进程；退出 pi 或切换会话时停止运行中的任务，后台日志保留在磁盘。
 
 **提供**：
 
-- 工具：`bash`（覆盖内置，新增 `run_in_background`、`timeout`、`description` 参数）、`bash_bg`（直接后台启动）、`jobs`（list / output / kill / attach / search / cleanup / stats；output 支持按字节 offset 翻页读大日志，search 支持限定单任务、忽略大小写、上下文行）、`monitor`（按事件流监听命令输出或 WebSocket）。日志默认落在 `/tmp/pi-bg/<jobId>.log`。
+- 工具：`bash`（覆盖内置，新增 `run_in_background`、`timeout`、`description` 参数）、`bash_bg`（直接后台启动）、`jobs`（list / output / kill / attach / search / stats；output 支持按字节 offset 翻页读大日志，search 支持限定单任务、忽略大小写、上下文行）、`monitor`（按事件流监听命令输出或 WebSocket）。日志默认落在 `/tmp/pi-bg/<jobId>.log`。
 - 斜杠命令：`/bg` 转后台、`/bg-list` 任务面板、`/bg-version` 打印版本和路径、`/bg-config` 显示生效的配置、来源文件和加载警告。
-- 快捷键（默认值，可改）：`ctrl+shift+b` 转后台，`ctrl+shift+j` / `shift+down` 打开任务面板，`ctrl+shift+x` kill 最近一个运行中的作业。
+- 快捷键（默认值，可改）：`ctrl+shift+b` 转后台，`shift+down` 打开任务面板。没有全局「kill 最近任务」快捷键。
+
+**交互**：平时只在底栏显示正在运行的普通后台任务和 monitor 数量，例如 `▶ 2 tasks · ◉ 1 monitors · shift+down`；前台 bash 不计入，不再显示编辑器上方的后台状态条。前台命令超过 2 秒时的「转后台」提示仍保留。
+
+`shift+down` / `/bg-list` 打开一个双栏悬浮窗：左边是任务列表，右边立即显示所选任务的命令、状态、耗时、日志路径和实时输出，不需要 Enter，也不会再打开下一层菜单或编辑器。
+
+| 窗口内按键 | 行为 |
+| --- | --- |
+| `↑↓` / `j` / `k` | 列表焦点下选择任务，详情立即跟随；输出焦点下滚动日志 |
+| `Tab` | 切换列表与输出焦点（窗口提示为 `switch`） |
+| `PageUp` / `PageDown` | 列表跨页选择；输出翻页滚动 |
+| `Home` / `End` | 输出焦点下到当前日志预览的开头 / 末尾 |
+| `x` | 停止当前选中的运行中任务，终态任务不显示此操作 |
+| `c` | 将日志文件的绝对路径复制到系统剪贴板，不复制内容、不提交给 Agent |
+| `Esc` | 关闭整个窗口 |
+
+不提供重跑、删除条目或清理日志的按键。输出默认跟随尾部，往上滚后不会因新输出跳回底部；实时预览最多读取 `outputPreviewChars` 字节，窗口注明字节范围与省略的早期字节。需要完整日志时复制路径读取文件，或让 Agent 调 `jobs` 的 `output` action 按字节分页。
+
+**生命周期**：所有终态任务（completed / failed / killed）完成 4 秒后从面板列表隐藏。当前选中的任务例外，在这次打开的窗口内保留最终详情和输出，切换到其他任务或关闭窗口才释放。终态注册表记录完成 10 分钟后由每 60 秒运行一次的定时器回收，通知送达不会提前移除；`jobs list` 在这段保留期内仍能列出它们。回收后按 ID 调 `jobs output` 会报未知任务，但对话里的绝对日志路径仍可读取。扩展不主动删除后台日志，也没有 `jobs cleanup`；默认 `/tmp/pi-bg` 可能被操作系统清理，长期保留请配置 `logDir`。
 
 **配置**：配置文件 `~/.pi/agent/bg-tasks.json`（目录跟 `PI_CODING_AGENT_DIR`），优先级是环境变量 > 配置文件 > 默认值。文件可以不存在。每个键都能用环境变量覆盖，名字是 `BG_TASKS_` 加大写蛇形：`timeoutMs` → `BG_TASKS_TIMEOUT_MS`。
 
@@ -261,12 +299,11 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 | `monitorMaxLinesPerWindow` | `500` | 一个窗口内超过这么多行就停止发内容、只报抑制条数（monitor 继续跑） |
 | `monitorMaxOverflowWindows` | `3` | 连续这么多个窗口都溢出才真的杀掉 monitor |
 | `shortcutBackground` | `["ctrl+shift+b"]` | 转后台 |
-| `shortcutTaskPanel` | `["ctrl+shift+j", "shift+down"]` | 打开任务面板 |
-| `shortcutKillLatest` | `["ctrl+shift+x"]` | kill 最近一个运行中的作业 |
+| `shortcutTaskPanel` | `["shift+down"]` | 打开任务面板 |
 
-快捷键三项都接单个键名、键名数组，或 `"off"` 关掉。这是唯一能改这些键的途径 —— `pi.registerShortcut` 收的是原始键组合、不走 keybinding id，所以 `keybindings.json` 管不到它们。默认不注册 `ctrl+b`，那是 pi 内置的 `tui.editor.cursorLeft`，见 [键位冲突](#键位冲突)。
+快捷键两项都接单个键名、键名数组，或 `"off"` 关掉。这是唯一能改这些键的途径 —— `pi.registerShortcut` 收的是原始键组合、不走 keybinding id，所以 `keybindings.json` 管不到它们。默认不注册 `ctrl+b`，那是 pi 内置的 `tui.editor.cursorLeft`，见 [键位冲突](#键位冲突)。
 
-配置文件写错不会让扩展加载失败：非法值一律回退默认值，未知键会被忽略，每条都记一句警告 —— 用 `/bg-config` 看。渲染细节（侧栏预览宽度、2 秒快速完成窗口等）仍然写死在 `extensions/bg-tasks/types.ts`，没有开放。
+配置文件写错不会让扩展加载失败：非法值一律回退默认值，未知键会被忽略，每条都记一句警告 —— 用 `/bg-config` 看。旧 `shortcutKillLatest` 配置已移除，文件里保留它会显示未知键警告。渲染与生命周期细节（2 秒快速完成窗口、4 秒展示、10 分钟保留、60 秒回收间隔等）仍写死在 `extensions/bg-tasks/types.ts`，没有开放。
 
 #### `npm:@heyhuynhgiabuu/pi-pretty`
 
@@ -299,7 +336,7 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 
 两个实现细节：pretty 会用自己的 `promptSnippet` 覆盖 patty 的，模型会看不到后台任务提示，所以这里把那句补回去；patty 哪天改了入口、不再注册 `bash`，扩展会直接抛错，不静默退回 pi 原生 bash。
 
-**和 vendor 目录的关系**：patty 的代码 vendor 在 `extensions/bg-tasks/`，由本扩展当库 import。pi 的自动发现会把 `extensions/` 下**带 `index.ts` 的子目录也当成一个独立扩展**，于是 `bg-tasks` 会被再加载一遍，`bash` / `bash_bg` / `jobs` / `monitor` 和四个快捷键全部注册两次，启动时一片冲突警告。挡住这件事的是 [`package.json`](package.json) 里的 `pi.extensions` 声明（只列 `extensions/*.ts`），见 [添加扩展](#添加扩展)。
+**和 vendor 目录的关系**：patty 的代码 vendor 在 `extensions/bg-tasks/`，由本扩展当库 import。pi 的自动发现会把 `extensions/` 下**带 `index.ts` 的子目录也当成一个独立扩展**，于是 `bg-tasks` 会被再加载一遍，`bash` / `bash_bg` / `jobs` / `monitor` 和两个快捷键全部注册两次，启动时一片冲突警告。挡住这件事的是 [`package.json`](package.json) 里的 `pi.extensions` 声明（只列 `extensions/*.ts`），见 [添加扩展](#添加扩展)。
 
 #### `extensions/status-bar.ts` —— 统一状态栏
 
@@ -404,7 +441,7 @@ pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDING
 
 曾经还有第二处：input-history 的反向搜索默认是 `ctrl+r`，正好是 `app.session.rename`（重命名会话）。当时的做法也是把重命名禁掉。现在清单直接把 `searchShortcut` 改成了 `alt+r`（`files` 域，见 [配置文件在哪](#配置文件在哪)），`ctrl+r` 没人抢了，重命名也就回到了 pi 的默认行为。
 
-`pi-web-access` 的 `ctrl+shift+s` / `ctrl+shift+w`，以及 patty 的 `ctrl+shift+b` / `ctrl+shift+j` / `shift+down` / `ctrl+shift+x`，对着 pi 的动作表逐个核过，都没撞上内置动作 —— `shift+down` 尤其容易让人起疑，但内置用的是 `down`（`cursorDown` / `select.down`）、`ctrl+shift+down`（`altScreen.nextPrompt`）和 `alt+down`（`models.reorderDown`），没人要 `shift+down`。patty 刻意没注册 `ctrl+b`：那是内置 `tui.editor.cursorLeft` 的别名，抢过来会在启动时报冲突诊断。patty 这四个键都能在 `bg-tasks.json` 里改或设 `"off"`。
+`pi-web-access` 的 `ctrl+shift+s` / `ctrl+shift+w`，以及 patty 的 `ctrl+shift+b` / `shift+down`，对着 pi 的动作表逐个核过，都没撞上内置动作 —— `shift+down` 尤其容易让人起疑，但内置用的是 `down`（`cursorDown` / `select.down`）、`ctrl+shift+down`（`altScreen.nextPrompt`）和 `alt+down`（`models.reorderDown`），没人要 `shift+down`。patty 刻意没注册 `ctrl+b`：那是内置 `tui.editor.cursorLeft` 的别名，抢过来会在启动时报冲突诊断。patty 这两个键都能在 `bg-tasks.json` 里改或设 `"off"`。后台任务面板不监听裸 `↓` / `←`，不会和 subagents 的列表入口争抢按键；只在悬浮窗打开时处理导航。
 
 可管理范围就是清单里声明了的那几项：`settings.json` 的 `retry.maxRetries`、`keybindings.json` 的 `tui.editor.jumpForward`、`pi-input-history.json` 的 `searchShortcut`。其余配置文件、其余键都不在本仓库的管理范围内，各自的机器上自己维护。
 
@@ -485,6 +522,11 @@ pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDING
 | 固定了精确版本 | 不动 |
 | 本机有包，清单里没有 | 保留，除非该域在 `--prune` 里 |
 | 本机有包，且在 `conflicts` 里 | 卸载（merge 模式下也会卸） |
+| `--dev`，本仓库远程来源已注册 | 先卸载该仓库的远程注册，再注册当前检出的绝对路径（merge 也切换） |
+| `--dev`，当前检出已注册 | 保留本地来源，不更新；第三方包照常对齐 |
+| 同一检出执行普通安装，本仓库本地来源已注册 | 先移除这个本地注册，再安装或更新清单的远程版 |
+| 来源切换的移除失败 | 中止，不再执行安装或配置写入 |
+| `packages` 未选中或 `--dry-run` | 不切换来源；dry-run 仅显示计划 |
 | 声明了设置键，本机值不同或缺失 | 写成声明的值 |
 | 声明了设置键，本机值已一致 | 不动，也不重写文件 |
 | 声明成 `null` | 从本机删掉（本来就没有就什么都不做） |
@@ -533,10 +575,12 @@ pnpm install            # 装开发依赖
 pnpm check              # 类型检查 + 全部测试，提交前跑这个
 pnpm typecheck          # 只跑 tsc --noEmit
 pnpm test               # 只跑 node --test
+./install.sh --dev      # 本仓库切到当前检出；之前需 pnpm install
+./install.sh --dev --dry-run  # 看本地测试模式的切换和同步计划
 ./install.sh --dry-run  # 看看这台机器缺什么
 ```
 
-测试用 `node --test`，没有第三方框架。全部测试都不联网、不碰 `~/.pi`：`scripts/sync.test.mjs` 会在 `PATH` 里放一个假的 `pi`，并把 `PI_CODING_AGENT_DIR` 指到一个临时目录，所以配置读写都发生在那里。`scripts/pi-manifest.test.mjs` 只读本仓库的 `package.json`，校验 `pi.extensions` 还盖得住所有顶层扩展、且没把 `extensions/` 下的子目录放进来。
+测试用 `node --test`，没有第三方框架。全部测试都不联网、不碰 `~/.pi`：`scripts/sync.test.mjs` 会使用假的 `pi`，并把 `PI_CODING_AGENT_DIR` 指到临时目录，所以配置读写都发生在那里。它还用带空格路径的临时 git 检出验证 `install.sh --dev`：远程/本地双向切换、不同 git 写法和 ref、重复执行、两份同时注册、移除失败中止、dry-run、域选择、非法检出及管道安装拒绝；第三方包和 prune 保持原来的行为。`scripts/pi-manifest.test.mjs` 只读本仓库的 `package.json`，校验 `pi.extensions` 还盖得住所有顶层扩展、且没把 `extensions/` 下的子目录放进来。
 
 扩展 import 的 `@earendil-works/*`（pi 自己的 SDK）是 peer 依赖，运行时由 pi 提供，所以不装。类型检查和测试前会先跑 [`scripts/link-pi-sdk.mjs`](scripts/link-pi-sdk.mjs)，它在本机 pi 安装里找到这套 SDK 并软链进 `node_modules/`——类型因此永远对着真正加载这些代码的那个 pi 版本。`pnpm install` 之后链接可能被清掉，跑 `pnpm link-sdk` 重建即可；pi 装在别处时用 `PI_SDK_DIR` 或 `PI_BIN` 指过去。
 

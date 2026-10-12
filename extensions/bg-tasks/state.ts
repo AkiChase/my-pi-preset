@@ -32,9 +32,13 @@ export class BackgroundRegistry {
     killedCount = 0;
     totalStarted = 0;
     totalDurationMs = 0;
-    recentTerminal: Job[] = [];
+    /** Age-based metadata sweep; logs are not removed. */
+    sweepTimer: NodeJS.Timeout | undefined = undefined;
+    /** Closes the one active panel on shutdown/session replacement. */
+    closePanel: (() => void) | undefined = undefined;
+    panelOpen = false;
 
-    /** Live-duration ticker for the sidebar pills; runs while jobs are alive. */
+    /** Live-duration ticker for the foreground hand-off hint. */
     sidebarTimer: NodeJS.Timeout | undefined = undefined;
     /** Last rendered sidebar content — used to skip redundant widget updates. */
     lastSidebarContent: string | undefined = undefined;

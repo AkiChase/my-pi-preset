@@ -10,10 +10,11 @@
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/AkiChase/my-pi-preset/main/install.sh | sh
 #   ./install.sh --dry-run
+#   ./install.sh --dev
 #   ./install.sh --sync settings
 #   ./install.sh --prune packages
 #
-# Options are passed through to sync.mjs: --sync, --prune, --dry-run.
+# Options are passed through to sync.mjs: --dev, --sync, --prune, --dry-run.
 set -eu
 
 REPO="AkiChase/my-pi-preset"
@@ -27,6 +28,19 @@ die() {
   printf '\033[31m[install]\033[0m %s\n' "$*" >&2
   exit 1
 }
+
+# Dev needs the package checkout, not just a downloaded installer. Reject before
+# fetching anything so `curl | sh -s -- --dev` cannot install a temporary path.
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P) || script_dir=""
+local_checkout=false
+if [ -f "$0" ] && [ -n "$script_dir" ] && [ -f "$script_dir/scripts/sync.mjs" ] && [ -f "$script_dir/pi-preset.json" ]; then
+  local_checkout=true
+fi
+for arg in "$@"; do
+  if [ "$arg" = "--dev" ] && [ "$local_checkout" = false ]; then
+    die "--dev requires a local my-pi-preset checkout; run ./install.sh --dev there."
+  fi
+done
 
 log "checking required commands"
 command -v node >/dev/null 2>&1 || die "'node' is not on PATH; it is required to run the sync script."
@@ -53,8 +67,7 @@ log "pi $("$PI_BIN" --version 2>/dev/null || echo '?'), node $(node --version)"
 
 # Work from the local checkout when this script sits in one, otherwise fetch
 # the two files it needs (the piped `curl | sh` case).
-script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd) || script_dir=""
-if [ -n "$script_dir" ] && [ -f "$script_dir/scripts/sync.mjs" ] && [ -f "$script_dir/pi-preset.json" ]; then
+if [ "$local_checkout" = true ]; then
   log "using local checkout at $script_dir"
   manifest="$script_dir/pi-preset.json"
   sync_script="$script_dir/scripts/sync.mjs"

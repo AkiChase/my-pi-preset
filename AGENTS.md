@@ -5,7 +5,7 @@
 | 路径 | 作用 |
 | --- | --- |
 | `pi-preset.json` | 清单：`packages` 要装的，`conflicts` 不能当 pi 包装的，`settings` / `keybindings` / `files` 要对齐的本机配置，`preserve` prune 时也不动的键 |
-| `install.sh` + `scripts/sync.mjs` | 把本机对齐到清单（四个域：packages / settings / keybindings / files） |
+| `install.sh` + `scripts/sync.mjs` | 把本机对齐到清单（四个域：packages / settings / keybindings / files）；`--dev` 仅将本仓库来源切到当前 git 检出 |
 | `extensions/` | 自带扩展。加载范围由 `package.json` 的 `pi.extensions`（`extensions/*.ts`）声明，**不是** pi 自动发现；子目录不加载 |
 | `local/` | 本机草稿：计划、笔记、临时脚本。**已 gitignore**，不进仓库，也别在这里放代码 |
 | `README.md` | 面向使用者的全部文档 |
@@ -33,10 +33,14 @@ pnpm install            # 开发依赖
 pnpm check              # typecheck + test，提交前跑
 pnpm link-sdk           # 重建 pi SDK 软链（pnpm install 后可能需要）
 ./install.sh --dry-run
+./install.sh --dev --dry-run            # 看本仓库远程→当前检出的切换计划
+./install.sh --dev                      # 本地测试，先 pnpm install，再 /reload
 ./install.sh --sync settings --dry-run   # 只看配置会怎么变
 ```
 
 用 pnpm，不要 `package-lock.json`。别人机器上的运行时依赖由 pi 用它自己的包管理器（默认 npm）安装，不读 `pnpm-lock.yaml`：`dependencies` 保持宽松范围，`devDependencies` 不会装到那些机器上。
+
+`--dev` 不改清单，仅在内存中把本仓库的 git 来源换成执行 `sync.mjs` 所在检出的绝对路径；必须有本仓库 `package.json` / `pi` 声明和 `.git`，且不允许切换时移除当前检出所在的 pi 管理克隆。第三方包保持远程。pi 不安装或修改本地包依赖，先 `pnpm install`；之后 `/reload`，用 `/bg-version` 确认本地路径。同一检出普通 `./install.sh` 切回远程。切换先移除相反来源，失败中止以免工具重复注册；只在同步 packages 时生效，dry-run 不改动。不要将任意本地路径加入清单来源验证，也不要把 git/local 全局视为同一身份。
 
 ## 检查
 
@@ -44,6 +48,7 @@ pnpm link-sdk           # 重建 pi SDK 软链（pnpm install 后可能需要）
 
 - `tsconfig.json`：`noEmit` + strict，只检查 `extensions/**/*.ts`。别用 `any` / `@ts-ignore` 糊，必须压制时写明原因。
 - 测试用 `node --test`，放 `extensions/<ext>/__tests__/*.test.ts` 或 `scripts/*.test.mjs`。必须离线、不碰 `~/.pi`。
+- `scripts/sync.test.mjs`：离线 mock pi 与临时检出，覆盖四域同步和 `--dev` 双向切换、重复执行、两来源共存、git 写法/ref、空格路径、移除失败、dry-run、域选择不碰包、非法检出及管道安装拒绝；不执行真实 pi 安装或读写 `~/.pi`。
 - `scripts/pi-manifest.test.mjs`：`pi.extensions` 要盖全顶层 `extensions/*.ts`、不得包含子目录；新增 `skills/` 等资源目录也得在 `pi` 里声明。
 
 ## 约定

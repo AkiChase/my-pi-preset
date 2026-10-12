@@ -1,7 +1,6 @@
 /**
  * `jobs` tool actions — kill result strings (CC's TaskStopTool), unknown-id
- * errors, a read surfacing the outcome (CC's TaskOutputTool), and the lazy eviction
- * sweep in `jobs list`.
+ * errors and retained terminal outcomes.
  */
 
 import { describe, it } from "node:test";
@@ -123,8 +122,8 @@ void describe("jobs output — a read surfaces the outcome", () => {
     });
 });
 
-void describe("jobs list — lazy sweep", () => {
-    void it("sweeps surfaced terminal jobs into the recent-terminal ring", async () => {
+void describe("jobs list — retained metadata", () => {
+    void it("lists surfaced terminal records without eviction or duplicates", async () => {
         const { tool, reg, ctx } = harness();
         const running = mkJob(reg, { id: `job-${process.pid}-l1`, command: "run-me" });
         const swept = mkJob(reg, { id: `job-${process.pid}-l3`, command: "done-read" });
@@ -135,9 +134,10 @@ void describe("jobs list — lazy sweep", () => {
         const res = await tool.execute("t6", { action: "list" }, undefined, undefined, ctx);
         const text = res.content[0].text;
 
-        assert.equal(reg.jobs.has(swept.id), false, "surfaced terminal job evicted by the sweep");
+        assert.equal(reg.jobs.has(swept.id), true, "listing must not reclaim metadata");
         assert.ok(text.includes("run-me"), "running job listed");
-        assert.match(text, /done-read - ✓ completed\n?$/, "swept job shows as a recent terminal");
+        assert.ok(text.includes("done-read - ✓ completed"));
+        assert.equal(text.split("done-read").length - 1, 1);
         assert.ok(running.status === "running");
     });
 

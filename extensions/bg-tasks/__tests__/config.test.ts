@@ -158,8 +158,8 @@ void describe("loadConfig — environment overrides", () => {
         assert.match(warnings.join("\n"), /BG_TASKS_TIMEOUT_MS: timeoutMs: expected a number/);
     });
     void it("can unbind a shortcut", () => {
-        const { config } = load(undefined, { BG_TASKS_SHORTCUT_KILL_LATEST: "off" });
-        assert.deepEqual(config.shortcutKillLatest, []);
+        const { config } = load(undefined, { BG_TASKS_SHORTCUT_TASK_PANEL: "off" });
+        assert.deepEqual(config.shortcutTaskPanel, []);
     });
 });
 

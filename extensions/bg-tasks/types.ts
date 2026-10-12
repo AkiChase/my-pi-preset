@@ -4,6 +4,7 @@
 
 import type { ChildProcess } from "node:child_process";
 import type { AgentToolResult } from "@earendil-works/pi-agent-core";
+import type { ExtensionUIContext, Theme } from "@earendil-works/pi-coding-agent";
 
 // --- Fixed internal constants ---
 // Configurable knobs live in config.ts; what stays here is either a rendering
@@ -13,14 +14,13 @@ import type { AgentToolResult } from "@earendil-works/pi-agent-core";
  *  longer and a slow command looks frozen. */
 export const QUICK_COMPLETION_MS = 2_000;
 export const FOREGROUND_TAIL_BYTES = 4_096;
-export const RECENT_TERMINAL_KEEP = 20;
+export const FINISHED_LINGER_MS = 4_000;
+export const TERMINAL_RETENTION_MS = 10 * 60_000;
+export const REGISTRY_SWEEP_MS = 60_000;
 
 export const PREVIEW_CHARS = {
-    sidebar: 25,
-    taskList: 40,
-    detail: 50,
     line: 80,
-    /** Live progress line shown in the sidebar pill. */
+    /** Command preview in the foreground hand-off hint. */
     progress: 60,
 } as const;
 
@@ -52,6 +52,8 @@ export interface Job {
     command: string;
     pid: number;
     startTime: number;
+    /** Frozen on the first terminal transition; drives UI hiding and registry expiry. */
+    endedAt?: number;
     status: JobStatus;
     exitCode?: number;
     logPath: string;
@@ -63,8 +65,8 @@ export interface Job {
      * Whether the agent has seen this job's terminal outcome — by
      * <task-notification>, by asking for the kill, or by reading it through
      * `jobs output` / `jobs attach`. Set only AFTER the outcome actually
-     * reached the agent, so a failed send leaves it clear and the job stays
-     * listed.
+     * reached the agent. Delivery does not control metadata retention; all
+     * terminal records stay for the same ten-minute window.
      *
      * Upstream had a single `notified` boolean carrying three different
      * meanings at once ("already told", "don't tell", "being read right
@@ -90,7 +92,7 @@ export interface Job {
     isBackgrounded: boolean;
     /** Defaults to "shell" when absent. */
     kind?: JobKind;
-    /** Transient teardown hook (follower + ws socket). */
+    /** Transient source teardown hook; released on the terminal transition. */
     stop?: () => void;
 }
 
@@ -142,17 +144,11 @@ export const DELIVER_PASSIVE = { deliverAs: "followUp", triggerTurn: false } as 
 
 // --- UI context ---
 export interface UiContext {
-    ui: {
-        notify(message: string, level?: "info" | "warning" | "error"): void;
-        setWidget(
-            name: string,
-            content: string[] | undefined,
-            options?: { placement?: "aboveEditor" | "belowEditor" }
-        ): void;
-        setStatus(name: string, content: unknown): void;
-        theme: { fg(colour: string, text: string): string };
-        select(title: string, options: string[]): Promise<string | undefined>;
-        editor(title: string, content: string): Promise<string | undefined>;
+    /** Custom overlays are TUI-only; the other methods also work in RPC. */
+    mode?: string;
+    ui: Pick<ExtensionUIContext, "notify" | "setWidget" | "setStatus" | "select" | "editor"> & {
+        theme: Pick<Theme, "fg">;
+        custom?: ExtensionUIContext["custom"];
     };
 }
 

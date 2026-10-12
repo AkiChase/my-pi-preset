@@ -73,7 +73,6 @@ export interface BgTasksConfig {
     monitorMaxOverflowWindows: number;
     shortcutBackground: ShortcutBinding;
     shortcutTaskPanel: ShortcutBinding;
-    shortcutKillLatest: ShortcutBinding;
 }
 
 /** Every default in one place. Frozen: a caller that mutates this would change
@@ -103,8 +102,7 @@ export const DEFAULTS: BgTasksConfig = Object.freeze({
     monitorMaxLinesPerWindow: 500,
     monitorMaxOverflowWindows: 3,
     shortcutBackground: Object.freeze(["ctrl+shift+b"]),
-    shortcutTaskPanel: Object.freeze(["ctrl+shift+j", "shift+down"]),
-    shortcutKillLatest: Object.freeze(["ctrl+shift+x"]),
+    shortcutTaskPanel: Object.freeze(["shift+down"]),
 } satisfies BgTasksConfig);
 
 /** Config file name inside the agent directory. */
@@ -144,7 +142,6 @@ const NUMERIC_BOUNDS: Record<NumericKey, { min: number; max: number }> = {
 const SHORTCUT_KEYS: readonly ShortcutKey[] = [
     "shortcutBackground",
     "shortcutTaskPanel",
-    "shortcutKillLatest",
 ];
 
 const NUMERIC_KEYS = Object.keys(NUMERIC_BOUNDS) as NumericKey[];

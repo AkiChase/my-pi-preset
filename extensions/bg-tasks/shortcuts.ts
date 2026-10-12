@@ -3,11 +3,10 @@
  *
  * Defaults:
  *   - Ctrl+Shift+B: move the foreground bash to background
- *   - Ctrl+Shift+J / Shift+Down: open the background task manager
- *   - Ctrl+Shift+X: kill the most recent running job
+ *   - Shift+Down: open the background task manager
  *
- * All three are configurable (`shortcutBackground`, `shortcutTaskPanel`,
- * `shortcutKillLatest`), including `"off"`, because `registerShortcut` takes a
+ * Both are configurable (`shortcutBackground`, `shortcutTaskPanel`),
+ * including `"off"`, because `registerShortcut` takes a
  * raw chord rather than an action id — pi's `keybindings.json` cannot reach
  * these, so the config file is the only way to change or release a key.
  *
@@ -19,13 +18,7 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { BackgroundRegistry } from "./state.ts";
-import {
-    takeControl,
-    terminateJobSilently,
-    type ControlContext,
-} from "./lifecycle.ts";
-import { renderSidebar } from "./registry.ts";
-import { jobLabel } from "./format.ts";
+import { takeControl, type ControlContext } from "./lifecycle.ts";
 import { openBgListPanel } from "./ui.ts";
 import type { ShortcutBinding } from "./config.ts";
 
@@ -78,12 +71,6 @@ export function registerShortcuts(
         "Open background task manager",
         async (ctx) => openBgListPanel(reg, ctx)
     );
-    bind(
-        reg.config.shortcutKillLatest,
-        "shortcutKillLatest",
-        "Kill the most recent running background job",
-        async (ctx) => handleCtrlX(reg, ctx)
-    );
 
     return warnings;
 }
@@ -100,24 +87,4 @@ async function handleCtrlB(
     ctx: Parameters<NonNullable<Parameters<ExtensionAPI["registerShortcut"]>[1]["handler"]>>[0]
 ): Promise<void> {
     takeControl(reg, ctx as ControlContext);
-}
-
-/** Ctrl+Shift+X: kill the most recent running job. */
-async function handleCtrlX(
-    reg: BackgroundRegistry,
-    ctx: Parameters<NonNullable<Parameters<ExtensionAPI["registerShortcut"]>[1]["handler"]>>[0]
-): Promise<void> {
-    const running = Array.from(reg.jobs.values())
-        .filter((j) => j.status === "running")
-        .sort((a, b) => b.startTime - a.startTime);
-
-    if (running.length === 0) {
-        ctx.ui.notify("No running tasks to kill", "warning");
-        return;
-    }
-
-    const target = running[0];
-    terminateJobSilently(reg, target);
-    renderSidebar(reg, ctx);
-    ctx.ui.notify(`Killed ${jobLabel(target)}`, "info");
 }
