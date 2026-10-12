@@ -44,33 +44,10 @@ export interface BgTasksConfig {
     /** No log growth for this long + a prompt-like tail ⇒ stall warning. */
     stallThresholdMs: number;
     stallTailBytes: number;
-    monitorDefaultTimeoutMs: number;
-    monitorMaxTimeoutMs: number;
-    /** Monitor poll cadence; doubles as the event batch window. */
-    monitorPollMs: number;
-    /**
-     * Coalescing window for stream events. The follower's poll tick batches
-     * lines that land together, but at one line per tick a 10-minute watch
-     * still produced ~600 separate messages, each repeating its own header.
-     * The first line after a quiet period is emitted immediately; everything
-     * within this window after it goes out as one message at the window's end.
-     */
+    /** Minimum interval between ordinary monitor progress submissions; 0 sends each source batch. */
     monitorFlushMs: number;
-    /** Lines in a single emitted event; the excess is counted as suppressed. */
+    /** Maximum preview lines per monitor batch. */
     monitorMaxLinesPerEvent: number;
-    monitorRateWindowMs: number;
-    /**
-     * Lines per window before a monitor stops emitting content and starts
-     * reporting a suppressed count instead. It keeps running — the full output
-     * is on disk either way.
-     */
-    monitorMaxLinesPerWindow: number;
-    /**
-     * Consecutive over-budget windows before the monitor is killed outright. A
-     * single burst is a burst; sustained overflow is a filter that does not
-     * work, and only that deserves losing the watch.
-     */
-    monitorMaxOverflowWindows: number;
     shortcutBackground: ShortcutBinding;
     shortcutTaskPanel: ShortcutBinding;
 }
@@ -89,18 +66,8 @@ export const DEFAULTS: BgTasksConfig = Object.freeze({
     stallCheckIntervalMs: 5_000,
     stallThresholdMs: 45_000,
     stallTailBytes: 1_024,
-    monitorDefaultTimeoutMs: 300_000,
-    monitorMaxTimeoutMs: 3_600_000,
-    monitorPollMs: 200,
-    // 2s: these events never wake the agent (they are appended passively and
-    // read at its next turn), so a longer window costs the model nothing and
-    // cuts the message count proportionally. The leading-edge emit keeps the
-    // "something is happening" signal instant for whoever is watching.
-    monitorFlushMs: 2_000,
+    monitorFlushMs: 30_000,
     monitorMaxLinesPerEvent: 50,
-    monitorRateWindowMs: 10_000,
-    monitorMaxLinesPerWindow: 500,
-    monitorMaxOverflowWindows: 3,
     shortcutBackground: Object.freeze(["ctrl+shift+b"]),
     shortcutTaskPanel: Object.freeze(["shift+down"]),
 } satisfies BgTasksConfig);
@@ -129,14 +96,8 @@ const NUMERIC_BOUNDS: Record<NumericKey, { min: number; max: number }> = {
     stallCheckIntervalMs: { min: 500, max: 600_000 },
     stallThresholdMs: { min: 1_000, max: 24 * 3_600_000 },
     stallTailBytes: { min: 64, max: 1024 * 1024 },
-    monitorDefaultTimeoutMs: { min: 1_000, max: 24 * 3_600_000 },
-    monitorMaxTimeoutMs: { min: 1_000, max: 24 * 3_600_000 },
-    monitorPollMs: { min: 20, max: 60_000 },
     monitorFlushMs: { min: 0, max: 600_000 },
     monitorMaxLinesPerEvent: { min: 1, max: 100_000 },
-    monitorRateWindowMs: { min: 500, max: 600_000 },
-    monitorMaxLinesPerWindow: { min: 1, max: 1_000_000 },
-    monitorMaxOverflowWindows: { min: 1, max: 1_000 },
 };
 
 const SHORTCUT_KEYS: readonly ShortcutKey[] = [
@@ -319,16 +280,6 @@ export function loadConfig(
         resolve(key, (raw, source) => parseShortcut(key, raw, source, warnings));
     }
     resolve("logDir", (raw, source) => parseLogDir(raw, source, warnings));
-
-    // A ceiling below the default would silently clamp every monitor; catch the
-    // inconsistency here rather than letting it look like a monitor bug.
-    if (config.monitorDefaultTimeoutMs > config.monitorMaxTimeoutMs) {
-        warnings.push(
-            `monitorDefaultTimeoutMs (${config.monitorDefaultTimeoutMs}) exceeds ` +
-                `monitorMaxTimeoutMs (${config.monitorMaxTimeoutMs}) — raising the ceiling to match`
-        );
-        config.monitorMaxTimeoutMs = config.monitorDefaultTimeoutMs;
-    }
 
     return { config, warnings, path: file ? path : undefined };
 }

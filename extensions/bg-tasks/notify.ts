@@ -31,6 +31,26 @@ import { DEFAULTS, type BgTasksConfig } from "./config.ts";
 import type { BackgroundRegistry } from "./state.ts";
 import { describeJob } from "./format.ts";
 import { readTailLines } from "./output.ts";
+import { previewText, type MonitorPreview } from "./monitor-buffer.ts";
+
+export interface MonitorNotificationPayload {
+    state: "progress" | "absent" | "resumed" | TerminalStatus;
+    description: string;
+    preview: MonitorPreview;
+    silenceMs?: number;
+    note?: string;
+}
+
+export function buildMonitorNotification(job: Job, payload: MonitorNotificationPayload, summary?: string): string {
+    return [
+        `[monitor ${job.id} · ${payload.state}] ${payload.description}`,
+        ...(summary ? [summary] : []),
+        `log: ${job.logPath}`,
+        ...(payload.silenceMs !== undefined ? [`No events for ${payload.silenceMs}ms; monitor is still running.`] : []),
+        ...(payload.note ? [payload.note] : []),
+        previewText(payload.preview),
+    ].filter(Boolean).join("\n");
+}
 
 /** Terminal statuses a notification can carry. */
 export type TerminalStatus = "completed" | "failed" | "killed";
@@ -154,19 +174,20 @@ export function sendTaskNotification(args: {
     status?: TerminalStatus;
     /** Explicit summary (monitors compose their own). */
     summary?: string;
+    monitor?: MonitorNotificationPayload;
 }): boolean {
     const { reg, pi, job } = args;
     if (job.outcomeSurfaced) return false;
     if ((job.attachCount ?? 0) > 0) return false;
     const status = args.status ?? (job.status as TerminalStatus);
     const summary = args.summary ?? completionSummary(job, status);
-    const outputTail = failureTail(job, status, reg.config);
+    const outputTail = args.monitor ? "" : failureTail(job, status, reg.config);
 
     try {
         pi.sendMessage(
             {
                 customType: EVENT.taskNotification,
-                content: buildTaskNotification({
+                content: args.monitor ? buildMonitorNotification(job, args.monitor, summary) : buildTaskNotification({
                     taskId: job.id,
                     outputFile: job.logPath,
                     status,
@@ -179,6 +200,7 @@ export function sendTaskNotification(args: {
                     status,
                     summary,
                     outputFile: job.logPath,
+                    ...(args.monitor ? { monitor: args.monitor } : {}),
                     // Kept for correlation by anything reading the session log;
                     // deliberately out of the model-facing text.
                     ...(job.toolCallId ? { toolUseId: job.toolCallId } : {}),
@@ -188,7 +210,7 @@ export function sendTaskNotification(args: {
             DELIVER_STEER
         );
     } catch (err) {
-        job.notifyError = (err as Error).message || String(err);
+        job.notifyError = err instanceof Error ? err.message || String(err) : String(err);
         console.error("[bg-tasks] task notification failed:", err);
         return false;
     }

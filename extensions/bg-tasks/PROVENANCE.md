@@ -1,4 +1,4 @@
-# Provenance
+# 来源与本地分叉记录
 
 The files in this directory started as a one-time copy of the `src/` tree of
 [`patty-io/pi-patty-bg-tasks`](https://github.com/patty-io/pi-patty-bg-tasks).
@@ -10,6 +10,20 @@ The files in this directory started as a one-time copy of the `src/` tree of
 | Upstream date | 2026-08-01 |
 | Copied from | `src/**` (including `src/__tests__`), flattened to this directory |
 | Licence | MIT, see `LICENSE.upstream` |
+
+## 当前 Monitor 行为（本地分叉）
+
+以下变更在原上游 v2.0.0／上表提交及 MIT 来源基础上实现，不改变来源或许可证。后文较早英文记录保留为历史，不是当前 monitor 契约。
+
+- monitor 不再从日志轮询重建活动；命令使用 detached `bash -c` 和 stdout/stderr 双 pipe，收到的原始 bytes 写同一日志，两流独立增量 UTF-8／有界部分行解析。没有整体 `2>&1`、eval、嵌套 shell 或 tee 改写，用户的管道／重定向语义保持；stderr 不代表失败，跨流接收顺序不是实际发生顺序。
+- 新内部 `monitor-buffer.ts` 统一有界前缀与省略计数，复用行数和共享字符预算。源事件先接入 session 再启动，无启动回放队列；WebSocket 保留消息边界，空消息算活动，诊断只进入收尾。
+- `monitorFlushMs` 默认 30 秒，保留显式值及 0；首批和静默后恢复立即发送。进度／静默／恢复使用用户可见的 `DELIVER_STEER`，没有批次之间的 passive 消息。可选 `wake_absent_ms` 从启动／事件到达计时，每段静默只提醒一次，提醒不停止监听。普通合并和静默只由 session 决策，面板不参与。
+- 删除 `persistent`、隐式默认截止／上限、速率窗口／连续溢出停止及配置、日志 follower 与轮询配置。可选有限正数 `timeout_ms` 才安排总截止；超出 Node 单次定时范围时分段等待。没有旧参数兼容、迁移或用户配置写入。
+- 主 shell `exit` 同步进入 finishing，暂停并读取 Node 已缓冲的两流 bytes，只加入日志／同一收尾，再销毁 pipes 和关闭 fd。不等待 EOF／孙进程，不加 grace timeout；任一流未结束时说明后续输出可能未记录，未知数量不计入通知省略统计。
+- 自然结束、失败、外部信号、显式截止及共享日志大小保护由一个合并 terminal 通知消费 pending。`notify.ts` 的可选 typed monitor payload 替代 monitor 的 failure-tail 回读，保留 shell 原行为、attach／outcome 抑制及发送失败记录。显式 jobs／panel／session stop 仍静默。进度与 absent/resumed 不修改 Job.status 或结果标记。
+- 所有 monitor 启用共享 `maxLogBytes` 周期保护；`handleOversize` 小范围回调拥有 monitor 停止和通知，不再附加被动超量 warning，shell 默认路径不变。消息 renderer 仅适配 monitor 载荷和安全宽度／控制符，不改 panel、shortcut、input、注册表保留或顶层 wrapper。
+- 启动接线／sidebar 渲染失败时，monitor 自己停止源和进程组、取消共享 abort／timer、释放 completion hooks，工具继续负责注册／started 回滚，不改变后台 shell 启动行为。进度与收尾提交抛出的 null／undefined 也被隔离记录，不误判源失败或标记结果；空 WS 预览后再合并 Unicode 预览时，零字符预算下完全省略的非空行计为整行省略，不误计截断行。
+- 离线证据：`monitor-buffer.test.ts`、`monitor-source.test.ts`、`monitor-session.test.ts`、`monitor.test.ts`、`config.test.ts` 及共享通知、日志保护、会话、面板、shell、manifest 回归。调度使用 node:test 假时钟／假源，源使用隔离 subprocess／pipe／stub WS；无新依赖。
 
 ## This is a fork, not a vendored dependency
 
@@ -222,7 +236,7 @@ explainable.
     constructor body rather than using TypeScript parameter properties. pi and
     `node --test` both run these files through type stripping, which rejects
     `constructor(private readonly x)` outright — it typechecks and then fails at load.
-- **Monitor stream events are coalesced, and a firehose is suppressed rather than fatal.**
+- **Historical monitor batching (superseded by the Chinese current-behavior section above).**
   Upstream emitted one message per follower poll tick (200 ms), so a stream producing a
   line per second produced a message per second — ~600 separate transcript entries for a
   ten-minute watch, each repeating its own `◉ description` header. Its only brake was

@@ -6,7 +6,7 @@
 
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CONFIG_FILENAME, DEFAULTS, envNameFor, loadConfig } from "../config.ts";
@@ -98,9 +98,9 @@ void describe("loadConfig — malformed input never throws", () => {
         assert.match(warnings.join("\n"), /timeoutMs: expected a number/);
     });
     void it("falls back and warns on an out-of-range number", () => {
-        const { config, warnings } = load('{"monitorPollMs": 0}');
-        assert.equal(config.monitorPollMs, DEFAULTS.monitorPollMs);
-        assert.match(warnings.join("\n"), /monitorPollMs: 0 is outside/);
+        const { config, warnings } = load('{"monitorMaxLinesPerEvent": 0}');
+        assert.equal(config.monitorMaxLinesPerEvent, DEFAULTS.monitorMaxLinesPerEvent);
+        assert.match(warnings.join("\n"), /monitorMaxLinesPerEvent: 0 is outside/);
     });
     void it("falls back and warns on a shortcut of the wrong type", () => {
         const { config, warnings } = load('{"shortcutBackground": 42}');
@@ -121,13 +121,22 @@ void describe("loadConfig — malformed input never throws", () => {
         const { warnings } = load('{"timoutMs": 5000}');
         assert.match(warnings.join("\n"), /unknown key "timoutMs"/);
     });
-    void it("raises the monitor ceiling when the default would exceed it", () => {
-        const { config, warnings } = load(
-            '{"monitorDefaultTimeoutMs": 600000, "monitorMaxTimeoutMs": 60000}'
-        );
-        // Otherwise every monitor is silently clamped and looks like a bug.
-        assert.equal(config.monitorMaxTimeoutMs, 600_000);
-        assert.match(warnings.join("\n"), /raising the ceiling/);
+    void it("uses 30s by default, preserves explicit values/zero and environment precedence without writes", () => {
+        assert.equal(load(undefined).config.monitorFlushMs, 30_000);
+        assert.equal(load('{"monitorFlushMs": 2000}').config.monitorFlushMs, 2000);
+        assert.equal(load('{"monitorFlushMs": 0}').config.monitorFlushMs, 0);
+        const agentDir = mkdtempSync(join(dir, "unchanged-"));
+        const path = join(agentDir, CONFIG_FILENAME);
+        const contents = '{"monitorFlushMs": 2000, "monitorDefaultTimeoutMs": 1, "monitorMaxTimeoutMs": 2, "monitorPollMs": 3, "monitorRateWindowMs": 4, "monitorMaxLinesPerWindow": 5, "monitorMaxOverflowWindows": 6}';
+        writeFileSync(path, contents);
+        const result = loadConfig(agentDir, { BG_TASKS_MONITOR_FLUSH_MS: "0" });
+        assert.equal(result.config.monitorFlushMs, 0);
+        assert.equal(result.warnings.length, 6, "ordinary unknown-key warnings only");
+        assert.equal(readFileSync(path, "utf8"), contents);
+        for (const key of Object.keys(JSON.parse(contents)).filter(k => k !== "monitorFlushMs")) {
+            assert.ok(!(key in DEFAULTS));
+            assert.ok(!(key in result.config));
+        }
     });
 });
 
@@ -136,8 +145,8 @@ void describe("loadConfig — environment overrides", () => {
         assert.equal(envNameFor("timeoutMs"), "BG_TASKS_TIMEOUT_MS");
         assert.equal(envNameFor("logDir"), "BG_TASKS_LOG_DIR");
         assert.equal(
-            envNameFor("monitorMaxLinesPerWindow"),
-            "BG_TASKS_MONITOR_MAX_LINES_PER_WINDOW"
+            envNameFor("monitorMaxLinesPerEvent"),
+            "BG_TASKS_MONITOR_MAX_LINES_PER_EVENT"
         );
     });
     void it("takes precedence over the file", () => {

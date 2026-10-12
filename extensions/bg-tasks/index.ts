@@ -13,6 +13,8 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createBashToolDefinition } from "@earendil-works/pi-coding-agent";
+import { stripTerminalSequences, truncateToWidth } from "@earendil-works/pi-tui";
+import type { MonitorNotificationPayload } from "./notify.ts";
 import { BackgroundRegistry } from "./state.ts";
 import { detectNonInteractive, terminateJobSilently } from "./lifecycle.ts";
 import { startRegistrySweep, stopRegistrySweep, stopSidebarTicker } from "./registry.ts";
@@ -72,8 +74,13 @@ export default function (pi: ExtensionAPI): void {
         theme: { fg(colour: string, text: string): string }
     ) => {
         const details = message.details as
-            | { status?: string; summary?: string; outputTail?: string }
+            | { status?: string; summary?: string; outputTail?: string; monitor?: MonitorNotificationPayload }
             | undefined;
+        if (details?.monitor) {
+            const text = stripTerminalSequences(String(message.content)).replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, "");
+            return { render: (width: number) => text.split("\n").map((line) =>
+                truncateToWidth(theme.fg("dim", line), Math.max(0, width))), invalidate: () => {} };
+        }
         const colour =
             details?.status === "completed"
                 ? "success"
@@ -97,6 +104,9 @@ export default function (pi: ExtensionAPI): void {
         return { render: () => [line, ...tail], invalidate: () => {} };
     };
     pi.registerMessageRenderer(EVENT.taskNotification, (message, _options, theme) =>
+        renderTaskNotification(message, theme)
+    );
+    pi.registerMessageRenderer(EVENT.monitorEvent, (message, _options, theme) =>
         renderTaskNotification(message, theme)
     );
     pi.registerMessageRenderer(EVENT.stall, (message, _options, theme) =>

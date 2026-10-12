@@ -123,15 +123,12 @@ export type EventName = (typeof EVENT)[keyof typeof EVENT];
 
 // --- Deliver options ---
 /** Steer the message into the current/next turn AND wake the agent.
- *  pi queues it while the agent is streaming and delivers it at the next
- *  tool-call boundary — Claude Code's 'next' priority. Use when the message
- *  IS something the agent must react to now: a background job's terminal
- *  <task-notification>, a stall warning, a deadline decision. */
+ *  Pi 1.1.0 queues it while streaming and consumes it after the current
+ *  assistant tool batch, without cancelling tools. Use for task completion,
+ *  bounded monitor progress/silence/recovery, stall warnings and deadlines. */
 export const DELIVER_STEER = { deliverAs: "steer", triggerTurn: true } as const;
-/** Append the message to the transcript PASSIVELY: it never wakes the agent and
- *  never queues work. The agent reads it on its next natural turn. Monitor
- *  stream events are informational and must not force an unsolicited
- *  acknowledgment or starve user input.
+/** Append to the transcript PASSIVELY without scheduling agent processing.
+ *  Used by the shell's existing resource warning path, not monitor events.
  *
  *  What pi actually does with this (agent-session.ts sendCustomMessage): with
  *  `triggerTurn: false` the steer/followUp queue branch is skipped entirely, so

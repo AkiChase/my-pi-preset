@@ -48,9 +48,8 @@ export function startBackgroundJob(args: {
     /** Suppress the interactive-prompt stall heuristic (monitors stream their
      *  own output, so a quiet tail is normal, not a stuck prompt). */
     disablePromptStall?: boolean;
-    /** Suppress the oversize auto-kill (persistent log tails are expected to
-     *  grow without bound). */
-    disableOversizeKill?: boolean;
+    /** Monitor-specific oversize owner; shell keeps the default warning path. */
+    handleOversize?: () => void;
     onExit?: (result: SpawnExit) => void;
 }): AbortController {
     ensureCompletionPromise(args.job);
@@ -62,7 +61,7 @@ export function startBackgroundJob(args: {
         logPath: args.job.logPath,
         pi: args.pi,
         disablePromptStall: args.disablePromptStall,
-        disableOversizeKill: args.disableOversizeKill,
+        handleOversize: args.handleOversize,
         onOversize: () => terminateJobSilently(args.reg, args.job),
         config: args.reg.config,
     });
@@ -71,6 +70,7 @@ export function startBackgroundJob(args: {
         // Session replacement clears the map; an old process's late exit must
         // not notify or mutate counters belonging to the new session.
         if (args.reg.jobs.get(args.job.id) !== args.job) return;
+        if (isTerminalStatus(args.job.status)) return;
         args.onExit?.(result);
         completeJob({
             job: args.job,

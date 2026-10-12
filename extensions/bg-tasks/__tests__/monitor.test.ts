@@ -1,5 +1,7 @@
-import { describe, it, before, after } from "node:test";
+import { describe, it, before, after, test } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,6 +9,8 @@ import { BackgroundRegistry } from "../state.ts";
 import { registerMonitorTool } from "../tools/monitor.ts";
 import { spawnWithFileOutput } from "../spawn.ts";
 import { openWsSource, isWsSupported } from "../monitor-ws.ts";
+import { DEFAULTS } from "../config.ts";
+import { terminateJobSilently } from "../lifecycle.ts";
 import { EVENT } from "../types.ts";
 
 const dir = join(tmpdir(), `pi-bg-monitor-${process.pid}`);
@@ -14,6 +18,7 @@ mkdirSync(dir, { recursive: true });
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 interface CapturedTool {
+    parameters?: { properties: Record<string, unknown> };
     execute: (
         toolCallId: string,
         params: unknown,
@@ -34,7 +39,7 @@ function makeHarness() {
             messages.push(msg);
         },
     };
-    const reg = new BackgroundRegistry();
+    const reg = new BackgroundRegistry({ ...DEFAULTS, logDir: dir });
     registerMonitorTool(pi as never, reg);
     const ctx = {
         cwd: process.cwd(),
@@ -165,7 +170,7 @@ void describe("monitor — ws source mapping", () => {
     void it("appends text frames and a binary placeholder to the log", async () => {
         assert.ok(isWsSupported());
         const logPath = join(dir, "ws.log");
-        const src = openWsSource({ url: "wss://example/feed" }, logPath);
+        const src = openWsSource({ url: "wss://example/feed" }, logPath, { event() {}, finishing() {}, final() {} }, { maxLines: 50, maxChars: 12000 });
         const ws = FakeWS.instances[FakeWS.instances.length - 1];
 
         ws.dispatch("message", { data: "hello" });
@@ -188,4 +193,85 @@ after(() => {
     } catch {
         /* best-effort */
     }
+});
+
+
+for (const key of ["timeout_ms", "wake_absent_ms"] as const) {
+    for (const value of [0, -1, NaN, Infinity]) {
+        test(`AC11: ${key}=${value} rejected before WS construction or registry insertion`, async () => {
+            const h = makeHarness(); const before = FakeWS.instances.length;
+            await assert.rejects(() => h.tool.execute("invalid", { command: "echo must-not-run", description: "invalid", [key]: value },
+                undefined, undefined, h.ctx), /finite positive/);
+            assert.equal(h.reg.totalStarted, 0); assert.equal(h.reg.jobs.size, 0); assert.equal(FakeWS.instances.length, before);
+        });
+    }
+}
+test("AC16: tool schema has optional timeout/silence and no persistent", () => {
+    const h = makeHarness(); const keys = h.tool.parameters!.properties;
+    assert.ok("timeout_ms" in keys); assert.ok("wake_absent_ms" in keys); assert.ok(!("persistent" in keys));
+});
+test("source constructor failure rolls back started count and registry", async t => {
+    const original = globalThis.WebSocket;
+    globalThis.WebSocket = class { constructor() { throw new Error("constructor failed"); } } as unknown as typeof WebSocket;
+    t.after(() => { globalThis.WebSocket = original; });
+    const h = makeHarness();
+    await assert.rejects(() => h.tool.execute("fail", { ws: { url: "ws://local.invalid" }, description: "x" }, undefined, undefined, h.ctx), /constructor failed/);
+    assert.equal(h.reg.jobs.size, 0); assert.equal(h.reg.totalStarted, 0); assert.equal(h.reg.jobAborts.size, 0);
+});
+test("AC4/5/6/12/19: WS empty/multiline/omitted messages each reset activity; diagnostics and late messages don't recover", async t => {
+    t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1000000 });
+    const original = globalThis.WebSocket; globalThis.WebSocket = FakeWS as unknown as typeof WebSocket;
+    t.after(() => { globalThis.WebSocket = original; t.mock.timers.reset(); });
+    const reg = new BackgroundRegistry({ ...DEFAULTS, logDir: dir, monitorMaxLinesPerEvent: 2, outputPreviewChars: 5 });
+    const messages: { content: string; details: { monitor: { state: string } } }[] = [];
+    let tool!: CapturedTool;
+    registerMonitorTool({ registerTool(def: CapturedTool) { tool = def; }, sendMessage(m: typeof messages[number]) { messages.push(m); } } as never, reg);
+    const ctx = makeHarness().ctx;
+    await tool.execute("ws", { ws: { url: "ws://local.invalid" }, description: "ws activity", wake_absent_ms: 1000 }, undefined, undefined, ctx);
+    const ws = FakeWS.instances.at(-1)!;
+    ws.dispatch("message", { data: "" }); assert.equal(messages.length, 1);
+    for (let i = 0; i < 5; i++) { t.mock.timers.tick(900); ws.dispatch("message", { data: "abcdef\nmore\nlast" }); }
+    assert.equal(messages.length, 1, "omitted and buffered events prevent silence");
+    t.mock.timers.tick(1000); assert.equal(messages[1]!.details.monitor.state, "absent");
+    assert.match(messages[1]!.content, /notification omitted/);
+    ws.dispatch("message", { data: "stderr is just text" }); assert.equal(messages[2]!.details.monitor.state, "resumed");
+    ws.dispatch("error", {}); ws.dispatch("message", { data: "late" }); ws.dispatch("close", { code: 1000, reason: "" });
+    await Promise.resolve(); await Promise.resolve();
+    assert.equal(messages.length, 4); assert.equal(messages[3]!.details.monitor.state, "failed");
+    assert.match(messages[3]!.content, /WebSocket error/); assert.doesNotMatch(messages[3]!.content, /late/);
+    t.mock.timers.tick(100000); assert.equal(messages.length, 4); assert.equal(reg.jobAborts.size, 0);
+});
+
+test("AC17/19: real stderr-only source exceeds shared log cap, stops with one combined terminal", async t => {
+    const reg = new BackgroundRegistry({ ...DEFAULTS, logDir: dir, maxLogBytes: 100, stallCheckIntervalMs: 20 });
+    const sent: { customType: string; content: string }[] = [];
+    let tool!: CapturedTool;
+    registerMonitorTool({ registerTool(def: CapturedTool) { tool = def; }, sendMessage(m: typeof sent[number]) { sent.push(m); } } as never, reg);
+    t.after(() => { for (const job of reg.jobs.values()) terminateJobSilently(reg, job); });
+    await tool.execute("stderr-cap", { command: "while true; do printf 'stderr-output-0123456789\\n' >&2; sleep 0.01; done", description: "stderr cap" }, undefined, undefined, makeHarness().ctx);
+    const job = [...reg.jobs.values()][0]!; await job.donePromise;
+    const terminals = sent.filter(m => m.customType === EVENT.taskNotification);
+    assert.equal(terminals.length, 1); assert.match(terminals[0]!.content, /log size exceeded 100 bytes/);
+    assert.ok(!sent.some(m => m.customType === EVENT.stall)); assert.equal(job.status, "killed");
+    assert.match(readFileSync(job.logPath, "utf8"), /stderr-output/); assert.equal(reg.jobAborts.size, 0);
+});
+
+test("AC18: tool startup sidebar failure closes WS/log fd and rolls back all runtime registration", async t => {
+    t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1000000 });
+    const original = globalThis.WebSocket;
+    let closes = 0;
+    globalThis.WebSocket = class extends FakeWS { override close() { closes++; super.close(); } } as unknown as typeof WebSocket;
+    const closedFds: number[] = [], close = fs.closeSync;
+    t.mock.method(fs, "closeSync", (fd: number) => { closedFds.push(fd); close(fd); }); syncBuiltinESMExports();
+    t.after(() => { globalThis.WebSocket = original; t.mock.restoreAll(); syncBuiltinESMExports(); t.mock.timers.reset(); });
+    const h = makeHarness(); h.ctx.ui.setStatus = () => { throw new Error("sidebar failed"); };
+    await assert.rejects(() => h.tool.execute("ui-fail", { ws: { url: "ws://local.invalid" }, description: "ui failure",
+        wake_absent_ms: 1000 }, undefined, undefined, h.ctx), /sidebar failed/);
+    assert.equal(closes, 1); assert.equal(closedFds.length, 1);
+    assert.equal(h.reg.jobs.size, 0); assert.equal(h.reg.totalStarted, 0); assert.equal(h.reg.jobAborts.size, 0);
+    const ws = FakeWS.instances.at(-1)!;
+    ws.dispatch("message", { data: "late" }); ws.dispatch("error", {}); ws.dispatch("close", { code: 1000 });
+    t.mock.timers.tick(100000); await Promise.resolve();
+    assert.equal(h.messages.length, 0); assert.equal(closes, 1); assert.equal(closedFds.length, 1);
+    assert.equal(h.reg.completedCount + h.reg.failedCount + h.reg.killedCount, 0);
 });

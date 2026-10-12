@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { describe, it, test } from "node:test";
 import assert from "node:assert/strict";
 import { BackgroundRegistry } from "../state.ts";
 import {
@@ -362,3 +362,16 @@ void describe("completeJob — exit-path notification", () => {
         assert.equal(reg.completedCount, 1);
     });
 });
+
+for (const sendError of [null, undefined]) {
+    test(`terminal ${sendError} submission failure stays unsurfaced; a later successful call clears error and latches once`, t => {
+        t.mock.method(console, "error", () => {});
+        const h = harness(); const job = add(h.reg, mkJob({}));
+        assert.equal(sendTaskNotification({ reg: h.reg, job, pi: { sendMessage() { throw sendError; } } as never }), false);
+        assert.equal(job.notifyError, String(sendError)); assert.equal(job.outcomeSurfaced, undefined);
+        assert.equal(sendTaskNotification({ reg: h.reg, job, pi: h.pi as never }), true);
+        assert.equal(job.notifyError, undefined); assert.equal(job.outcomeSurfaced, true);
+        assert.equal(sendTaskNotification({ reg: h.reg, job, pi: h.pi as never }), false);
+        assert.equal(h.messages.length, 1); assert.equal(h.reg.jobs.get(job.id), job);
+    });
+}

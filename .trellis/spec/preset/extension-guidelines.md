@@ -30,6 +30,10 @@ Use [lifecycle.ts](../../../extensions/bg-tasks/lifecycle.ts) for terminal trans
 
 Optional host effects must be gated and isolated. [blocked-signal.ts](../../../extensions/blocked-signal.ts) pairs prompt block/release, releases on shutdown, suppresses duplicate host notifications and bounds CLI calls. Its [tests](../../../extensions/__tests__/blocked-signal.test.ts) use fake SDK events/sinks, including late notification IDs and sink failure.
 
+## Monitor 事件与停止
+
+修改 monitor 或共享任务面板的执行接入时，另读 [Monitor 契约](./monitor-contract.md)。源回调先于启动接线，stdout/stderr 默认合并但独立解析完整行；时间／缓冲归 session，面板只调用共享停止能力。absent/resumed 不变更 Job 运行状态或消费结果标记，不把实时进度再次回读成失败尾部。该文档记录接口、错误矩阵和必须保留的离线断言。
+
 ## Safe Terminal Rendering
 
 Follow [BgTaskPanel](../../../extensions/bg-tasks/ui.ts): strip terminal controls from logs, bound reads via `readLogSlice`, show omitted-byte ranges, and size with SDK `visibleWidth`/`truncateToWidth`, not string length. Preserve selected final metadata without retaining runtime hooks. `openBgListPanel` permits one interactive overlay and disposes in `finally`; component `dispose` stops timers/input. [ui.test.ts](../../../extensions/bg-tasks/__tests__/ui.test.ts) covers wide/control text, narrow resizing, duplicate opens and timer disposal.

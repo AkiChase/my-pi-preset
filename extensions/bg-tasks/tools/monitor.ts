@@ -1,10 +1,4 @@
-// src/tools/monitor.ts
-//
-// `monitor` tool — a streaming-event background watch. Each stdout line (or
-// WebSocket text frame) becomes one notification delivered into the agent's
-// turn. This is distinct from bash_bg/run_in_background (one notification on
-// completion): monitor is for per-event streams (tail -f | grep, poll loops,
-// file watches, ws feeds), not one-shot "wait until done".
+// Monitor tool: event-arrival notifications, bounded batching, optional silence wakes.
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@earendil-works/pi-ai";
@@ -12,13 +6,12 @@ import type { BackgroundRegistry } from "../state.ts";
 import {
     type UiContext,
 } from "../types.ts";
-import { add, createRunningJob, errPathFor, newJobId, logPathFor } from "../registry.ts";
+import { add, createRunningJob, newJobId, logPathFor } from "../registry.ts";
 import { assertJobSlot, isBlankCommand, requireExistingCwd } from "../lifecycle.ts";
 import { isWsSupported, type WsSpec } from "../monitor-ws.ts";
 import {
     openWsMonitorSource,
     spawnCommandSource,
-    type MonitorSource,
 } from "../monitor-source.ts";
 import { startMonitorSession } from "../monitor-session.ts";
 import { textBlock } from "../format.ts";
@@ -29,7 +22,7 @@ interface MonitorParams {
     command?: string;
     ws?: WsSpec;
     description: string;
-    persistent?: boolean;
+    wake_absent_ms?: number;
     timeout_ms?: number;
 }
 
@@ -38,25 +31,23 @@ export function registerMonitorTool(pi: ExtensionAPI, reg: BackgroundRegistry): 
         name: "monitor",
         label: "Monitor",
         description:
-            "Stream events from a long-running process: each stdout line (or WebSocket " +
-            "text frame) becomes one notification, delivered while you keep working. " +
-            "Use this for per-event streams — NOT for one-shot 'wait until done' (use " +
-            "bash run_in_background for that). Exit ends the watch.",
-        promptSnippet:
-            "Stream per-event notifications from a process, log, poll loop, or WebSocket",
+            "Watch a command or WebSocket with visible, agent-waking batched notifications. " +
+            "Command stdout and stderr are collected together; complete lines are activity. " +
+            "The first batch is immediate, later progress is coalesced (default 30s). " +
+            "No implicit timeout; the main command exit ends observation.",
+        promptSnippet: "Watch event streams with batched notifications and optional silence reminders",
         promptGuidelines: [
-            "Pick by notification count: ONE ('tell me when done') → bash run_in_background with an `until` loop that exits; ONE-PER-EVENT → monitor.",
-            "Don't use an unbounded command (tail -f, while true, inotifywait -m) for a single notification — it never exits and stays armed until timeout.",
-            "Every pipe stage must flush per line: grep needs --line-buffered, awk needs fflush(); never pipe to `head` (it buffers until N matches).",
-            "Silence is not success: your filter must match failure signatures too (e.g. grep -E --line-buffered 'done|Traceback|Error|FAILED|Killed|OOM'), or a crash looks identical to 'still running'.",
-            "Only stdout is the event stream; merge stderr with 2>&1 if its failures should notify. Poll remote APIs at 30s+, local checks at 0.5–1s, and guard transient failures with `|| true`.",
-            "Give a specific description — it is shown on every notification.",
-            "Use persistent:true for session-length watches (PR monitoring, log tails); stop it with the jobs tool (action='kill').",
-            "Use the ws source for a WebSocket feed instead of `command: 'websocat …'` — each text frame becomes one event.",
+            "For one result when done, use bash run_in_background with a loop that exits; use monitor for event streams.",
+            "Both stdout and stderr are received. command | grep filters stdout only; command 2>&1 | grep filters both streams.",
+            "Flush pipeline stages per line: grep --line-buffered, awk fflush(). A partial command line does not wake the agent.",
+            "Silence is not success. Optional wake_absent_ms reminds once per silence; the first recovery is immediate and the watch continues.",
+            "No timeout unless timeout_ms is provided. Stop session-length watches via jobs action='kill'; explicit stop sends no final notification.",
+            "Give a specific description. Read the log for output omitted by bounded previews. stderr content alone is not failure.",
+            "WebSocket messages, including empty messages, count as activity; progress is batched, not one notification per line.",
         ],
         parameters: Type.Object({
             command: Type.Optional(
-                Type.String({ description: "Shell script; each stdout line is an event. Mutually exclusive with ws." })
+                Type.String({ description: "Shell script; complete stdout or stderr lines are activity. Mutually exclusive with ws." })
             ),
             ws: Type.Optional(
                 Type.Object(
@@ -68,11 +59,11 @@ export function registerMonitorTool(pi: ExtensionAPI, reg: BackgroundRegistry): 
                 )
             ),
             description: Type.String({ description: "Specific description, shown on every notification." }),
-            persistent: Type.Optional(
-                Type.Boolean({ description: "Run for the whole session (no timeout). Stop via jobs action='kill'. Default false." })
-            ),
             timeout_ms: Type.Optional(
-                Type.Number({ description: `Kill after this deadline (default ${reg.config.monitorDefaultTimeoutMs}, max ${reg.config.monitorMaxTimeoutMs}). Ignored when persistent.` })
+                Type.Number({ description: "Optional finite positive total deadline in milliseconds. Omitted means no deadline." })
+            ),
+            wake_absent_ms: Type.Optional(
+                Type.Number({ description: "Optional finite positive event-arrival silence threshold in milliseconds; remind once, keep watching." })
             ),
         }),
 
@@ -101,55 +92,41 @@ export function registerMonitorTool(pi: ExtensionAPI, reg: BackgroundRegistry): 
             if (hasCommand) requireExistingCwd(mctx.cwd);
             assertJobSlot(reg);
 
+            for (const key of ["timeout_ms", "wake_absent_ms"] as const) {
+                const value = p[key];
+                if (value !== undefined && (typeof value !== "number" || !Number.isFinite(value) || value <= 0)) {
+                    throw new Error(`\`${key}\` must be a finite positive number.`);
+                }
+            }
             const description = p.description.trim();
-            const persistent = p.persistent === true;
-            const timeoutMs = Math.min(
-                p.timeout_ms && p.timeout_ms > 0
-                    ? p.timeout_ms
-                    : reg.config.monitorDefaultTimeoutMs,
-                reg.config.monitorMaxTimeoutMs
-            );
-
             const id = newJobId("monitor", reg);
             const logPath = logPathFor(reg, id);
 
-            // Build the event source (command or ws) behind one seam, then hand
-            // it to the session, which owns the streaming/terminal lifecycle.
-            const source: MonitorSource = hasWs
-                ? openWsMonitorSource(p.ws!, logPath)
-                : spawnCommandSource({
-                      command: p.command!,
-                      cwd: mctx.cwd,
-                      logPath,
-                      errPath: errPathFor(reg, id),
-                  });
-
             const job = createRunningJob({
-                id,
-                name: description,
-                command: source.label,
-                pid: source.pid,
-                logPath,
-                toolCallId: _toolCallId,
-                kind: "monitor",
+                id, name: description, command: hasWs ? `ws ${p.ws!.url}` : p.command!,
+                pid: 0, logPath, toolCallId: _toolCallId, kind: "monitor",
             });
             add(reg, job);
-
-            startMonitorSession({
-                pi,
-                reg,
-                ctx: mctx,
-                job,
-                source,
-                description,
-                persistent,
-                timeoutMs,
-            });
+            try {
+                startMonitorSession({
+                    pi, reg, ctx: mctx, job, description,
+                    timeoutMs: p.timeout_ms, wakeAbsentMs: p.wake_absent_ms,
+                    createSource: (sinks) => {
+                        const limits = { maxLines: reg.config.monitorMaxLinesPerEvent,
+                            maxChars: reg.config.outputPreviewChars };
+                        return hasWs ? openWsMonitorSource(p.ws!, logPath, sinks, limits)
+                            : spawnCommandSource({ command: p.command!, cwd: mctx.cwd, logPath, sinks, limits });
+                    },
+                });
+            } catch (err) {
+                reg.jobs.delete(id);
+                reg.totalStarted--;
+                throw err;
+            }
 
             const sourceDesc = hasWs ? `WebSocket ${p.ws!.url}` : "command";
-            const deadlineDesc = persistent
-                ? "persistent (stop via jobs action='kill')"
-                : `timeout ${Math.round(timeoutMs / 1000)}s`;
+            const deadlineDesc = p.timeout_ms === undefined
+                ? "no deadline (stop via jobs action='kill')" : `timeout ${p.timeout_ms}ms`;
             return {
                 content: [
                     textBlock(

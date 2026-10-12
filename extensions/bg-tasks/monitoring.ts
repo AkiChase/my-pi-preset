@@ -37,8 +37,8 @@ export function watchStalls(args: {
     onOversize?: () => void;
     /** Skip the interactive-prompt stall heuristic (used for monitors). */
     disablePromptStall?: boolean;
-    /** Skip the oversize auto-kill (used for persistent monitors). */
-    disableOversizeKill?: boolean;
+    /** When supplied, owns both oversize termination and notification. */
+    handleOversize?: () => void;
     /** Thresholds; defaults let tests and callers without a registry omit it. */
     config?: Pick<
         BgTasksConfig,
@@ -61,8 +61,12 @@ export function watchStalls(args: {
         try {
             const { size } = fsStatSync(args.logPath);
 
-            if (size > maxLogBytes && !args.disableOversizeKill) {
+            if (size > maxLogBytes) {
                 cancelled = true;
+                if (args.handleOversize) {
+                    args.handleOversize();
+                    return;
+                }
                 if (args.onOversize) args.onOversize();
                 args.pi.sendMessage(
                     {

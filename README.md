@@ -270,6 +270,18 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 - 斜杠命令：`/bg` 转后台、`/bg-list` 任务面板、`/bg-version` 打印版本和路径、`/bg-config` 显示生效的配置、来源文件和加载警告。
 - 快捷键（默认值，可改）：`ctrl+shift+b` 转后台，`shift+down` 打开任务面板。没有全局「kill 最近任务」快捷键。
 
+**Monitor 通知与唤醒**：`monitor` 的首批输出立即通知，之后普通进度按 `monitorFlushMs` 合并（默认 30 秒），两批之间只写日志和有界缓冲，不追加被动消息或空通知。所有进度、静默、恢复和收尾通知都可见并唤醒 Agent；Agent 忙碌时在当前整批工具完成后的安全边界接收，不取消正在执行的工具，也不保证每条通知都有独立回复。
+
+- 通知本地提交异常只记录错误，不当成源失败、不停止正常监听，也不把结果标为已告知；不自动重试。源已创建但启动接线失败时会清理监听资源并回滚注册，不发送启动失败收尾通知。
+- `command` 与 `ws` 二选一，`description` 必填。命令默认接收 stdout **和** stderr 到同一日志／通知，不标来源或严重度；stderr 内容不等于失败，自然结果看主 shell 的退出码／信号。两个流独立解析 UTF-8 和完整行，不保证跨流严格时间顺序，也不保证通知行序与合并日志的字节顺序一致。
+- 工具合流不改 shell 管道：`command | grep pattern` 只过滤 stdout，stderr 绕过 grep 仍被收到；`command 2>&1 | grep pattern` 才过滤两流。显式分别重定向仍生效。管道需要逐行刷新，例如 `grep --line-buffered`。
+- 可选 `wake_absent_ms` 是有限正数，表示从启动或最近完整行／WS 消息到达起静默多久提醒；不传关闭。每段静默只提醒一次，监听继续；首次恢复事件立即通知，并重新计算普通间隔。被通知省略的行和空 WS 消息仍算活动；命令未换行片段只在收尾并入，不单独唤醒。多行 WS 消息只算一次到达。
+- 可选 `timeout_ms` 是有限正数的总截止；不传没有隐式截止。到时停止源，把原因和待发输出合为一条收尾。自然成功、失败、外部信号和日志超限也只产生一条合并收尾，仍遵守结果已告知／`jobs attach` 等待时的共享抑制。`jobs kill`、面板 x 和会话退出不新增尾批或收尾通知，已提交的消息不撤回，日志保留。
+- 命令观察随**主 shell 的 exit** 立即结束，不等待孙进程的 stdout/stderr EOF，也没有排空宽限时间。同步保存 Node 已缓冲的两流 bytes、并入收尾后关闭管道；任一流尚未结束时会说明后续输出可能未记录，不虚构数量。日志完整性只覆盖已接收／最终读取的观察范围，不承诺保存之后的孙进程输出。
+- 待发正文按行数及字符数保留本批前缀，超长行只留有界预览；通知明确区分省略的整行、字符和截断行，更多输出可读同一日志。通知省略不丢弃观察范围内原始日志，不因持续高频输出本身停止监听。所有 monitor 都遵守共享 `maxLogBytes`；这是周期磁盘保护，日志可能在检查之间超阈值，不是硬写入上限或速率限制。
+
+已删除 `persistent`、`monitorDefaultTimeoutMs`、`monitorMaxTimeoutMs`、`monitorPollMs`、`monitorRateWindowMs`、`monitorMaxLinesPerWindow` 和 `monitorMaxOverflowWindows`，无兼容别名或迁移层，不改写用户配置；旧文件键仅按普通未知键处理。
+
 **交互**：平时只在底栏显示正在运行的普通后台任务和 monitor 数量，例如 `▶ 2 tasks · ◉ 1 monitors · shift+down`；前台 bash 不计入，不再显示编辑器上方的后台状态条。前台命令超过 2 秒时的「转后台」提示仍保留。
 
 `shift+down` / `/bg-list` 打开一个双栏悬浮窗：左边是任务列表，右边立即显示所选任务的命令、状态、耗时、日志路径和实时输出，不需要 Enter，也不会再打开下一层菜单或编辑器。
@@ -303,14 +315,8 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 | `stallCheckIntervalMs` | `5000` | 卡死检测的轮询间隔 |
 | `stallThresholdMs` | `45000` | 日志多久没增长算可疑 |
 | `stallTailBytes` | `1024` | 判断交互提示符时读多少尾字节 |
-| `monitorDefaultTimeoutMs` | `300000` | `monitor` 的默认截止时间 |
-| `monitorMaxTimeoutMs` | `3600000` | `monitor` 的硬上限 |
-| `monitorPollMs` | `200` | `monitor` 读日志的轮询间隔 |
-| `monitorFlushMs` | `2000` | 事件合并窗口。安静后的首批立刻发，之后窗口内攒成一条 |
-| `monitorMaxLinesPerEvent` | `50` | 单条事件最多几行，多出来的计入「未显示」 |
-| `monitorRateWindowMs` | `10000` | 刷屏检测的滑动窗口 |
-| `monitorMaxLinesPerWindow` | `500` | 一个窗口内超过这么多行就停止发内容、只报抑制条数（monitor 继续跑） |
-| `monitorMaxOverflowWindows` | `3` | 连续这么多个窗口都溢出才真的杀掉 monitor |
+| `monitorFlushMs` | `30000` | 普通 monitor 进度通知的最小提交间隔；首批及静默后恢复立即发送，`0` 按源回调批次直接发送 |
+| `monitorMaxLinesPerEvent` | `50` | monitor 待发正文和单条通知的行数上限；字符上限复用 `outputPreviewChars` |
 | `shortcutBackground` | `["ctrl+shift+b"]` | 转后台 |
 | `shortcutTaskPanel` | `["shift+down"]` | 打开任务面板 |
 

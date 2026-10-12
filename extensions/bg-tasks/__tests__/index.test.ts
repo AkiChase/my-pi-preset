@@ -6,10 +6,11 @@
  *     and appends no state snapshot
  */
 
-import { describe, it, after } from "node:test";
+import { describe, it, after, test } from "node:test";
 import assert from "node:assert/strict";
 import { execSync } from "node:child_process";
 import extension from "../index.ts";
+import { visibleWidth } from "@earendil-works/pi-tui";
 import { EVENT } from "../types.ts";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -50,13 +51,14 @@ function makePi() {
     const handlers = new Map<string, SessionHandler>();
     const messages: { customType: string }[] = [];
     const appendedEntries: unknown[] = [];
+    const renderers = new Map<string, (message: unknown, options: unknown, theme: unknown) => { render: (width: number) => string[] }>();
     const pi = {
         registerTool(def: CapturedTool) {
             tools.set(def.name, def);
         },
         registerShortcut() {},
         registerCommand() {},
-        registerMessageRenderer() {},
+        registerMessageRenderer(name: string, renderer: (message: unknown, options: unknown, theme: unknown) => { render: (width: number) => string[] }) { renderers.set(name, renderer); },
         on(event: string, handler: SessionHandler) {
             handlers.set(event, handler);
         },
@@ -67,7 +69,7 @@ function makePi() {
             appendedEntries.push(data);
         },
     };
-    return { pi, tools, handlers, messages, appendedEntries };
+    return { pi, tools, handlers, messages, appendedEntries, renderers };
 }
 
 const uiCtx = {
@@ -164,4 +166,17 @@ after(() => {
     } catch {
         /* already gone */
     }
+});
+
+test("AC10: monitor progress and terminal renderer show identity/state/log/omissions, width/control safe", () => {
+    const h = startExtension(); const theme = { fg: (_: string, text: string) => text };
+    for (const type of [EVENT.monitorEvent, EVENT.taskNotification]) {
+        const content = "[monitor m00000001 · absent] 中文 watch\nlog: /tmp/monitor.log\n\u001b[2Joutput\n[notification omitted: 2 whole lines]";
+        const rendered = h.renderers.get(type)!({ content, details: { monitor: { state: "absent" } } }, {}, theme);
+        const wide = rendered.render(100).join("\n");
+        assert.match(wide, /m00000001.*absent/); assert.match(wide, /log: \/tmp\/monitor.log/); assert.match(wide, /omitted: 2/);
+        assert.ok(!wide.includes("\u001b")); assert.ok(rendered.render(10).every(line => visibleWidth(line) <= 10));
+    }
+    const shell = h.renderers.get(EVENT.taskNotification)!({ content: "x", details: { status: "failed", summary: "shell failure", outputTail: "tail" } }, {}, theme);
+    assert.deepEqual(shell.render(100), ["● shell failure", "  │ tail"]);
 });

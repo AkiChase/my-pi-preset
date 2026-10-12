@@ -1,0 +1,12 @@
+{"file":".trellis/spec/preset/index.md","reason":"核对任务范围、验收门禁以及开发集成不进入 preset 的要求"}
+{"file":".trellis/spec/preset/repository-guidelines.md","reason":"核对中文文档、vendor 本地归属、依赖与目录规则"}
+{"file":".trellis/spec/preset/extension-guidelines.md","reason":"检查单一工具入口、SDK 类型、资源释放、终态幂等及 shell 行为不变"}
+{"file":".trellis/spec/preset/testing-guidelines.md","reason":"检查离线隔离、假时钟与源事件测试、真实回归有效性以及 pnpm check 结果"}
+{"file":".trellis/spec/preset/documentation.md","reason":"检查行为和参数变更已同步 README 与 PROVENANCE，没有混入开发流程"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"检查复用现有配置和生命周期，没有第二套队列或旧参数兼容机制"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"检查事件到达、日志完整性、通知内容与终态投递之间的数据一致性"}
+{"file":".trellis/tasks/10-12-monitor-wake/research/design-evidence.md","reason":"按证据区分旧实现与目标行为，核对用户决定和 Pi 的安全投递边界"}
+{"file":".trellis/tasks/10-12-monitor-wake/research/source-drain.md","reason":"按用户确认的主 shell exit 结束契约实现同步读取与关闭；不等 stdout EOF、不加排空时限，明确已接收输出完整性边界"}
+{"file":".trellis/tasks/10-12-monitor-wake/research/follow-up-boundary.md","reason":"先完成 monitor 再做 subagents-task-ux；保护 Job、显式停止、结果抑制、会话清理与可迁移通知契约，不提前改名或重构共享 task-ui"}
+{"file":".trellis/tasks/10-12-monitor-wake/research/merged-output.md","reason":"按新决定默认合并 stdout/stderr：双 pipe 同日志、独立解析完整行、同一通知调度；保护 shell 管道和退出码语义，不恢复 stderr-only 例外"}
+{"file":".trellis/spec/preset/monitor-contract.md","reason":"按当前 monitor 的可执行源、通知、停止契约复核修复，保护后续任务 UI 接入与双流行为"}
