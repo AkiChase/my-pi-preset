@@ -110,10 +110,11 @@ pi 里只有一个本仓库自带的命令：`/statusbar`，在自定义状态�
 | [`pi-memory`](#npmpi-memory) | 跨会话记忆：长期记忆、日志、便签、检索 | 无（只有 `PI_MEMORY_*` 环境变量） | 无 |
 | [`@tintinweb/pi-subagents`](#npmtintinwebpi-subagents) | 子 agent 和工作流编排 | `~/.pi/agent/subagents.json` | 无（只有浮层内按键） |
 | [`@juicesharp/rpiv-ask-user-question`](#npmjuicesharprpiv-ask-user-question) | 让模型给出选项，而不是自己猜 | `~/.config/rpiv-ask-user-question/config.json` | `ctrl+]`，可改 |
+| [`@tifan/pi-recap`](#npmtifanpi-recap) | 会话回到现场：一行 recap，离开后自动生成 | `~/.pi/agent/extensions/pi-recap.json` | 无 |
 | [`pi-patty-bg-tasks`](#npmpi-patty-bg-tasks) | 后台任务：长命令不阻塞会话 | `~/.pi/agent/bg-tasks.json` | `ctrl+shift+b` 等，可改 |
 | [`@heyhuynhgiabuu/pi-pretty`](#npmheyhuynhgiabuupi-pretty) | 终端输出美化 | `~/.pi/agent/pi-pretty.json` | 无 |
 
-前七个是普通依赖，由 pi 从 npm 安装，来源写在 [`pi-preset.json`](pi-preset.json) 的 `packages` 里，本仓库不动它们的代码。
+前八个是普通依赖，由 pi 从 npm 安装，来源写在 [`pi-preset.json`](pi-preset.json) 的 `packages` 里，本仓库不动它们的代码。
 
 后两个（patty 和 pretty）比较特殊：patty 已拷贝为本仓库的代码，pretty 是本仓库的 npm 运行时依赖（见 [`package.json`](package.json)）；两者由 `extensions/bash-unified.ts` 亲自加载，所以也被写进了清单的 `conflicts`，**不能**再当成普通 pi 包安装。否则 `bash` 这个工具会被注册两次，pi 直接报冲突、启动失败。
 
@@ -242,6 +243,18 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 **提供**：工具 `ask_user_question`。没有斜杠命令，不注册全局快捷键；问卷内的按键见问卷底部提示，其中 `ctrl+]` 用来折叠 / 展开浮层。
 
 **配置**：配置文件 `~/.config/rpiv-ask-user-question/config.json`（走 `XDG_CONFIG_HOME`，不在 agent 目录下），只读不写。能配四项：`collapseKey`（默认 `"ctrl+]"`，写 `"off"` 关掉）、`guidance.description`、`guidance.promptSnippet`、`guidance.promptGuidelines`（后三项调节模型提问的积极程度）。其余按键不可重映射。默认的 `ctrl+]` 会撞 pi 的 `tui.editor.jumpForward`，见 [键位冲突](#键位冲突)。
+
+#### `npm:@tifan/pi-recap`
+
+> 来源：[npm](https://www.npmjs.com/package/@tifan/pi-recap) · [GitHub](https://github.com/tifandotme/pi-extensions/tree/master/packages/pi-recap)（需要 pi 0.84.2 以上）
+
+回到一个会话时不用重读整条 transcript。它在编辑器上方显示一行 recap：先说你当初为什么开这个会话，再补当前状态、关键决定、相关文件或命令、以及下一步大概要做什么。recap 用的是 pi 的当前会话上下文（跟随当前分支、尊重压缩），不去扒完整的会话文件或终端历史；最新一条 recap 存在 LLM 上下文之外。
+
+触发时机：`/recap` 当场生成一条新的；agent 结束后等 5 分钟，如果你一直闲着就自动生成一条；resume 时若已存的 recap 仍对得上最新会话状态就直接显示，过期或缺失则重新生成；你发出任何非 `/recap` 消息时 recap 清掉。
+
+**提供**：命令 `/recap`（生成并显示）、`/recap status`（看所选模型、当前模型、新鲜度、是否可见）、`/recap config`（选 recap 模型）、`/recap help`。用 `setWidget` 画在编辑器上方，和 `@tintinweb/pi-subagents` 一样，互不影响；不注册全局快捷键。
+
+**配置**：配置文件 `~/.pi/agent/extensions/pi-recap.json`（在 agent 目录的 `extensions/` 子目录下，不是根目录），只有一个键 `model`，形如 `{ "model": "provider/model-id" }`。扩展自己读写它：`/recap config` 选模型时写入，选「Use default」时删掉。上游默认模型是 `openai-codex/gpt-5.6-luna`，**本机没有这个 provider**，所以首次用必须跑一次 `/recap config` 选一个本机已认证的文本模型（如 `mp-messages/deepseek-v4.1-flash`），否则 recap 会报没有可用模型。因为这个文件在 `extensions/` 子目录里、而清单的 `files` 域只认 agent 根目录下的文件名，所以它**不由清单声明**，每台机器各自 `/recap config` 一次。
 
 ### 由本仓库代为加载的包
 
@@ -402,6 +415,7 @@ pi 自己其实把信号发出来了 —— `ui_prompt_start` / `ui_prompt_end` 
 | `~/.pi/agent/pi-pretty.json` | `@heyhuynhgiabuu/pi-pretty` |
 | `~/.pi/agent/subagents.json`、`<项目>/.pi/subagents.json` | `@tintinweb/pi-subagents`，项目覆盖全局 |
 | `~/.config/rpiv-ask-user-question/config.json` | `@juicesharp/rpiv-ask-user-question`，走 `XDG_CONFIG_HOME`，不在 agent 目录下 |
+| `~/.pi/agent/extensions/pi-recap.json` | `@tifan/pi-recap`，只有 `model` 一键；在 `extensions/` 子目录下，不由清单声明 |
 | `~/.pi/agent/memory/` | `pi-memory` 的数据目录（不是配置），可用 `PI_MEMORY_DIR` 改写；配置只有 `PI_MEMORY_*` 环境变量 |
 | `~/.pi/agent/bg-tasks.json` | `pi-patty-bg-tasks`（本仓库代为加载），超时、并发、日志目录、快捷键。所有键也能用 `BG_TASKS_*` 环境变量覆盖 |
 | 无 | `pi-session-name` 全部硬编码，没有任何配置入口 |
