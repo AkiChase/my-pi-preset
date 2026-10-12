@@ -43,3 +43,43 @@ Migrated project rules into source-backed preset specs, removed frontend scaffol
 ### Next Steps
 
 - Bootstrap complete; unrelated Trellis initialization files remain uncommitted and other tasks unchanged.
+
+
+## Session 2: Monitor 通知与唤醒实现及收尾
+<!-- trellis-session: v=2 fp=0342f5e039fc71b0 -->
+
+**Date**: 2026-10-12
+**Task**: Monitor 通知与唤醒实现及收尾
+**Branch**: `main`
+
+### Summary
+
+完成 monitor 合并唤醒、可选静默恢复、默认 stdout/stderr 同日志及统一停止保护；19 条验收通过，工作已合并 main 并由用户 push，当前任务归档。
+
+### Main Changes
+
+- monitor 首批立即、普通 30 秒合并、每段静默一次提醒与恢复立即通知；删除隐式截止、persistent、速率停止和轮询。
+- 默认合并 stdout/stderr，独立有界 UTF-8／部分行解析；主 shell exit 结束观察，已缓冲输出合入单条收尾，显式停止不新增通知。
+- 独立审查发现并修复启动资源回滚、null/undefined 通知异常、Unicode 省略分类；补正 deadline 被 oversize 假覆盖的测试。
+- 项目文档使用中文；新增 monitor 契约规范，保留后续 subagents-task-ux 的执行/UI 边界，不启动或修改其他任务。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `75e5278` | docs: use Chinese for project and task documentation |
+| `85c6189` | feat: add batched monitor wakes and unified output handling |
+
+### Testing
+
+- [OK] 隔离 pnpm check：strict typecheck 通过，325/325；bg-tasks＋manifest 无 force-exit 308/308，正常退出。
+- [OK] 最终独立 deadline/oversize 覆盖复查 11/11，无剩余发现；归档后链接和 24 条上下文路径校验通过。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 后续 subagents-task-ux 从 main 上已完成的 monitor 行为及归档契约重新建立基线，按自身审阅流程开始。
+- 本轮归档与日志提交尚未 push；真实 Pi Agent/网络 WebSocket 的端到端体验未验证。
