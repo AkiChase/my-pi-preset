@@ -1,0 +1,27 @@
+{
+  "result": "FAIL",
+  "method": "installed Pi 1.2.0 CLI in separate tmux 3.6a server; real terminal input and actual tools; native faux offline provider controls only tool-call sequence",
+  "cases": [
+    {"case":"isolated CLI startup","status":"PASS"},
+    {"case":"read success collapsed exactly one nonblank tool row","status":"PASS","evidence":"tmux-evidence/read-collapsed.ansi.txt"},
+    {"case":"find success 32 actual files, collapsed one row and Ctrl+O roundtrip","status":"PASS","evidence":"tmux-evidence/find-expanded.txt"},
+    {"case":"grep success 48 actual matches, collapsed one row and Ctrl+O roundtrip","status":"PASS","evidence":"tmux-evidence/grep-expanded.txt"},
+    {"case":"bash ordinary long output containing background keywords, one row and Ctrl+O roundtrip","status":"PASS","evidence":"tmux-evidence/bash-expanded.txt"},
+    {"case":"bash nonzero exit with 30 output lines, error background and expanded returned body","status":"PASS","evidence":"tmux-evidence/bash-error-expanded.txt"},
+    {"case":"read error collapsed one physical nonblank row","status":"PASS","evidence":"tmux-evidence/read-error-collapsed.txt","note":"manual text review after fixture searched untruncated filename; no error expansion coverage"},
+    {"case":"pending/success/error dark-theme colors distinct","status":"PASS","pending_rgb":[52,56,58],"success_rgb":[37,65,49],"error_rgb":[91,40,42]},
+    {"case":"continuous background for long collapsed Bash title","status":"FAIL","evidence":"tmux-evidence/bash-collapsed.ansi.txt","note":"49m occurs at title ellipsis, remaining title and metadata inherit terminal default background"},
+    {"case":"continuous background for shortened Read error title","status":"FAIL","evidence":"tmux-evidence/read-error-collapsed.ansi.txt","note":"same 49m background reset before ellipsis/metadata"},
+    {"case":"Read resize 140/80/40 stays one nonblank row and Ctrl+O works","status":"PASS","evidence":"tmux-evidence/read-width-40-collapsed.txt"},
+    {"case":"40-column expand hint completely shown or omitted","status":"FAIL","evidence":"tmux-evidence/read-width-40-collapsed.txt","note":"hint cut to ctrl; metadata width computation does not match actual rendered width"},
+    {"case":"mouse SGR padding does not expand; body expands; expanded code body recollapses","status":"PASS","evidence":"tmux-evidence/mouse-body.txt","note":"actual tmux send-keys -l SGR bytes into CLI stdin, not component simulation; not a physical pointing-device or attached terminal-client forwarding test"},
+    {"case":"optional jobs list empty returns actual backend, one collapsed row, Ctrl+O roundtrip","status":"PASS","evidence":"tmux-minimal/jobs-list-expanded.txt"},
+    {"case":"get_subagent_result normal/verbose/running/wait-release with actual child","status":"NOT_RUN","reason":"scope converged after real background defects and user requested timely minimal smoke"},
+    {"case":"jobs output/search/stats/attach partial-final/release/kill","status":"NOT_RUN","reason":"same bounded scope decision"},
+    {"case":"Find/Grep error expansion and all six tools at all widths","status":"NOT_RUN"},
+    {"case":"light/system themes, actual input-history package, regular-mode mouse, image attachments","status":"NOT_RUN"}
+  ],
+  "cleanup":{"all_test_clis_naturally_quit":true,"isolated_config_roots_removed":true,"own_tmux_servers_stopped":true,"pending_os_pid_gone":true,"personal_install_sync_reload_commit":false,"product_edits_by_validator":false,"parallel_changes":"README and host-loading-smoke.mjs changed concurrently for at-path-completion; not reverted"},
+  "raw_reports":["tmux-evidence/report.json","tmux-minimal/report.json"],
+  "report":"tmux-validation.md"
+}

@@ -49,7 +49,7 @@ node --test extensions/agent-tasks/__tests__/*.test.ts
 
 ## Beautify 验证
 
-[editor.test.ts](../../../extensions/beautify/__tests__/editor.test.ts) 使用实际 SDK setter/reset/editor 和自有 appearance，历史插件是独立离线 fixture，不依赖本机 input-history 安装。[tools.test.ts](../../../extensions/beautify/__tests__/tools.test.ts) 验证原生工具结果、真实 renderer/component、Shiki 与宽度。来源与范围见 [TESTING.md](../../../extensions/beautify/TESTING.md)。定向执行不加 force-exit：
+[editor.test.ts](../../../extensions/beautify/__tests__/editor.test.ts) 使用实际 SDK setter/reset/editor 和自有 appearance，历史插件是独立离线 fixture，不依赖本机 input-history 安装。[tools.test.ts](../../../extensions/beautify/__tests__/tools.test.ts) 验证原生工具结果、真实 renderer/component、Shiki 与宽度；shell-collapse/retrieval/registered-agent 增加主题背景、同轮单行、原 renderer 隔离委托与实际注册检索信封。retrieval 另以实际 host 对照 default/self 的上下／左右 padding 和正文鼠标命中，检查 partial→final 不触发缓存结果的 original 回调、空／多行 description、safe integer 合计、throwing original 的可读参数／结果 fallback，以及实际 SDK runToolCall 的 details={} 错误降级。来源与范围见 [TESTING.md](../../../extensions/beautify/TESTING.md)。定向执行不加 force-exit：
 
 ```sh
 node --test extensions/beautify/__tests__/*.test.ts
@@ -58,6 +58,26 @@ node --test extensions/beautify/__tests__/*.test.ts
 覆盖同实例 transient state、history/Down 两种顺序、禁用 Down、安全降级、部分安装失败回滚、后来 wrapper/padding/factory 所有权、reset-before-shutdown 和真实 GC；验证 Read offset/notice、async stale、图片单次、Bash 后台 handle、grep literal/context，以及模型结果不被改写。局部移除行为后回归须失败。
 
 真实 CLI/PTy 与实际 input-history 包另列验证，不以 fixture 推定终端/IME/任意插件兼容。SDK 极窄中文和聚焦光标异常必须对照记录，不能跳过后称为已修复。测试使用 Pi 1.2.0 实际 SDK 和临时配置目录，不安装第二 SDK，不访问个人配置。
+
+## 有界 tmux 真实终端验收
+
+适用于工具renderer/背景/键位/窗口变化任务；自动组件测试不能证明真实终端样式。用户明确授权后才运行，不访问个人认证/配置，不连接用户现有panes。
+
+1. 使用唯一 `tmux -L <test-id>` 服务和临时配置、HOME、PI_CODING_AGENT_DIR、cwd、sessions/logs。`env -i` 提供必要PATH与终端变量；直接调用现有installed CLI并显式加载当前检出，禁用自动发现和在线请求。离线faux仅安排调用顺序，工具执行仍走真实CLI循环。
+2. **先最小矩阵，再专项**：一个短Read成功、长标题Bash、错误返回、一个optional结果；验证收缩→真实Ctrl+O展开→收回、140/80/40列。目标是快速暴露问题，不先搭建完整agent/attach矩阵。模型/child专项不被需要时不运行。
+3. 固定并记录主题。没有颜色应答时system可能无背景；dark结果不能代表system/light。用 `capture-pane -p -e` 保存文本屏幕及SGR；resize后必须等待原始CLI写流中完成的新宽度帧（完整border及帧结束），不能仅凭capture中的border长度判断，因为tmux可裁剪旧宽度画面。逐段验证整行背景连续，不能只搜索有无48m。标题省略后49m或0m也必须检查；hint空间不足应完整省略，不仅断言一行。
+4. Ctrl+O用 `tmux send-keys ... C-o` 并用前后屏幕证实。SGR鼠标字节输入可验证实际CLI命中，但必须标为stdin模拟，不冒称物理鼠标/attached-client转发全链路。`/debug`不含所有overlay且不是截图；capture-pane文本也不是图片。
+5. 每项记PASS/FAIL/NOT_RUN，同时审阅report.error、cases、exit code。driver捕获异常后exit0不代表通过；fixture问题与产品失败分开记录，不能改产品或预期迁就失败。
+6. 等待使用有界条件循环/monitor，不用固定sleep等待。搭建或专项受阻时及时给状态，收敛最小证据，把剩余项标NOT_RUN，不持续扩建harness。
+7. finally发送自身/quit，确认CLI及自有child真实退出；必要时只TERM/KILL测试PID/group，停止自己的唯一tmux服务，删除临时config。禁止不带-L的kill-server或触碰用户pane。保留有界证据到task research，检查无凭证。
+
+已跑通参考：[tmux-validation](../../tasks/10-13-beautify-tool-shell-collapse/research/tmux-validation.md)及其tmux-harness脚本（仅测试材料，不是产品入口）。本轮验证发现自动测试遗漏的背景reset；最初残缺hint经raw frame复核属于tmux裁剪旧帧的夹具误判，等待真实resize frame后通过。流程有效不代表所有矩阵通过；定向复验见[terminal-fix-report](../../tasks/10-13-beautify-tool-shell-collapse/research/terminal-fix-report.md)。复用先读报告的夹具失败和启动命令，不盲跑全量driver。
+
+## @ 路径连续补全验证
+
+`node --test extensions/at-path-completion/__tests__/*.test.ts` 使用实际已安装SDK和临时agent目录，不加force-exit。覆盖实际Editor/CustomEditor/host setter/reset、无列表slash与目录接受续提示、唯一项只展示、Enter不误提交、Escape/后续键/鼠标/失焦/overlay/文本替换/关闭的迟到请求；保native Copy、普通Tab和非@ trigger。后装delegating setter只接收一次provider转换，nondelegating替换不回写旧链；GC检查退役wrapper不保editor/screen。native provider仅临时目录，`~/`使用隔离子进程HOME，不扫描个人目录，fd缺失不下载。
+
+原生行为红测须证明两个触发缺口，增强断言另外保留；actual host loader防Node-only子路径import。internal接口存在不证明升级兼容；实际PTY/IME/input-history原包验收与离线fixture分开报告。详见 [TESTING.md](../../../extensions/at-path-completion/TESTING.md) 与 [扩展契约](./extension-guidelines.md#-路径连续补全契约)。
 
 ## Representative Regression Evidence
 

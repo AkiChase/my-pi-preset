@@ -1,8 +1,8 @@
 import type { Theme, ToolRenderers } from "@earendil-works/pi-coding-agent";
 import { Highlighter, language } from "../highlight.ts";
-import { clean, readNotice, splitView, summary, wrap } from "../layout.ts";
+import { clean, readNotice, splitView, wrap } from "../layout.ts";
 import { text, type RenderContext, type Result } from "../types.ts";
-import { fallback, numbered, renderers } from "./shared.ts";
+import { fallback, genericMetadata, numbered, renderers } from "./shared.ts";
 
 function applyHighlight(weak: WeakRef<ReadDrawing>, revision: number, ansi: string | undefined): void {
   const drawing = weak.deref();
@@ -36,8 +36,7 @@ class ReadDrawing {
   invalidate() {}
   render(width: number): string[] {
     const { result, theme, ctx } = this;
-    const pad = Math.min(Math.max(0, Math.floor(ctx.outputPad)), Math.max(0, width - 1));
-    const room = Math.max(0, width - pad);
+    const room = width;
     const raw = text(result), view = splitView(raw, readNotice);
     const path = clean(String(ctx.args.path ?? "read"));
     const start = typeof ctx.args.offset === "number" ? Math.max(1, ctx.args.offset) : 1;
@@ -53,33 +52,36 @@ class ReadDrawing {
       const weak = new WeakRef(this);
       void this.highlighter.highlight(view.body, language(path)).then(applyHighlight.bind(undefined, weak, revision));
     }
+    if (!ctx.expanded) return [];
     let lines: string[];
-    if (ctx.isError || image) lines = wrap(path, room).map(line => theme.fg("accent", line)).concat(fallback(result, theme, ctx, room));
-    else if (!ctx.expanded) lines = summary(path, typeof ctx.args.offset === "number" ? `:${start}` : "", `${view.lines.length} lines`, room, theme).concat(view.notice.flatMap(line => wrap(line, room).map(row => theme.fg("muted", row))));
+    if (ctx.isError || image) lines = fallback(result, theme, ctx, room);
     else {
       const code = this.ansi?.split("\n") ?? view.lines;
       const digits = String(start + Math.max(0, view.lines.length - 1)).length;
-      lines = wrap(path, room).map(line => theme.fg("accent", line));
+      lines = [];
       lines.push(...view.lines.map((_line, index) => numbered(code[index] ?? view.lines[index]!, start + index, digits, room, theme)));
       if (!view.lines.length && !view.notice.length) lines.push(...wrap("(empty file)", room));
       lines.push(...view.notice.flatMap(line => wrap(line, room).map(row => theme.fg("muted", row))));
     }
-    return lines.map(line => " ".repeat(pad) + line);
+    return lines;
   }
 }
 export function readRenderers(highlighter: Highlighter): ToolRenderers {
-  const base = renderers("read", fallback);
+  const base = renderers("read", fallback, (result, ctx) => {
+    if (!result || ctx.isError) return genericMetadata(result, ctx);
+    const raw = text(result), view = splitView(raw, readNotice);
+    if (result.content.some(block => block.type === "image") || /^Read image file \[image\//.test(raw)) return { stats: "image" };
+    return { stats: `${view.lines.length} lines${view.notice.length ? " · limited" : ""}` };
+  });
   return { ...base,
-    renderCall(args, theme, context) {
-      const call = base.renderCall!(args, theme, context);
-      return { invalidate() {}, render: width => context.state["beautify.read.result"] ? [] : call.render(width) };
-    },
-    renderResult(result, _options, theme, context) {
+    renderResult(result, options, theme, context) {
+      base.renderResult!(result, options, theme, context);
       const ctx = context as RenderContext;
-      ctx.state["beautify.read.result"] = true;
       const existing = ctx.lastComponent;
-      if (existing instanceof ReadDrawing) { existing.update(result, theme, ctx); return existing; }
-      return new ReadDrawing(highlighter, result, theme, ctx);
+      const drawing = existing instanceof ReadDrawing ? existing : new ReadDrawing(highlighter, result, theme, ctx);
+      drawing.update(result, theme, ctx);
+      // Keep the highlighting revision current even when its body is hidden.
+      return drawing;
     },
   };
 }

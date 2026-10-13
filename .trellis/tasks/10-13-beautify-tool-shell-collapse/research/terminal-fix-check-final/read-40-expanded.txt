@@ -1,0 +1,60 @@
+
+
+ CASE read
+
+
+
+ sample.ts:3
+  3 │ export const MARK_3 = "sample va›
+  4 │ export const MARK_4 = "sample va›
+  5 │ export const MARK_5 = "sample va›
+  6 │ export const MARK_6 = "sample va›
+  7 │ export const MARK_7 = "sample va›
+  8 │ export const MARK_8 = "sample va›
+  9 │ export const MARK_9 = "sample va›
+ 10 │ export const MARK_10 = "sample v›
+ 11 │ export const MARK_11 = "sample v›
+ 12 │ export const MARK_12 = "sample v›
+ 13 │ export const MARK_13 = "sample v›
+ 14 │ export const MARK_14 = "sample v›
+ 15 │ export const MARK_15 = "sample v›
+ 16 │ export const MARK_16 = "sample v›
+ 17 │ export const MARK_17 = "sample v›
+ 18 │ export const MARK_18 = "sample v›
+ 19 │ export const MARK_19 = "sample v›
+ 20 │ export const MARK_20 = "sample v›
+ 21 │ export const MARK_21 = "sample v›
+ 22 │ export const MARK_22 = "sample v›
+ 23 │ export const MARK_23 = "sample v›
+ 24 │ export const MARK_24 = "sample v›
+ 25 │ export const MARK_25 = "sample v›
+ 26 │ export const MARK_26 = "sample v›
+ 27 │ export const MARK_27 = "sample v›
+ 28 │ export const MARK_28 = "sample v›
+ 29 │ export const MARK_29 = "sample v›
+ 30 │ export const MARK_30 = "sample v›
+ 31 │ export const MARK_31 = "sample v›
+ 32 │ export const MARK_32 = "sample v›
+ 33 │ export const MARK_33 = "sample v›
+ 34 │ export const MARK_34 = "sample v›
+ 35 │ export const MARK_35 = "sample v›
+ 36 │ export const MARK_36 = "sample v›
+ 37 │ export const MARK_37 = "sample v›
+ 38 │ export const MARK_38 = "sample v›
+ 39 │ export const MARK_39 = "sample v›
+ 40 │ export const MARK_40 = "sample v›
+ 41 │ export const MARK_41 = "sample v›
+ 42 │ export const MARK_42 = "sample v›
+ [7 more lines in file. Use offset=43 t
+ o continue.]
+
+
+ CASE_DONE read
+
+ Tool output: expanded
+
+────────────────────────────────────────
+❯
+────────────────────────────────────────
+/private/var/folders/fx/bn7t1rq16xn7_...
+↑5.2k ↓16 R4.8k W5.2k CH84.1% 4.4%/12...

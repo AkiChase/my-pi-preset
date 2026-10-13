@@ -1,0 +1,13 @@
+✔ actual host terminal-effective background covers shortened bash title, metadata and right padding (one
+two) (2.691584ms)
+✔ actual host terminal-effective background covers shortened read title, metadata and right padding (ENOENT:) (0.440041ms)
+✔ actual host terminal-effective background covers shortened bash title, metadata and right padding (failure) (0.2325ms)
+✔ actual fullscreen 140→80→40→140 frames preserve complete-or-omitted hint and Ctrl+O-style expansion (57.74675ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 476.122667

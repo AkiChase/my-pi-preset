@@ -1,0 +1,210 @@
+✔ child marker preserves unrelated root context, nested awaits and rejection boundaries (3.04025ms)
+✔ cached host loader guards same/different cwd children and isolates overlapping root loads (1428.844417ms)
+✔ actual host history=first, Down=first/true (67.408416ms)
+✔ actual host history=first, Down=first/false (15.065666ms)
+✔ actual host history=first, Down=last/true (11.699167ms)
+✔ actual host history=first, Down=last/false (19.890583ms)
+✔ actual host history=last, Down=first/true (11.658167ms)
+✔ actual host history=last, Down=first/false (13.144083ms)
+✔ actual host history=last, Down=last/true (4.963708ms)
+✔ actual host history=last, Down=last/false (4.872417ms)
+[beautify] Editor installation failed; keeping original editing UI.
+[beautify] Editor installation failed; keeping original editing UI.
+[beautify] Editor installation failed; keeping original editing UI.
+[beautify] Editor installation failed; keeping original editing UI.
+[beautify] Editor installation failed; keeping original editing UI.
+[beautify] Editor installation failed; keeping original editing UI.
+✔ live handoff preserves subclass, cursor/undo, history draft, paste, autocomplete, IME and callbacks (187.435125ms)
+✔ appearance keeps native working status, scroll labels and only first prompt (0.955375ms)
+✔ unsupported accessor leaves native UI mounted and usable (1.284709ms)
+✔ unsupported locked leaves native UI mounted and usable (0.838208ms)
+✔ unsupported missing leaves native UI mounted and usable (0.311334ms)
+✔ unsupported nonextensible leaves native UI mounted and usable (0.271208ms)
+✔ actual host partial after setter rollback keeps same UI, focus and undo (0.423833ms)
+✔ actual host partial focus rollback keeps same UI, focus and undo (0.265375ms)
+✔ later opaque render/factory, user padding and reset-before-shutdown remain owned (0.292875ms)
+[beautify] Editor installation failed; keeping original editing UI.
+✔ production composition registers only backend tools and native presentation stays independent (695.001ms)
+✔ opaque retired appearance/factory release context and TUI under real GC (524.209917ms)
+✔ descriptor partial mutation and locked later visual wrapper restore safely (12.7415ms)
+✔ active overlay and non-TUI modes do not unmount or replace an editor (1.49175ms)
+[beautify] Editor installation failed; keeping original editing UI.
+✔ decoration during active history/paste/autocomplete preserves their native transient state (6.525541ms)
+✔ cleanup retains later padding setter ownership (0.2535ms)
+✔ cleanup retains later padding getter ownership (0.143459ms)
+✔ cleanup retains later padding underlying ownership (0.128875ms)
+✔ padding mutation then failure restores native methods, physical padding and usable UI (0.308458ms)
+[beautify] Editor installation failed; keeping original editing UI.
+✔ captured future factory keeps a single live visual lease and history (2.121375ms)
+✔ handoff descriptor failure before setter restores appearance and all earlier handoff methods (0.388583ms)
+✔ appearance preserves native non-finite padding behavior and never consumes source indentation after a later takeover (0.243375ms)
+✔ migrated Alt+R query, older/newer navigation, cancel and branch priority stay intact (1.193792ms)
+✔ migrated later border wrapper and nondelegating render retain their receivers and content (0.293791ms)
+(node:83330) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ actual registered get_subagent_result emits running/completed/verbose/not-found/released/cancelled contracts with no extra display consumption (19.496375ms)
+✔ agent header snapshots, verbose body and exact wait/not-found envelopes are conservative (4.047333ms)
+✔ jobs six action guards ignore body spoofing, byte range is not character count, partial is only following (2.23375ms)
+✔ actual host optional call/result sync, mouse/key expansion, pending/partial/final and historical state (9.689625ms)
+✔ unknown formats delegate original slots/state/shell, known→unknown switches synchronously and missing original has generic preview (12.792167ms)
+✔ unknown default renderer shell preserves host-style Box, full original context and details (0.493125ms)
+✔ actual loader optional absence/dynamic next, no tools registered, unrelated renderer identity unchanged (130.893ms)
+[beautify] Optional renderer failed; retaining readable arguments and result.
+✔ actual registered jobs produces list/stats/output/search/attach/kill envelopes without display-side reads or consumption (27.662167ms)
+✔ empty/multiline descriptions keep header status and unsafe terminal sums delegate (0.224167ms)
+✔ self compatibility shell has exactly the default host padding hit bounds and backgrounds (1.325959ms)
+✔ generic fallback renders raw expanded arguments, bounded collapsed args, and replaces throwing delegates without stale data (1.679083ms)
+✔ partial→final contracts never delegate using the previous result with new context (0.185625ms)
+✔ actual SDK thrown jobs errors carry details object and safely delegate without changing output (2.00325ms)
+✔ actual host read paints pending/success/error backgrounds and only host padding (2.795125ms)
+✔ actual host read call/result compose synchronously to one collapsed row (9.709292ms)
+✔ actual host bash paints pending/success/error backgrounds and only host padding (45.930166ms)
+✔ actual host bash call/result compose synchronously to one collapsed row (4.337459ms)
+✔ actual host find paints pending/success/error backgrounds and only host padding (1.521542ms)
+✔ actual host find call/result compose synchronously to one collapsed row (0.575083ms)
+✔ actual host grep paints pending/success/error backgrounds and only host padding (0.223625ms)
+✔ actual host grep call/result compose synchronously to one collapsed row (0.299583ms)
+✔ actual host fallback errors and ordinary background words remain collapsed, expanded retains all text (0.571667ms)
+✔ actual default shell mouse toggles body, partial/error/image/limited output remain one row (9.172167ms)
+✔ actual host terminal-effective background covers shortened bash title, metadata and right padding (one
+two) (3.031833ms)
+✔ actual host terminal-effective background covers shortened read title, metadata and right padding (ENOENT:) (6.223916ms)
+✔ actual host terminal-effective background covers shortened bash title, metadata and right padding (failure) (0.476833ms)
+✔ actual fullscreen 140→80→40→140 frames preserve complete-or-omitted hint and Ctrl+O-style expansion (155.222333ms)
+✔ actual loader/resolver owns six display adapters, original tool execution/structured output and host images stay untouched (240.767125ms)
+✔ four actual host components obey widths/padding/expansion and native metadata (18.696083ms)
+✔ notice parsing is exact, unknown text/control data is retained safely and path offset stays atomic (1.411792ms)
+✔ Shiki ANSI, unknown/80k fallback, finite LRU and once-only redacted diagnostics (5.936959ms)
+✔ async read redraw rejects changed content, width, collapse, close and preserves successful ANSI on real invalidation (1.032542ms)
+✔ Read notice separation preserves blank source lines and refuses embedded or unknown lookalikes (0.07825ms)
+✔ exact search notices preserve unknown suffixes and native Read byte-limit notices (0.064792ms)
+✔ language detection preserves the approved Pretty extension/basename map only (0.061084ms)
+✔ multiline/control/Unicode tool titles always return physical width-bounded rows (0.673625ms)
+✔ external terminal controls are stripped before styling all four tool outputs (1.776916ms)
+✔ Find unknown notice and partial blank records use readable fallback rather than fabricated counts (0.093166ms)
+✔ actual host first installation keeps live default/custom identity, draft cursor, undo and native callbacks (12.634833ms)
+✔ first handoff preserves real history browsing draft, large paste expansion and explicit empty Tab autocomplete (5.653875ms)
+✔ strict empty/press/focused/no-overlay conditions and actual TUI routing; no-task native history survives (5.305875ms)
+✔ Beautify live editor first, Down last: actual prompt render and custom action/callback ownership preserved (9.853375ms)
+✔ history-equivalent instance wrapper before, later factory delegation and inactive opaque wrappers (0.564583ms)
+✔ history-equivalent instance wrapper after, later factory delegation and inactive opaque wrappers (3.43175ms)
+✔ owner fresh model exposes foreground-only and four-second visibility, refuses open/closed interaction (0.837167ms)
+[task-ui] Down opener installation failed: Error: Editor handoff cannot safely shadow setText
+    at interpose (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/editor-handoff/index.ts:12:23)
+    at preserveHandoff (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/editor-handoff/index.ts:46:23)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/editor.ts:110:35
+    at async Object.start (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:69:62)
+    at async TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:299:22)
+    at async Test.run (node:internal/test_runner/test:1125:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+[task-ui] Down opener installation failed: Error: Down opener installation deferred by an active overlay
+    at ctx.ui.custom.overlay (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/editor.ts:97:45)
+    at file:///Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/interactive-mode.js:2354:29
+    at new Promise (<anonymous>)
+    at Object.showExtensionCustom (file:///Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/interactive-mode.js:2334:16)
+    at Object.custom (file:///Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/interactive-mode.js:2074:48)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/editor.ts:96:26
+    at Object.start (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:69:68)
+    at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:316:30)
+    at Test.runInAsyncScope (node:async_hooks:228:14)
+    at Test.run (node:internal/test_runner/test:1118:25)
+[task-ui] Down opener installation failed: Error: Editor handoff cannot safely shadow handleInput
+    at interpose (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/editor-handoff/index.ts:12:23)
+    at decorate (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/editor.ts:42:21)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/editor.ts:112:34
+    at async Object.start (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:69:62)
+    at async TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:332:22)
+    at async Test.run (node:internal/test_runner/test:1125:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+[task-ui] Down opener installation failed: Error: host setter failure
+    at h.ctx.ui.setEditorComponent (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:359:137)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/editor.ts:114:20
+    at async Object.start (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:69:62)
+    at async TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:361:26)
+    at async Test.run (node:internal/test_runner/test:1125:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+✔ beautify actual session_start before Down and real panel focus/nav/close leave execution waits untouched (31.192125ms)
+✔ later same-object factory does not stack input leases; descriptor ownership and scoped host setters are restored (0.438125ms)
+✔ unsupported accessor live editor is diagnosed without invoking private setters or changing its methods (1.2905ms)
+✔ Down preflight with an existing overlay never hides it or mutates the mounted editor (1.182416ms)
+✔ non-configurable input failure rolls back public handoff properties before any host unmount (1.019541ms)
+✔ opaque retired input/factory release ctx, TUI, coordinator and panel under real GC (667.443709ms)
+✔ disabled/noninteractive/missing editor APIs do not access or install; reentrant setter close/throw leaves no active lease (0.670875ms)
+▶ package.json pi.extensions
+  ✔ is declared (1.648458ms)
+  ✔ loads every top-level extension file (8.485625ms)
+  ✔ loads nothing from a subdirectory of extensions/ (0.573042ms)
+  ✔ loads independent path continuation once, never its helpers (1.676334ms)
+  ✔ keeps composition-owned packages in conflicts, not standalone packages or runtime copies (3.941209ms)
+  ✔ covers the resource types this repo ships (0.068208ms)
+✔ package.json pi.extensions (18.106916ms)
+PASS preset dry-run replaces standalone subagents without installing or writing state
+PASS merge mode keeps unlisted packages
+PASS --prune removes unlisted packages
+PASS version change reinstalls
+PASS pinned version is not updated
+PASS missing install path triggers install
+PASS ssh and https identities match
+PASS --dry-run makes no changes
+PASS unsupported source is rejected
+PASS conflicting package is removed in merge mode
+PASS absent conflict is a no-op
+PASS source in both packages and conflicts is rejected
+PASS merge mode aligns declared keys only
+PASS declared null removes a key
+PASS prune mode keeps preserved and pi-owned keys only
+PASS a deep path is created
+PASS an array value is replaced whole
+PASS an already matching machine is left untouched
+PASS a broken settings.json is not overwritten
+PASS declaring a pi-owned settings key is rejected
+PASS a declared-and-preserved path is rejected
+PASS a segment-array preserve path protects a dotted key
+PASS a dotted settings key is rejected
+PASS a key and a one-element list compare equal
+PASS keybindings.json is created with the declared bindings
+PASS prune mode drops undeclared action ids
+PASS an invalid keybinding value is rejected
+PASS an extension config file is created with the declared key
+PASS merge mode keeps undeclared keys in an extension config file
+PASS removed Pretty declaration leaves legacy file untouched
+PASS prune mode reaches declared files only
+PASS a declared null removes a key from an extension config file
+PASS "files.settings.json" is rejected
+PASS "files.keybindings.json" is rejected
+PASS "files.auth.json" is rejected
+PASS "files.models.json" is rejected
+PASS "files.sub/dir.json" is rejected
+PASS "files.../escape.json" is rejected
+PASS "files.notjson" is rejected
+PASS "files..hidden.json" is rejected
+PASS preserving a key in an undeclared file is rejected
+PASS a declared-and-preserved key in a file is rejected
+PASS a broken extension config file is not overwritten
+PASS --sync packages touches nothing else
+PASS --sync settings never runs pi
+PASS bare --prune applies to the synced domains
+PASS --prune outside --sync is rejected
+PASS an unknown domain is rejected
+PASS --sync none does nothing
+PASS --dev switches git spellings/refs to a space-containing checkout and is repeatable
+PASS normal install switches back to remote, repeats, and preserves third-party/prune order
+PASS both sources installed removes only the opposite source without updating local code
+PASS failed source removal aborts before installing packages or writing configs
+PASS source switching dry-run performs no package actions or writes
+PASS unselected package domain never lists, installs, removes or switches sources
+PASS dev override does not alias unrelated local checkouts
+PASS --dev refuses to remove the checkout it would load as a local package
+PASS --dev rejects downloaded scripts, invalid checkouts/manifests and manifest local sources
+PASS piped installer rejects --dev before downloading or running pi
+
+All sync checks passed.
+✔ scripts/sync.test.mjs (14708.559541ms)
+ℹ tests 92
+ℹ suites 1
+ℹ pass 92
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14885.89225

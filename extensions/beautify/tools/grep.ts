@@ -1,7 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { clean, searchNotice, splitView, summary, wrap } from "../layout.ts";
+import { clean, searchNotice, splitView, wrap } from "../layout.ts";
 import { text, type Args } from "../types.ts";
-import { fallback, numbered, renderers } from "./shared.ts";
+import { fallback, genericMetadata, numbered, renderers } from "./shared.ts";
 export interface Match { path: string; number: number; body: string; match: boolean }
 export function parseMatch(line: string): Match | undefined {
   // Multiple numeric delimiters or mixed match/context delimiters are ambiguous paths.
@@ -35,9 +35,7 @@ export const grepRenderers = renderers("grep", (result, theme, ctx, width) => {
   if (ctx.isError || view.body === "No matches found") return fallback(result, theme, ctx, width);
   const records = view.lines.map(parseMatch);
   if (records.some(record => !record)) return fallback(result, theme, ctx, width);
-  const matches = records.filter(record => record?.match).length;
   const notice = view.notice.flatMap(line => wrap(line, width).map(row => theme.fg("muted", row)));
-  if (!ctx.expanded) return summary("Matches", "", `${matches} matching lines shown`, width, theme).concat(notice);
   const rows: string[] = [];
   let previous: string | undefined;
   const digits = String(Math.max(1, ...records.map(record => record!.number))).length;
@@ -46,4 +44,11 @@ export const grepRenderers = renderers("grep", (result, theme, ctx, width) => {
     rows.push(numbered(record.match ? highlightMatch(clean(record.body), ctx.args, theme) : record.body, record.number, digits, width, theme, record.match));
   }
   return rows.concat(notice);
+}, (result, ctx) => {
+  if (!result || ctx.isError) return genericMetadata(result, ctx);
+  const view = splitView(text(result), searchNotice);
+  if (view.body === "No matches found") return { stats: "No matches found" };
+  const records = view.lines.map(parseMatch);
+  if (!records.length || records.some(record => !record)) return genericMetadata(result, ctx);
+  return { stats: `${records.filter(record => record?.match).length} matching lines shown${view.notice.length ? " · limited" : ""}` };
 });

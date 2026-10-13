@@ -1,0 +1,96 @@
+{"time":1791914174544,"kind":"session-start","cwd":"/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-jbgqr2p1/cwd","mode":"tui","model":"scripted"}
+{"time":1791914174614,"kind":"terminal-input","data":"C"}
+{"time":1791914174615,"kind":"terminal-input","data":"A"}
+{"time":1791914174616,"kind":"terminal-input","data":"S"}
+{"time":1791914174616,"kind":"terminal-input","data":"E"}
+{"time":1791914174616,"kind":"terminal-input","data":" "}
+{"time":1791914174617,"kind":"terminal-input","data":"r"}
+{"time":1791914174617,"kind":"terminal-input","data":"e"}
+{"time":1791914174617,"kind":"terminal-input","data":"a"}
+{"time":1791914174617,"kind":"terminal-input","data":"d"}
+{"time":1791914174617,"kind":"terminal-input","data":"\r"}
+{"time":1791914174621,"kind":"provider-request","prompt":"CASE read","results":0,"sessionId":"01a13668-654c-7067-b62d-135491b95a90"}
+{"time":1791914174622,"kind":"planned-call","name":"read","tool":"read","args":{"path":"sample.ts","offset":3,"limit":40}}
+{"time":1791914174623,"kind":"execution-start","type":"tool_execution_start","toolCallId":"smoke-1","toolName":"read","args":{"path":"sample.ts","offset":3,"limit":40}}
+{"time":1791914174624,"kind":"tool-result","type":"tool_result","toolName":"read","toolCallId":"smoke-1","input":{"path":"sample.ts","offset":3,"limit":40},"content":[{"type":"text","text":"export const MARK_3 = \"sample value 3\";\nexport const MARK_4 = \"sample value 4\";\nexport const MARK_5 = \"sample value 5\";\nexport const MARK_6 = \"sample value 6\";\nexport const MARK_7 = \"sample value 7\";\nexport const MARK_8 = \"sample value 8\";\nexport const MARK_9 = \"sample value 9\";\nexport const MARK_10 = \"sample value 10\";\nexport const MARK_11 = \"sample value 11\";\nexport const MARK_12 = \"sample value 12\";\nexport const MARK_13 = \"sample value 13\";\nexport const MARK_14 = \"sample value 14\";\nexport const MARK_15 = \"sample value 15\";\nexport const MARK_16 = \"sample value 16\";\nexport const MARK_17 = \"sample value 17\";\nexport const MARK_18 = \"sample value 18\";\nexport const MARK_19 = \"sample value 19\";\nexport const MARK_20 = \"sample value 20\";\nexport const MARK_21 = \"sample value 21\";\nexport const MARK_22 = \"sample value 22\";\nexport const MARK_23 = \"sample value 23\";\nexport const MARK_24 = \"sample value 24\";\nexport const MARK_25 = \"sample value 25\";\nexport const MARK_26 = \"sample value 26\";\nexport const MARK_27 = \"sample value 27\";\nexport const MARK_28 = \"sample value 28\";\nexport const MARK_29 = \"sample value 29\";\nexport const MARK_30 = \"sample value 30\";\nexport const MARK_31 = \"sample value 31\";\nexport const MARK_32 = \"sample value 32\";\nexport const MARK_33 = \"sample value 33\";\nexport const MARK_34 = \"sample value 34\";\nexport const MARK_35 = \"sample value 35\";\nexport const MARK_36 = \"sample value 36\";\nexport const MARK_37 = \"sample value 37\";\nexport const MARK_38 = \"sample value 38\";\nexport const MARK_39 = \"sample value 39\";\nexport const MARK_40 = \"sample value 40\";\nexport const MARK_41 = \"sample value 41\";\nexport const MARK_42 = \"sample value 42\";\n\n[7 more lines in file. Use offset=43 to continue.]"}],"structuredContent":"export const MARK_3 = \"sample value 3\";\nexport const MARK_4 = \"sample value 4\";\nexport const MARK_5 = \"sample value 5\";\nexport const MARK_6 = \"sample value 6\";\nexport const MARK_7 = \"sample value 7\";\nexport const MARK_8 = \"sample value 8\";\nexport const MARK_9 = \"sample value 9\";\nexport const MARK_10 = \"sample value 10\";\nexport const MARK_11 = \"sample value 11\";\nexport const MARK_12 = \"sample value 12\";\nexport const MARK_13 = \"sample value 13\";\nexport const MARK_14 = \"sample value 14\";\nexport const MARK_15 = \"sample value 15\";\nexport const MARK_16 = \"sample value 16\";\nexport const MARK_17 = \"sample value 17\";\nexport const MARK_18 = \"sample value 18\";\nexport const MARK_19 = \"sample value 19\";\nexport const MARK_20 = \"sample value 20\";\nexport const MARK_21 = \"sample value 21\";\nexport const MARK_22 = \"sample value 22\";\nexport const MARK_23 = \"sample value 23\";\nexport const MARK_24 = \"sample value 24\";\nexport const MARK_25 = \"sample value 25\";\nexport const MARK_26 = \"sample value 26\";\nexport const MARK_27 = \"sample value 27\";\nexport const MARK_28 = \"sample value 28\";\nexport const MARK_29 = \"sample value 29\";\nexport const MARK_30 = \"sample value 30\";\nexport const MARK_31 = \"sample value 31\";\nexport const MARK_32 = \"sample value 32\";\nexport const MARK_33 = \"sample value 33\";\nexport const MARK_34 = \"sample value 34\";\nexport const MARK_35 = \"sample value 35\";\nexport const MARK_36 = \"sample value 36\";\nexport const MARK_37 = \"sample value 37\";\nexport const MARK_38 = \"sample value 38\";\nexport const MARK_39 = \"sample value 39\";\nexport const MARK_40 = \"sample value 40\";\nexport const MARK_41 = \"sample value 41\";\nexport const MARK_42 = \"sample value 42\";\n\n[7 more lines in file. Use offset=43 to continue.]","isError":false}
+{"time":1791914174624,"kind":"execution-end","type":"tool_execution_end","toolCallId":"smoke-1","toolName":"read","result":{"content":[{"type":"text","text":"export const MARK_3 = \"sample value 3\";\nexport const MARK_4 = \"sample value 4\";\nexport const MARK_5 = \"sample value 5\";\nexport const MARK_6 = \"sample value 6\";\nexport const MARK_7 = \"sample value 7\";\nexport const MARK_8 = \"sample value 8\";\nexport const MARK_9 = \"sample value 9\";\nexport const MARK_10 = \"sample value 10\";\nexport const MARK_11 = \"sample value 11\";\nexport const MARK_12 = \"sample value 12\";\nexport const MARK_13 = \"sample value 13\";\nexport const MARK_14 = \"sample value 14\";\nexport const MARK_15 = \"sample value 15\";\nexport const MARK_16 = \"sample value 16\";\nexport const MARK_17 = \"sample value 17\";\nexport const MARK_18 = \"sample value 18\";\nexport const MARK_19 = \"sample value 19\";\nexport const MARK_20 = \"sample value 20\";\nexport const MARK_21 = \"sample value 21\";\nexport const MARK_22 = \"sample value 22\";\nexport const MARK_23 = \"sample value 23\";\nexport const MARK_24 = \"sample value 24\";\nexport const MARK_25 = \"sample value 25\";\nexport const MARK_26 = \"sample value 26\";\nexport const MARK_27 = \"sample value 27\";\nexport const MARK_28 = \"sample value 28\";\nexport const MARK_29 = \"sample value 29\";\nexport const MARK_30 = \"sample value 30\";\nexport const MARK_31 = \"sample value 31\";\nexport const MARK_32 = \"sample value 32\";\nexport const MARK_33 = \"sample value 33\";\nexport const MARK_34 = \"sample value 34\";\nexport const MARK_35 = \"sample value 35\";\nexport const MARK_36 = \"sample value 36\";\nexport const MARK_37 = \"sample value 37\";\nexport const MARK_38 = \"sample value 38\";\nexport const MARK_39 = \"sample value 39\";\nexport const MARK_40 = \"sample value 40\";\nexport const MARK_41 = \"sample value 41\";\nexport const MARK_42 = \"sample value 42\";\n\n[7 more lines in file. Use offset=43 to continue.]"}],"structuredContent":"export const MARK_3 = \"sample value 3\";\nexport const MARK_4 = \"sample value 4\";\nexport const MARK_5 = \"sample value 5\";\nexport const MARK_6 = \"sample value 6\";\nexport const MARK_7 = \"sample value 7\";\nexport const MARK_8 = \"sample value 8\";\nexport const MARK_9 = \"sample value 9\";\nexport const MARK_10 = \"sample value 10\";\nexport const MARK_11 = \"sample value 11\";\nexport const MARK_12 = \"sample value 12\";\nexport const MARK_13 = \"sample value 13\";\nexport const MARK_14 = \"sample value 14\";\nexport const MARK_15 = \"sample value 15\";\nexport const MARK_16 = \"sample value 16\";\nexport const MARK_17 = \"sample value 17\";\nexport const MARK_18 = \"sample value 18\";\nexport const MARK_19 = \"sample value 19\";\nexport const MARK_20 = \"sample value 20\";\nexport const MARK_21 = \"sample value 21\";\nexport const MARK_22 = \"sample value 22\";\nexport const MARK_23 = \"sample value 23\";\nexport const MARK_24 = \"sample value 24\";\nexport const MARK_25 = \"sample value 25\";\nexport const MARK_26 = \"sample value 26\";\nexport const MARK_27 = \"sample value 27\";\nexport const MARK_28 = \"sample value 28\";\nexport const MARK_29 = \"sample value 29\";\nexport const MARK_30 = \"sample value 30\";\nexport const MARK_31 = \"sample value 31\";\nexport const MARK_32 = \"sample value 32\";\nexport const MARK_33 = \"sample value 33\";\nexport const MARK_34 = \"sample value 34\";\nexport const MARK_35 = \"sample value 35\";\nexport const MARK_36 = \"sample value 36\";\nexport const MARK_37 = \"sample value 37\";\nexport const MARK_38 = \"sample value 38\";\nexport const MARK_39 = \"sample value 39\";\nexport const MARK_40 = \"sample value 40\";\nexport const MARK_41 = \"sample value 41\";\nexport const MARK_42 = \"sample value 42\";\n\n[7 more lines in file. Use offset=43 to continue.]"},"isError":false,"durationMs":1}
+{"time":1791914174625,"kind":"provider-request","prompt":"CASE read","results":1,"sessionId":"01a13668-654c-7067-b62d-135491b95a90"}
+{"time":1791914174626,"kind":"agent-end"}
+{"time":1791914174660,"kind":"terminal-input","data":"\u001b[111;5u"}
+{"time":1791914174722,"kind":"terminal-input","data":"\u001b[111;5u"}
+{"time":1791914174911,"kind":"terminal-input","data":"\u001b[111;5u"}
+{"time":1791914174923,"kind":"terminal-input","data":"\u001b[111;5u"}
+{"time":1791914175163,"kind":"terminal-input","data":"\u001b[111;5u"}
+{"time":1791914175176,"kind":"terminal-input","data":"\u001b[111;5u"}
+{"time":1791914175191,"kind":"terminal-input","data":"/"}
+{"time":1791914175192,"kind":"terminal-input","data":"n"}
+{"time":1791914175192,"kind":"terminal-input","data":"e"}
+{"time":1791914175192,"kind":"terminal-input","data":"w"}
+{"time":1791914175194,"kind":"terminal-input","data":"\r"}
+{"time":1791914175195,"kind":"session-shutdown","type":"session_shutdown","reason":"new","targetSessionFile":"/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-jbgqr2p1/sessions/2026-10-13T17-56-15-195Z_01a13668-6adb-7067-b62d-1357423f2b77.jsonl"}
+{"time":1791914175205,"kind":"session-start","cwd":"/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-jbgqr2p1/cwd","mode":"tui","model":"scripted"}
+{"time":1791914175212,"kind":"terminal-input","data":"C"}
+{"time":1791914175212,"kind":"terminal-input","data":"A"}
+{"time":1791914175212,"kind":"terminal-input","data":"S"}
+{"time":1791914175212,"kind":"terminal-input","data":"E"}
+{"time":1791914175212,"kind":"terminal-input","data":" "}
+{"time":1791914175212,"kind":"terminal-input","data":"b"}
+{"time":1791914175212,"kind":"terminal-input","data":"a"}
+{"time":1791914175212,"kind":"terminal-input","data":"s"}
+{"time":1791914175213,"kind":"terminal-input","data":"h"}
+{"time":1791914175215,"kind":"terminal-input","data":"\r"}
+{"time":1791914175216,"kind":"provider-request","prompt":"CASE bash","results":0,"sessionId":"01a13668-6adb-7067-b62d-1357423f2b77"}
+{"time":1791914175216,"kind":"planned-call","name":"bash","tool":"bash","args":{"command":"python3 -c \"print('\\\\n'.join('BASH_LINE_'+str(i) for i in range(30)));print('Job ID background job /tmp/pi-bg/example.log')\"","description":"Ordinary keyword output"}}
+{"time":1791914175216,"kind":"execution-start","type":"tool_execution_start","toolCallId":"smoke-1","toolName":"bash","args":{"command":"python3 -c \"print('\\\\n'.join('BASH_LINE_'+str(i) for i in range(30)));print('Job ID background job /tmp/pi-bg/example.log')\"","description":"Ordinary keyword output"}}
+{"time":1791914175241,"kind":"tool-result","type":"tool_result","toolName":"bash","toolCallId":"smoke-1","input":{"command":"python3 -c \"print('\\\\n'.join('BASH_LINE_'+str(i) for i in range(30)));print('Job ID background job /tmp/pi-bg/example.log')\"","description":"Ordinary keyword output"},"content":[{"type":"text","text":"BASH_LINE_0\nBASH_LINE_1\nBASH_LINE_2\nBASH_LINE_3\nBASH_LINE_4\nBASH_LINE_5\nBASH_LINE_6\nBASH_LINE_7\nBASH_LINE_8\nBASH_LINE_9\nBASH_LINE_10\nBASH_LINE_11\nBASH_LINE_12\nBASH_LINE_13\nBASH_LINE_14\nBASH_LINE_15\nBASH_LINE_16\nBASH_LINE_17\nBASH_LINE_18\nBASH_LINE_19\nBASH_LINE_20\nBASH_LINE_21\nBASH_LINE_22\nBASH_LINE_23\nBASH_LINE_24\nBASH_LINE_25\nBASH_LINE_26\nBASH_LINE_27\nBASH_LINE_28\nBASH_LINE_29\nJob ID background job /tmp/pi-bg/example.log\n"}],"isError":false}
+{"time":1791914175241,"kind":"execution-end","type":"tool_execution_end","toolCallId":"smoke-1","toolName":"bash","result":{"content":[{"type":"text","text":"BASH_LINE_0\nBASH_LINE_1\nBASH_LINE_2\nBASH_LINE_3\nBASH_LINE_4\nBASH_LINE_5\nBASH_LINE_6\nBASH_LINE_7\nBASH_LINE_8\nBASH_LINE_9\nBASH_LINE_10\nBASH_LINE_11\nBASH_LINE_12\nBASH_LINE_13\nBASH_LINE_14\nBASH_LINE_15\nBASH_LINE_16\nBASH_LINE_17\nBASH_LINE_18\nBASH_LINE_19\nBASH_LINE_20\nBASH_LINE_21\nBASH_LINE_22\nBASH_LINE_23\nBASH_LINE_24\nBASH_LINE_25\nBASH_LINE_26\nBASH_LINE_27\nBASH_LINE_28\nBASH_LINE_29\nJob ID background job /tmp/pi-bg/example.log\n"}]},"isError":false,"durationMs":24}
+{"time":1791914175242,"kind":"provider-request","prompt":"CASE bash","results":1,"sessionId":"01a13668-6adb-7067-b62d-1357423f2b77"}
+{"time":1791914175242,"kind":"agent-end"}
+{"time":1791914175261,"kind":"terminal-input","data":"\u001b[111;5u"}
+{"time":1791914175275,"kind":"terminal-input","data":"\u001b[111;5u"}
+{"time":1791914175289,"kind":"terminal-input","data":"/"}
+{"time":1791914175289,"kind":"terminal-input","data":"n"}
+{"time":1791914175289,"kind":"terminal-input","data":"e"}
+{"time":1791914175289,"kind":"terminal-input","data":"w"}
+{"time":1791914175292,"kind":"terminal-input","data":"\r"}
+{"time":1791914175293,"kind":"session-shutdown","type":"session_shutdown","reason":"new","targetSessionFile":"/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-jbgqr2p1/sessions/2026-10-13T17-56-15-293Z_01a13668-6b3d-7067-b62d-1359bbbfb43d.jsonl"}
+{"time":1791914175300,"kind":"session-start","cwd":"/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-jbgqr2p1/cwd","mode":"tui","model":"scripted"}
+{"time":1791914175307,"kind":"terminal-input","data":"C"}
+{"time":1791914175307,"kind":"terminal-input","data":"A"}
+{"time":1791914175307,"kind":"terminal-input","data":"S"}
+{"time":1791914175307,"kind":"terminal-input","data":"E"}
+{"time":1791914175307,"kind":"terminal-input","data":" "}
+{"time":1791914175307,"kind":"terminal-input","data":"r"}
+{"time":1791914175307,"kind":"terminal-input","data":"e"}
+{"time":1791914175308,"kind":"terminal-input","data":"a"}
+{"time":1791914175308,"kind":"terminal-input","data":"d"}
+{"time":1791914175308,"kind":"terminal-input","data":"-"}
+{"time":1791914175308,"kind":"terminal-input","data":"e"}
+{"time":1791914175308,"kind":"terminal-input","data":"r"}
+{"time":1791914175308,"kind":"terminal-input","data":"r"}
+{"time":1791914175308,"kind":"terminal-input","data":"o"}
+{"time":1791914175308,"kind":"terminal-input","data":"r"}
+{"time":1791914175310,"kind":"terminal-input","data":"\r"}
+{"time":1791914175311,"kind":"provider-request","prompt":"CASE read-error","results":0,"sessionId":"01a13668-6b3d-7067-b62d-1359bbbfb43d"}
+{"time":1791914175311,"kind":"planned-call","name":"read-error","tool":"read","args":{"path":"missing-file.ts"}}
+{"time":1791914175312,"kind":"execution-start","type":"tool_execution_start","toolCallId":"smoke-1","toolName":"read","args":{"path":"missing-file.ts"}}
+{"time":1791914175312,"kind":"tool-result","type":"tool_result","toolName":"read","toolCallId":"smoke-1","input":{"path":"missing-file.ts"},"content":[{"type":"text","text":"ENOENT: no such file or directory, access '/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-jbgqr2p1/cwd/missing-file.ts'"}],"details":{},"isError":true}
+{"time":1791914175312,"kind":"execution-end","type":"tool_execution_end","toolCallId":"smoke-1","toolName":"read","result":{"content":[{"type":"text","text":"ENOENT: no such file or directory, access '/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-jbgqr2p1/cwd/missing-file.ts'"}],"details":{}},"isError":true,"durationMs":0}
+{"time":1791914175313,"kind":"provider-request","prompt":"CASE read-error","results":1,"sessionId":"01a13668-6b3d-7067-b62d-1359bbbfb43d"}
+{"time":1791914175313,"kind":"agent-end"}
+{"time":1791914175341,"kind":"terminal-input","data":"\u001b[111;5u"}
+{"time":1791914175353,"kind":"terminal-input","data":"\u001b[111;5u"}
+{"time":1791914175365,"kind":"terminal-input","data":"/"}
+{"time":1791914175366,"kind":"terminal-input","data":"d"}
+{"time":1791914175366,"kind":"terminal-input","data":"e"}
+{"time":1791914175366,"kind":"terminal-input","data":"b"}
+{"time":1791914175366,"kind":"terminal-input","data":"u"}
+{"time":1791914175366,"kind":"terminal-input","data":"g"}
+{"time":1791914175368,"kind":"terminal-input","data":"\r"}
+{"time":1791914175372,"kind":"terminal-input","data":"/"}
+{"time":1791914175372,"kind":"terminal-input","data":"q"}
+{"time":1791914175372,"kind":"terminal-input","data":"u"}
+{"time":1791914175372,"kind":"terminal-input","data":"i"}
+{"time":1791914175372,"kind":"terminal-input","data":"t"}
+{"time":1791914175375,"kind":"terminal-input","data":"\r"}
+{"time":1791914175430,"kind":"session-shutdown","type":"session_shutdown","reason":"quit"}

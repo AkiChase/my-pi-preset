@@ -1,0 +1,60 @@
+ sample.ts
+  1 │ export const MARK_1 = "sample value 1";
+  2 │ export const MARK_2 = "sample value 2";
+  3 │ export const MARK_3 = "sample value 3";
+  4 │ export const MARK_4 = "sample value 4";
+  5 │ export const MARK_5 = "sample value 5";
+  6 │ export const MARK_6 = "sample value 6";
+  7 │ export const MARK_7 = "sample value 7";
+  8 │ export const MARK_8 = "sample value 8";
+  9 │ export const MARK_9 = "sample value 9";
+ 10 │ export const MARK_10 = "sample value 10";
+ 11 │ export const MARK_11 = "sample value 11";
+ 12 │ export const MARK_12 = "sample value 12";
+ 13 │ export const MARK_13 = "sample value 13";
+ 14 │ export const MARK_14 = "sample value 14";
+ 15 │ export const MARK_15 = "sample value 15";
+ 16 │ export const MARK_16 = "sample value 16";
+ 17 │ export const MARK_17 = "sample value 17";
+ 18 │ export const MARK_18 = "sample value 18";
+ 19 │ export const MARK_19 = "sample value 19";
+ 20 │ export const MARK_20 = "sample value 20";
+ 21 │ export const MARK_21 = "sample value 21";
+ 22 │ export const MARK_22 = "sample value 22";
+ 23 │ export const MARK_23 = "sample value 23";
+ 24 │ export const MARK_24 = "sample value 24";
+ 25 │ export const MARK_25 = "sample value 25";
+ 26 │ export const MARK_26 = "sample value 26";
+ 27 │ export const MARK_27 = "sample value 27";
+ 28 │ export const MARK_28 = "sample value 28";
+ 29 │ export const MARK_29 = "sample value 29";
+ 30 │ export const MARK_30 = "sample value 30";
+ 31 │ export const MARK_31 = "sample value 31";
+ 32 │ export const MARK_32 = "sample value 32";
+ 33 │ export const MARK_33 = "sample value 33";
+ 34 │ export const MARK_34 = "sample value 34";
+ 35 │ export const MARK_35 = "sample value 35";
+ 36 │ export const MARK_36 = "sample value 36";
+ 37 │ export const MARK_37 = "sample value 37";
+ 38 │ export const MARK_38 = "sample value 38";
+ 39 │ export const MARK_39 = "sample value 39";
+ 40 │ export const MARK_40 = "sample value 40";
+ 41 │ export const MARK_41 = "sample value 41";
+ 42 │ export const MARK_42 = "sample value 42";
+ 43 │ export const MARK_43 = "sample value 43";
+ 44 │ export const MARK_44 = "sample value 44";
+ 45 │ export const MARK_45 = "sample value 45";
+ 46 │ export const MARK_46 = "sample value 46";
+ 47 │ export const MARK_47 = "sample value 47";
+ 48 │ export const MARK_48 = "sample value 48";
+
+
+ CASE_DONE grep
+
+ Tool output: expanded
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-7tmpgmdp/cwd
+↑5.4k ↓18 R4.7k W5.4k CH77.6% 4.8%/128k (auto)                                                                                      scripted

@@ -1,10 +1,11 @@
-import { clean, summary, wrap } from "../layout.ts";
 import { text } from "../types.ts";
-import { fallback, renderers } from "./shared.ts";
-export const bashRenderers = renderers("bash", (result, theme, ctx, width) => {
-  const output = clean(text(result));
-  if (ctx.expanded || ctx.isError || /(?:running in background|manually backgrounded|background job|Job ID|\/tmp\/pi-bg\/)/i.test(output)) return fallback(result, theme, ctx, width);
-  const lines = output ? output.split("\n").length : 0;
-  const duration = ctx.durationMs === undefined ? "" : ` · ${ctx.durationMs}ms call`;
-  return summary("Output", "", `${lines} lines${duration}`, width, theme).concat(!output ? wrap("(no output)", width) : []);
+import { fallback, genericMetadata, renderers } from "./shared.ts";
+export const bashRenderers = renderers("bash", fallback, (result, ctx) => {
+  if (!result || ctx.isError) return genericMetadata(result, ctx);
+  const raw = text(result);
+  const background = raw.match(/^Command (?:running in background|was manually backgrounded by user) with ID: ([^\s.]+)\. Output is being written to: [^\n]+$/);
+  if (background) return { stats: `background ID: ${background[1]}` };
+  const meta = genericMetadata(result, ctx);
+  if (typeof ctx.durationMs === "number" && Number.isFinite(ctx.durationMs) && ctx.durationMs >= 0) meta.secondary = `${ctx.durationMs}ms call`;
+  return meta;
 });

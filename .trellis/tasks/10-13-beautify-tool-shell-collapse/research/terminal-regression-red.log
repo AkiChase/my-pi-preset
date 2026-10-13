@@ -1,0 +1,68 @@
+✖ actual host terminal-effective background covers shortened bash title, metadata and right padding (one
+two) (3.9985ms)
+✖ actual host terminal-effective background covers shortened read title, metadata and right padding (ENOENT:) (0.561708ms)
+✖ actual host terminal-effective background covers shortened bash title, metadata and right padding (failure) (0.264958ms)
+✔ actual fullscreen 140→80→40→140 frames preserve complete-or-omitted hint and Ctrl+O-style expansion (124.7445ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 1
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1218.512584
+
+✖ failing tests:
+
+test at extensions/beautify/__tests__/terminal-layout.test.ts:49:3
+✖ actual host terminal-effective background covers shortened bash title, metadata and right padding (one
+two) (3.9985ms)
+  AssertionError [ERR_ASSERTION]: background changed at column 32: "\u001b[48;2;37;65;49m \u001b[38;2;167;152;215m$ python3 -c \"print('\\\\n'.join(\u001b[0m…or i in range(30)));print('Job ID background job /tmp/pi-bg/example.log')\"\u001b[39m  \u001b[38;2;157;165;169m2 output lines · ctrl+o expand\u001b[39m \u001b[49m"
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/beautify/__tests__/terminal-layout.test.ts:61:16)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at extensions/beautify/__tests__/terminal-layout.test.ts:49:3
+✖ actual host terminal-effective background covers shortened read title, metadata and right padding (ENOENT:) (0.561708ms)
+  AssertionError [ERR_ASSERTION]: background changed at column 4: "\u001b[48;2;91;40;42m \u001b[38;2;167;152;215mmis\u001b[0m…-file.ts\u001b[39m  \u001b[38;2;157;165;169merror: ENOENT: no such file or directory, access '/private/var/folders/fx/isolated-test/T/beautify-final-unique-test/cwd/mis\u001b[0m\u001b[39m \u001b[49m"
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/beautify/__tests__/terminal-layout.test.ts:61:16)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at extensions/beautify/__tests__/terminal-layout.test.ts:49:3
+✖ actual host terminal-effective background covers shortened bash title, metadata and right padding (failure) (0.264958ms)
+  AssertionError [ERR_ASSERTION]: background changed at column 139: "\u001b[48;2;91;40;42m \u001b[38;2;167;152;215m$ run\u001b[39m  \u001b[38;2;157;165;169merror: failure long error metadata long error metadata long error metadata long error metadata long error metadata long error metad\u001b[0m\u001b[39m \u001b[49m"
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/beautify/__tests__/terminal-layout.test.ts:61:16)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

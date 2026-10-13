@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/preset/extension-guidelines.md", "reason": "展示层边界及宿主 renderer/高亮/编辑器约束"}
+{"file": ".trellis/spec/preset/testing-guidelines.md", "reason": "隔离实际 SDK 验证与可观察行为红测"}
+{"file": ".trellis/tasks/10-13-beautify-tool-shell-collapse/design.md", "reason": "主题默认外壳与整块单行组合设计"}
+{"file": ".trellis/tasks/10-13-beautify-tool-shell-collapse/research/retrieval-contracts.md", "reason": "get_result/jobs实际合同与无私有依赖边界"}

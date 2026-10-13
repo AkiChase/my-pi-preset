@@ -1,0 +1,60 @@
+
+ SMOKE_READY
+
+
+ ✓ New session started
+
+
+
+ CASE read-error
+
+
+
+ mis…-file.ts  error: ENOENT: no such file or directory, access '/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-7tm
+
+
+ CASE_DONE read-error
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-7tmpgmdp/cwd
+↑4.8k ↓13 R4.8k W4.8k CH97.9% 3.8%/128k (auto)                                                                                      scripted

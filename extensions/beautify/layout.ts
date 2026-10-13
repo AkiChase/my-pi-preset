@@ -7,6 +7,9 @@ export function clean(text: string): string {
   return text.replace(/\r\n?/g, "\n").replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "").replace(/\x1b(?:\[[0-?]*[ -/]*[@-~]|[ -/]*[@-~])/g, "").replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, "").replace(/\t/g, "    ");
 }
 export function clip(text: string, width: number, marker = "›"): string { return truncateToWidth(text, Math.max(0, width), marker); }
+// Plain summary fields have no styles to preserve. SDK truncation adds a full
+// reset even for plain input; remove it before fg styling so the host owns bg.
+function clipPlain(text: string, width: number): string { return clean(clip(text, width, "")); }
 export function wrap(text: string, width: number): string[] {
   if (width < 1) return [];
   const output: string[] = [];
@@ -29,19 +32,26 @@ export function middlePath(path: string, width: number, suffix = ""): string {
   const tailRoom = Math.ceil((room - 1) * 0.7);
   let tail = "";
   while (graphemes.length && visibleWidth(graphemes.at(-1)! + tail) <= tailRoom) tail = graphemes.pop()! + tail;
-  const head = clip(graphemes.join(""), room - 1 - visibleWidth(tail), "");
+  const head = clipPlain(graphemes.join(""), room - 1 - visibleWidth(tail));
   return head + "…" + tail + suffix;
 }
-export function summary(path: string, suffix: string, stats: string, width: number, theme: Theme): string[] {
-  // A Component row must never contain physical newlines. Expanded titles use
-  // wrap() to preserve full text; collapsed labels escape line breaks explicitly.
+export function summary(path: string, suffix: string, stats: string, width: number, theme: Theme, secondary = ""): string[] {
+  if (width < 1) return [];
   path = clean(path).replace(/\n/g, "\\n");
+  stats = clean(stats).replace(/\n/g, "\\n");
+  secondary = clean(secondary).replace(/\n/g, "\\n");
   const hint = clean(keyHint("app.tools.expand", "expand"));
-  const metadata = [stats, hint].filter(Boolean).join(" · ");
-  if (visibleWidth(path + suffix + "  " + metadata) <= width) return [theme.fg("accent", path + suffix) + "  " + theme.fg("muted", metadata)];
-  // Offset is atomic: if it cannot fit, omit it rather than rendering a dangling colon.
-  const title = middlePath(path, width, suffix);
-  return [theme.fg("accent", title), theme.fg("muted", clip(visibleWidth(metadata) <= width ? metadata : stats, width))];
+  const minimumTitle = Math.min(visibleWidth(path + suffix), Math.max(visibleWidth(suffix), Math.min(12, Math.floor(width / 3))));
+  const fields = secondary ? secondary.split(" · ") : [];
+  let metadata = [stats, ...fields, hint].filter(Boolean).join(" · ");
+  if (visibleWidth(metadata) + minimumTitle + 2 > width) metadata = [stats, ...fields].filter(Boolean).join(" · ");
+  while (fields.length && visibleWidth(metadata) + minimumTitle + 2 > width) {
+    fields.pop(); metadata = [stats, ...fields].filter(Boolean).join(" · ");
+  }
+  if (visibleWidth(metadata) + minimumTitle + 2 > width) metadata = clipPlain(stats, Math.max(0, width - minimumTitle - 2));
+  const room = width - (metadata ? visibleWidth(metadata) + 2 : 0);
+  const label = middlePath(path, room, suffix);
+  return [theme.fg("accent", label) + (metadata ? "  " + theme.fg("muted", metadata) : "")];
 }
 export function splitView(raw: string, noticePattern: RegExp): View {
   const text = clean(raw);

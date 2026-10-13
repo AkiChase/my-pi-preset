@@ -1,0 +1,32 @@
+{
+  "command": "exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-yikcj1uw/home PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-yikcj1uw/agent BEAUTIFY_SMOKE_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-yikcj1uw PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_IMAGE_PROTOCOL=none PI_HYPERLINKS=0 PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-yikcj1uw/terminal.raw PATH=/Users/jyxc-dz-0101322/.pi/agent/bin:/opt/homebrew/bin:/usr/bin:/bin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-yikcj1uw /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-yikcj1uw/sessions --use-theme dark --tui-mode fullscreen --tools read,bash,find,grep,Agent,get_subagent_result,jobs -e /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-beautify-tool-shell-collapse/research/tmux-harness/provider.ts -e /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-beautify-tool-shell-collapse/research/tmux-harness/width-observer.ts -e /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/beautify.ts -e /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-composition.ts --model beautify-offline/scripted",
+  "server": "beautify-final-yikcj1uw",
+  "root": "/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-yikcj1uw",
+  "cases": [
+    {
+      "case": "hint 80",
+      "status": "PASS",
+      "line": " sample.ts:3  40 lines \u00b7 limited \u00b7 ctrl+o expand"
+    },
+    {
+      "case": "hint 40",
+      "status": "PASS",
+      "line": " sample.ts:3  40 lines \u00b7 limited"
+    },
+    {
+      "case": "hint 140",
+      "status": "PASS",
+      "line": " sample.ts:3  40 lines \u00b7 limited \u00b7 ctrl+o expand"
+    },
+    {
+      "case": "bash CtrlO roundtrip",
+      "status": "PASS"
+    }
+  ],
+  "error": "Timeout done read-error",
+  "cleanup": {
+    "natural_cli_exit": true,
+    "own_server_stopped": true,
+    "isolated_config_removed": true
+  }
+}

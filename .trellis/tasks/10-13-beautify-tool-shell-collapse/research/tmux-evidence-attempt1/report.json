@@ -1,0 +1,22 @@
+{
+  "versions": {
+    "pi": "1.2.0",
+    "tmux": "3.6a"
+  },
+  "root": "/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-nwlwuaip",
+  "server": "beautify-beautify-tmux-nwlwuaip",
+  "cases": [
+    {
+      "case": "isolated offline CLI startup",
+      "status": "PASS"
+    }
+  ],
+  "error": "No tool background group for sample.ts:3",
+  "cleanup": {
+    "natural_cli_exit": true,
+    "isolated_config_removed": true
+  },
+  "scope": "actual tmux Pi CLI agent loop, scripted offline provider, production tools/renderers",
+  "command": "exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-nwlwuaip/home PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-nwlwuaip/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-nwlwuaip/sessions BEAUTIFY_SMOKE_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-nwlwuaip PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-nwlwuaip/terminal.raw PATH=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-nwlwuaip /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-themes --no-context-files --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-nwlwuaip/sessions --use-theme dark --tui-mode fullscreen --tools read,bash,find,grep,Agent,get_subagent_result,jobs -e /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-beautify-tool-shell-collapse/research/tmux-harness/provider.ts -e /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/beautify.ts -e /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-composition.ts --model beautify-offline/scripted --thinking off",
+  "elapsed_seconds": 3.22
+}

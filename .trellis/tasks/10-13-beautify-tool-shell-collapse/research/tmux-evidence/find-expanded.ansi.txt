@@ -1,0 +1,60 @@
+
+ [38;2;126;136;142mSMOKE_READY[39m
+
+
+ [38;2;167;152;215m✓ New session started[39m
+
+
+[48;2;33;59;73m
+ [38;2;222;224;225mCASE find[39m
+
+
+[48;2;37;65;49m
+ [38;2;167;152;215mfind *.ts in files[39m
+ [1m[38;2;167;152;215m.[0m[48;2;37;65;49m
+   match-00.ts
+   match-01.ts
+   match-02.ts
+   match-03.ts
+   match-04.ts
+   match-05.ts
+   match-06.ts
+   match-07.ts
+   match-08.ts
+   match-09.ts
+   match-10.ts
+   match-11.ts
+   match-12.ts
+   match-13.ts
+   match-14.ts
+   match-15.ts
+   match-16.ts
+   match-17.ts
+   match-18.ts
+   match-19.ts
+   match-20.ts
+   match-21.ts
+   match-22.ts
+   match-23.ts
+   match-24.ts
+   match-25.ts
+   match-26.ts
+   match-27.ts
+   match-28.ts
+   match-29.ts
+   match-30.ts
+   match-31.ts
+
+
+[49m CASE_DONE find
+
+ [38;2;126;136;142mTool output: expanded[39m
+
+
+
+
+[38;2;108;118;123m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯[39m [7m [0m
+[38;2;108;118;123m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[38;2;126;136;142m/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-7tmpgmdp/cwd[39m
+[38;2;126;136;142m↑4.9k ↓17 R4.7k W4.9k CH95.3% 3.9%/128k (auto)                                                                                      scripted

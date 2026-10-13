@@ -1,0 +1,60 @@
+
+[48;2;33;59;73m
+ [38;2;222;224;225mCASE read[39m
+
+
+[48;2;37;65;49m
+ [38;2;167;152;215msample.ts:3[39m
+ [38;2;126;136;142m 3 │ [39mexport const MARK_3 = "sample va[49m›
+[48;2;37;65;49m [38;2;126;136;142m 4 │ [39mexport const MARK_4 = "sample va[49m›
+[48;2;37;65;49m [38;2;126;136;142m 5 │ [39mexport const MARK_5 = "sample va[49m›
+[48;2;37;65;49m [38;2;126;136;142m 6 │ [39mexport const MARK_6 = "sample va[49m›
+[48;2;37;65;49m [38;2;126;136;142m 7 │ [39mexport const MARK_7 = "sample va[49m›
+[48;2;37;65;49m [38;2;126;136;142m 8 │ [39mexport const MARK_8 = "sample va[49m›
+[48;2;37;65;49m [38;2;126;136;142m 9 │ [39mexport const MARK_9 = "sample va[49m›
+[48;2;37;65;49m [38;2;126;136;142m10 │ [39mexport const MARK_10 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m11 │ [39mexport const MARK_11 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m12 │ [39mexport const MARK_12 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m13 │ [39mexport const MARK_13 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m14 │ [39mexport const MARK_14 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m15 │ [39mexport const MARK_15 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m16 │ [39mexport const MARK_16 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m17 │ [39mexport const MARK_17 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m18 │ [39mexport const MARK_18 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m19 │ [39mexport const MARK_19 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m20 │ [39mexport const MARK_20 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m21 │ [39mexport const MARK_21 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m22 │ [39mexport const MARK_22 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m23 │ [39mexport const MARK_23 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m24 │ [39mexport const MARK_24 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m25 │ [39mexport const MARK_25 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m26 │ [39mexport const MARK_26 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m27 │ [39mexport const MARK_27 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m28 │ [39mexport const MARK_28 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m29 │ [39mexport const MARK_29 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m30 │ [39mexport const MARK_30 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m31 │ [39mexport const MARK_31 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m32 │ [39mexport const MARK_32 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m33 │ [39mexport const MARK_33 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m34 │ [39mexport const MARK_34 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m35 │ [39mexport const MARK_35 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m36 │ [39mexport const MARK_36 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m37 │ [39mexport const MARK_37 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m38 │ [39mexport const MARK_38 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m39 │ [39mexport const MARK_39 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m40 │ [39mexport const MARK_40 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m41 │ [39mexport const MARK_41 = "sample v[49m›
+[48;2;37;65;49m [38;2;126;136;142m42 │ [39mexport const MARK_42 = "sample v[49m›
+[48;2;37;65;49m [38;2;157;165;169m[7 more lines in file. Use offset=43 t[39m
+ [38;2;157;165;169mo continue.][39m
+
+
+[49m CASE_DONE read
+
+ [38;2;126;136;142mTool output: expanded[39m
+
+[38;2;108;118;123m────────────────────────────────────────
+❯[39m [7m [0m
+[38;2;108;118;123m────────────────────────────────────────
+[38;2;126;136;142m/private/var/folders/fx/bn7t1rq16xn7_...
+↑5.2k ↓16 R4.8k W5.2k CH84.1% 4.4%/12[39m...

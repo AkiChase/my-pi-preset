@@ -10,7 +10,9 @@
 
 ## Beautify 与编辑器组合
 
-[beautify.ts](../../../extensions/beautify.ts) 是独立美化入口，嵌套 [beautify](../../../extensions/beautify/index.ts) 仅通过公开 `registerToolRenderer` 接管 read/bash/find/grep 展示，不重注册执行、不改 result/content/structuredContent。其他工具调用 next；宿主负责图片。组件使用 render(width) 的真实列宽与 outputPad，不用 stdout.columns 决定布局。Read 的 offset 按 1-based 输入，续读说明不作为代码行，高亮有界且迟到回调不能更新关闭后的 activation。
+[beautify.ts](../../../extensions/beautify.ts) 是独立美化入口，嵌套 [beautify](../../../extensions/beautify/index.ts) 仅通过公开 `registerToolRenderer` 接管 read/bash/find/grep，并保守适配可选 get_subagent_result/jobs 展示，不重注册执行、不改 result/content/structuredContent。其他工具调用 next；宿主负责图片。原四类和常规可选工具用 default host Box；组件仅使用 render(width) 传入内宽，不再减／补 outputPad，不用 stdout.columns 决定布局。call/result 用每调用 namespaced state 同步组合，收缩仅 call 一行，结果组件空行；expanded 保标题与正文。单行摘要按 SDK 显示列预算，offset 原子、关键状态优先，次要元数据逐字段省略。
+
+可选工具只按固定参数／text-only 且 details undefined 信封识别，不读私有 registry，不额外执行或消费。只解析 get_result 头部及 jobs action 对应头部，attach partial 不扫描日志状态，final 覆盖 partial；released/cancelled retrieval 不表示任务停止。未知参数／结果委托 original renderer，state 与 call/result lastComponent 各自隔离，无 original 用 public 组件，收缩参数采用有界 key=value 预览，展开参数保字符串实际分行与已返回全文，结果为 10 行预览／展开全文。Pi 1.2 在 renderCall 前选 shell，renderShell 无 context；仅 original self 的可选分支使用公开 Box 做已知态外壳，未知态移除 Box 保原 self，无双框；已知态的 padding 点击通过 handled/no-render 阻止 host 外层 MouseRegion 误展开，正文命中仍交宿主切换。已有结果时 renderCall 延后组合至同轮 renderResult，不能把缓存 partial 按新 final context 解析并触发 original 生命周期。原 renderer 回调失败时一次无敏感信息诊断并显示当前参数／结果的通用回退，lastComponent 只保存该 original 成功返回的组件。get_result description 无空白分隔的多行可读，空 description 用请求 ID；分隔含歧义不猜正文，jobs terminal 合计也须 safe integer。SDK thrown tool error 的 details 为 {}，不扩大 undefined 信封 guard，走原／通用错误展示。证据见 [retrieval.test.ts](../../../extensions/beautify/__tests__/retrieval.test.ts) 与 [shell-collapse.test.ts](../../../extensions/beautify/__tests__/shell-collapse.test.ts)。Read 的 offset 按 1-based 输入，续读说明不作为代码行，高亮有界且迟到回调不能更新关闭后的 activation。
 
 输入框 [owner.ts](../../../extensions/beautify/editor/owner.ts) 与 [appearance.ts](../../../extensions/beautify/editor/appearance.ts) 在已有活实例上装饰，保留 history、receiver、subclass、undo/paste/补全与 IME。只提供上下规则和首行 ❯，不接管鼠标/clipboard，不承诺原生复制恢复软换行。
 
@@ -26,9 +28,55 @@ Use [lifecycle.ts](../../../extensions/process-tasks/lifecycle.ts) for terminal 
 
 Optional host effects must be gated and isolated. [blocked-signal.ts](../../../extensions/blocked-signal.ts) pairs prompt block/release, releases on shutdown, suppresses duplicate host notifications and bounds CLI calls. Its [tests](../../../extensions/__tests__/blocked-signal.test.ts) use fake SDK events/sinks, including late notification IDs and sink failure.
 
+## @ 路径连续补全契约
+
+### 1. 范围与触发
+独立 [at-path-completion.ts](../../../extensions/at-path-completion.ts) 修复手动输入 `@path/` 与原生接受目录后续提示；不耦合 Beautify，不改搜索、ignore、递归、排序或20项上限。
+
+### 2. 签名
+公开 `addAutocompleteProvider(current => wrapProvider(cell, current))` 委托原 provider；活实例公开 handleInput/getText/getLines/getCursor 用于观察。唯一内部能力为 [compat.ts](../../../extensions/at-path-completion/compat.ts) 的 `tryTriggerAutocomplete(false)`，Pi1.2含义是普通、非显式Tab请求；这是已授权内部适配，不是稳定公开SDK合同。
+
+### 3. 契约
+真实slash先委托原receiver，再核全文/光标单字符插入及合法token；已有列表交原生更新。applyCompletion先委托原实现，目录须同时满足SDK label/value的 `/` 判据和返回路径光标，再微任务续请求。唯一候选只展示；文件接受、Enter submit、空目录保持原生。保活实例与handoff，不复制私有编辑状态。
+
+### 4. 验证与错误矩阵
+缺失能力/unsafe descriptor/安装失败→一次英文诊断并保原生Tab和实际container/focus。Escape、后续输入、文本替换、鼠标、失焦/overlay、换editor/关闭→待续请求失效；attachment请求在provider进入前和await后均核focus。附加候选过滤仅作用于 `@`，native Copy no-op保留候选请求但失效续提示微任务，不吞普通Tab或其他trigger。
+
+### 5. 正常／基线／错误案例
+正常接受目录→原生写入且cancel后自动开新列表；基线无增强→仍需Tab；错误模拟Tab→唯一候选会被接受。公开provider安装按host规则取消旧列表，但不丢活实例history/undo/paste。方法存在不能证明升级后语义相同，须实际SDK回归。
+
+### 6. 必需断言
+actual Editor/CustomEditor、host setter/reset、forceTab唯一目录、Tab/Enter/mouse、Escape debounce前/await后、focus/overlay、编码slash、history/Down/Beautify多顺序、partial rollback和GC；[check-regressions.test.ts](../../../extensions/at-path-completion/__tests__/check-regressions.test.ts) 保其他provider与later setter。真实PTY/IME/input-history原包未验证不能以fixture代称。
+
+### 7. 错误与正确
+错误：cleanup从后来顶层setter重放已转换provider，重复包装。正确：只在setter identity仍匹配时，把本观察层收到的exact public参数重放到其predecessor；nondelegating替换不回写旧链。退休cell/lease清引用并成为inactive delegate，不重装旧factory。token使用Pi1.2同等delimiter规则；host jiti alias不支持 `pi-tui/dist/utils.js`，Node-only import成功不能替代actual loader检查。
+
 ## Monitor 事件与停止
 
 修改 monitor 或共享任务面板的执行接入时，另读 [Monitor 契约](./monitor-contract.md)。源回调先于启动接线，stdout/stderr 默认合并但独立解析完整行；时间／缓冲归 session，面板只调用共享停止能力。absent/resumed 不变更 Job 运行状态或消费结果标记，不把实时进度再次回读成失败尾部。该文档记录接口、错误矩阵和必须保留的离线断言。
+
+## Beautify 宿主与可选结果合同
+
+### 1. 范围
+原四类工具及 get_subagent_result/jobs 的展示层；不改变执行、结果或消费语义。
+
+### 2. 签名
+公开入口为 `registerToolRenderer((name, next) => ToolRenderers | undefined)`；`renderCall(args, theme, context)` 和 `renderResult(result, options, theme, context)` 共享 `context.state`，但 `lastComponent` 按 call/result 分槽。
+
+### 3. 合同
+宿主按 call→result→render 更新；已有结果时 optional call 不用新 context 解析旧 partial，等本轮 result 再组合。default shell 负责背景和 outputPad，render(width) 是内宽；self 兼容分支才自行提供 Box，padding 点击不切换。新增两工具仅识别合法参数、单 text block、details=undefined 和固定头部；状态是返回快照，attach release 不等于停止 job。
+
+### 4. 验证与错误矩阵
+工具缺席→无注册副作用；未知格式/details（包括 SDK thrown error 的 `{}`）→原 renderer 或通用预览；original 回调抛错→当前参数/结果可读 fallback＋一次脱敏诊断，成功原 lastComponent 不被替换；不安全计数/合计→降级或省略，不显示舍入统计。
+
+### 5. 正常／基线／错误案例
+正常已知信封→整块单行＋完整已返回正文展开；基线第三方未知 renderer→保留原展示和状态；错误 stopped following→仅结束跟随，不报 killed。空 description 回退请求 ID，多行 description 不扫描正文求统计。
+
+### 6. 必需断言
+actual-host 检查背景行尾填充、单行、一次 padding、正文/留白 mouse 边界、partial→final 原 callback 次数；actual registered tools 检查返回文本不变且无额外读取/消费；缺席/动态/历史/同名异形/原 renderer 抛错回归保留。
+
+### 7. 错误与正确
+错误：self 外壳只画前景色；default renderer 再减 outputPad；新 final context 解析旧 partial。正确：常规使用 host default Box 内宽，同轮结果更新唯一摘要，未知可选合同隔离原 call/result state 和 lastComponent 后委托。纯摘要截断需清除SDK对纯文本自动加入的full reset再加fg，不能让0m取消宿主背景；不要清除正文/Shiki合法样式。回归逐显示cell验证背景连续，不只验证48m存在。
 
 ## Safe Terminal Rendering
 

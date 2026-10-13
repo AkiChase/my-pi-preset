@@ -1,0 +1,50 @@
+
+ SMOKE_READY
+
+
+ ✓ New session started
+
+
+
+ CASE bash-pending
+
+
+
+ $ python3 /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-exa__vej/work.py pending  timeout 60s  ctrl+o expand
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+── ⠋ Working ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-exa__vej/cwd
+↑4.8k ↓42 W4.8k CH0.0% 7.5%/128k (auto)                                                                                             scripted
+shell: 1 active · shift+down

@@ -64,7 +64,7 @@ const assertRoot = (result) => {
   assert.deepEqual([...ext.tools.keys()].sort(), rootToolNames);
   assert.ok(ext.tools.get("bash").definition.parameters.properties.run_in_background);
   assert.equal(ext.toolRenderers.length, 1);
-  assert.equal(ext.toolRenderers[0]("bash", () => undefined).renderShell, "self");
+  assert.equal(ext.toolRenderers[0]("bash", () => undefined).renderShell, "default");
   assert.ok(ext.commands.has("agents"));
   for (const event of rootOnlyEvents) assert.equal(ext.handlers.get(event)?.length, 1, `root owns ${event}`);
   for (const event of removedOverviewEvents) assert.equal(ext.handlers.has(event), false, `no legacy overview ${event}`);

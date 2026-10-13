@@ -1,0 +1,60 @@
+
+ SMOKE_READY
+
+
+ ✓ New session started
+
+
+
+ CASE bash
+
+
+
+ $ python3 -c "print('\\n'.j…ange(30)));print('Job ID background job /tmp/pi-bg/example.log')"  32 output lines · 67ms call · ctrl+o expand
+
+
+ CASE_DONE bash
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-yikcj1uw/cwd
+↑4.9k ↓51 R4.8k W4.9k CH93.7% 4.0%/128k (auto)                                                                                      scripted

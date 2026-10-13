@@ -1,0 +1,60 @@
+
+ SMOKE_READY
+
+
+ ✓ New session started
+
+
+
+ CASE bash
+
+
+
+ $ python3 -c "print('\\n'.join('BASH_LINE_'+str(i) for i in range(30)));print('Job ID background job /tmp/pi-bg/example.log')"
+ BASH_LINE_0
+ BASH_LINE_1
+ BASH_LINE_2
+ BASH_LINE_3
+ BASH_LINE_4
+ BASH_LINE_5
+ BASH_LINE_6
+ BASH_LINE_7
+ BASH_LINE_8
+ BASH_LINE_9
+ BASH_LINE_10
+ BASH_LINE_11
+ BASH_LINE_12
+ BASH_LINE_13
+ BASH_LINE_14
+ BASH_LINE_15
+ BASH_LINE_16
+ BASH_LINE_17
+ BASH_LINE_18
+ BASH_LINE_19
+ BASH_LINE_20
+ BASH_LINE_21
+ BASH_LINE_22
+ BASH_LINE_23
+ BASH_LINE_24
+ BASH_LINE_25
+ BASH_LINE_26
+ BASH_LINE_27
+ BASH_LINE_28
+ BASH_LINE_29
+ Job ID background job /tmp/pi-bg/example.log
+
+
+
+ CASE_DONE bash
+
+ Tool output: expanded
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-yikcj1uw/cwd
+↑4.9k ↓51 R4.8k W4.9k CH93.7% 4.0%/128k (auto)                                                                                      scripted

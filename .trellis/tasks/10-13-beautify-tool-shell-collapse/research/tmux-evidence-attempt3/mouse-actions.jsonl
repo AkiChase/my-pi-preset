@@ -1,0 +1,2 @@
+{"label": "padding", "input": "\u001b[<0;5;8M\u001b[<0;5;8m", "row": 8, "method": "tmux send-keys -l"}
+{"label": "body", "input": "\u001b[<0;5;9M\u001b[<0;5;9m", "row": 9, "method": "tmux send-keys -l"}

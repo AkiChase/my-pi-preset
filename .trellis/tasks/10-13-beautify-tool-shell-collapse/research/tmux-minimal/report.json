@@ -1,0 +1,35 @@
+{
+  "command": "exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-exa__vej/home PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-exa__vej/agent BEAUTIFY_SMOKE_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-exa__vej PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_IMAGE_PROTOCOL=none PI_HYPERLINKS=0 PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-exa__vej/terminal.raw PATH=/Users/jyxc-dz-0101322/.pi/agent/bin:/opt/homebrew/bin:/usr/bin:/bin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-exa__vej /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-exa__vej/sessions --use-theme dark --tools read,bash,find,grep,Agent,get_subagent_result,jobs -e /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-beautify-tool-shell-collapse/research/tmux-harness/provider.ts -e /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/beautify.ts -e /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-composition.ts --model beautify-offline/scripted",
+  "server": "beautify-final-exa__vej",
+  "root": "/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-final-exa__vej",
+  "cases": [
+    {
+      "case": "actual jobs list empty collapsed",
+      "status": "PASS",
+      "lines": [
+        " jobs list  0 jobs \u00b7 ctrl+o expand"
+      ]
+    },
+    {
+      "case": "actual jobs Ctrl+O expanded",
+      "status": "PASS",
+      "returned_text": "No background jobs"
+    },
+    {
+      "case": "actual jobs Ctrl+O recollapse",
+      "status": "PASS"
+    },
+    {
+      "case": "actual pending shell background",
+      "status": "PASS",
+      "pid": 20554
+    }
+  ],
+  "error": null,
+  "cleanup": {
+    "natural_cli_exit": true,
+    "pending.pid": "gone",
+    "own_server_stopped": true,
+    "isolated_config_removed": true
+  }
+}

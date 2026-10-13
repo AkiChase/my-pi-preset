@@ -1,0 +1,1035 @@
+
+> my-pi-preset@0.1.0 check /Users/jyxc-dz-0101322/tools/my-pi-preset
+> pnpm run typecheck && pnpm run test
+
+
+> my-pi-preset@0.1.0 typecheck /Users/jyxc-dz-0101322/tools/my-pi-preset
+> node scripts/link-pi-sdk.mjs && tsc -p tsconfig.json
+
+[2m[link-pi-sdk][0m linked 0 new of 7 @earendil-works/* packages from /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules
+
+> my-pi-preset@0.1.0 test /Users/jyxc-dz-0101322/tools/my-pi-preset
+> node scripts/link-pi-sdk.mjs && node --test --test-force-exit "extensions/**/__tests__/*.test.ts" "scripts/*.test.mjs"
+
+[2m[link-pi-sdk][0m linked 0 new of 7 @earendil-works/* packages from /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules
+▶ watchPrompts
+  ✔ brackets a prompt with one block and one release (1.049834ms)
+  ✔ labels a titleless questionnaire from the ask-user payload (0.079291ms)
+  ✔ does not reuse a stale ask-user label for the next prompt (0.068625ms)
+  ✔ ignores an unpaired end so a host is not released twice (0.051459ms)
+  ✔ releases a prompt still open at shutdown (0.054375ms)
+  ✔ keeps going when one sink throws (0.053583ms)
+✔ watchPrompts (1.922125ms)
+▶ herdr sink
+  ✔ emits the blocked pair herdr counts on (0.292917ms)
+✔ herdr sink (0.355791ms)
+▶ cmux sink
+  ✔ skips the kinds cmux already patches (9.799875ms)
+  ✔ notifies for a questionnaire and dismisses it by id (0.117542ms)
+  ✔ dismisses an id that arrives after the answer (0.065417ms)
+  ✔ stays quiet when no notification was posted (0.045709ms)
+✔ cmux sink (10.128167ms)
+▶ host detection
+  ✔ requires herdr's full pane environment (0.060791ms)
+  ✔ needs cmux's socket, workspace and bundled cli, and honors its opt-out (0.4765ms)
+✔ host detection (0.645833ms)
+▶ label helpers
+  ✔ flattens and truncates (0.187625ms)
+  ✔ falls back from header to question text, and ignores the other questions (0.117542ms)
+  ✔ prefers a prompt title over the ask-user label (0.066958ms)
+✔ label helpers (0.479917ms)
+(node:84217) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ actual clone cancellation after reload prevents create, late create only locally disposes (5.883583ms)
+✔ actual clone aborts owned prompt; its retained Agent callback cannot spawn after close (0.869458ms)
+✔ actual clone attempts one forced-background Agent call and never retries a throwing admission (0.358625ms)
+✔ actual scheduler old timer/finalize cannot dispatch or mutate a rebound same-id store (7.35075ms)
+✔ actual scheduler once and cron callbacks retain binding and shutdown cancels its executing child signal (14.061792ms)
+✔ actual workflow host gate observes cancellation and drain waits for the real pi.exec promise (101.592167ms)
+✔ actual RPC retained callbacks and late spawn reply ignore closing activation (19.552917ms)
+✔ actual clone reports only successful admission, preserves origin and forces background once (0.246583ms)
+(node:84218) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ nested actual delegation ignores legacy turn budgets and keeps user defaults across resume (4.82425ms)
+✔ trusted scheduler persistence and RPC retain explicit turn limits through actual manager execution (26.657125ms)
+✔ running foreground detach transfers current lease above a full background pool; later admission waits (0.872958ms)
+✔ queued foreground moves the same admission to background, unlinks queue parent and releases original gate (1.124708ms)
+✔ worktree startup is visible and waitable immediately; detached failure remains a terminal same-ID outcome (1.163042ms)
+✔ detach during successful startup survives later Esc without creating another runner (0.339209ms)
+✔ true foreground Esc stops its run and descendants; queued already-aborted launches settle (0.632334ms)
+✔ completion wins inline once, while detach wins same-tick completion without consuming (0.221666ms)
+✔ resume foreground uses new run controller/admission and the same session, and refuses simultaneous re-entry (0.252625ms)
+✔ multiple retrieval leases count independently; cancellation and /bg never stop or consume execution (0.250625ms)
+✔ source freezes all owned/workflow/queued/no-session views, reads bounded details without consuming, and scopes stop (1.864791ms)
+✔ freeze/stop/dispose releases queued and startup terminal handles without an orphan wait (0.669833ms)
+✔ workflow child stopped through actual source/host returns skipped and never auto-retries that attempt (35.891625ms)
+✔ foreground resume queued admission can migrate to background without losing its original gate (0.406542ms)
+✔ source observer changes and owner retention preserve completed children past sweep without recursive waits (0.304958ms)
+✔ fresh panel after actual sweep retains consumed workflow child at group end + 0ms only within window (4.71075ms)
+✔ fresh panel after actual sweep retains consumed workflow child at group end + 3999ms only within window (0.917334ms)
+✔ fresh panel after actual sweep retains consumed workflow child at group end + 4000ms only within window (0.257417ms)
+✔ 3B1 stop releases the transferred pool once without waiting for noncooperative execution (0.281792ms)
+(node:84219) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ foundation config ignores old names; real agent discovery retains project precedence (873.375291ms)
+✔ child marker preserves unrelated root context, nested awaits and rejection boundaries (28.61625ms)
+✔ cached host loader guards same/different cwd children and isolates overlapping root loads (1492.207959ms)
+(node:84221) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ actual runner cancellation at env never starts a prompt and closes partial sessions once (2.458208ms)
+✔ actual runner cancellation at reload never starts a prompt and closes partial sessions once (0.762042ms)
+✔ actual runner cancellation at create never starts a prompt and closes partial sessions once (4.29375ms)
+✔ actual runner cancellation at bind never starts a prompt and closes partial sessions once (3.892584ms)
+✔ actual runner cancellation at callback never starts a prompt and closes partial sessions once (0.789041ms)
+✔ actual runner cancellation at prompt never starts a prompt and closes partial sessions once (1.72475ms)
+✔ actual runner already-aborted launch/resume do no startup, subscriptions or prompt (1.601167ms)
+✔ actual manager/runner delayed startup stays starting; Esc/x cancels and releases the admission for a replacement (4.23275ms)
+✔ actual runner normal new/resume and parent-detached delayed startup still prompt exactly once per run (1.507625ms)
+✔ actual manager/runner freezes 2 turns across delayed bind and resume (9.10175ms)
+✔ actual manager/runner freezes unlimited turns across delayed bind and resume (0.807ms)
+✔ actual runner callback failure closes exposed session once even through manager disposal (2.885834ms)
+✔ actual runner structured retry remains cancelled after a first prompt and resume turn accounting resets per invocation (97.546083ms)
+✔ actual resume setup subscription failure releases earlier subscription and abort listener without a prompt (3.991958ms)
+✔ actual new/resume retain soft steering and hard turn limit enforcement (9.836625ms)
+✔ actual prompt failure retains live session for resume unlike disposed startup (0.950834ms)
+✔ actual resume outcome flags and manager terminal priority preserve current text, stats and prior run snapshots (11.849333ms)
+✔ actual workflow host treats hard-aborted resume as non-success without changing workflow decisions (22.260584ms)
+✔ 3B1 stopped terminal is not actual execution drain (new and resume) (2.840833ms)
+✔ 3B1 freeze during actual create/bind only closes late sessions, with stable disposal (1.43225ms)
+✔ 3B1 noncooperative prompt survives bounded close only as an effectless cleanup owner (18.248958ms)
+✔ 3B1 queued/nested stop drains siblings despite throwing observers and output cleanup (1.240959ms)
+✔ 3B1 synchronous onStart closure blocks subsequent resume output setup and prompt (0.857916ms)
+✔ 3B1 throwing subscription disposers cannot strand other subscriptions or parent link (1.634292ms)
+✔ 3B1 new subscription setup failure cleans the first subscription and partial session (0.663708ms)
+✔ 3B1 followup completed retained child releases extension resource before shutdown phase ends (0.816166ms)
+✔ 3B1 followup direct manager dispose runs completed child shutdown hook exactly once (0.823583ms)
+✔ 3B1 followup shutdown stops running child before disposal and includes completed retained parent (1.315917ms)
+✔ 3B1 followup throwing completed child hook cannot block sibling resource cleanup (1.085541ms)
+✔ 3B1 followup direct dispose timeout seals late created child hooks and keeps artifacts (12.617292ms)
+✔ 3B1 followup checks host permission at actual hook boundary after hasHandlers (0.475416ms)
+✔ 3B1 followup pending completed child hook retains owner after direct dispose budget (11.731959ms)
+(node:84222) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ model Agent schema omits turn limits at root and nested boundaries (17.582834ms)
+✔ legacy model turn limit cannot affect actual foreground new/resume execution or notices (548.889708ms)
+✔ legacy model turn limit cannot affect actual background new/resume execution or notices (530.499959ms)
+✔ model scheduled delegation never persists legacy or default turn budgets and fires with current user configuration (1285.172833ms)
+✔ actual root delegation preserves frontmatter limits including unlimited, ignores legacy values and resumes stored type (1077.594792ms)
+✔ default actual model delegation stays unlimited despite legacy budget (5.526292ms)
+✔ actual foreground Agent detaches before startup, keeps activity/transcript and delivers one failure notice (268.487ms)
+✔ actual Agent completion returns inline despite UI failures and suppresses delayed notification (266.513542ms)
+✔ actual launch detach preserves same run and transcript, later Esc cannot stop it, and resume appends same file (528.607417ms)
+✔ actual result waits during startup count independently, wait:false peeks and same-tick cancelled completion nudges once (518.319375ms)
+✔ actual foreground Esc stops, background result Esc does not, and both naturally release waits (6.755541ms)
+✔ grouped notices recheck consumed/current runs and preserve one upstream group delivery (397.443625ms)
+✔ group completion while retrieval is active does not strand sibling notice or duplicate after cancelled wait (648.331708ms)
+✔ delayed group nudge cannot deliver a resumed run through the old attempt's notification (660.991417ms)
+✔ actual background new transcript filesystem failure rolls back before membership and rethrows, without runner/pool/wait orphan (538.097333ms)
+✔ actual background resume transcript stream setup error is rethrown unchanged, stops controller and releases pool (266.812208ms)
+✔ actual background resume filesystem initialization failure cannot start a new run or lose prior transcript (267.629375ms)
+✔ actual foreground detach notifications carry exact new/resume/mention call correlation and terminal per-run turn stats (799.665459ms)
+✔ actual delayed group details retain terminal stats for first/others and omit a consumed member (398.199458ms)
+✔ actual queued background resume stream error settles without prompting or leaking admission, and reports the returned run failure once (266.908334ms)
+✔ actual foreground transcript filesystem failure preserves its existing stop/wait rollback (2.90425ms)
+✔ closed actual factory rejects retained tool callbacks before touching results (2.382209ms)
+[task-ui] sibling dispose failed: Error: optional cleanup
+    at Object.dispose (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/agent-tasks/__tests__/tool-waits.test.ts:521:164)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/lifecycle.ts:78:84
+    at TaskLifecycle.safely (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/lifecycle.ts:48:15)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/lifecycle.ts:78:48
+✔ explicit source stop silently filters its group member but reports the natural sibling (396.990709ms)
+✔ injected participant freezes both backends before wait cancellation, drains retained child resources and repeated starts (267.197959ms)
+✔ actual factory clone late create cannot fallback or admit an Agent after shutdown (3.294625ms)
+✔ actual factory stops a busy workflow worker without a completion notice and preserves script (349.971584ms)
+✔ actual factory shutdown releases queued launch/retrieval and awaited resume without an old notice (529.38625ms)
+[pi-subagents] Running workflow flag…
+✔ actual factory workflow termination drains its in-flight host gate and blocks late journal/notice (90.3385ms)
+✔ actual CLI workflow repeated start executes once; shutdown forbids late entry/next-turn delivery (328.287834ms)
+✔ actual factory shutdown during delayed worktree startup prevents late child admission and notice (264.119208ms)
+✔ actual workflow natural completion still produces one notice and source stop affects only owned children (693.832083ms)
+✔ direct actual factory owns one local shutdown handler and rejects old callbacks (3.051667ms)
+✔ synchronous shutdown from a completion event blocks subsequent entry and held notice (263.65425ms)
+✔ source publication shutdown cannot recreate terminal input or timers (2.927459ms)
+✔ agent factory never registers legacy terminal navigation even with TUI context (2.455208ms)
+✔ actual background starting source listener shutdown rejects without artifact or owner leaks (3.055625ms)
+✔ actual foreground starting source listener shutdown rejects without artifact or owner leaks (2.453459ms)
+✔ actual clone privately overrides custom frontmatter foreground pin, ordinary Agent still honors it (529.309584ms)
+✔ actual clone Agent model refusal reports original text once without fallback admission (4.406375ms)
+✔ clone throwing after admission gives failure feedback but never retries the admitted run (264.854792ms)
+(node:84223) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ real workflow worker executes a no-agent script and shuts down before resolving (45.656125ms)
+✔ real worker RPC invokes a stub host and returns its answer (38.236125ms)
+✔ abort stops a live real worker without a forced test-process exit (35.893125ms)
+✔ aborted real worker never starts a gate from a late host result (66.565708ms)
+✔ paused real worker and a throwing host abort still terminate without new launch or retained control (56.509ms)
+(node:84224) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ actual worktree add signal cancellation preserves partial paths and does not continue git (4.779ms)
+✔ actual manager worktree add cancelled at close never launches a runner or stale cleanup (9.516209ms)
+✔ actual worktree cleanup failures preserve unsaved files and generated branches (12.462417ms)
+✔ actual cleanup cancellation between awaits starts no subsequent git and keeps artifacts (3.576208ms)
+✔ actual runner cleanup waits for its output hook and in-flight git, stops after close boundary (4.486375ms)
+✔ noncooperative runner close preserves actively written worktree and retained late owner (17.307916ms)
+✔ native lock-modified printable slash continues suggestions "\u001b[27;65;47~" (109.303833ms)
+✔ native lock-modified printable slash continues suggestions "\u001b[27;129;47~" (111.218375ms)
+✔ native lock-modified printable slash continues suggestions "\u001b[27;66;47~" (101.709333ms)
+✔ directory debounce cannot start a visible request after early focus (104.034709ms)
+✔ directory debounce cannot start a visible request after early overlay (103.18125ms)
+✔ unrelated trigger provider retains a pending native request across the native no-op copy action (409.743208ms)
+✔ directory observation requires native label, @ value and actual directory cursor together (610.347166ms)
+✔ ordinary non-attachment force Tab remains active across a handled extension shortcut (202.776958ms)
+✔ agent mention provider retains native suggestions across no-op copy (304.312833ms)
+✔ shutdown does not run a later provider-transforming setter twice (101.414084ms)
+✔ shutdown never overwrites a later nondelegating provider setter with an old chain (103.948333ms)
+✔ closed-list actual slash requests ordinary suggestions across path and terminal encodings (2776.458875ms)
+✔ quoted directory cursor may remain before the closing quote (103.12575ms)
+✔ actual list "\t" accepts directory then displays but does not accept its only child (308.066125ms)
+✔ actual list "\r" accepts directory then displays but does not accept its only child (304.472ms)
+✔ force Tab single-directory applies asynchronously then ordinary next query never auto-accepts (101.547333ms)
+✔ already-open suggestions use native update once; empty directories remain closed (305.247459ms)
+✔ file completion keeps native trailing space and normal Enter submits exactly once (205.422875ms)
+✔ prose, email, slash commands, jumps, shortcuts and bracketed paste never request enhancement (711.366542ms)
+✔ token delimiter contract excludes email and accepts native wrappers and CJK punctuation (0.363416ms)
+✔ delayed ordinary query cannot display after escape (203.50125ms)
+✔ delayed ordinary query cannot display after type (202.794083ms)
+✔ delayed ordinary query cannot display after delete (204.560667ms)
+✔ delayed ordinary query cannot display after cursor (203.723375ms)
+✔ delayed ordinary query cannot display after mouse (204.38125ms)
+✔ delayed ordinary query cannot display after replace (202.711125ms)
+✔ delayed ordinary query cannot display after shutdown (203.686ms)
+✔ delayed ordinary query cannot display after editor (205.069958ms)
+✔ delayed ordinary query cannot display after overlay (203.17675ms)
+✔ delayed ordinary query cannot display after focus (202.681459ms)
+✔ directory follow-up microtask is discarded after escape (204.816459ms)
+✔ directory follow-up microtask is discarded after type (204.713625ms)
+✔ directory follow-up microtask is discarded after mouse (203.751084ms)
+✔ directory follow-up microtask is discarded after replace (205.062708ms)
+✔ directory follow-up microtask is discarded after shutdown (203.757709ms)
+✔ directory follow-up microtask is discarded after editor (204.164875ms)
+✔ Escape, mouse and shutdown before native debounce starts cannot reopen the list (316.823083ms)
+✔ force Tab pending query cannot late-accept after Escape even if provider ignores abort (204.13675ms)
+✔ native @ typing debounce is cancelled on shutdown and a new activation starts clean (203.011375ms)
+✔ actual resetExtensionUI before shutdown preserves default editing and does not reinstall predecessor (110.969417ms)
+✔ actual native list mouse callback accepts directory then displays a single next child without submit (207.430042ms)
+✔ actual native fd provider keeps ignored scoped, dot/parent/absolute/quoted and recursive cap semantics (1129.442458ms)
+✔ home path uses native provider in a temporary HOME child, never personal home (207.295125ms)
+✔ fd absent retains native no-result behavior with no replacement search (103.526417ms)
+✔ native baseline: closed-list slash does not request (105.054875ms)
+✔ native baseline: list "\t" directory acceptance closes suggestions (206.214416ms)
+✔ native baseline: list "\r" directory acceptance closes suggestions (205.252875ms)
+✔ native baseline: force Tab single directory closes suggestions (105.393917ms)
+✔ actual setter preserves cursor, undo, callbacks, history and paste state on the live instance (213.166916ms)
+✔ later opaque wrapper and delegating provider survive retirement; factory remains an inactive delegate (307.911958ms)
+✔ future delegated factory decorates a new editor and invalidates the old lease (202.72725ms)
+✔ safe degradation missing keeps actual mounted UI usable (102.448458ms)
+✔ safe degradation nonconfig keeps actual mounted UI usable (205.136708ms)
+✔ safe degradation accessor keeps actual mounted UI usable (204.811792ms)
+✔ safe degradation setter keeps actual mounted UI usable (204.32025ms)
+✔ safe degradation overlay keeps actual mounted UI usable (205.19225ms)
+✔ safe degradation throwing-request keeps actual mounted UI usable (204.564334ms)
+✔ shutdown/reset reentry does not register a late provider or re-enable the activation (101.907833ms)
+✔ Beautify, Down and history/agent provider fixtures compose in multiple loading orders including Down disabled (2042.218625ms)
+✔ opaque retired forwarder releases screen/editor under actual GC (581.107334ms)
+✔ actual host history=first, Down=first/true (17.2335ms)
+✔ actual host history=first, Down=first/false (3.02ms)
+✔ actual host history=first, Down=last/true (2.878083ms)
+✔ actual host history=first, Down=last/false (1.94175ms)
+✔ actual host history=last, Down=first/true (2.24825ms)
+✔ actual host history=last, Down=first/false (1.783375ms)
+✔ actual host history=last, Down=last/true (2.231458ms)
+✔ actual host history=last, Down=last/false (1.783334ms)
+[beautify] Editor installation failed; keeping original editing UI.
+[beautify] Editor installation failed; keeping original editing UI.
+[beautify] Editor installation failed; keeping original editing UI.
+[beautify] Editor installation failed; keeping original editing UI.
+[beautify] Editor installation failed; keeping original editing UI.
+[beautify] Editor installation failed; keeping original editing UI.
+✔ live handoff preserves subclass, cursor/undo, history draft, paste, autocomplete, IME and callbacks (193.863625ms)
+✔ appearance keeps native working status, scroll labels and only first prompt (0.888042ms)
+✔ unsupported accessor leaves native UI mounted and usable (1.172791ms)
+✔ unsupported locked leaves native UI mounted and usable (0.706ms)
+✔ unsupported missing leaves native UI mounted and usable (0.291875ms)
+✔ unsupported nonextensible leaves native UI mounted and usable (0.238ms)
+✔ actual host partial after setter rollback keeps same UI, focus and undo (0.433625ms)
+✔ actual host partial focus rollback keeps same UI, focus and undo (0.2995ms)
+✔ later opaque render/factory, user padding and reset-before-shutdown remain owned (0.336917ms)
+[beautify] Editor installation failed; keeping original editing UI.
+✔ production composition registers only backend tools and native presentation stays independent (1643.683458ms)
+✔ opaque retired appearance/factory release context and TUI under real GC (716.451834ms)
+✔ descriptor partial mutation and locked later visual wrapper restore safely (15.785084ms)
+✔ active overlay and non-TUI modes do not unmount or replace an editor (2.357958ms)
+[beautify] Editor installation failed; keeping original editing UI.
+✔ decoration during active history/paste/autocomplete preserves their native transient state (6.952458ms)
+✔ cleanup retains later padding setter ownership (0.423959ms)
+✔ cleanup retains later padding getter ownership (0.237208ms)
+✔ cleanup retains later padding underlying ownership (0.164542ms)
+✔ padding mutation then failure restores native methods, physical padding and usable UI (0.392375ms)
+[beautify] Editor installation failed; keeping original editing UI.
+✔ captured future factory keeps a single live visual lease and history (2.770417ms)
+✔ handoff descriptor failure before setter restores appearance and all earlier handoff methods (0.449167ms)
+✔ appearance preserves native non-finite padding behavior and never consumes source indentation after a later takeover (0.409209ms)
+✔ migrated Alt+R query, older/newer navigation, cancel and branch priority stay intact (6.209291ms)
+✔ migrated later border wrapper and nondelegating render retain their receivers and content (0.44525ms)
+(node:84253) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ actual registered get_subagent_result emits running/completed/verbose/not-found/released/cancelled contracts with no extra display consumption (30.859166ms)
+✔ agent header snapshots, verbose body and exact wait/not-found envelopes are conservative (1.384875ms)
+✔ jobs six action guards ignore body spoofing, byte range is not character count, partial is only following (1.298459ms)
+✔ actual host optional call/result sync, mouse/key expansion, pending/partial/final and historical state (4.577375ms)
+✔ unknown formats delegate original slots/state/shell, known→unknown switches synchronously and missing original has generic preview (1.592625ms)
+✔ unknown default renderer shell preserves host-style Box, full original context and details (0.254834ms)
+✔ actual loader optional absence/dynamic next, no tools registered, unrelated renderer identity unchanged (90.295708ms)
+[beautify] Optional renderer failed; retaining readable arguments and result.
+✔ actual registered jobs produces list/stats/output/search/attach/kill envelopes without display-side reads or consumption (23.1955ms)
+✔ empty/multiline descriptions keep header status and unsafe terminal sums delegate (0.148208ms)
+✔ self compatibility shell has exactly the default host padding hit bounds and backgrounds (1.315333ms)
+✔ generic fallback renders raw expanded arguments, bounded collapsed args, and replaces throwing delegates without stale data (1.2065ms)
+✔ partial→final contracts never delegate using the previous result with new context (0.154167ms)
+✔ actual SDK thrown jobs errors carry details object and safely delegate without changing output (2.702083ms)
+✔ actual host read paints pending/success/error backgrounds and only host padding (2.620583ms)
+✔ actual host read call/result compose synchronously to one collapsed row (8.313292ms)
+✔ actual host bash paints pending/success/error backgrounds and only host padding (22.646708ms)
+✔ actual host bash call/result compose synchronously to one collapsed row (1.922375ms)
+✔ actual host find paints pending/success/error backgrounds and only host padding (0.705958ms)
+✔ actual host find call/result compose synchronously to one collapsed row (0.554459ms)
+✔ actual host grep paints pending/success/error backgrounds and only host padding (0.223666ms)
+✔ actual host grep call/result compose synchronously to one collapsed row (0.306458ms)
+✔ actual host fallback errors and ordinary background words remain collapsed, expanded retains all text (0.583375ms)
+✔ actual default shell mouse toggles body, partial/error/image/limited output remain one row (4.917167ms)
+✔ actual host terminal-effective background covers shortened bash title, metadata and right padding (one
+two) (3.21325ms)
+✔ actual host terminal-effective background covers shortened read title, metadata and right padding (ENOENT:) (0.53425ms)
+✔ actual host terminal-effective background covers shortened bash title, metadata and right padding (failure) (0.248792ms)
+✔ actual fullscreen 140→80→40→140 frames preserve complete-or-omitted hint and Ctrl+O-style expansion (80.666625ms)
+✔ actual loader/resolver owns six display adapters, original tool execution/structured output and host images stay untouched (181.4545ms)
+✔ four actual host components obey widths/padding/expansion and native metadata (16.769458ms)
+✔ notice parsing is exact, unknown text/control data is retained safely and path offset stays atomic (0.573417ms)
+✔ Shiki ANSI, unknown/80k fallback, finite LRU and once-only redacted diagnostics (6.362333ms)
+✔ async read redraw rejects changed content, width, collapse, close and preserves successful ANSI on real invalidation (1.226292ms)
+✔ Read notice separation preserves blank source lines and refuses embedded or unknown lookalikes (0.101834ms)
+✔ exact search notices preserve unknown suffixes and native Read byte-limit notices (0.079375ms)
+✔ language detection preserves the approved Pretty extension/basename map only (0.071667ms)
+✔ multiline/control/Unicode tool titles always return physical width-bounded rows (0.776625ms)
+✔ external terminal controls are stripped before styling all four tool outputs (1.732834ms)
+✔ Find unknown notice and partial blank records use readable fallback rather than fabricated counts (0.089875ms)
+✔ actual foreground abort escalates ignored TERM before host shutdown can be reached, preserving logs (269.835166ms)
+[task-ui] close hook failed: Error: optional panel sink failed
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/__tests__/activation.test.ts:50:43
+    at TaskLifecycle.safely (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/lifecycle.ts:48:15)
+    at TaskLifecycle.shutdown (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/lifecycle.ts:61:50)
+    at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/__tests__/activation.test.ts:51:36)
+    at async Test.run (node:internal/test_runner/test:1125:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+✔ shutdown stops fg/bg/command monitor/pending/attach and owned timers despite throwing UI; old tools reject (316.9035ms)
+✔ late actual exit changes neither next activation counts nor notices (7.220125ms)
+✔ TERM-killed group leader cannot strand its TERM-ignoring descendant (24.885ms)
+✔ WS monitor silent shutdown closes its source and late socket frames cannot send or change next registry (3.205625ms)
+[process-tasks] stop hook failed: Error: stop hook failure
+    at jobs.<computed>.stop (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/__tests__/activation.test.ts:163:39)
+    at terminateJob (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/lifecycle.ts:327:23)
+    at terminateJobSilently (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/lifecycle.ts:287:11)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/lifecycle.ts:41:63
+    at safely (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/lifecycle.ts:28:15)
+    at Object.stop (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/lifecycle.ts:41:50)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/lifecycle.ts:64:77
+    at TaskLifecycle.safely (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/lifecycle.ts:48:15)
+    at TaskLifecycle.shutdown (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/lifecycle.ts:64:44)
+    at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/__tests__/activation.test.ts:164:27)
+✔ normal actual exit disarms escalation and a late stop cannot signal the released PID (305.719625ms)
+✔ throwing backend stop hook cannot prevent actual kill or sibling cleanup (3.613792ms)
+✔ reentrant add publication shutdown cancels monitor before opening a socket or log (0.594417ms)
+✔ monitor tool setup publication shutdown preserves stopped metadata/counts and never reports started (1.097042ms)
+✔ monitor tool setup publication shutdown then throw preserves stopped metadata/counts and never reports started (0.860458ms)
+▶ bash_bg — timeout kill is loud
+  ✔ marks the log AND sends a killed notification (1608.397833ms)
+✔ bash_bg — timeout kill is loud (1608.972792ms)
+▶ bash tool — Claude Code tool-result strings
+  ✔ run_in_background returns the generic CC string (no Name fragment) (4.218458ms)
+  ✔ manual background (Ctrl+Shift+B) returns the manual CC string (405.216625ms)
+  ✔ timeout auto-background returns the same generic CC string (1002.521625ms)
+  ✔ timeout kill (auto-background not allowed) appends 'Command timed out after Ns' to the log (1003.792542ms)
+  ✔ an external signal death is reported as killed ('was stopped'), never completed (303.134166ms)
+✔ bash tool — Claude Code tool-result strings (2719.818375ms)
+▶ bash foreground — Claude Code parity on turn abort
+  ✔ a genuine cancel (Esc) KILLS the foreground command (607.576416ms)
+  ✔ a backgrounding pause (steering / Ctrl+Shift+B) SURVIVES the abort (604.70025ms)
+✔ bash foreground — Claude Code parity on turn abort (1213.095583ms)
+▶ commands
+  ✔ /process-tasks-version reports the loaded package version and path (0.636792ms)
+✔ commands (1.115625ms)
+▶ formatConfigReport
+  ✔ says so plainly when nothing is overridden (0.161916ms)
+  ✔ lists only the overridden keys, with their defaults (0.103916ms)
+  ✔ surfaces load warnings (0.122125ms)
+✔ formatConfigReport (0.48575ms)
+▶ loadConfig — no file
+  ✔ returns the defaults with no warnings (1.374958ms)
+✔ loadConfig — no file (1.610375ms)
+▶ loadConfig — valid file
+  ✔ overrides only the keys present (0.700625ms)
+  ✔ expands a leading ~ in logDir (0.622125ms)
+  ✔ rounds a fractional number rather than passing it downstream (1.506042ms)
+✔ loadConfig — valid file (2.943792ms)
+▶ loadConfig — malformed input never throws
+  ✔ ignores a file that is not JSON (0.983584ms)
+  ✔ ignores a JSON file that is not an object (0.819625ms)
+  ✔ reports a non-ENOENT read failure (0.55875ms)
+  ✔ falls back and warns on a non-numeric number (0.452792ms)
+  ✔ falls back and warns on an out-of-range number (0.603625ms)
+  ✔ falls back and warns on an empty logDir (0.477833ms)
+  ✔ warns about an unknown key — a typo is silence otherwise (0.457583ms)
+  ✔ uses 30s by default, preserves explicit values/zero and environment precedence without writes (1.152791ms)
+✔ loadConfig — malformed input never throws (5.7195ms)
+▶ loadConfig — environment overrides
+  ✔ derives the variable name from the key (0.048958ms)
+  ✔ takes precedence over the file (0.4765ms)
+  ✔ applies without a file (0.143916ms)
+  ✔ warns and keeps the file value when the variable is invalid (0.244916ms)
+✔ loadConfig — environment overrides (0.975667ms)
+▶ DEFAULTS
+  ✔ is frozen so a caller cannot change the fallbacks (0.024416ms)
+✔ DEFAULTS (0.046166ms)
+✔ does not read legacy backend shortcut keys or environment overrides (0.300125ms)
+✔ foreground two-second hint show-and-clear failure cannot orphan a launch (17.28425ms)
+✔ foreground two-second hint clear-only failure cannot orphan a launch (14.33525ms)
+✔ foreground two-second hint poller-stop failure cannot orphan a launch (16.628041ms)
+✔ foreground execution error survives a failing final source publication (4.58775ms)
+✔ bash explicit background setup failure silently stops the spawned process and preserves original error (2.16225ms)
+✔ bash_bg explicit background setup failure silently stops the spawned process and preserves original error (2.223209ms)
+✔ jobs wait returns a consumed inline outcome even when the completion toast throws (1.14575ms)
+✔ jobs terminal returns a consumed inline outcome even when the completion toast throws (1.209459ms)
+✔ jobs sibling-cancel returns a consumed inline outcome even when the completion toast throws (1.04725ms)
+▶ readTailLines
+  ✔ returns the last N non-empty lines (0.823958ms)
+  ✔ drops blank lines so the budget is spent on content (0.258709ms)
+  ✔ strips ANSI colour and collapses \r progress redraws (0.224292ms)
+  ✔ returns '' for an empty file (0.172333ms)
+  ✔ returns '' for a missing file rather than throwing (0.051209ms)
+  ✔ honours the char bound, keeping the END of a huge log (0.303459ms)
+✔ readTailLines (2.118ms)
+▶ failureTail
+  ✔ is empty for a completed job — success costs no context (0.217625ms)
+  ✔ carries the log tail for a failed job (0.220167ms)
+  ✔ carries the log tail for a signal death (killed) (0.2305ms)
+  ✔ says '(no output)' when a job failed having printed nothing (0.055917ms)
+✔ failureTail (0.8295ms)
+▶ buildTaskNotification — the tail block
+  ✔ omits the block when there is no tail (0.056542ms)
+  ✔ passes the tail through verbatim — no escaping to undo (0.082541ms)
+✔ buildTaskNotification — the tail block (0.18725ms)
+▶ sendTaskNotification — failure carries its own output
+  ✔ inlines the tail in both the text and details (0.390917ms)
+  ✔ sends no tail for a completed job (0.130167ms)
+✔ sendTaskNotification — failure carries its own output (0.54775ms)
+▶ bash_bg --name 라벨
+  ✔ formatJobLine은 이름 있는 잡에 대해 'name (job-id)' 헤더 사용 (0.572875ms)
+  ✔ 이름 없는 잡은 job-id만 (0.0585ms)
+✔ bash_bg --name 라벨 (1.092166ms)
+▶ jobs.search 정규식 검색
+  ✔ 여러 잡 로그에서 정규식 매치 (1.093041ms)
+✔ jobs.search 정규식 검색 (1.141916ms)
+▶ metadata expiry
+  ✔ 실행 중 잡은 보존, 종료된 잡은 제거 (0.796875ms)
+✔ metadata expiry (0.845625ms)
+▶ jobs.stats
+  ✔ 집계 정확성 (0.155541ms)
+✔ jobs.stats (0.204958ms)
+▶ killProcessTree + processExists 안전성
+  ✔ 잘못된 PID에서 throw하지 않음 (0.147875ms)
+✔ killProcessTree + processExists 안전성 (0.19975ms)
+▶ add/sweep lifecycle
+  ✔ 중복 add는 멱등하지 않음 (counter 누적) (0.049833ms)
+  ✔ an expired ID can be re-registered (0.049ms)
+✔ add/sweep lifecycle (0.143292ms)
+▶ formatDuration
+  ✔ sub-second rounds to 0s (0.373625ms)
+  ✔ seconds only (0.053667ms)
+  ✔ minutes + seconds (0.04ms)
+✔ formatDuration (0.952083ms)
+▶ truncateTail
+  ✔ returns as-is when within maxChars (0.044375ms)
+  ✔ adds marker + tail when over maxChars (0.534875ms)
+✔ truncateTail (0.639791ms)
+▶ statusLabel
+  ✔ running + backgrounded (0.091834ms)
+  ✔ running + foreground (0.042ms)
+  ✔ completed (0.039417ms)
+  ✔ failed (0.03175ms)
+  ✔ killed (0.061666ms)
+✔ statusLabel (0.347667ms)
+✔ statusLabel distinguishes foreground and background (0.044625ms)
+▶ oneLine
+  ✔ collapses whitespace runs and trims (0.059083ms)
+✔ oneLine (0.080584ms)
+▶ describeJob
+  ✔ prefers the job name (0.099792ms)
+  ✔ falls back to the command, collapsed to one line (0.054708ms)
+  ✔ truncates a long command (0.039625ms)
+✔ describeJob (0.247042ms)
+▶ formatJobLine
+  ✔ running jobs show duration (0.0975ms)
+  ✔ shows the duration exactly once (0.056708ms)
+  ✔ collapses a multi-line command to one line (0.032292ms)
+  ✔ named jobs show the name first (0.040708ms)
+  ✔ terminal jobs render their status label (0.035166ms)
+  ✔ failed terminal jobs render the failed label (0.033292ms)
+  ✔ running jobs show the bg label (0.024917ms)
+✔ formatJobLine (0.379792ms)
+▶ background hint
+  ✔ names the command, its elapsed time, and the chord (0.621208ms)
+  ✔ collapses a multi-line command onto one row (0.055916ms)
+  ✔ lists every hinted command and pluralises the chord line (0.064ms)
+  ✔ advertises the configured chord, not the default (0.056041ms)
+  ✔ falls back to /bg when the chord is unbound (0.052125ms)
+  ✔ stays up until the last parallel command is gone (0.091625ms)
+  ✔ a repeated show does not rewrite an unchanged widget (0.05ms)
+  ✔ clear is a no-op when nothing is shown (0.034583ms)
+  ✔ a dropped slot retires the hint even with no clear call (0.056708ms)
+  ✔ ignores a slot that has not passed the quick window (0.072625ms)
+✔ background hint (1.71575ms)
+▶ session_start — registry is born empty (no revival)
+  ✔ ignores a stale persisted state entry entirely (1.44ms)
+  ✔ session replacement stops old tasks and starts an empty registry (243.063958ms)
+✔ session_start — registry is born empty (no revival) (245.05125ms)
+▶ session_shutdown — kills running tasks on ANY reason
+  ✔ reason "quit" kills running tasks silently (242.129959ms)
+  ✔ reason "reload" kills running tasks silently (245.428625ms)
+✔ session_shutdown — kills running tasks on ANY reason (487.804209ms)
+✔ AC10: monitor progress and terminal renderer show identity/state/log/omissions, width/control safe (2.6325ms)
+✔ factory batches command and WS; session fallback cancels old windows; batch renderer remains safe (608.10575ms)
+✔ factory fallback reset inside deadline decision schedules new source and skips remaining old decisions (2.604459ms)
+✔ actual factory retains hundreds of terminals beyond admission: bounded single delivery, manifest queries, isolation and fd cleanup (745.587833ms)
+✔ ordinary interactive input never detaches, aborts or resubmits (1.198375ms)
+✔ ordinary rpc input never detaches, aborts or resubmits (0.051292ms)
+✔ ordinary extension input never detaches, aborts or resubmits (0.0385ms)
+▶ readLogSlice
+  ✔ returns the tail when no offset is given (1.221333ms)
+  ✔ reads an interior range — the part upstream could not reach (0.226333ms)
+  ✔ clamps a range that runs past the end (0.210958ms)
+  ✔ clamps an offset beyond EOF to an empty slice, not an error (0.248083ms)
+  ✔ returns undefined for a missing or empty log (0.21875ms)
+✔ readLogSlice (2.410625ms)
+▶ jobs output — paging
+  ✔ defaults to the tail and says which bytes it showed (0.95425ms)
+  ✔ names the offset to continue from when more remains (0.453833ms)
+  ✔ flags the bytes it skipped so a tail cannot read as the whole log (0.644917ms)
+  ✔ pages the whole log without overlap or gaps (0.569334ms)
+  ✔ says so plainly when the offset lands past the end (0.631875ms)
+✔ jobs output — paging (3.480625ms)
+▶ jobs — required parameters
+  ✔ names the action and the missing parameter (0.684542ms)
+✔ jobs — required parameters (0.731583ms)
+▶ jobs search — scope, case, context
+  ✔ scans every job by default (5.62175ms)
+  ✔ limits the scan to one job when given a jobId (0.9575ms)
+  ✔ errors on an unknown jobId instead of silently scanning everything (0.298042ms)
+  ✔ is case-sensitive by default and case-insensitive on request (1.281125ms)
+  ✔ shows context lines in grep's :/- convention (0.503875ms)
+  ✔ omits context lines that do not exist at the file edges (0.430209ms)
+  ✔ counts every match even when context is on and display is capped (0.401333ms)
+  ✔ still reports a context-free search in one line per hit (0.457667ms)
+✔ jobs search — scope, case, context (10.125917ms)
+▶ jobs kill — CC's TaskStopTool
+  ✔ returns the exact CC success string and suppresses the notification (1.130958ms)
+  ✔ unknown id errors with CC's exact string (0.322625ms)
+✔ jobs kill — CC's TaskStopTool (1.935208ms)
+▶ jobs output — a read surfaces the outcome
+  ✔ marks a terminal job surfaced on read (0.487959ms)
+  ✔ does NOT mark a still-running job (peek) (0.313916ms)
+  ✔ unknown id errors with CC's exact string (0.202291ms)
+✔ jobs output — a read surfaces the outcome (1.103208ms)
+▶ jobs list — retained metadata
+  ✔ lists surfaced terminal records without eviction or duplicates (0.599792ms)
+  ✔ lists a terminal job whose outcome never reached the agent (0.398584ms)
+✔ jobs list — retained metadata (1.082167ms)
+▶ jobs attach — suppression is scoped to the wait
+  ✔ an aborted attach leaves the job able to notify later (0.798458ms)
+  ✔ two concurrent attaches do not cancel each other's suppression (0.293041ms)
+✔ jobs attach — suppression is scoped to the wait (1.14325ms)
+▶ processExists
+  ✔ the current process is alive (0.512709ms)
+  ✔ PID 0 is treated as dead (0.059334ms)
+  ✔ a negative PID is treated as dead (0.048ms)
+  ✔ undefined is treated as dead (0.03125ms)
+✔ processExists (1.187292ms)
+▶ killProcessTree
+  ✔ PID 0 / negative / undefined are no-ops (0.129875ms)
+✔ killProcessTree (0.178083ms)
+▶ statusFromExit
+  ✔ 0 → completed (0.077667ms)
+  ✔ 1 → failed (0.047667ms)
+  ✔ a signal death → killed (external kill, OOM — never completed) (0.041083ms)
+  ✔ a signal wins over a code (0.038792ms)
+  ✔ null without a signal → failed (the spawn-error path passes code 1) (0.047541ms)
+  ✔ undefined → failed (0.04ms)
+✔ statusFromExit (0.419125ms)
+▶ markTerminal idempotency
+  ✔ a second call after completion is ignored (0.260291ms)
+  ✔ killed → killed (0.053833ms)
+✔ markTerminal idempotency (0.37025ms)
+▶ ensureCompletionPromise
+  ✔ creates donePromise resolvable via resolveDone (0.091958ms)
+✔ ensureCompletionPromise (0.11725ms)
+▶ markKilledSilently
+  ✔ status=killed, outcome marked surfaced (0.052458ms)
+✔ markKilledSilently (0.080125ms)
+▶ createJobAbort / abortJob
+  ✔ registers a controller and is idempotent (0.056167ms)
+  ✔ abortJob aborts the signal and removes the controller (0.073292ms)
+  ✔ abortJob on an unknown job is a no-op (0.021959ms)
+✔ createJobAbort / abortJob (0.178708ms)
+▶ BackgroundRegistry defaults
+  ✔ initializes default fields (0.026417ms)
+✔ BackgroundRegistry defaults (0.041791ms)
+✔ AC12/15: bounded prefix, exact whole/truncated omission counts survive rebatching (1.887041ms)
+✔ AC12/15: characters include newlines; empty lines capped; surrogate pairs not split (2.157083ms)
+✔ AC4/12/19: independent UTF-8 decoders and bounded partials only produce activity at newline (0.737125ms)
+✔ AC12/15: once a prefix is truncated, later small lines/fragments cannot fill its gap (0.10675ms)
+✔ AC12: empty WS preview plus Unicode at zero budget matches direct prefix and omission counts (0.137708ms)
+[process-tasks] monitor notification failed: [object Object]
+✔ fixed first window, shared cadence, no trailing debounce or empty wake (3.093708ms)
+✔ first window min(200,F), F=0 (0.503292ms)
+✔ first window min(200,F), F=1 (0.594792ms)
+✔ first window min(200,F), F=50 (0.55425ms)
+✔ first window min(200,F), F=199 (0.473917ms)
+✔ first window min(200,F), F=200 (0.515625ms)
+✔ timely refresh carries ordinary pending and restarts cadence; transitions preserved (0.606208ms)
+✔ terminal attach suppression does not block others; retry respects identity and consumption (0.403458ms)
+✔ reentrant submission consumes only snapshot and commits shared next interval (0.45525ms)
+✔ cancel in send callback does not revive old pending (0.436834ms)
+✔ freeze in send callback does not revive old pending (0.340916ms)
+✔ reset in send callback does not revive old pending (0.27825ms)
+✔ unknown submission failures do not kill, replay progress or latch terminal; retry remains finite (0.471417ms)
+✔ fair shared preview budget includes separators, same cropped payload in body/details and bounded metadata (0.423208ms)
+✔ huge flush delay chunks timers; terminal consumption/replacement cancel before delivery (0.292875ms)
+✔ known finishing suspends pending until terminal rather than flushing ordinary preview (0.282166ms)
+✔ natural terminal arriving during progress submission is not lost or double-consumed (0.268833ms)
+✔ transition metadata caps noisy short windows without losing terminal; reset releases held retries (0.32825ms)
+✔ zero preview budget keeps identities and terminal state while long metadata stays bounded (0.420875ms)
+✔ reset during decision callback schedules the new epoch without submitting the old snapshot (0.261833ms)
+✔ unstringifiable submission error cannot escape notification isolation (0.35625ms)
+✔ unstringifiable submission error cannot escape notification isolation (0.341458ms)
+✔ throwing error inspector cannot escape isolation or lose the next event (0.726459ms)
+✔ exactly fitting ordinary batch is not rejected by overflow preselection (0.27075ms)
+✔ reset and enqueue inside host send preserves fresh cadence and does not commit old terminal latch (0.40375ms)
+✔ thousands of retained terminal sources: one hard-bounded wire payload, complete original manifest, consumption and log retention (914.015167ms)
+✔ exclusive chunked manifest writes handle partial writes, failure cleanup and close ownership without fd leaks (18.966417ms)
+✔ manifest failure sends one bounded truthful hint; unsaved omitted terminal stays unconsumed with no automatic retry (70.940875ms)
+✔ unrepresentable log/manifest paths never overflow the cap or advertise a truncated path (1.6325ms)
+✔ manifest identity is registry and epoch independent; reset/dispose never deletes another batch (299.270833ms)
+✔ successful manifest but failed host submission preserves file and every terminal retrieval latch without auto replay (270.63875ms)
+✔ hard wire cap remains independent of huge preview budgets and JSON-escaped multibyte content (18.91125ms)
+✔ manifest JSON chunks preserve lone surrogates, escapes and pairs across boundaries (2.996292ms)
+✔ manifest zero write failure clears its partial file and closes the owned fd (1.167583ms)
+✔ manifest close before failure clears its partial file and closes the owned fd (1.5945ms)
+✔ manifest close after failure clears its partial file and closes the owned fd (1.602667ms)
+✔ failed manifest omitted outcome remains available to explicit retrieval retry, with original metadata (91.221ms)
+[process-tasks] monitor notification failed: sink unavailable
+[process-tasks] monitor notification failed: sink unavailable
+[process-tasks] monitor notification failed: Unknown notification error
+[process-tasks] monitor notification failed: Unknown notification error
+✔ AC2/3/10: bounded first window, shared 30s, quiet arrival short window, no passive/empty messages (5.471041ms)
+✔ AC3/13: no silence wake or implicit old deadline (0.808584ms)
+✔ AC4/5/6/7/18: startup silence once, two timely recoveries, arrival resets silence not status/latch (1.060958ms)
+✔ AC8: same-point absent consumes pending instead of ordinary progress (0.952625ms)
+✔ AC6: ordinary interval restarts at recovery submission (1.089208ms)
+✔ AC9/10: completed combines pending/final once with no repeated failure tail or late timers (1.285ms)
+✔ AC9/10: failed combines pending/final once with no repeated failure tail or late timers (0.597916ms)
+✔ AC9/10: killed combines pending/final once with no repeated failure tail or late timers (0.592625ms)
+✔ AC9/18: shared panel/jobs stop and session abort suppress pending/final and clean resources (0.740375ms)
+✔ AC14: total deadline wins over silence/progress, drains into one reason terminal (0.895959ms)
+✔ AC11/14: huge finite deadlines/silence are chunked, not Node 1ms overflow (0.814125ms)
+✔ AC15/4: firehose never rate-kills, bounded previews, omitted activity resets silence (2.285084ms)
+✔ AC17: shared maxLogBytes check owns one combined wake, no adjacent passive warning (1.219542ms)
+✔ AC9/17: attach/outcome suppression keeps terminal output from being re-sent (0.801125ms)
+✔ send failure never kills source or marks outcome surfaced (1.638208ms)
+✔ AC9: known finishing prevents same-point timer/final-read leading-edge emission (0.756583ms)
+✔ AC2: zero interval still sends a whole source callback batch, not individual lines (0.839417ms)
+✔ AC18: viewing/closing panel leaves monitor scheduling alone; panel x and jobs kill are silent (6.731042ms)
+✔ AC18: jobs kill of active monitor with pending/silence timer uses the same silent boundary (0.97275ms)
+✔ AC18: replacement registry ignores old callbacks and abort releases source/timer (0.720959ms)
+✔ AC9/14/17: deadline failure to submit never latches outcome surfaced (0.734ms)
+✔ AC9/14/17: deadline terminal obeys attach suppression without marking outcome (0.789416ms)
+✔ AC9/14/17: oversize failure to submit never latches outcome surfaced (0.544292ms)
+✔ AC9/14/17: oversize terminal obeys attach suppression without marking outcome (0.79725ms)
+✔ AC10: null send failures isolate progress, reminder, recovery and terminal (0.836208ms)
+✔ AC9/10/14/17: deadline with null sink failure still stops and cleans without latching success (0.613958ms)
+✔ AC9/10/14/17: oversize with null sink failure still stops and cleans without latching success (0.468791ms)
+✔ AC10: undefined send failures isolate progress, reminder, recovery and terminal (0.896417ms)
+✔ AC9/10/14/17: deadline with undefined sink failure still stops and cleans without latching success (0.599875ms)
+✔ AC9/10/14/17: oversize with undefined sink failure still stops and cleans without latching success (0.916ms)
+✔ AC18: startup wiring failure cleans source, abort/timers and completion hooks; late callbacks are inert (1.310541ms)
+✔ AC10: command receive path stays alive across null progress failure and preserves both raw streams (1.890583ms)
+✔ AC10: command receive path stays alive across undefined progress failure and preserves both raw streams (0.810875ms)
+✔ shared retrieval detach on the terminal tick re-delivers the bounded monitor final, not a failure tail (1.43875ms)
+✔ reentrant shutdown inside source factory closes actual WS source exactly once without a final batch (2.193916ms)
+✔ reentrant shutdown inside registry publication return closes actual WS source exactly once without a final batch (0.849917ms)
+✔ reentrant shutdown inside registry wire publish closes actual WS source exactly once without a final batch (0.868666ms)
+✔ direct monitor session rejects closed admission without calling its source factory (0.437708ms)
+✔ direct monitor session rejects terminal admission without calling its source factory (0.37325ms)
+✔ direct monitor session rejects replaced admission without calling its source factory (0.288834ms)
+✔ already-terminal background setup invokes a throwing source stop but still stops and releases actual execution (0.680875ms)
+✔ session batch: two actual sessions share one fixed first window (0.910125ms)
+✔ actual session keeps absent/resumed order inside one short window and does not reset event silence on send (0.85525ms)
+✔ inline attach completion consumes delayed terminal without notification or retry owner (0.7925ms)
+✔ actual command session does not turn unstringifiable notification failure into source failure (0.953625ms)
+✔ actual command session does not turn unstringifiable notification failure into source failure (0.800375ms)
+✔ initial monitor decision: silence shutdown reports the correct setup outcome (5.744125ms)
+✔ initial monitor decision: immediate deadline reports the correct setup outcome (1.523791ms)
+✔ default first window allows startup then submission-triggered shutdown clears sibling pending (2.883583ms)
+✔ AC12/19: raw merged log, stderr activity, exit zero completed: printf 'OUT\n'; printf 'ERR\n' >&2 (10.114458ms)
+✔ AC12/19: raw merged log, stderr activity, exit zero completed: printf 'ERR\n' >&2 (5.860208ms)
+✔ AC19: user pipe semantics preserved: { printf 'drop-out\nkeep-out\n'; printf 'drop-err\nkeep-err\n' >&2; } | grep keep (8.9355ms)
+✔ AC19: user pipe semantics preserved: { printf 'drop-out\nkeep-out\n'; printf 'drop-err\nkeep-err\n' >&2; } 2>&1 | grep keep (9.271166ms)
+✔ AC19: explicit separate redirects remain separate (6.391ms)
+✔ AC9/12: exit boundary synchronously drains both pipes, EOF first=true (1.854ms)
+✔ AC9/12: exit boundary synchronously drains both pipes, EOF first=false (1.004166ms)
+✔ AC12: descendant-held pipes do not keep the monitor alive after main shell exit (5.265667ms)
+✔ AC9: pipe error fails once and destroys both streams (0.688166ms)
+✔ AC12: incomplete UTF-8 is logged as raw bytes and explicitly noted at exit boundary (1.08425ms)
+✔ AC12/19: huge raw dual-stream output stays on disk even when source previews omit it (2.128625ms)
+✔ raw log writer handles short writes; write failure is contained and closes both pipes (1.713416ms)
+▶ monitor tool — validation
+  ✔ rejects when neither command nor ws is given (1.247458ms)
+  ✔ rejects when both command and ws are given (0.137083ms)
+  ✔ rejects a blank description (0.106875ms)
+✔ monitor tool — validation (2.053541ms)
+▶ monitor tool — command lifecycle
+  ✔ short command folds live lines into one timely terminal notification (306.046375ms)
+✔ monitor tool — command lifecycle (306.148208ms)
+▶ monitor — split spawn output
+  ✔ writes stdout and stderr to separate files when errPath is set (3.644542ms)
+✔ monitor — split spawn output (3.724542ms)
+▶ monitor — ws source mapping
+  ✔ appends text frames and a binary placeholder to the log (0.595709ms)
+✔ monitor — ws source mapping (0.797833ms)
+✔ AC11: timeout_ms=0 rejected before WS construction or registry insertion (0.23375ms)
+✔ AC11: timeout_ms=-1 rejected before WS construction or registry insertion (0.104417ms)
+✔ AC11: timeout_ms=NaN rejected before WS construction or registry insertion (0.190333ms)
+✔ AC11: timeout_ms=Infinity rejected before WS construction or registry insertion (0.107083ms)
+✔ AC11: wake_absent_ms=0 rejected before WS construction or registry insertion (0.143625ms)
+✔ AC11: wake_absent_ms=-1 rejected before WS construction or registry insertion (0.186ms)
+✔ AC11: wake_absent_ms=NaN rejected before WS construction or registry insertion (0.130084ms)
+✔ AC11: wake_absent_ms=Infinity rejected before WS construction or registry insertion (0.123708ms)
+✔ AC16: tool schema has optional timeout/silence and no persistent (0.054667ms)
+✔ source constructor failure rolls back started count and registry (0.313167ms)
+✔ AC4/5/6/12/19: WS empty/multiline/omitted messages each reset activity; diagnostics and late messages don't recover (1.545125ms)
+✔ AC17/19: real stderr-only source exceeds shared log cap, stops with one combined terminal (318.52675ms)
+✔ AC18: tool startup wiring failure closes WS/log fd and rolls back all runtime registration (1.38375ms)
+▶ looksLikePrompt — CC prompt patterns
+  ✔ matches the interactive-prompt set on the last line (2.275708ms)
+  ✔ stays silent on ordinary output (merely-slow commands) (0.159583ms)
+✔ looksLikePrompt — CC prompt patterns (3.240625ms)
+▶ watchStalls — 45s latch (fake timers)
+  ✔ fires once after 45s of zero growth on a prompt-like tail, then latches (4.189208ms)
+  ✔ uses the job name as the description when set (0.68425ms)
+  ✔ stays silent on a merely-slow command (no prompt pattern) (0.862458ms)
+  ✔ output growth resets the stall clock (1.087417ms)
+✔ watchStalls — 45s latch (fake timers) (6.981ms)
+▶ buildTaskNotification — compact text
+  ✔ is two lines for an outcome with no tail (0.785583ms)
+  ✔ omits the status segment when there is none (stall warning) (0.098084ms)
+  ✔ does not escape anything — there is no markup left to break (0.076417ms)
+  ✔ delimits the tail so log text cannot read as our own (0.04875ms)
+✔ buildTaskNotification — compact text (1.816458ms)
+▶ completionSummary — CC's exact strings
+  ✔ bash completed with an exit code (0.15475ms)
+  ✔ bash completed without an exit code omits the suffix (0.034334ms)
+  ✔ bash failed (0.035916ms)
+  ✔ bash killed (0.053458ms)
+  ✔ uses the job name as {desc} when set (0.072541ms)
+  ✔ monitor summaries (0.076291ms)
+✔ completionSummary — CC's exact strings (0.562208ms)
+▶ sendTaskNotification — exactly-once + retention
+  ✔ sends compact text with steer delivery without evicting the job (0.875125ms)
+  ✔ latches exactly-once: a second send is a no-op (0.065417ms)
+  ✔ kill suppression: a pre-latched job is skipped (and not evicted) (0.040417ms)
+  ✔ the monitor's pre-transition send retains its record (0.056209ms)
+  ✔ a failed send strands the job: unsurfaced, listed, and reason recorded (0.064917ms)
+  ✔ skips the send while a jobs attach is waiting, without surfacing (0.095042ms)
+✔ sendTaskNotification — exactly-once + retention (1.281959ms)
+▶ completeJob — exit-path notification
+  ✔ terminal transition releases hooks and freezes counters even when send fails (0.595084ms)
+  ✔ sends the <task-notification> the moment the job exits (0.122667ms)
+  ✔ a job read before exit exits silently and lingers (0.117292ms)
+  ✔ notification "self": the monitor already sent, so this retains silently (0.085833ms)
+  ✔ notification "self" whose send failed keeps the job listed (0.042417ms)
+  ✔ notification "suppressed" + FAILED stays listed instead of vanishing (0.058417ms)
+  ✔ notification "suppressed" + completed retains without notification (0.072792ms)
+✔ completeJob — exit-path notification (1.194458ms)
+✔ terminal null submission failure stays unsurfaced; a later successful call clears error and latches once (0.388084ms)
+✔ terminal undefined submission failure stays unsurfaced; a later successful call clears error and latches once (0.108959ms)
+▶ readBoundedTail
+  ✔ reads small file entirely (5.671084ms)
+  ✔ truncates large file to tail (0.469417ms)
+  ✔ returns fallback for missing file (0.172208ms)
+✔ readBoundedTail (6.949125ms)
+▶ pollFileTail
+  ✔ calls onUpdate when file grows (404.478625ms)
+✔ pollFileTail (404.607292ms)
+▶ readLastLine — live progress source
+  ✔ returns the last non-empty line (1.691541ms)
+  ✔ ignores trailing blank lines (0.389875ms)
+  ✔ strips ANSI colour codes but keeps literal brackets (JSON) (0.234958ms)
+  ✔ collapses a carriage-return progress bar to its final segment (0.273584ms)
+  ✔ strips OSC sequences, tabs, and stray control chars (no escape injection) (0.416583ms)
+  ✔ returns empty string when there is no output yet (0.31675ms)
+  ✔ returns empty string for a missing file (0.086875ms)
+✔ readLastLine — live progress source (3.992334ms)
+▶ renderSidebar — source publication and hint only
+  ✔ publishes both foreground and background source changes without a competing footer (0.966916ms)
+  ✔ foreground-only work does not appear in the footer (0.105958ms)
+✔ renderSidebar — source publication and hint only (1.147125ms)
+▶ registry IDs and lookup
+  ✔ uses random typed IDs and resolves only retained records (1.298667ms)
+✔ registry IDs and lookup (2.062792ms)
+▶ terminal transitions own lifetime counters
+  ✔ completed is counted once and time freezes at the first transition (0.430125ms)
+  ✔ failed is counted once and time freezes at the first transition (0.075542ms)
+  ✔ killed is counted once and time freezes at the first transition (0.113708ms)
+  ✔ silent kill followed by late exit cannot double-count or overwrite endedAt (0.343208ms)
+  ✔ foreground entries are included in execution lifetime metrics (0.104125ms)
+✔ terminal transitions own lifetime counters (1.489125ms)
+▶ age-based metadata sweep
+  ✔ expires all terminal statuses after ten minutes, never live jobs or log files (1.414792ms)
+  ✔ sweeps every sixty seconds and releases the timer idempotently (0.45725ms)
+✔ age-based metadata sweep (1.993208ms)
+▶ detectBlockedSleep — naive-wait detection
+  ✔ blocks a standalone long sleep (0.625291ms)
+  ✔ blocks an EMBEDDED top-level sleep (the lingering-job case) (0.0635ms)
+  ✔ blocks a newline-separated sleep (bash's primary separator) (0.041833ms)
+  ✔ blocks a backgrounded sleep (sleep 600 &) (0.07825ms)
+  ✔ blocks minute/hour/day durations regardless of number (0.052791ms)
+  ✔ allows sub-2s and float sleeps (deliberate pacing) (0.04725ms)
+  ✔ NEVER flags a sleep inside a polling loop (the correct pattern) (0.047083ms)
+  ✔ does not flag a sleep inside a pipeline or subshell (0.037292ms)
+  ✔ allows commands with no sleep (0.045125ms)
+✔ detectBlockedSleep — naive-wait detection (1.73975ms)
+▶ bash_bg — rejects a backgrounded sleep wait
+  ✔ blocks an embedded sleep in bash_bg (previously unguarded) (0.7245ms)
+  ✔ still allows a real backgrounded command (2.952625ms)
+✔ bash_bg — rejects a backgrounded sleep wait (3.746292ms)
+▶ spawnWithFileOutput
+  ✔ captures stdout to log file (9.707875ms)
+  ✔ captures stderr to same log file (3.610625ms)
+  ✔ returns non-zero exit code on failure (3.268875ms)
+  ✔ respects AbortSignal (204.061833ms)
+  ✔ resolves when the shell exits even if a grandchild holds the fds (4.565083ms)
+✔ spawnWithFileOutput (225.979584ms)
+▶ killProcessTree
+  ✔ kills a running process (306.23525ms)
+✔ killProcessTree (306.433209ms)
+✔ early /bg before two seconds returns immediately; same PID/log survive subsequent parent abort (10.101416ms)
+✔ foreground finalization preserves terminal record/log: printf final-log (8.811333ms)
+✔ foreground finalization preserves terminal record/log: printf failed-log; exit 7 (7.800083ms)
+✔ genuine launch signal and source silent stop retain final logs and release runtime hooks (110.637458ms)
+✔ bash timeout retains auto-background behavior inside the quick window (55.316208ms)
+✔ already-aborted retrieval and wait:false return promptly without stopping or consuming a running job (2.174542ms)
+✔ two retrieval waits share counts; cancelling one cannot release the sibling suppression (1.53375ms)
+✔ retrieval completion on completion tick produces inline result OR one notification (1.238291ms)
+✔ retrieval detach on completion tick produces inline result OR one notification (1.069209ms)
+✔ source exposes frozen queued/foreground/background/terminal views and bounded detail only (3.316625ms)
+✔ factory injection registers one source, no shared controls; standalone fixtures register controls once (1.38625ms)
+✔ foreground setup failure rolls back the process and wait but preserves its log (3.408667ms)
+✔ task-ui owns canonical chords, supports remapping/off, never falls back to process config (2.358875ms)
+✔ invalid JSON/values warn without breaking defaults; array keys are bounded by valid strings (0.961292ms)
+✔ namespaces IDs and run revisions without separator collisions (0.72825ms)
+✔ detaches all launch/retrieval leases exactly once and removes parent signals synchronously (0.333375ms)
+✔ completion wins the same-tick race with one result and one cleanup (0.088084ms)
+✔ detach wins the same-tick race with one result and one cleanup (0.04425ms)
+✔ already-aborted signals interrupt launch only; retrieval never stops execution (0.09125ms)
+✔ epoch owner can cancel waits idempotently then admit new waits; final disposal prevents admission (0.411666ms)
+✔ callback/cleanup failures still settle the lease and cannot starve sibling detach or disposal (0.305917ms)
+✔ actual host first installation keeps live default/custom identity, draft cursor, undo and native callbacks (6.409958ms)
+✔ first handoff preserves real history browsing draft, large paste expansion and explicit empty Tab autocomplete (6.929125ms)
+✔ strict empty/press/focused/no-overlay conditions and actual TUI routing; no-task native history survives (2.472334ms)
+✔ Beautify live editor first, Down last: actual prompt render and custom action/callback ownership preserved (1.125583ms)
+✔ history-equivalent instance wrapper before, later factory delegation and inactive opaque wrappers (0.976875ms)
+✔ history-equivalent instance wrapper after, later factory delegation and inactive opaque wrappers (0.619292ms)
+✔ owner fresh model exposes foreground-only and four-second visibility, refuses open/closed interaction (1.183667ms)
+[task-ui] Down opener installation failed: Error: Editor handoff cannot safely shadow setText
+    at interpose (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/editor-handoff/index.ts:12:23)
+    at preserveHandoff (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/editor-handoff/index.ts:46:23)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/editor.ts:110:35
+    at async Object.start (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:69:62)
+    at async TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:299:22)
+    at async Test.run (node:internal/test_runner/test:1125:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+[task-ui] Down opener installation failed: Error: Down opener installation deferred by an active overlay
+    at ctx.ui.custom.overlay (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/editor.ts:97:45)
+    at file:///Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/interactive-mode.js:2354:29
+    at new Promise (<anonymous>)
+    at Object.showExtensionCustom (file:///Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/interactive-mode.js:2334:16)
+    at Object.custom (file:///Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/interactive-mode.js:2074:48)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/editor.ts:96:26
+    at Object.start (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:69:68)
+    at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:316:30)
+    at Test.runInAsyncScope (node:async_hooks:228:14)
+    at Test.run (node:internal/test_runner/test:1118:25)
+[task-ui] Down opener installation failed: Error: Editor handoff cannot safely shadow handleInput
+    at interpose (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/editor-handoff/index.ts:12:23)
+    at decorate (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/editor.ts:42:21)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/editor.ts:112:34
+    at async Object.start (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:69:62)
+    at async TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:332:22)
+    at async Test.run (node:internal/test_runner/test:1125:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+[task-ui] Down opener installation failed: Error: host setter failure
+    at h.ctx.ui.setEditorComponent (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:359:137)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/editor.ts:114:20
+    at async Object.start (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:69:62)
+    at async TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:361:26)
+    at async Test.run (node:internal/test_runner/test:1125:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+✔ beautify actual session_start before Down and real panel focus/nav/close leave execution waits untouched (11.00925ms)
+✔ later same-object factory does not stack input leases; descriptor ownership and scoped host setters are restored (0.850042ms)
+✔ unsupported accessor live editor is diagnosed without invoking private setters or changing its methods (2.123333ms)
+✔ Down preflight with an existing overlay never hides it or mutates the mounted editor (1.119291ms)
+✔ non-configurable input failure rolls back public handoff properties before any host unmount (0.985083ms)
+✔ opaque retired input/factory release ctx, TUI, coordinator and panel under real GC (597.647708ms)
+✔ disabled/noninteractive/missing editor APIs do not access or install; reentrant setter close/throw leaves no active lease (0.650084ms)
+[task-ui] close hook failed: Error: optional UI failure
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/lifecycle.test.ts:20:55
+    at TaskLifecycle.safely (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/lifecycle.ts:48:15)
+    at TaskLifecycle.shutdown (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/lifecycle.ts:61:50)
+    at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/lifecycle.test.ts:21:32)
+    at Test.runInAsyncScope (node:async_hooks:228:14)
+    at Test.run (node:internal/test_runner/test:1118:25)
+    at Test.start (node:internal/test_runner/test:1015:17)
+    at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17)
+[task-ui] broken freeze failed: Error: freeze
+    at Object.freeze (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/lifecycle.test.ts:37:59)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/lifecycle.ts:60:79
+    at TaskLifecycle.safely (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/lifecycle.ts:48:15)
+    at TaskLifecycle.shutdown (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/lifecycle.ts:60:44)
+    at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/lifecycle.test.ts:40:21)
+    at Test.runInAsyncScope (node:async_hooks:228:14)
+    at Test.run (node:internal/test_runner/test:1118:25)
+    at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+    at Test.postRun (node:internal/test_runner/test:1247:19)
+    at Test.run (node:internal/test_runner/test:1175:12)
+[task-ui] broken stop failed: Error: stop
+    at Object.stop (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/lifecycle.test.ts:37:98)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/lifecycle.ts:64:77
+    at TaskLifecycle.safely (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/lifecycle.ts:48:15)
+    at TaskLifecycle.shutdown (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/lifecycle.ts:64:44)
+    at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/lifecycle.test.ts:40:21)
+    at Test.runInAsyncScope (node:async_hooks:228:14)
+    at Test.run (node:internal/test_runner/test:1118:25)
+    at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+    at Test.postRun (node:internal/test_runner/test:1247:19)
+    at Test.run (node:internal/test_runner/test:1175:12)
+[task-ui] broken drain failed: Error: drain
+    at Object.drain (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/lifecycle.test.ts:38:31)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/lifecycle.ts:69:52
+    at async file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/lifecycle.ts:68:17
+    at async Promise.all (index 0)
+✔ all synchronous freeze/disarm runs before waits/stop; drains precede disposal; close is stable (4.193083ms)
+[task-ui] pending cleanup timed out
+[task-ui] broken dispose failed: Error: dispose
+    at Object.dispose (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/lifecycle.test.ts:38:72)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/lifecycle.ts:78:84
+    at TaskLifecycle.safely (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/lifecycle.ts:48:15)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/lifecycle.ts:78:48
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+✔ throwing hooks and a never-resolving actual cleanup cannot block other participant disposal (22.977875ms)
+(node:85111) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ one shared /bg releases mixed shell/agent launch and retrieval waits without replacing execution (16.301292ms)
+✔ shared panel shows all modes, immediate bounded details, focus/scroll, safe widths and path-only copy (44.467625ms)
+✔ workflow and real ordinary parent tree default open; stable collapse survives refresh and new groups open (0.228875ms)
+✔ whole-root terminal window and final selected detail survive source sweep until switching, never stale run stop (4.767083ms)
+✔ panel x routes queued/starting/paused capabilities, background chord detaches all; Esc never detaches (1.208833ms)
+✔ coordinator finite facade rejects unknown/stale/closed identities and limits preview reads (0.247292ms)
+✔ footer counts only independent real work, including foreground-only and queue (0.32425ms)
+✔ one shared owner/explicit controls/overlay, lifecycle closes before wait disposal and unsubscribes (0.826834ms)
+✔ shared UI status shutdown reentry cannot resurrect subscribers/timers/overlay (0.790458ms)
+✔ shared UI custom shutdown reentry cannot resurrect subscribers/timers/overlay (0.20175ms)
+✔ shared UI factory shutdown reentry cannot resurrect subscribers/timers/overlay (0.13325ms)
+(node:85153) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ actual SDK runtime new/resume/fork/import/quit creates fresh factories; canceled/invalid switch keeps old activation usable (322.024ms)
+✔ actual SDK AgentSession.reload invokes old shutdown before activation rebuild (typed offline services) (8.359417ms)
+✔ registers only shared commands and the two default chords (2.562458ms)
+✔ remaps/unbinds chords and isolates SDK rejections (0.271458ms)
+✔ owner publishes semantic monitor fields and configured shortcut; actual footer preserves ANSI and widths (22.058166ms)
+✔ owner uses the same colors/order for every type, ignores descendants/terminal tasks and hides empty state (0.756959ms)
+▶ package.json pi.extensions
+  ✔ is declared (0.411625ms)
+  ✔ loads every top-level extension file (3.94025ms)
+  ✔ loads nothing from a subdirectory of extensions/ (0.309667ms)
+  ✔ loads independent path continuation once, never its helpers (1.0965ms)
+  ✔ keeps composition-owned packages in conflicts, not standalone packages or runtime copies (4.062041ms)
+  ✔ covers the resource types this repo ships (0.086666ms)
+✔ package.json pi.extensions (10.512667ms)
+PASS preset dry-run replaces standalone subagents without installing or writing state
+PASS merge mode keeps unlisted packages
+PASS --prune removes unlisted packages
+PASS version change reinstalls
+PASS pinned version is not updated
+PASS missing install path triggers install
+PASS ssh and https identities match
+PASS --dry-run makes no changes
+PASS unsupported source is rejected
+PASS conflicting package is removed in merge mode
+PASS absent conflict is a no-op
+PASS source in both packages and conflicts is rejected
+PASS merge mode aligns declared keys only
+PASS declared null removes a key
+PASS prune mode keeps preserved and pi-owned keys only
+PASS a deep path is created
+PASS an array value is replaced whole
+PASS an already matching machine is left untouched
+PASS a broken settings.json is not overwritten
+PASS declaring a pi-owned settings key is rejected
+PASS a declared-and-preserved path is rejected
+PASS a segment-array preserve path protects a dotted key
+PASS a dotted settings key is rejected
+PASS a key and a one-element list compare equal
+PASS keybindings.json is created with the declared bindings
+PASS prune mode drops undeclared action ids
+PASS an invalid keybinding value is rejected
+PASS an extension config file is created with the declared key
+PASS merge mode keeps undeclared keys in an extension config file
+PASS removed Pretty declaration leaves legacy file untouched
+PASS prune mode reaches declared files only
+PASS a declared null removes a key from an extension config file
+PASS "files.settings.json" is rejected
+PASS "files.keybindings.json" is rejected
+PASS "files.auth.json" is rejected
+PASS "files.models.json" is rejected
+PASS "files.sub/dir.json" is rejected
+PASS "files.../escape.json" is rejected
+PASS "files.notjson" is rejected
+PASS "files..hidden.json" is rejected
+PASS preserving a key in an undeclared file is rejected
+PASS a declared-and-preserved key in a file is rejected
+PASS a broken extension config file is not overwritten
+PASS --sync packages touches nothing else
+PASS --sync settings never runs pi
+PASS bare --prune applies to the synced domains
+PASS --prune outside --sync is rejected
+PASS an unknown domain is rejected
+PASS --sync none does nothing
+PASS --dev switches git spellings/refs to a space-containing checkout and is repeatable
+PASS normal install switches back to remote, repeats, and preserves third-party/prune order
+PASS both sources installed removes only the opposite source without updating local code
+PASS failed source removal aborts before installing packages or writing configs
+PASS source switching dry-run performs no package actions or writes
+PASS unselected package domain never lists, installs, removes or switches sources
+PASS dev override does not alias unrelated local checkouts
+PASS --dev refuses to remove the checkout it would load as a local package
+PASS --dev rejects downloaded scripts, invalid checkouts/manifests and manifest local sources
+PASS piped installer rejects --dev before downloading or running pi
+
+All sync checks passed.
+✔ scripts/sync.test.mjs (15733.721167ms)
+ℹ tests 671
+ℹ suites 72
+ℹ pass 671
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 23538.426875

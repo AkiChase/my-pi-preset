@@ -25,10 +25,12 @@ function tui() {
 }
 function result(renderer: ToolRenderers, raw: string, args = {}, overrides = {}) {
   const ctx = context(args, overrides);
-  return renderer.renderResult!({ content: [{ type: "text", text: raw }], details: undefined }, { expanded: ctx.expanded, isPartial: false }, theme, ctx);
+  const call = renderer.renderCall!(ctx.args, theme, ctx);
+  const body = renderer.renderResult!({ content: [{ type: "text", text: raw }], details: undefined }, { expanded: ctx.expanded, isPartial: false }, theme, ctx);
+  return { render: (width: number) => [...call.render(width), ...body.render(width)] };
 }
 
-test("actual loader/resolver owns only four renderers, original tool execution/structured output and host images stay untouched", async () => {
+test("actual loader/resolver owns six display adapters, original tool execution/structured output and host images stay untouched", async () => {
   const dir = mkdtempSync(join(tmpdir(), "beautify-loader-")); mkdirSync(join(dir, "cwd"));
   const screen = tui();
   const loaded = await loadExtensions([entry], join(dir, "cwd"));
@@ -39,7 +41,7 @@ test("actual loader/resolver owns only four renderers, original tool execution/s
     const runner = resolver(loaded, dir);
     const base = { renderShell: "default" };
     for (const name of ["edit", "write", "ls", "codemode", "Agent"]) assert.equal(runner.resolveToolRenderers(name, () => base), base);
-    for (const name of ["read", "bash", "find", "grep"]) assert.equal(runner.resolveToolRenderers(name, () => base).renderShell, "self");
+    for (const name of ["read", "bash", "find", "grep"]) assert.equal(runner.resolveToolRenderers(name, () => base).renderShell, "default");
     let reads = 0;
     const definition = createReadToolDefinition(dir, { operations: { async access() {}, async readFile() { reads++; return Buffer.from("const x = 1;\nlast"); }, async detectImageMimeType() { return undefined; } } });
     const execute = definition.execute, params = definition.parameters, guidelines = definition.promptGuidelines;
@@ -84,13 +86,14 @@ test("four actual host components obey widths/padding/expansion and native metad
         component.setExpanded(expanded);
         for (const width of [1, 2, 8, 20, 40, 80, 120]) {
           const rows = component.render(width);
-          assert.ok(rows.every((line: string) => visibleWidth(line) <= width), `${fixture.name}/${expanded}/${width}`);
+          // Pi Box reserves at least one content cell plus two-sided padding, even below five columns.
+          assert.ok(rows.every((line: string) => visibleWidth(line) <= Math.max(width, 5)), `${fixture.name}/${expanded}/${width}`);
           if (fixture.name === "read" && !expanded && width >= 8) assert.ok(rows.some((line: string) => plain(line).includes(":65")));
         }
       }
       component.setExpanded(false); const compact = plain(component.render(120).join("\n"));
       assert.match(compact, /(?:alt|option)\+o/);
-      if (fixture.name === "read") { assert.match(compact, /2 lines/); assert.match(compact, /offset=67/); }
+      if (fixture.name === "read") { assert.match(compact, /2 lines/); assert.match(compact, /limited/); }
       if (fixture.name === "bash") { assert.match(compact, /0ms call/); assert.match(compact, /timeout 5s/); }
       if (fixture.name === "grep") assert.match(compact, /2 matching lines shown/);
       if (fixture.name === "find") assert.match(compact, /3 files shown/);
@@ -215,6 +218,6 @@ test("external terminal controls are stripped before styling all four tool outpu
 test("Find unknown notice and partial blank records use readable fallback rather than fabricated counts", () => {
   for (const raw of ["a.ts\n\n[2 results limit reached. Unknown extra data]", "a.ts\n"]) {
     const rows = plain(result(findRenderers, raw, {}, { expanded: false }).render(120).join("\n"));
-    assert.match(rows, /a\.ts/); assert.doesNotMatch(rows, /files shown/);
+    assert.match(rows, /output lines/); assert.doesNotMatch(rows, /files shown/);
   }
 });

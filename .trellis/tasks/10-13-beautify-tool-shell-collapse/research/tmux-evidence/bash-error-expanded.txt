@@ -1,0 +1,60 @@
+
+ SMOKE_READY
+
+
+ ✓ New session started
+
+
+
+ CASE bash-error
+
+
+
+ $ python3 -c "import sys;print('\\n'.join('ERROR_LINE_'+str(i) for i in range(30)));sys.exit(7)"
+ ERROR_LINE_0
+ ERROR_LINE_1
+ ERROR_LINE_2
+ ERROR_LINE_3
+ ERROR_LINE_4
+ ERROR_LINE_5
+ ERROR_LINE_6
+ ERROR_LINE_7
+ ERROR_LINE_8
+ ERROR_LINE_9
+ ERROR_LINE_10
+ ERROR_LINE_11
+ ERROR_LINE_12
+ ERROR_LINE_13
+ ERROR_LINE_14
+ ERROR_LINE_15
+ ERROR_LINE_16
+ ERROR_LINE_17
+ ERROR_LINE_18
+ ERROR_LINE_19
+ ERROR_LINE_20
+ ERROR_LINE_21
+ ERROR_LINE_22
+ ERROR_LINE_23
+ ERROR_LINE_24
+ ERROR_LINE_25
+ ERROR_LINE_26
+ ERROR_LINE_27
+ ERROR_LINE_28
+ ERROR_LINE_29
+
+
+
+ CASE_DONE bash-error
+
+ Tool output: expanded
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-7tmpgmdp/cwd
+↑4.9k ↓43 R4.8k W4.9k CH94.1% 3.9%/128k (auto)                                                                                      scripted

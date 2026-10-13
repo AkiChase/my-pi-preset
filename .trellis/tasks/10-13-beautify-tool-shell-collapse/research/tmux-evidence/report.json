@@ -1,0 +1,217 @@
+{
+  "versions": {
+    "pi": "1.2.0",
+    "tmux": "3.6a"
+  },
+  "root": "/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-7tmpgmdp",
+  "server": "beautify-beautify-tmux-7tmpgmdp",
+  "cases": [
+    {
+      "case": "isolated offline CLI startup",
+      "status": "PASS"
+    },
+    {
+      "case": "read collapsed",
+      "status": "PASS",
+      "bg": [
+        37,
+        65,
+        49
+      ],
+      "nonblank_rows": [
+        [
+          9,
+          " sample.ts:3  40 lines · limited · ctrl+o expand"
+        ]
+      ],
+      "background_rows": 4
+    },
+    {
+      "case": "read expanded",
+      "status": "PASS",
+      "visible_expected": "MARK_42"
+    },
+    {
+      "case": "read actual Ctrl+O roundtrip",
+      "status": "PASS"
+    },
+    {
+      "case": "actual SGR padding",
+      "status": "PASS",
+      "row": 8,
+      "mechanism": "tmux send-keys -l SGR bytes -> CLI stdin -> fullscreen host mouse routing (host consumes before public input observer)"
+    },
+    {
+      "case": "actual SGR body",
+      "status": "PASS",
+      "row": 9,
+      "mechanism": "tmux send-keys -l SGR bytes -> CLI stdin -> fullscreen host mouse routing (host consumes before public input observer)"
+    },
+    {
+      "case": "actual SGR expanded code body recollapse",
+      "status": "PASS",
+      "row": 16
+    },
+    {
+      "case": "read-width-80 collapsed",
+      "status": "PASS",
+      "bg": [
+        37,
+        65,
+        49
+      ],
+      "nonblank_rows": [
+        [
+          9,
+          " sample.ts:3  40 lines · limited · ctrl+o expand"
+        ]
+      ],
+      "background_rows": 4
+    },
+    {
+      "case": "read-width-40 collapsed",
+      "status": "PASS",
+      "bg": [
+        37,
+        65,
+        49
+      ],
+      "nonblank_rows": [
+        [
+          9,
+          " sample.ts:3  40 lines · limited · ctrl"
+        ]
+      ],
+      "background_rows": 4
+    },
+    {
+      "case": "read-width-140 collapsed",
+      "status": "PASS",
+      "bg": [
+        37,
+        65,
+        49
+      ],
+      "nonblank_rows": [
+        [
+          9,
+          " sample.ts:3  40 lines · limited · ctrl+o expand"
+        ]
+      ],
+      "background_rows": 4
+    },
+    {
+      "case": "width 140/80/40 actual resize",
+      "status": "PASS"
+    },
+    {
+      "case": "find collapsed",
+      "status": "PASS",
+      "bg": [
+        37,
+        65,
+        49
+      ],
+      "nonblank_rows": [
+        [
+          13,
+          " find *.ts in files  32 files shown · ctrl+o expand"
+        ]
+      ],
+      "background_rows": 4
+    },
+    {
+      "case": "find expanded",
+      "status": "PASS",
+      "visible_expected": "match-31.ts"
+    },
+    {
+      "case": "find actual Ctrl+O roundtrip",
+      "status": "PASS"
+    },
+    {
+      "case": "grep collapsed",
+      "status": "PASS",
+      "bg": [
+        37,
+        65,
+        49
+      ],
+      "nonblank_rows": [
+        [
+          13,
+          " grep MARK in sample.ts  48 matching lines shown · ctrl+o expand"
+        ]
+      ],
+      "background_rows": 4
+    },
+    {
+      "case": "grep expanded",
+      "status": "PASS",
+      "visible_expected": "MARK_48"
+    },
+    {
+      "case": "grep actual Ctrl+O roundtrip",
+      "status": "PASS"
+    },
+    {
+      "case": "bash collapsed",
+      "status": "PASS",
+      "bg": [
+        37,
+        65,
+        49
+      ],
+      "nonblank_rows": [
+        [
+          13,
+          " $ python3 -c \"print('\\\\n'.j…ange(30)));print('Job ID background job /tmp/pi-bg/example.log')\"  32 output lines · 27ms call · ctrl+o expand"
+        ]
+      ],
+      "background_rows": 2
+    },
+    {
+      "case": "bash continuous background",
+      "status": "FAIL",
+      "reason": "ANSI reset before remaining visible title/metadata",
+      "raw_line": " \u001b[38;2;167;152;215m$ python3 -c \"print('\\\\n'.j\u001b[39m\u001b[49m…ange(30)));print('Job ID background job /tmp/pi-bg/example.log')\"  \u001b[38;2;157;165;169m32 output lines · 27ms call · ctrl+o expand\u001b[39m"
+    },
+    {
+      "case": "bash expanded",
+      "status": "PASS",
+      "visible_expected": "BASH_LINE_29"
+    },
+    {
+      "case": "bash actual Ctrl+O roundtrip",
+      "status": "PASS"
+    },
+    {
+      "case": "bash-error collapsed",
+      "status": "PASS",
+      "bg": [
+        91,
+        40,
+        42
+      ],
+      "nonblank_rows": [
+        [
+          13,
+          " $ python3 -c \"import sys;print('\\\\n'.join('ERROR_LINE_'+str(i) for i in range(30)));sys.exit(7)\"  error: ERROR_LINE_0 · ctrl+o expand"
+        ]
+      ],
+      "background_rows": 4
+    },
+    {
+      "case": "bash-error error keyboard expansion",
+      "status": "PASS"
+    }
+  ],
+  "error": "No tool background group for missing-file.ts",
+  "cleanup": {
+    "natural_cli_exit": true,
+    "isolated_config_removed": true
+  },
+  "scope": "actual tmux Pi CLI agent loop, scripted offline provider, production tools/renderers",
+  "command": "exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-7tmpgmdp/home PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-7tmpgmdp/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-7tmpgmdp/sessions BEAUTIFY_SMOKE_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-7tmpgmdp PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-7tmpgmdp/terminal.raw PATH=/Users/jyxc-dz-0101322/.pi/agent/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-7tmpgmdp /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-themes --no-context-files --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-7tmpgmdp/sessions --use-theme dark --tui-mode fullscreen --tools read,bash,find,grep,Agent,get_subagent_result,jobs -e /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-beautify-tool-shell-collapse/research/tmux-harness/provider.ts -e /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/beautify.ts -e /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-composition.ts --model beautify-offline/scripted --thinking off",
+  "elapsed_seconds": 3.01
+}

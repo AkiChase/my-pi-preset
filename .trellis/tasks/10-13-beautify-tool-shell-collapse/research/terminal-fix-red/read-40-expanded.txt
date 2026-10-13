@@ -1,0 +1,60 @@
+ SMOKE_READY
+
+
+ CASE read
+
+
+
+ sample.ts:3
+  3 │ export const MARK_3 = "sample val
+  4 │ export const MARK_4 = "sample val
+  5 │ export const MARK_5 = "sample val
+  6 │ export const MARK_6 = "sample val
+  7 │ export const MARK_7 = "sample val
+  8 │ export const MARK_8 = "sample val
+  9 │ export const MARK_9 = "sample val
+ 10 │ export const MARK_10 = "sample va
+ 11 │ export const MARK_11 = "sample va
+ 12 │ export const MARK_12 = "sample va
+ 13 │ export const MARK_13 = "sample va
+ 14 │ export const MARK_14 = "sample va
+ 15 │ export const MARK_15 = "sample va
+ 16 │ export const MARK_16 = "sample va
+ 17 │ export const MARK_17 = "sample va
+ 18 │ export const MARK_18 = "sample va
+ 19 │ export const MARK_19 = "sample va
+ 20 │ export const MARK_20 = "sample va
+ 21 │ export const MARK_21 = "sample va
+ 22 │ export const MARK_22 = "sample va
+ 23 │ export const MARK_23 = "sample va
+ 24 │ export const MARK_24 = "sample va
+ 25 │ export const MARK_25 = "sample va
+ 26 │ export const MARK_26 = "sample va
+ 27 │ export const MARK_27 = "sample va
+ 28 │ export const MARK_28 = "sample va
+ 29 │ export const MARK_29 = "sample va
+ 30 │ export const MARK_30 = "sample va
+ 31 │ export const MARK_31 = "sample va
+ 32 │ export const MARK_32 = "sample va
+ 33 │ export const MARK_33 = "sample va
+ 34 │ export const MARK_34 = "sample va
+ 35 │ export const MARK_35 = "sample va
+ 36 │ export const MARK_36 = "sample va
+ 37 │ export const MARK_37 = "sample va
+ 38 │ export const MARK_38 = "sample va
+ 39 │ export const MARK_39 = "sample va
+ 40 │ export const MARK_40 = "sample va
+ 41 │ export const MARK_41 = "sample va
+ 42 │ export const MARK_42 = "sample va
+ [7 more lines in file. Use offset=43 t
+
+
+ CASE_DONE read
+
+ Tool output: expanded
+
+────────────────────────────────────────
+❯
+────────────────────────────────────────
+/private/var/folders/fx/bn7t1rq16xn7_66t
+↑5.2k ↓16 R4.8k W5.2k CH84.1% 4.4%/128k

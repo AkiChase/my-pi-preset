@@ -1,0 +1,59 @@
+{
+  "versions": {
+    "pi": "1.2.0",
+    "tmux": "3.6a"
+  },
+  "root": "/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-qo4x144f",
+  "server": "beautify-beautify-tmux-qo4x144f",
+  "cases": [
+    {
+      "case": "isolated offline CLI startup",
+      "status": "PASS"
+    },
+    {
+      "case": "read collapsed",
+      "status": "PASS",
+      "bg": [
+        37,
+        65,
+        49
+      ],
+      "nonblank_rows": [
+        [
+          9,
+          " sample.ts:3  40 lines · limited · ctrl+o expand"
+        ]
+      ],
+      "background_rows": 4
+    },
+    {
+      "case": "read expanded",
+      "status": "PASS",
+      "visible_expected": "MARK_42"
+    },
+    {
+      "case": "read actual Ctrl+O roundtrip",
+      "status": "PASS"
+    },
+    {
+      "case": "actual SGR padding",
+      "status": "PASS",
+      "row": 8,
+      "mechanism": "tmux send-keys -l SGR bytes -> CLI stdin -> fullscreen host mouse routing (host consumes before public input observer)"
+    },
+    {
+      "case": "actual SGR body",
+      "status": "PASS",
+      "row": 9,
+      "mechanism": "tmux send-keys -l SGR bytes -> CLI stdin -> fullscreen host mouse routing (host consumes before public input observer)"
+    }
+  ],
+  "error": "Timeout: mouse recollapse",
+  "cleanup": {
+    "natural_cli_exit": true,
+    "isolated_config_removed": true
+  },
+  "scope": "actual tmux Pi CLI agent loop, scripted offline provider, production tools/renderers",
+  "command": "exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-qo4x144f/home PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-qo4x144f/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-qo4x144f/sessions BEAUTIFY_SMOKE_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-qo4x144f PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-qo4x144f/terminal.raw PATH=/Users/jyxc-dz-0101322/.pi/agent/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-qo4x144f /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-themes --no-context-files --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-tmux-qo4x144f/sessions --use-theme dark --tui-mode fullscreen --tools read,bash,find,grep,Agent,get_subagent_result,jobs -e /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-beautify-tool-shell-collapse/research/tmux-harness/provider.ts -e /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/beautify.ts -e /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-composition.ts --model beautify-offline/scripted --thinking off",
+  "elapsed_seconds": 16.81
+}
