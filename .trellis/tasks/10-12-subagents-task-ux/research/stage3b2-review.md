@@ -1,0 +1,29 @@
+# 阶段3B2独立审查与定向修复
+
+## review状态与批准后的验收边界
+
+reviewa03ec4e7读取actualindex/clone/scheduler/workflow/RPC/waits等以及测试。用户已选择方案1的协作式取消，review更新结论：不协作第三方provider/hooks无法强杀不再blocking，但自有timer/input/socket/worker资源停止仍要求。原详细review正文保存在其output JSONL的前一个assistant text；最终摘要只复述编号，主会话实际提取完整正文确认位置，不凭模糊summary派改。
+
+review定向actualaux/tool/workflow/loading/SDK44/44正常退出，diffcheck通过；没有为新增发现动态复现，标为源码确认，不冒称实际OS漏资源已复现。parentfull459/agent93/three437正常检查证据保留。
+
+## Blocking1：同步shutdown后重新登记资源
+
+index870registerSource同步changed→subscriber shutdown，返回后fleet.setUICtx仍注册terminalinput；后台spawn2208→started外发listener shutdown后仍attach/initbatchtimer/currentactivity/widget/fleetensureTimer。fleet.dispose已clearsui，但newintervalupdate无ctxreturn，不能自清。属于ownresource错误，非协作豁免不适用。需actualsourcepub/startedevent重入tests，activeaftereffectguard和cleanupownerbackstop；旧UI全面删除留stage4，不借此扩写。
+
+## Blocking2：真实clone后台强制不生效
+
+mentionclone125传run_in_backgroundtrue，actualregisteredAgent1913resolver遵循invocation-config141 frontmatter.runInBackground??params，所以合法自定义agent pinnedfalse还fg，waitcompleteconsumes结果进随后被丢弃clone，主会话无结果notice。现有aux test仅stubargtrue，不能证明真实模式。私有调用能力必须在actualinvocationdecision强制bg，不改普通Agentfrontmatter优先级、不加模型可伪造hiddenparams/globalflag；actualcustom.md+registeredtool+actualclonetypedseam回归。
+
+## Shouldfix3：pre-admissionrefusal没有反馈
+
+cloneattempted=true早于调用；actualmodelresolver/dispatch可正常return无ID拒绝，spawnedfalse/attemptedtrue后index1133静默return，无fallback、无toast，只剩Prompting。必须carry真实refusal/unknownadmission异常错误给原ctx至少明确反馈；可能已admittedthrow不能blind重试duplicate。onceattempt保留，测试actual工具拒绝无records而用户获原因。
+
+## Docs4
+
+当前spec旧条目说agentparticipant未接入/process-onlySDK与新段落冲突。parent已修部分header/body与批准AC9，剩余一致性在窄修同步；历史handoff不得抹失败证据。G3仍不勾。
+
+## 分工与验证
+
+主会话读actualsessionstart/backgroundspawn/clonecall/configresolver，确认优先级与资源复活路径后，新agent89f7cf5b只改index/mention与必要旧UIguard/privatehelper/tests/docs，不动acceptedmanager/runner/worktree/process/monitor/task-uicoordinator。新tests先旧实现fail，再fullstrict+targetnoforce；源码confirmed与实际red区分。修后parent/independentreview确认才闭G3/入4阶段。
+
+没有模型/network/git/install/reload/SDKwrites/个人配置或commit，task仍in_progress。

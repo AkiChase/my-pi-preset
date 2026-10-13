@@ -22,13 +22,18 @@
   "peerDependencies": {
     "@earendil-works/pi-agent-core": "*",
     "@earendil-works/pi-ai": "*",
-    "@earendil-works/pi-coding-agent": "*"
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
   },
   "dependencies": {
-    "@heyhuynhgiabuu/pi-pretty": "^0.6.31"
+    "@heyhuynhgiabuu/pi-pretty": "^0.6.31",
+    "croner": "^10.0.1",
+    "nanoid": "^5.1.16"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typebox": "^1.3.27"
   }
 }

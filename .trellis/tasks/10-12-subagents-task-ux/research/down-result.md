@@ -1,0 +1,30 @@
+# Down 编辑器切片实施与主会话验证
+
+## 当前状态
+
+Down实现72cf8668达到turnlimit，代码已写入，GCtarget1fail/文档未同步，不能据summary标G4。主会话读actualeditor/owner/config/composition/tests，完成GCfixture窄修并同步文档。strict＋editor/config/panel/actualcachedhostloader **26/26**正常退出（bxzbfyfuy）；集中最终strict/full **481/481**、三模块 **459/459**无forceexit正常退出，diffcheck通过（bvqn4rb6d）。独立窄review30c29cc7进行中。
+
+## 实际接口与实现
+
+- task-ui/editor.ts：只实例handleInput装饰，publicgetText/focused/isShowingAutocomplete与TUIgetFocusedComponent/hasOverlay判断。严格空文本+viewabletasks+press+非repeat+owneractive/nonopen时Downopenspanel；不detach/abort/resubmit，无globalrawlistener/裸DownregisterShortcut。非命中原receiverdelegate。
+- 首次factory同步返回实际focusedliveeditor，不调用previousfactory重建；preserveHandoff暂时publicsetter/callback/actionmap屏蔽SDKsame-instance冗余setText/provider/appearance/接线，finally恢复各自仍owneddescriptor，保留cursor/historydraft/undo/paste/autocomplete。后续factory正常delegateprevious再decorate，WeakSet不重复叠lease。
+- shutdown清cell.resources/panelaccess，所有methodlease只恢复自己descriptor；screen/targetrelease。不调用hostsetter重建default/previous，后续opaquefactory退休透传。不承诺未来不委托原factory的全新editor自动继承Down；显式/tasks/Shift+Down仍可用。
+- owner.canOpenfreshmodel只判当前4秒可见row、无open/closed，不采用selectedpin；fg-only成立。configdefaulttrue、false不装，移除inactivewarning；composition在实际Pretty注册后才registerDown，确保真实sessionstart顺序不被覆盖。
+
+## 实际离线测试覆盖
+
+editor-host.mjs只读actualinstalledInteractiveMode.setCustomEditorComponent/createExtensionUIContext、CustomEditor/TuiMainScreen、Pretty实际源码，没有复制SDKsetter。使用tempagentdir/禁nativeFFF seam。
+
+editor.test.ts覆盖default/custominstanceidentity、firsthandoff草稿/光标/undo/nativeappactions/callbacks，真实historybrowse草稿、bracketpaste expansion、emptyexplicitTabautocomplete优先；strictspace/multiline/no tasks/nativehistory/release/repeat/nullfocus/othercomponent/overlayTUI真实dispatch；actualPrettysessionstart→Down→panelnav/close不detach，repeatedstart不再重建；历史等价inputwrapper先后顺序、laterfactorydelegation/opaqueinput退役、descriptorattributeownership、unsupportedaccessor、closed/setterthrow/getclose。实际input-history完整源码和相邻Prettycompat生产集成不在本轮已验声明（相邻代码仍未提交）。
+
+## GC失败：是夹具环境保留，不是已确认生产闭包
+
+原editor-retention.mjs在create()内部直接定义opaqueInput/opaqueFactory，与panel.canOpen→coordinator、host→TUI等fixtureclosures共享函数环境。即使生产cell/access/screen/target已清，也可能通过fixture定义位置自身保留环境。主会话把opaqueCall(callback)放module-scope生成模拟外部包装，仅保留传入已退休function；WeakRef断言未降低：仍要求ctx/TUI/coordinator/panel4/4collect，真实--expose-gc通过。断言改逐项deepEqual [true,true,true,true]便于确认，不把未clear只unref当释放。
+
+## 后续与边界
+
+review复现actualhostsetter在factoryexception前已clearedcontainer，unsupportededitor的Down安装失败会留下未挂载编辑器：identity/method restored却rendered0。这是真实blocking，parent增加container/render/focus/factory/continueediting断言，不能只说已有测试绿。
+
+窄修把可能失败的descriptor操作移到破坏性setter之前：通过publicctx.ui.custom的overlayfactory同步done取得realTUI，SDKclosedguard使probe不挂载；若已有overlay则throw且不done，避免hideexistingoverlay。await后验active/focus→getpreviousfactory→preserveHandoff/decorate，旧editor仍mounted时完成preflight；initialfactory只返回已检查原实例，不在清容器后才抛descriptorerror。unsupportedaccessor/nonconfiginput失败恢复hand-offdescriptor但未调用hostsetter，factory/mount/focus/state保留。新增existingoverlay安装回归确保不关闭别的selector。测试通过actualSDKshowExtensionCustom，没复制probe状态机。targetstrict26/26通过（bvin2el94）。最终strict/full **483/483**、三模块 **461/461**无forceexit自然退出（bsowz6kd3），diffcheck/contextvalidate通过。原review獨立窄复核editor14/14自然退出与actualSDK三情形验证：accessorfailure容器clear0/保render3line/factoryfocuscursor继续输入；existingoverlayhide0；正常probe挂载0，无空组件遗留。原blocking明确关闭。
+
+README、provenance/spec与实际defaulttrue/入口/retiredownership同步，localpaths0missing。G3核心已接受，G4自动范围接受、真实TUI仍待授权；不commit/finish/archive，不更改backend/SDK/个人配置。

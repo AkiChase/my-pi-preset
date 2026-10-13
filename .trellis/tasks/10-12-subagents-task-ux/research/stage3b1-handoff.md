@@ -1,0 +1,27 @@
+# 阶段3B1实施交接：manager真实执行清理
+
+3A已验收：主会话最终strict/full416/416、三模块394/394自然退出，最后独立review1033038b定向2/2确认最后started返回问题关闭。protocol和process已ready，wholeG3未完成。3B拆顺序3B1（manager/runner/worktree）和3B2（index/clone/scheduler/workflow）给不同agent，避免一个实现包办所有复杂执行。3B1不能声称已统一productionparticipant/通知epoch。
+
+## 允许范围与实际缺口
+
+只写agent-manager.ts、agent-runner.ts必要shutdownowner、worktree.ts局部cancel/保留、相应tests/docs；不写index/composition/task-ui/process/clone/scheduler/workflow。3B2消费交付的actualmanager关闭API再迁participant。
+
+beginRun立即record.promise与terminal；abort提前resolveTerminal，真正runner没有退出。startAgent局部 `promise=runAgent(...).then(...cleanup).catch(...)` 后 `void promise`，startResume同样丢真实执行链；startups仅worktree/startAgent入场，waitForAll按status过滤，已stopped真实runner/cleanup被忽略。disposefreeze/abortAll后立即clearagents/startups/runs，sessions快照会漏latercreate；latecallback和worktreecleanup使用已删run无法release，真正清理未await。
+
+## 应交付API
+
+manager已有freezeAdmission/abortAll/dispose；新增明确backendowned `drain()`／`drainExecution()`（名称自定）追踪实际startup/new/resume/worktree/output/childshutdown的promise，不是terminalhandlegates。dispose应幂等stablepromise，先closed/禁admission/cancel、await actualcleanup（内部有界），完成后清maps/listeners/queue/pool；latecleanup必须仍被旧owner接住，不能因超时丢失唯一session/worktree引用，更不能靠globalnextmanager继续执行。
+
+关闭时onStart/onComplete/onUsage/onCompact和外部optionscallbacks不得重新发布旧运行；cleanup-onlyonSessionCreated可以close late session不能续prompt/steer/transcriptpublish，run/recordidentity检查防resumerun串改。正常新/恢复统计与parentdetach不改变；真正promptfailure session仍保留可resume，partialclosed清引用、hardaborted/steered/stoppedpriority不回退。可选callback抛错不能妨碍siblings/ownedcleanup。
+
+3B2将调用freeze→stop→drain→dispose，3B1dispose单独直接使用也安全。协议drain2秒、childshutdown3秒矛盾需明确：不要假称等terminal即allcleanup完；采用有界await+保留旧ownerlatecleanup，清理函数不得涉及已stalepi/ctx。reader能确认实际超时后什么保留什么不可再执行。单独drain可能不用内部超时让protocol负责，但dispose不能无界死等provider；输出明确事实。
+
+## worktree保留约束
+
+当前create worktree add30秒，各git await无signal；给create接受optional cancellation并检查await边界，运行中取消add要处理partialpath；用stubpi.exec/tempfiles跑真实worktree路径（不调用git），防latecreate返回再prompt。cleanup普通成功保留原branch能力；shutdown仅在runner真实停止后操作worktree，非协作runner仍在写时不得force-remove。错误时cleanup当前catch强制remove可能毁未提交更改，确认有改动保留artifact/路径而不是虚报已保存。不可在closing后调用host已invalidated pi触发新git/新消息：开始于close前的cleanup需要其资源owner/有限plan，晚到副作用按契约保护，遇不可保证的真实限制必须report/停设计，不用任意globalexec绕host。
+
+## 验证
+
+actualmanager+actualrunner typed输入seam：runningnew/resume、queue、nested、delayedenv/create/bind/partialcallback、worktreecreate/cleanup和outputhooks；freeze/abort后terminal先结束而drain仍等待actualexecution，迟到callbacksessioncloseonce/no prompt/no onComplete/currentcounts，finally能release已转移pool。无协作runner故意保持promise时dispose有界且latefinish不复活记录/不误删正在写的worktree；重复dispose/drain稳定不漏timer。
+
+常规waitForAll要包括正在cleanup的stoppedexecution，正常不会永久等queued禁止后promises；禁止resumeclosed，无旧callid/terminalsnapshot/limits退化。新增tests先证明oldfail再fix，strict/full+agent/三模块noforce，temporaryconfig。README/provenance/spec和中文stage3b1-result.md交付exactAPI/remaining3B2，不勾G3。禁止model/network/install/reload/SDK改动/真实git执行/commit/task生命周期；不改相邻Pretty兼容或modelmaxturnlimitplanning任务。

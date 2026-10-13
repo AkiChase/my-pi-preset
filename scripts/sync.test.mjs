@@ -94,6 +94,27 @@ function run({
   return out;
 }
 
+// Composition replacement is a real offline dry-run plan, not a comment-only guard.
+{
+  const preset = JSON.parse(readFileSync(resolve(scriptDir, "..", "pi-preset.json"), "utf8"));
+  const result = run({
+    manifest: preset.packages,
+    conflicts: preset.conflicts,
+    listOutput: ["User packages:", "  npm:@tintinweb/pi-subagents", "    /p/upstream"].join("\n"),
+    settingsFile: '{"untouched":true}',
+    args: ["--sync", "packages", "--dry-run"],
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.calls, []);
+  assert.equal(result.settingsText, '{"untouched":true}');
+  assert.match(result.stderr, /^\s*remove\s+packages\s+npm:@tintinweb\/pi-subagents\s/m);
+  assert.match(result.stderr, /^\s*install\s+packages\s+git:github.com\/AkiChase\/my-pi-preset\s/m);
+  // Scope the assertion to plan rows: "must not be installed" also contains
+  // the word install, but is not an installation action.
+  assert.doesNotMatch(result.stderr, /^\s*install\s+packages\s+npm:@tintinweb\/pi-subagents\s/m);
+  console.log("PASS preset dry-run replaces standalone subagents without installing or writing state");
+}
+
 const OTHER = "npm:other-tool";
 const ONE = { "npm:pi-session-name": "latest" };
 
@@ -474,13 +495,13 @@ const ONE = { "npm:pi-session-name": "latest" };
     preserve: { files: { "pi-input-history.json": ["scrollUpShortcut"] } },
     seedFiles: {
       "pi-input-history.json": JSON.stringify({ newerShortcut: "ctrl+s", scrollUpShortcut: "ctrl+k" }),
-      "bg-tasks.json": JSON.stringify({ timeoutMs: 60000 }),
+      "process-tasks.json": JSON.stringify({ timeoutMs: 60000 }),
     },
     args: ["--sync", "files", "--prune"],
   });
   assert.deepEqual(JSON.parse(fileTexts["pi-input-history.json"]), { scrollUpShortcut: "ctrl+k", searchShortcut: "alt+r" });
-  assert.deepEqual(JSON.parse(fileTexts["bg-tasks.json"]), { timeoutMs: 60000 });
-  assert.doesNotMatch(stderr, /bg-tasks\.json/);
+  assert.deepEqual(JSON.parse(fileTexts["process-tasks.json"]), { timeoutMs: 60000 });
+  assert.doesNotMatch(stderr, /process-tasks\.json/);
   console.log("PASS prune mode reaches declared files only");
 }
 
@@ -524,7 +545,7 @@ for (const name of ["sub/dir.json", "../escape.json", "notjson", ".hidden.json"]
   const { status, stderr } = run({
     manifest: {},
     files: { "pi-input-history.json": { searchShortcut: "alt+r" } },
-    preserve: { files: { "bg-tasks.json": ["timeoutMs"] } },
+    preserve: { files: { "process-tasks.json": ["timeoutMs"] } },
     args: ["--sync", "files"],
   });
   assert.equal(status, 1);

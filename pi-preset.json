@@ -6,13 +6,13 @@
     "npm:pi-input-history": "latest",
     "npm:pi-web-access": "latest",
     "npm:pi-memory": "latest",
-    "npm:@tintinweb/pi-subagents": "latest",
     "npm:@juicesharp/rpiv-ask-user-question": "latest",
     "npm:@tifan/pi-recap": "latest"
   },
   "conflicts": [
     "npm:pi-patty-bg-tasks",
-    "npm:@heyhuynhgiabuu/pi-pretty"
+    "npm:@heyhuynhgiabuu/pi-pretty",
+    "npm:@tintinweb/pi-subagents"
   ],
   "settings": {
     "retry": {

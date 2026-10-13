@@ -2,13 +2,13 @@
 
 ## 1. 适用范围
 
-修改 monitor 源、通知、停止、配置、消息渲染，或把进程执行后端接入统一任务 UI 时，读取本规范。当前实现位于 `extensions/bg-tasks/`，由顶层 wrapper 加载；内部 helper 不是独立扩展。
+修改 monitor 源、通知、停止、配置、消息渲染，或把进程执行后端接入统一任务 UI 时，读取本规范。当前实现位于 `extensions/process-tasks/`，由顶层 wrapper 加载；内部 helper 不是独立扩展。
 
 monitor 管理流事件，不替代后台 bash 的单次完成通知。任务 UI 只查看快照和调用后端停止能力，不拥有 monitor 定时器、缓冲或通知生产。
 
 ## 2. 接口
 
-[monitor-source.ts](../../../extensions/bg-tasks/monitor-source.ts) 定义：
+[monitor-source.ts](../../../extensions/process-tasks/monitor-source.ts) 定义：
 
 ```ts
 interface MonitorSinks {
@@ -27,9 +27,9 @@ interface MonitorSource {
 
 - factory 拿到 sinks 后才启动，避免 source 先输出、session 后订阅。源构造及后续共享生命周期／UI 接线任一环节抛错都须回滚已启动的源、进程组、fd、timer、abort/completion 引用，再撤销任务注册；不能只删 registry。清理不产生收尾消息，不使用启动回放队列。
 - `MonitorResult` 在退出码／信号基础上携带可选 `reason`、`observationNote`。
-- [monitor-buffer.ts](../../../extensions/bg-tasks/monitor-buffer.ts) 的 `MonitorPreview` 保存有界 `lines: {text, omittedChars}[]`、`omittedLines`、`omittedChars`、`truncatedLines`。消费、再次合并时保留省略元数据，不重复计数。
-- [notify.ts](../../../extensions/bg-tasks/notify.ts) 的 `MonitorNotificationPayload` 保存 `state`、`description`、`preview`、可选 `silenceMs`／`note`。`sendTaskNotification({ monitor })` 替代 monitor 的 failure-tail 回读；未提供载荷的 shell 路径保持原契约。
-- [lifecycle.ts](../../../extensions/bg-tasks/lifecycle.ts) 和 [monitoring.ts](../../../extensions/bg-tasks/monitoring.ts) 的可选 `handleOversize` 由 monitor 拥有停止和合并通知；未提供时保留共享 shell 默认处理。
+- [monitor-buffer.ts](../../../extensions/process-tasks/monitor-buffer.ts) 的 `MonitorPreview` 保存有界 `lines: {text, omittedChars}[]`、`omittedLines`、`omittedChars`、`truncatedLines`。消费、再次合并时保留省略元数据，不重复计数。
+- [notify.ts](../../../extensions/process-tasks/notify.ts) 的 `MonitorNotificationPayload` 保存 `state`、`description`、`preview`、可选 `silenceMs`／`note`。`sendTaskNotification({ monitor })` 替代 monitor 的 failure-tail 回读；未提供载荷的 shell 路径保持原契约。
+- [lifecycle.ts](../../../extensions/process-tasks/lifecycle.ts) 和 [monitoring.ts](../../../extensions/process-tasks/monitoring.ts) 的可选 `handleOversize` 由 monitor 拥有停止和合并通知；未提供时保留共享 shell 默认处理。
 
 ## 3. 行为与配置
 
@@ -85,11 +85,11 @@ WS message 是一次活动，空消息也算；内容可以多行。close/error 
 
 ## 6. 必须保留的测试
 
-- [monitor-buffer.test.ts](../../../extensions/bg-tasks/__tests__/monitor-buffer.test.ts)：前缀／整行和字符省略、再次合并、空行、Unicode、不完整超长行有界。零预算下 `{text: "", omittedChars: 2}` 是完全省略的非空行，不可当作真实空行；原文摄入与 source preview 再合并的保留／省略分类一致。
-- [monitor-source.test.ts](../../../extensions/bg-tasks/__tests__/monitor-source.test.ts)：两流日志及独立解析、shell 管道／重定向、exit 的同步读取和双流关闭、继承管道不等待、短写／源错误。
-- [monitor-session.test.ts](../../../extensions/bg-tasks/__tests__/monitor-session.test.ts)：假时钟首批／间隔／空消息、两轮静默／恢复、边界合并、巨大时间、发送失败、共享显式停止／attach／session／日志保护。
-- [monitor.test.ts](../../../extensions/bg-tasks/__tests__/monitor.test.ts)、[config.test.ts](../../../extensions/bg-tasks/__tests__/config.test.ts)：源启动前参数验证、旧字段删除、默认和覆盖、不写用户文件。
-- [index.test.ts](../../../extensions/bg-tasks/__tests__/index.test.ts)：monitor 模型／TUI 身份、状态、日志及省略说明，宽度／控制符安全；shell 原渲染和会话回归不变。
+- [monitor-buffer.test.ts](../../../extensions/process-tasks/__tests__/monitor-buffer.test.ts)：前缀／整行和字符省略、再次合并、空行、Unicode、不完整超长行有界。零预算下 `{text: "", omittedChars: 2}` 是完全省略的非空行，不可当作真实空行；原文摄入与 source preview 再合并的保留／省略分类一致。
+- [monitor-source.test.ts](../../../extensions/process-tasks/__tests__/monitor-source.test.ts)：两流日志及独立解析、shell 管道／重定向、exit 的同步读取和双流关闭、继承管道不等待、短写／源错误。
+- [monitor-session.test.ts](../../../extensions/process-tasks/__tests__/monitor-session.test.ts)：假时钟首批／间隔／空消息、两轮静默／恢复、边界合并、巨大时间、发送失败、共享显式停止／attach／session／日志保护。
+- [monitor.test.ts](../../../extensions/process-tasks/__tests__/monitor.test.ts)、[config.test.ts](../../../extensions/process-tasks/__tests__/config.test.ts)：源启动前参数验证、旧字段删除、默认和覆盖、不写用户文件。
+- [index.test.ts](../../../extensions/process-tasks/__tests__/index.test.ts)：monitor 模型／TUI 身份、状态、日志及省略说明，宽度／控制符安全；shell 原渲染和会话回归不变。
 - 全量检查按 [Testing Guidelines](./testing-guidelines.md) 隔离用户配置；另跑不带 force-exit 的定向回归，不能用强退掩盖 fd／timer／process 泄漏。
 
 ## 7. 常见错误与正确边界
@@ -103,3 +103,22 @@ WS message 是一次活动，空消息也算；内容可以多行。close/error 
 **正确：** 执行原始命令，在工具接收端合并两流；用户自行决定 shell 内部重定向。
 
 执行后端迁移／改名时整组保留以上源、通知和停止契约，不恢复旧 follower、被动通知、`persistent` 或速率终止。不要求 UI 和各执行后端变成同一个引擎。
+
+## 8. 共享 retrieval 接入补充
+
+`jobs attach` 取消／显式 detach 后须重查已终态且未消费的结果，不能只依赖 source exit 时的一次发送。`notify.ts` 遇 attachCount>0 保存本次已构造的有界终态 payload，最后一个 wait 取消后可重新发送原收尾；不保存或重启 monitor source／buffer，不改源活动、timer 或 batching。成功 inline 消费或显式 stop 清除该重查资格。`monitor-session.test.ts` 的 shared retrieval terminal tick 案例验证 pending/final 合成内容只交付一次且不回读 failure tail。
+
+
+## 9. Activation shutdown 的实际执行边界（阶段 3A）
+
+`MonitorSource.execution?: OwnedExecution` 只归 backend，command source 以真实 child `exit`/spawn error 建立 execution；`source.exit` 仍是既有观察截止／同步 stop 的 result，二者不得混用。`startBackgroundJob` 追踪 actual execution，silent stop 同时关 source、fd/timer 并按实际退出 identity 进行 TERM→KILL，不把 OS 引用放进 task-ui 快照。WS/pending pid0 不 signal。此补充不改变活动判定、decoder、buffer、deadline、stderr 或首批/合并语义；旧 hard source/session tests 继续保留。
+
+composition 在 process 的 freeze 后再取消 wait/stop；冻结时旧 monitor 的 current 检查禁消息，清理不新增尾批。`activation.test.ts` 的真实 command 与 fake WS transport 覆盖有界退出／late frames／日志保留。agent participant 尚属 3B，不把当前协议接入写作全后端隔离已完成。
+
+### 同步启动重入守卫
+
+`add(reg, job)` 和 sidebar 发布会同步调用订阅／UI，不能把首次 `assertJobSlot` 当成整个 setup 的 admission 保证。monitor 工具发布后、直接 `startMonitorSession` 创建源前必须同时检查 `reg.closed`、terminal 和 `reg.jobs.get(job.id) === job`；session 返回 `"started" | "cancelled"`，取消不得报告启动成功。末次初始 `decide()` 的静默提醒／收尾也可能同步触发 shutdown，返回前须复查 closed／map identity；正常即时 deadline 使 job 终态但 activation 仍有效，不应按启动失败处理。回归见 `monitor-setup-result.test.ts` 的实际工具与 clock/transport seam。
+
+factory 返回源后或共享接线中同步 shutdown，session 的 once stop owner 必须关闭已构造 source／fd 并停止 actual execution；不能只 stop pid0 或在已 abort controller 上补一个不会触发的 listener。共享 terminal setup 分支也须调用 source hook，hook 抛错仍执行 actual stop／清理。明确取消和 setup exception 分开：shutdown 已计入的 stopped 元数据／started/terminal 统计保留，只有非终态 failed admission 撤销计数，不能产生 killed 大于 totalStarted。日志保留，静默清理不发尾批。
+
+`activation.test.ts`／`monitor-session.test.ts` 的实际工具、source、session 只替换 WS transport，覆盖发布前无源、factory 返回前、sidebar／wire callback、shutdown 后再抛错、already-aborted 和 terminal throwing-stop；断言 socket 仅创建时关闭一次、actual execution map／wait／controller／runtime hooks 清空、无 cleanup timeout／旧通知、迟到 frame 不改变保留文件。原 fake source 一次 TERM、首批／事件／时间回归不能放宽。

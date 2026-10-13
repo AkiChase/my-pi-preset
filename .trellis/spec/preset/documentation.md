@@ -24,9 +24,9 @@ Multiple rows can apply. Example: moving a shortcut through a manifest `files` e
 
 ## Verify Before Describing
 
-Use [package.json](../../../package.json), [pi-preset.json](../../../pi-preset.json), actual extension registrations and source/test assertions to check descriptions. Historical comments can be stale: [shortcuts.test.ts](../../../extensions/bg-tasks/__tests__/shortcuts.test.ts) proves two defaults, even though an older manifest-test comment says four. [sync.test.mjs](../../../scripts/sync.test.mjs) proves source-switch removal precedes installation, while ordinary conflict removals retain their later order.
+Use [package.json](../../../package.json), [pi-preset.json](../../../pi-preset.json), actual extension registrations and source/test assertions to check descriptions. Historical comments can be stale: [shortcuts.test.ts](../../../extensions/task-ui/__tests__/shortcuts.test.ts) proves the shared controls own two defaults; the old backend-specific shortcut files no longer own these controls. [sync.test.mjs](../../../scripts/sync.test.mjs) proves source-switch removal precedes installation, while ordinary conflict removals retain their later order.
 
-Specs distinguish project policy from implementation descriptions and cite concrete evidence. Preserve vendor source/version/license and intentional deviations in [PROVENANCE.md](../../../extensions/bg-tasks/PROVENANCE.md), but user behavior still belongs in README.
+Specs distinguish project policy from implementation descriptions and cite concrete evidence. Preserve vendor source/version/license and intentional deviations in [PROVENANCE.md](../../../extensions/process-tasks/PROVENANCE.md), but user behavior still belongs in README.
 
 ## Keep Developer Workflow Out of User Documentation
 

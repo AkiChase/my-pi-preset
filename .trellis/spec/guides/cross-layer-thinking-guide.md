@@ -20,7 +20,7 @@ For each changed arrow, record the input shape, owner, failure mode and observab
 - **Resource → registration:** a nested `index.ts` is a library here, not an extension entry. Check the package glob, [manifest regression](../../../scripts/pi-manifest.test.mjs), wrapper capture and conflicts together before changing discovery.
 - **Execution → rendering:** [bash-unified.ts](../../../extensions/bash-unified.ts) gives pretty the bg-tasks execution definition. A renderer change must not accidentally replace timeout/background parameters or register another `bash`.
 - **Events → effects:** [watchPrompts](../../../extensions/blocked-signal.ts) owns prompt pairing/label normalization; host sinks own their gated side effects. Its [tests](../../../extensions/__tests__/blocked-signal.test.ts) cover late IDs, shutdown and sink failure. Do not copy optional payload casts into each sink.
-- **Completion → view:** [lifecycle.ts](../../../extensions/bg-tasks/lifecycle.ts) owns idempotent terminal state, [registry.ts](../../../extensions/bg-tasks/registry.ts) owns retention and [ui.ts](../../../extensions/bg-tasks/ui.ts) retains only selected metadata. Verify late exits, replacement and disposal, not merely the happy-path panel text.
+- **Completion → view:** [lifecycle.ts](../../../extensions/process-tasks/lifecycle.ts) owns idempotent terminal state, [registry.ts](../../../extensions/process-tasks/registry.ts) owns backend retention and [TaskPanel](../../../extensions/task-ui/panel.ts) retains only immutable selected metadata and a bounded detail snapshot. Verify late exits, replacement and disposal, not merely the happy-path panel text.
 
 ## Change Checklist
 

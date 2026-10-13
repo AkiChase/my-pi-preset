@@ -1,0 +1,55 @@
+# 阶段3契约：会话换代与旧执行清理
+
+此为主会话读取真实代码形成的后续实施契约，未代表阶段3完成。阶段2B六项review问题已修复并通过主会话393/50/371检查，最后独立复核16/16确认关闭；G2已关闭，阶段3必须保留actualrunner取消、transcriptrollback、run统计、toolcallid、disposedpartialsession清引用与resume限额终态修复。
+
+## Pi 1.1.0 真实生命周期：纠正早期假设
+
+主会话完整读取安装SDK的 `dist/core/agent-session-runtime.js`（只读）：`newSession`／`switchSession`／import先emit可取消的before_switch，成功才teardown；teardown先await主session.abort，再emit旧runner.shutdown，随后dispose旧session并createRuntime建立新activation和coordinator。fork走before_fork再同shutdown；reload由agent-session.js先旧runner.shutdown再_buildRuntime建立新closure。**真实host不是正常switch时复用原factory的manager/coordinator。**
+
+因此不要为假设的reuse设计global mutable manager或让旧pi/ctx在新epoch继续生效。最终shutdown.dispose组合实例是正确边界；新activation重新注册新source/controls。回归首先驱动actualhostruntime新factory生命周期，旧latecallback必须不起作用。重复session_start可以做防重初始化，但无需把disposed旧activation resurrection当产品需求。
+
+before_switch可由后续插件取消，switchSession也可能在cwd验证阶段失败，此时没有shutdown：不可在该event永久disposecoordinator/freeze到无法恢复。需要不破坏继续使用的admission策略；若先stop现存tasks，则保持本activation可接新调用。最终irreversibleclose在shutdown，同步通知失效和freeze须先于stop/await。fork即使无before_switch也必须被shutdown覆盖。
+
+特别注意host teardown先 `await session.abort()` 再shutdown：若foreground bash只发SIGTERM却子进程忽略，tool继续await spawned.exit，shutdown handler根本到不了。停止必须有有界终止/必要SIGKILL升级，登记真实exit不能拿markTerminal即resolve的donePromise冒充进程已退出。before_switch/before_fork可对已有执行作停止准备，但不永久关闭可能取消的activation；主会话abort、显式x和shutdown同用backend stop能力，保留monitor silent stop语义。任何SIGKILL timer必须检查仍属该pid/group的未退出execution并在真实exit解除，防PID复用误杀。
+
+## 当前具体缺口
+
+- agent/index.ts before_switch只clearCompleted+stop scheduler；真实换代有shutdown+新factory，但仍有旧runner/ctx捕获回调、实际执行promise未await、managerregistry释放时机与晚到通知缺口。重复start不能重复RPC/timers或复活旧任务。
+- manager.dispose当前abortAll后清空agents/startups/runs，未await所有startup/runner cleanup；2B已阻止actualrunner晚到prompt并幂等关闭partialsession，但dispose仍可能早于worktree清理完成。必须保留清理owned execution的真实promise，不能只因为terminalhandle已resolve就称runner停止。
+- TaskCoordinator.dispose最终旧activation不可再注册是正确语义；需按真实shutdown先freeze/禁通知再cancelWaits，backend清理后dispose。composition可提供shutdownphase hooks给UI，但不能让旧closure经过全局mutablepointer接入新activation。
+- process/index.ts shutdown只stop running、不处理pending，foreground/attach leases先解除顺序未统一；需要停止所有旧livejob并await真实childexit、有界强制终止，仅清自己hooks。新factory本来注册新source，验证freshregistration与oldlateexit无新计数/通知。
+- mention-clone目前无外部signal/取消handle，createSession与prompt前后无epoch检查，clone失败then fallback仍可spawn到old/currentctx。必须能停止clone实际session并阻止late fallback。
+- scheduler.stop只取消futuretimer/droprefs；resolveModel当前同步，不能虚构异步解析窗口，但late timer捕获this会绑定新store，实际awaitStartup链finalize读取this.getNextRun可串新binding。每个timer/start捕获activation/bindingtoken，停止后不spawn/emit或跨store写入。
+- workflowTasks只abort controller并clearMap，实际workerPromise未由ownertrackedawait，delayedprogress/completion、journal写和notification仍可能在旧activation结束后继续。
+- pendingnudges/groupjoin/batch/timer/activity/provider closures持currentctx/manager必须origin-epoch归属，不能读到后来更新的currentctx后误投新会话。
+
+## 最低关闭序列
+
+1. composition epoch标closing（同步），禁新tool/mention/scheduler/workflow admission，冻结backendmanager，禁旧消息外发。
+2. close panel/editor入口（后续UI以同interface注销），释放所有oldwait；disposelease不会造成原run误判自然完成通知。
+3. silentstop全部running/starting/queued进程/monitor/agent/child/workflow，取消clone/timers/join/RPC订阅。停止意图在通知生产入口区分explicit vs natural。
+4. 有界await真实runner/startup/worktree/childsession/worker清理。pending创建成功时只允许cleanup，不继续prompt/添加newrecord/UI。晚到清理不得引用新epoch map/manager。
+5. unregister/disposeoldsources，清oldUI/state，保留disklog/session/memory/schedule definition。newsession建立newmanager/newsource/admission；不恢复oldexecution。
+
+Coordinator是compositionowned，真实host新runtime用新实例，最终旧实例dispose。后端单独fixture可有局部实例，但生产不能新增globalcoordinator/sharedmutableexecutionregistry。若复用scheduler实例，bindingtoken保护其旧timer/awaitStartup链；不将backendmutable state迁移到nextactivation。
+
+## 运行与通知状态分离
+
+- explicit stop/session stop不能产生额外completiontasknotice或monitor尾批；动作本身反馈。后台自然完成/失败/外部signal仍走one report；usercancel genuinefg由tool结果表现。
+- managerterminalpromise可提前resolve让wait结束，但actualrun/cleanup还在进行：计数release/runneractive与shutdownawait应按executionlease，而非status是否terminal。
+- noticelatch需要源epoch和runId，不只recordid/currentctx；groupmembership所有terminalmembers能闭group但oldgroup cannot send。
+- oldcurrentctx不得为新session赋值后被oldcallback访问；捕获immutableoriginctx/key并用活跃epoch判定。
+
+## 验证矩阵
+
+实际backend/factory+fake runner/worker/tempconfigs，优先用SDK `AgentSessionRuntime` typed服务/创建seam驱动shutdown→dispose→newfactory/rebind（不模型），而不是只向旧closure重复emitstart来冒充真实切换：queuedrun旧sessionstop、新session即empty；worktreestart期间切换后latecreate结果cleanup不prompt；runningnew/resume+retrieval leases切换全部结束；nestedbranchcancel；pausedworkflow/awaithost/gateworker terminate；clonecreating/prompting/fallbacklate全部被取消；scheduler迟到timercallback/startupfinalize不spawn、不串新store。
+
+覆盖new/resume/fork/import/reload/quit实际event区别及before_switch取消/invalidcwd无shutdown继续可调用。重复start只检验防重复订阅，不要求旧disposedactivation重用。
+
+同步callback/UI抛错不能妨碍remainingdisposal；同close多次幂等；nextsessiontool还能执行、source/waits/managerregistry可重登记，rootchildloadingguard仍成立。不要仅mockfreezeassertcalls，必须真正驱动oldcallbacks并断言新map/counters/messages不变、temporaryartifacts仍存在。
+
+主会话新增 `extensions/task-ui/__tests__/mixed-waits.test.ts`，actualshell/bash+jobs和actualmanager/typedfakeagent同coordinator四个lease一次detach，ID/PID/session/log/output连续，后续父abort不杀backend。定向1/1自然退出、strict及最终393/50/371全门通过，G2已关闭。最终UI/TUI仍另stage4/5验证。状态sourceobservablecounts/terminaldetail不能依赖retainingruntimehooks。
+
+## 与后续UI接口
+
+向composition/task-ui提供明确sessionstart/close callbacks与epochview，sharedfooter/editor/panel由之后4阶段在这些hooks注册/注销。不要为了暂时清UI保留旧AgentWidget/Fleet代码当最终方案；这次只保证其暂时dispose不影响cleanup，后续完整移除。

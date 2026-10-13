@@ -1,0 +1,406 @@
+import assert from "node:assert/strict";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { it } from "node:test";
+import type { AgentSession, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import "./source-loader.mjs";
+import { TaskCoordinator } from "../../task-ui/coordinator.ts";
+import { TaskPanel } from "../../task-ui/panel.ts";
+import { FINISHED_LINGER_MS } from "../../task-ui/model.ts";
+import { DEFAULTS as UI_DEFAULTS } from "../../task-ui/config.ts";
+const { AgentManager } = await import("../src/agent-manager.ts");
+const { registerAgentWait, canDeliverAgentResult } = await import("../src/waits.ts");
+const { createAgentTaskSource } = await import("../src/source.ts");
+const { createWorkflowTask, completeWorkflowTask } = await import("../src/workflow/task.ts");
+const { runWorkflow } = await import("../src/workflow/runtime.ts");
+const { createWorkflowHost } = await import("../src/workflow/host.ts");
+const { registerAgents } = await import("../src/agent-types.ts");
+import type { AgentManagerDependencies } from "../src/agent-manager.ts";
+import type { RunResult } from "../src/agent-runner.ts";
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(done => { resolve = done; });
+  return { promise, resolve };
+}
+const tick = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
+// SDK objects have private runtime fields. The only boundary cast is the
+// intentionally partial offline session; runner methods below never use models.
+function fakeSession(): AgentSession {
+  return { messages: [], sessionManager: { getSessionFile: () => undefined },
+    dispose() {}, steer: async () => {}, subscribe: () => () => {}, getContextUsage: () => undefined,
+  } as unknown as AgentSession;
+}
+const pi = {} as ExtensionAPI;
+const ctx = { cwd: tmpdir() } as ExtensionContext;
+function fixture(extra: AgentManagerDependencies = {}, notify?: (record: import("../src/types.ts").AgentRecord) => void) {
+  const calls: { id: string; session: AgentSession; options: Parameters<NonNullable<AgentManagerDependencies["runAgent"]>>[3]; finish: (text?: string, failure?: string) => void }[] = [];
+  const resumes: { session: AgentSession; options: Parameters<NonNullable<AgentManagerDependencies["resumeAgent"]>>[2]; finish: (text?: string) => void }[] = [];
+  const deps: AgentManagerDependencies = {
+    runAgent: async (_ctx, _type, _prompt, options) => {
+      const result = deferred<RunResult>();
+      const session = fakeSession();
+      const call = { id: options.agentId!, session, options,
+        finish: (text = "answer", failure?: string) => result.resolve({ responseText: text, session, aborted: false, steered: false, failure }) };
+      calls.push(call);
+      // The real runner creates the session asynchronously; preserve that seam.
+      queueMicrotask(() => options.onSessionCreated?.(session));
+      options.signal?.addEventListener("abort", () => call.finish("stopped"), { once: true });
+      return result.promise;
+    },
+    resumeAgent: async (session, _prompt, options) => {
+      const result = deferred<{ text: string }>();
+      const call = { session, options, finish: (text = "resumed") => result.resolve({ text }) };
+      resumes.push(call);
+      options?.signal?.addEventListener("abort", () => call.finish("stopped"), { once: true });
+      return result.promise;
+    },
+    ...extra,
+  };
+  const manager = new AgentManager(notify, 1, undefined, undefined, undefined, deps);
+  manager.setMaxConcurrentForeground(1);
+  const coordinator = new TaskCoordinator();
+  const workflows = new Map<string, import("../src/workflow/task.ts").WorkflowTask>();
+  const source = createAgentTaskSource(manager, coordinator, workflows);
+  const off = coordinator.registerSource(source);
+  return { manager, coordinator, calls, resumes, source, workflows, deps,
+    spawn(background = false, options: Partial<Parameters<typeof manager.spawn>[4]> = {}) {
+      return manager.spawn(pi, ctx, "general-purpose", "test", { description: "test", isBackground: background, blocking: !background, ...options });
+    },
+    async close() { manager.freezeAdmission(); manager.abortAll(); await tick(); off(); source.dispose(); coordinator.dispose(); await manager.dispose(); },
+  };
+}
+
+void it("running foreground detach transfers current lease above a full background pool; later admission waits", async () => {
+  const f = fixture();
+  try {
+    const bg = f.spawn(true), parent = new AbortController(), fg = f.spawn(false, { signal: parent.signal });
+    const run = f.manager.getRun(fg)!;
+    const wait = registerAgentWait(f.manager, f.coordinator, run, "launch", parent.signal);
+    assert.equal(f.coordinator.detachAll(), 1);
+    assert.equal((await wait.result).kind, "detached");
+    parent.abort();
+    assert.equal(f.manager.getRecord(fg)?.status, "running");
+    assert.equal(f.calls.length, 2, "detach never reruns");
+    const next = f.spawn(true);
+    assert.equal(f.manager.getRecord(next)?.status, "queued");
+    f.calls.find(call => call.id === bg)!.finish(); await tick();
+    assert.equal(f.manager.getRecord(next)?.status, "queued", "transferred foreground still holds background slot");
+    f.calls.find(call => call.id === fg)!.finish("continuous output"); await tick();
+    assert.equal(f.manager.getRecord(next)?.status, "running");
+    assert.equal((await run.terminal).result, "continuous output");
+  } finally { await f.close(); }
+});
+
+void it("queued foreground moves the same admission to background, unlinks queue parent and releases original gate", async () => {
+  const f = fixture();
+  try {
+    f.spawn(false); const bg = f.spawn(true), parent = new AbortController();
+    const queued = f.spawn(false, { signal: parent.signal });
+    const gate = f.manager.getRecord(queued)!.startGate!;
+    const run = f.manager.getRun(queued)!;
+    const wait = registerAgentWait(f.manager, f.coordinator, run, "launch", parent.signal);
+    f.coordinator.detachAll(); await wait.result; parent.abort();
+    assert.equal(f.manager.getRecord(queued)?.status, "queued");
+    f.calls.find(call => call.id === bg)!.finish(); await gate;
+    assert.equal(f.calls.filter(call => call.id === queued).length, 1);
+    assert.equal(f.manager.getRecord(queued)?.isBackground, true);
+    parent.abort();
+    f.calls.find(call => call.id === queued)!.finish(); await run.terminal;
+    const nextFg = f.spawn(false);
+    assert.equal(f.manager.getRecord(nextFg)?.status, "queued", "original foreground still holds exactly one slot");
+    f.calls[0]!.finish(); await tick();
+    assert.equal(f.manager.getRecord(nextFg)?.status, "running");
+  } finally { await f.close(); }
+});
+
+void it("worktree startup is visible and waitable immediately; detached failure remains a terminal same-ID outcome", async () => {
+  const startup = deferred<undefined>();
+  const completed: string[] = [];
+  const f = fixture({ createWorktree: async () => startup.promise, worktreeEnabled: () => true }, record => completed.push(record.id));
+  try {
+    const parent = new AbortController(), id = f.spawn(false, { isolation: "worktree", signal: parent.signal });
+    const run = f.manager.getRun(id)!;
+    assert.equal(f.source.list()[0]?.status, "starting");
+    assert.ok(f.manager.getRecord(id)?.promise);
+    const launch = registerAgentWait(f.manager, f.coordinator, run, "launch", parent.signal);
+    const retrieval = registerAgentWait(f.manager, f.coordinator, run, "retrieval");
+    assert.equal(f.source.list()[0]?.waitCount, 2);
+    launch.detach(); await launch.result; parent.abort();
+    assert.equal(f.manager.getRecord(id)?.status, "running");
+    assert.equal(retrieval.settled, false, "startup retrieval cannot return early");
+    startup.resolve(undefined);
+    const outcome = await retrieval.result;
+    assert.equal(outcome.kind, "completed");
+    assert.equal(f.manager.getRecord(id)?.status, "error");
+    assert.deepEqual(completed, [id]);
+    assert.equal(f.calls.length, 0);
+    assert.equal(f.manager.getRecord(id)?.resultConsumed, true);
+  } finally { startup.resolve(undefined); await f.close(); }
+});
+
+void it("detach during successful startup survives later Esc without creating another runner", async () => {
+  const startup = deferred<NonNullable<import("../src/types.ts").AgentRecord["worktree"]>>();
+  const f = fixture({ createWorktree: async () => startup.promise, cleanupWorktree: async () => ({ hasChanges: false }), worktreeEnabled: () => true });
+  try {
+    const parent = new AbortController(), id = f.spawn(false, { isolation: "worktree", signal: parent.signal });
+    const run = f.manager.getRun(id)!;
+    const wait = registerAgentWait(f.manager, f.coordinator, run, "launch", parent.signal);
+    wait.detach(); await wait.result; parent.abort();
+    startup.resolve({ path: tmpdir(), branch: "fake", baseSha: "fake", workPath: tmpdir() });
+    await f.manager.awaitStartup(id);
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.calls[0]?.options.signal?.aborted, false);
+    f.calls[0]!.finish(); await run.terminal;
+    assert.equal(f.manager.getRecord(id)?.resultConsumed, false);
+    assert.equal(canDeliverAgentResult(f.manager, f.coordinator, f.manager.getRecord(id)!, run.identity.runId), true);
+  } finally { await f.close(); }
+});
+
+void it("true foreground Esc stops its run and descendants; queued already-aborted launches settle", async () => {
+  const f = fixture();
+  try {
+    const parent = new AbortController(), id = f.spawn(false, { signal: parent.signal });
+    const child = f.spawn(false, { parentAgentId: id });
+    const run = f.manager.getRun(id)!;
+    const wait = registerAgentWait(f.manager, f.coordinator, run, "launch", parent.signal);
+    parent.abort();
+    assert.equal((await wait.result).kind, "interrupted");
+    assert.equal(f.manager.getRecord(child)?.status, "stopped");
+    assert.equal((await run.terminal).status, "stopped");
+    const aborted = new AbortController(); aborted.abort();
+    const noRun = f.spawn(false, { signal: aborted.signal });
+    assert.equal((await f.manager.getRun(noRun)!.terminal).status, "stopped");
+    assert.equal(f.calls.some(call => call.id === noRun), false);
+  } finally { await f.close(); }
+});
+
+void it("completion wins inline once, while detach wins same-tick completion without consuming", async () => {
+  const f = fixture();
+  try {
+    const id = f.spawn(false), run = f.manager.getRun(id)!;
+    const wait = registerAgentWait(f.manager, f.coordinator, run, "launch");
+    f.calls[0]!.finish();
+    assert.equal((await wait.result).kind, "completed");
+    assert.equal(wait.detach(), false);
+    assert.equal(f.manager.getRecord(id)?.resultConsumed, true);
+    assert.equal(canDeliverAgentResult(f.manager, f.coordinator, f.manager.getRecord(id)!, run.identity.runId), false);
+    const second = f.spawn(false), next = f.manager.getRun(second)!;
+    const detached = registerAgentWait(f.manager, f.coordinator, next, "launch");
+    f.calls.find(call => call.id === second)!.finish(); detached.detach();
+    assert.equal((await detached.result).kind, "detached"); await next.terminal; await tick();
+    assert.equal(f.manager.getRecord(second)?.resultConsumed, false);
+    assert.equal(canDeliverAgentResult(f.manager, f.coordinator, f.manager.getRecord(second)!, next.identity.runId), true);
+  } finally { await f.close(); }
+});
+
+void it("resume foreground uses new run controller/admission and the same session, and refuses simultaneous re-entry", async () => {
+  const f = fixture();
+  try {
+    const id = f.spawn(false), original = f.manager.getRun(id)!;
+    f.calls[0]!.finish(); await original.terminal; await tick();
+    const parent = new AbortController();
+    const record = f.manager.resumeRun(id, "more", parent.signal)!;
+    const run = f.manager.getRun(id)!;
+    assert.notEqual(run.identity.runId, original.identity.runId);
+    assert.equal(f.resumes[0]?.session, f.calls[0]?.session);
+    assert.equal(f.manager.resumeRun(id, "reenter"), undefined);
+    const wait = registerAgentWait(f.manager, f.coordinator, run, "launch", parent.signal);
+    wait.detach(); parent.abort();
+    assert.equal(record.status, "running");
+    assert.equal(f.manager.stopRun(original.identity), false, "stale run cannot stop resume");
+    f.resumes[0]!.finish("new output"); await run.terminal;
+    assert.equal((await original.terminal).result, "answer", "old terminal snapshot is stable across resume");
+    assert.equal(f.manager.getRecord(id)?.result, "new output");
+    assert.equal(f.manager.getRecord(id)?.resultConsumed, false);
+  } finally { await f.close(); }
+});
+
+void it("multiple retrieval leases count independently; cancellation and /bg never stop or consume execution", async () => {
+  const f = fixture();
+  try {
+    const id = f.spawn(true), run = f.manager.getRun(id)!, parent = new AbortController();
+    const a = registerAgentWait(f.manager, f.coordinator, run, "retrieval", parent.signal);
+    const b = registerAgentWait(f.manager, f.coordinator, run, "retrieval");
+    assert.equal(f.source.list()[0]?.executionMode, "background");
+    assert.equal(f.source.list()[0]?.waitCount, 2);
+    parent.abort(); await a.result;
+    assert.equal(f.source.list()[0]?.waitCount, 1);
+    assert.equal(f.manager.getRecord(id)?.status, "running");
+    f.calls[0]!.finish(); b.detach(); await b.result; await run.terminal; await tick();
+    assert.equal(f.source.list()[0]?.waitCount, 0);
+    assert.equal(f.manager.getRecord(id)?.resultConsumed, false);
+    assert.equal(canDeliverAgentResult(f.manager, f.coordinator, f.manager.getRecord(id)!, run.identity.runId), true);
+    const dead = new AbortController(); dead.abort();
+    const cancelled = registerAgentWait(f.manager, f.coordinator, run, "retrieval", dead.signal);
+    assert.equal((await cancelled.result).kind, "interrupted");
+    assert.equal(f.manager.getRecord(id)?.resultConsumed, false);
+  } finally { await f.close(); }
+});
+
+void it("source freezes all owned/workflow/queued/no-session views, reads bounded details without consuming, and scopes stop", async () => {
+  const f = fixture(), dir = mkdtempSync(join(tmpdir(), "agent-source-"));
+  try {
+    const root = f.spawn(true), queued = f.spawn(true);
+    const nested = f.spawn(false, { parentAgentId: root });
+    const task = createWorkflowTask({ id: "wf_test", script: "", meta: { name: "pipeline", description: "test", phases: [{ title: "real phase" }] } });
+    f.workflows.set(task.id, task);
+    const owned = f.spawn(false, { workflowId: task.id });
+    const rows = f.source.list();
+    assert.equal(rows.length, 5);
+    assert.ok(Object.isFrozen(rows));
+    for (const row of rows) { assert.ok(Object.isFrozen(row)); assert.ok(Object.isFrozen(row.stats)); assert.ok(Object.isFrozen(row.artifacts)); assert.equal("session" in row, false); }
+    assert.equal(rows.find(row => row.taskId === nested)?.parentKey, rows.find(row => row.taskId === root)?.key);
+    assert.equal(rows.find(row => row.taskId === owned)?.parentKey, rows.find(row => row.taskId === task.id)?.key);
+    const queuedRow = rows.find(row => row.taskId === queued)!;
+    assert.match(f.source.detail(queuedRow)!.text, /conversation not established/);
+    const record = f.manager.getRecord(root)!;
+    record.outputFile = join(dir, "transcript.output");
+    writeFileSync(record.outputFile, "0123456789".repeat(4000));
+    const identity = f.manager.getRun(root)!.identity;
+    const detail = f.source.detail(identity, { offset: 10, limit: 21 })!;
+    assert.equal(detail.text.length, 21); assert.equal(detail.start, 10); assert.equal(detail.end, 31); assert.equal(detail.omittedAfter, 39969);
+    assert.ok(Object.isFrozen(detail));
+    assert.equal(record.resultConsumed, false);
+    assert.equal(f.source.detail(identity, { limit: Infinity })!.text.length, 16000);
+    assert.equal(f.source.stop(f.manager.getRun(nested)!.identity), true);
+    assert.equal(record.status, "running");
+    assert.equal(f.manager.getRecord(owned)?.status, "running");
+    assert.equal(f.source.stop(rows.find(row => row.taskId === task.id)!), true);
+    assert.equal(task.abortController.signal.aborted, true);
+    f.source.dispose(); assert.equal(f.source.list().length, 0); assert.equal(f.source.detail(identity), undefined);
+  } finally { await f.close(); rmSync(dir, { recursive: true, force: true }); }
+});
+
+void it("freeze/stop/dispose releases queued and startup terminal handles without an orphan wait", async () => {
+  const startup = deferred<undefined>();
+  const f = fixture({ createWorktree: async () => startup.promise, worktreeEnabled: () => true });
+  try {
+    const starting = f.spawn(false, { isolation: "worktree" }), queued = f.spawn(false);
+    const a = f.manager.getRun(starting)!, b = f.manager.getRun(queued)!;
+    f.manager.freezeAdmission(); f.manager.abortAll();
+    assert.equal((await a.terminal).status, "stopped"); assert.equal((await b.terminal).status, "stopped");
+    assert.throws(() => f.spawn(), /admission is closed/);
+    startup.resolve(undefined); await tick(); assert.equal(f.calls.length, 0);
+  } finally { startup.resolve(undefined); await f.close(); }
+});
+
+void it("workflow child stopped through actual source/host returns skipped and never auto-retries that attempt", { timeout: 10_000 }, async () => {
+  registerAgents(new Map());
+  const f = fixture();
+  try {
+    const task = createWorkflowTask({ id: "wf_actual", script: "" }); f.workflows.set(task.id, task);
+    const entered = deferred<void>();
+    const off = f.manager.subscribe(() => { if (f.calls.length) entered.resolve(); });
+    const running = runWorkflow({ script: 'export const meta={name:"stop test",description:"test"}; await agent("test");',
+      host: createWorkflowHost({ pi, ctx, manager: f.manager, workflowId: task.id }),
+    });
+    await entered.promise;
+    const row = f.source.list().find(row => row.kind === "agent")!;
+    assert.equal(f.source.stop(row), true);
+    const result = await running;
+    off();
+    assert.equal(result.status, "completed");
+    assert.equal(f.calls.length, 1, "user stop did not trigger a hidden retry");
+    assert.ok(result.progress.some(entry => entry.type === "workflow_agent" && entry.skipped));
+  } finally { await f.close(); }
+});
+
+void it("foreground resume queued admission can migrate to background without losing its original gate", async () => {
+  const f = fixture();
+  try {
+    const id = f.spawn(false); f.calls[0]!.finish(); await f.manager.getRun(id)!.terminal; await tick();
+    f.spawn(false); const bg = f.spawn(true);
+    const parent = new AbortController(); f.manager.resumeRun(id, "queued continuation", parent.signal);
+    const run = f.manager.getRun(id)!, gate = f.manager.getRecord(id)!.startGate!;
+    const wait = registerAgentWait(f.manager, f.coordinator, run, "launch", parent.signal);
+    wait.detach(); parent.abort();
+    assert.equal(f.resumes.length, 0);
+    f.calls.find(call => call.id === bg)!.finish(); await gate;
+    assert.equal(f.resumes.length, 1);
+    assert.equal(f.resumes[0]?.session, f.calls[0]?.session);
+    assert.equal(f.resumes[0]?.options?.signal?.aborted, false);
+    f.resumes[0]!.finish(); await run.terminal;
+  } finally { await f.close(); }
+});
+
+void it("source observer changes and owner retention preserve completed children past sweep without recursive waits", async () => {
+  const f = fixture();
+  try {
+    const task = createWorkflowTask({ id: "wf_retained", script: "" }); f.workflows.set(task.id, task);
+    const parent = f.spawn(false), child = f.spawn(false, { parentAgentId: parent }), owned = f.spawn(false, { workflowId: task.id });
+    f.calls.find(call => call.id === child)!.finish(); f.calls.find(call => call.id === owned)!.finish();
+    await f.manager.getRun(child)!.terminal; await f.manager.getRun(owned)!.terminal; await tick();
+    f.manager.consumeRun(f.manager.getRun(child)!.identity); f.manager.consumeRun(f.manager.getRun(owned)!.identity);
+    f.manager.getRecord(child)!.completedAt = 0; f.manager.getRecord(owned)!.completedAt = 0;
+    // Exercise the actual existing sweep, not a second test implementation.
+    const sweep = Reflect.get(f.manager, "cleanup"); assert.equal(typeof sweep, "function"); sweep.call(f.manager);
+    assert.ok(f.manager.getRecord(child)); assert.ok(f.manager.getRecord(owned));
+    let events = 0; const off = f.source.subscribe(() => { events++; });
+    const before = f.source.revision;
+    f.calls.find(call => call.id === parent)!.options.onToolActivity?.({ type: "start", toolName: "edit" });
+    const lease = registerAgentWait(f.manager, f.coordinator, f.manager.getRun(parent)!, "retrieval");
+    lease.detach(); await lease.result;
+    assert.ok(f.source.revision > before); assert.ok(events >= 3 && events < 10, "source/wait notifications cannot recurse");
+    off();
+  } finally { await f.close(); }
+});
+
+for (const elapsed of [0, FINISHED_LINGER_MS - 1, FINISHED_LINGER_MS]) {
+  void it(`fresh panel after actual sweep retains consumed workflow child at group end + ${elapsed}ms only within window`, async t => {
+    let now = 2_000_000;
+    t.mock.method(Date, "now", () => now);
+    const f = fixture();
+    let panel: TaskPanel | undefined;
+    try {
+      const task = createWorkflowTask({ id: "wf_fresh_panel", script: "" });
+      f.workflows.set(task.id, task);
+      const completion = f.manager.spawnAndWait(pi, ctx, "general-purpose", "early child", {
+        description: "early child", workflowId: task.id,
+      });
+      const id = f.calls[0]!.id;
+      f.calls[0]!.finish("retained child answer");
+      await completion; await f.manager.drainExecution();
+      assert.equal(f.manager.getRecord(id)?.resultConsumed, true, "actual workflow wait consumes its result");
+      now += 11 * 60_000;
+      completeWorkflowTask(task, { status: "completed", meta: { name: "Long workflow", description: "retention" },
+        agentCount: 1, replayedCount: 0, progress: [], value: "done" });
+      now += elapsed;
+      const sweep = Reflect.get(f.manager, "cleanup"); sweep.call(f.manager);
+      const retained = elapsed < FINISHED_LINGER_MS;
+      assert.equal(!!f.manager.getRecord(id), retained, "source retention ends exactly with the shared group window");
+      panel = new TaskPanel({ coordinator: f.coordinator, config: UI_DEFAULTS, ctx: { ui: { notify() {} } } as unknown as ExtensionContext,
+        theme: { fg: (_color, text) => text }, keys: { matches: () => false },
+        tui: { terminal: { rows: 40 }, requestRender() {} } as never, done() {} });
+      const rows = panel.model.refresh(f.coordinator.list(), now);
+      assert.deepEqual(rows.map(row => [row.view.taskId, row.depth]), retained ? [[task.id, 0], [id, 1]] : []);
+      if (retained) {
+        panel.handleInput("j");
+        assert.match(panel.render(180).join("\n"), /retained child answer/);
+        assert.equal(f.manager.getRecord(id)?.resultConsumed, true, "preview never changes result ownership");
+      }
+    } finally { panel?.dispose(); await f.close(); }
+  });
+}
+
+void it("3B1 stop releases the transferred pool once without waiting for noncooperative execution", async () => {
+  const pending = deferred<RunResult>(), session = fakeSession();
+  const f = fixture({ runAgent: async (_ctx, _type, _prompt, options) => { options.onSessionCreated?.(session); return pending.promise; } });
+  try {
+    const id = f.spawn(false), run = f.manager.getRun(id)!;
+    f.manager.detachRun(run.identity);
+    f.manager.abort(id); f.manager.abort(id);
+    assert.equal((await run.terminal).status, "stopped");
+    assert.ok(f.manager.executionCount > 0);
+    const next = f.spawn(true);
+    assert.equal(f.manager.getRecord(next)?.status, "running", "stop releases current background lease immediately");
+    assert.equal(f.manager.resumeRun(id, "cannot resume pending stopped prompt"), undefined);
+    pending.resolve({ session, responseText: "late", aborted: false, steered: false });
+    await f.manager.waitForAll();
+    const first = f.spawn(true), queued = f.spawn(true);
+    assert.equal(f.manager.getRecord(first)?.status, "running");
+    assert.equal(f.manager.getRecord(queued)?.status, "queued", "late settle must not release the pool twice");
+    await f.manager.waitForAll();
+  } finally { pending.resolve({ session, responseText: "late", aborted: false, steered: false }); await f.close(); }
+});

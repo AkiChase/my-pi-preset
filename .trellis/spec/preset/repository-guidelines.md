@@ -28,7 +28,7 @@ Paths below are relative to the repository root.
 
 ## Vendored Ownership
 
-[bg-tasks/PROVENANCE.md](../../../extensions/bg-tasks/PROVENANCE.md) records the upstream repository, exact commit, copy layout and license ([LICENSE.upstream](../../../extensions/bg-tasks/LICENSE.upstream)). Preserve provenance for new copies and record intentional deviations as they land. This fork is repository-owned code: edit it in place, without an upstream merge/sync obligation. Do not reinstall `pi-patty-bg-tasks` as a separate dependency or pi package.
+[process-tasks/PROVENANCE.md](../../../extensions/process-tasks/PROVENANCE.md) records the upstream repository, exact commit, copy layout and license ([LICENSE.upstream](../../../extensions/process-tasks/LICENSE.upstream)). Preserve provenance for new copies and record intentional deviations as they land. This fork is repository-owned code: edit it in place, without an upstream merge/sync obligation. Do not reinstall `pi-patty-bg-tasks` as a separate dependency or pi package.
 
 A vendor directory with `index.ts` must stay behind the top-level wrapper. Explicit discovery and [pi-manifest.test.mjs](../../../scripts/pi-manifest.test.mjs) prevent it loading again independently; never remove that guard. See [Extension Guidelines](./extension-guidelines.md).
 
