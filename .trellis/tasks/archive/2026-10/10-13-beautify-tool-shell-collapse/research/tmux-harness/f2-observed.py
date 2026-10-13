@@ -2,8 +2,8 @@
 """Actual isolated tmux+installed Pi validation; no component simulation or network."""
 import os, json, tempfile, pathlib, subprocess, time, re, shutil, hashlib, sys
 REPO=pathlib.Path('/Users/jyxc-dz-0101322/tools/my-pi-preset')
-OUT=REPO/'.trellis/tasks/10-13-beautify-tool-shell-collapse/research/terminal-fix-f2-observed'
-HARNESS=REPO/'.trellis/tasks/10-13-beautify-tool-shell-collapse/research/tmux-harness'
+OUT=REPO/'.trellis/tasks/archive/2026-10/10-13-beautify-tool-shell-collapse/research/terminal-fix-f2-observed'
+HARNESS=REPO/'.trellis/tasks/archive/2026-10/10-13-beautify-tool-shell-collapse/research/tmux-harness'
 SDK=pathlib.Path('/Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules')
 NODE='/opt/homebrew/bin/node'; TMUX='/opt/homebrew/bin/tmux'
 root=pathlib.Path(tempfile.mkdtemp(prefix='beautify-tmux-'))

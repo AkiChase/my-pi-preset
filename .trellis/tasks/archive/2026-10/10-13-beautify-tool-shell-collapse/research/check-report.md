@@ -65,7 +65,7 @@ export PI_SDK_DIR="$sdk_dir" PI_CODING_AGENT_DIR="$agent_dir"
 - `node --test extensions/beautify/__tests__/*.test.ts extensions/process-tasks/__tests__/{index,waits}.test.ts extensions/agent-tasks/__tests__/tool-waits.test.ts extensions/task-ui/__tests__/editor.test.ts extensions/agent-tasks/__tests__/loading.test.ts` → **141/141，exit0，自然退出**。
 - `pnpm check` → **strict TypeScript通过；606/606，exit0**。项目package test本身带force-exit，未更改脚本。
 - `node --test 'extensions/**/__tests__/*.test.ts' 'scripts/*.test.mjs'` → **606/606，exit0，无force-exit，自然退出**，覆盖process/agent/task-ui/beautify全部资源回归与脚本。
-- `python3 .trellis/scripts/task.py validate .trellis/tasks/10-13-beautify-tool-shell-collapse` → implement/check各4项全部通过。
+- `python3 .trellis/scripts/task.py validate .trellis/tasks/archive/2026-10/10-13-beautify-tool-shell-collapse` → implement/check各4项全部通过。
 - `git diff --check` → 通过；本任务新文件另检查行尾空白与本轮文档相对链接。
 - 项目没有独立lint命令：**未运行独立lint**，不标为Passed。
 
@@ -83,7 +83,7 @@ export PI_SDK_DIR="$sdk_dir" PI_CODING_AGENT_DIR="$agent_dir"
 - `extensions/beautify/TESTING.md`
 - `.trellis/spec/preset/extension-guidelines.md`
 - `.trellis/spec/preset/testing-guidelines.md`
-- `.trellis/tasks/10-13-beautify-tool-shell-collapse/research/check-report.md`
+- `.trellis/tasks/archive/2026-10/10-13-beautify-tool-shell-collapse/research/check-report.md`
 
 ## 未做／限制
 

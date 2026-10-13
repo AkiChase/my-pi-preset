@@ -71,7 +71,7 @@ node --test extensions/beautify/__tests__/*.test.ts
 6. 等待使用有界条件循环/monitor，不用固定sleep等待。搭建或专项受阻时及时给状态，收敛最小证据，把剩余项标NOT_RUN，不持续扩建harness。
 7. finally发送自身/quit，确认CLI及自有child真实退出；必要时只TERM/KILL测试PID/group，停止自己的唯一tmux服务，删除临时config。禁止不带-L的kill-server或触碰用户pane。保留有界证据到task research，检查无凭证。
 
-已跑通参考：[tmux-validation](../../tasks/10-13-beautify-tool-shell-collapse/research/tmux-validation.md)及其tmux-harness脚本（仅测试材料，不是产品入口）。本轮验证发现自动测试遗漏的背景reset；最初残缺hint经raw frame复核属于tmux裁剪旧帧的夹具误判，等待真实resize frame后通过。流程有效不代表所有矩阵通过；定向复验见[terminal-fix-report](../../tasks/10-13-beautify-tool-shell-collapse/research/terminal-fix-report.md)。复用先读报告的夹具失败和启动命令，不盲跑全量driver。
+已跑通参考：[tmux-validation](../../tasks/archive/2026-10/10-13-beautify-tool-shell-collapse/research/tmux-validation.md)及其tmux-harness脚本（仅测试材料，不是产品入口）。本轮验证发现自动测试遗漏的背景reset；最初残缺hint经raw frame复核属于tmux裁剪旧帧的夹具误判，等待真实resize frame后通过。流程有效不代表所有矩阵通过；定向复验见[terminal-fix-report](../../tasks/archive/2026-10/10-13-beautify-tool-shell-collapse/research/terminal-fix-report.md)。复用先读报告的夹具失败和启动命令，不盲跑全量driver。
 
 ## @ 路径连续补全验证
 

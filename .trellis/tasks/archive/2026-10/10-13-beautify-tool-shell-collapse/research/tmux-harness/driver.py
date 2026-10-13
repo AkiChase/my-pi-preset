@@ -2,8 +2,8 @@
 """Actual isolated tmux+installed Pi validation; no component simulation or network."""
 import os, json, tempfile, pathlib, subprocess, time, re, shutil, hashlib, sys
 REPO=pathlib.Path('/Users/jyxc-dz-0101322/tools/my-pi-preset')
-OUT=REPO/'.trellis/tasks/10-13-beautify-tool-shell-collapse/research/terminal-fix-f2-repro'
-HARNESS=REPO/'.trellis/tasks/10-13-beautify-tool-shell-collapse/research/tmux-harness'
+OUT=REPO/'.trellis/tasks/archive/2026-10/10-13-beautify-tool-shell-collapse/research/tmux-evidence'
+HARNESS=REPO/'.trellis/tasks/archive/2026-10/10-13-beautify-tool-shell-collapse/research/tmux-harness'
 SDK=pathlib.Path('/Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules')
 NODE='/opt/homebrew/bin/node'; TMUX='/opt/homebrew/bin/tmux'
 root=pathlib.Path(tempfile.mkdtemp(prefix='beautify-tmux-'))
@@ -122,6 +122,25 @@ try:
  wait(lambda:'SMOKE_READY' in plain(),'startup',30)
  capture('startup');case('isolated offline CLI startup')
  run('read');collapsed('read','sample.ts:3');expand('read','MARK_42')
+ # SGR actual stdin routing through tmux pane, not direct component.handleMouse.
+ _,ansi=capture('mouse-before');color,rows=latest_tool(ansi,'sample.ts:3');bodyrow=next(i for i,r in rows if r.strip())
+ for label,y,expected in [('padding',rows[0][0],False),('body',bodyrow,True)]:
+  before=len(events())
+  sequence=f'\x1b[<0;5;{y}M\x1b[<0;5;{y}m'
+  tm('send-keys','-l','-t','check:0.0',sequence)
+  (OUT/'mouse-actions.jsonl').open('a').write(json.dumps({'label':label,'input':sequence,'row':y,'method':'tmux send-keys -l'})+'\n')
+  if expected: wait(lambda:'MARK_42' in plain(),'mouse body expansion')
+  # Force a read-only command after padding to prove an input+render barrier.
+  else: send('/smoke-observe');wait(lambda:any(e['kind']=='observe' for e in events()[before:]),'observation barrier')
+  text,_=capture('mouse-'+label)
+  ok=('MARK_42' in text)==expected
+  case('actual SGR '+label,'PASS' if ok else 'FAIL',row=y,mechanism='tmux send-keys -l SGR bytes -> CLI stdin -> fullscreen host mouse routing (host consumes before public input observer)')
+  if not ok: raise RuntimeError('Actual mouse behavior mismatch '+label)
+ # Body click did not toggle global state. Click body title again to recollapse.
+ send('/smoke-observe');n=len(events());wait(lambda:any(e['kind']=='observe' for e in events()[n-20:]),'expanded input barrier')
+ text=plain(); title_row=next(i+1 for i,r in enumerate(text.splitlines()) if 'MARK_10' in r)
+ tm('send-keys','-l','-t','check:0.0',f'\x1b[<0;7;{title_row}M\x1b[<0;7;{title_row}m')
+ wait(lambda:'MARK_42' not in plain(),'mouse recollapse');case('actual SGR expanded code body recollapse',row=title_row)
  for width in [80,40,140]:
   tm('resize-window','-t','check:0','-x',str(width),'-y','60')
   wait(lambda:tm('display-message','-p','-t','check:0.0','#{pane_width}').strip()==str(width),'resize settle')
@@ -130,9 +149,43 @@ try:
   key('C-o');wait(lambda:'MARK_42' in plain(),'resize expand');key('C-o');wait(lambda:'MARK_42' not in plain(),'resize collapse')
   collapsed('read-width-'+str(width),'sample.ts:3' if width>40 else ':3')
  case('width 140/80/40 actual resize')
- for w in [80,40,140]:
-  text=(OUT/('read-width-'+str(w)+'-collapsed.txt')).read_text();line=next(r for r in text.splitlines() if ':3' in r and 'CASE' not in r)
-  case('complete hint '+str(w),'PASS' if 'ctrl' not in line or 'ctrl+o expand' in line else 'FAIL',line=line)
+ for name,token,expected in [('find','find *.ts','match-31.ts'),('grep','grep MARK','MARK_48'),('bash','$ python3','BASH_LINE_29'),('bash-error','$ python3','ERROR_LINE_29'),('read-error','missing-file.ts','ENOENT'),('find-error','missing-dir','does not exist'),('grep-error','grep [','regex')]:
+  new_session();run(name);collapsed(name,token)
+  # Error bodies may vary; exact tool-result observation still retained.
+  if name.endswith('error'):
+   key('C-o');wait(lambda:len([r for r in plain().splitlines() if r.strip()])>8,name+' error expand');capture(name+'-expanded');key('C-o');case(name+' error keyboard expansion')
+  else:expand(name,expected)
+ new_session()
+ n=len(events());send('CASE bash-pending')
+ wait(lambda:any(e['kind']=='execution-update' for e in events()[n:]),'pending update')
+ text,ansi=capture('bash-pending');PENDING,rs=latest_tool(ansi,'$ python3');nonblank=[r for i,r in rs if r.strip()]
+ case('pending background','PASS' if len(nonblank)==1 else 'FAIL',bg=PENDING,rows=rs)
+ (root/'pending.release').touch();wait(lambda:'CASE_DONE bash-pending' in plain(),'pending final');capture('bash-pending-final')
+ new_session();run('job-start');wait(lambda:any(e['kind']=='job-id' for e in events()),'job id');wait(lambda:(root/'background.pid').exists(),'actual job pid')
+ for name in ['jobs-list','jobs-output','jobs-search','jobs-stats']:
+  run(name);collapsed(name,'jobs')
+  key('C-o');capture(name+'-expanded');key('C-o');case(name+' real action keyboard expand')
+ n=len(events());send('CASE jobs-attach');wait(lambda:any(e['kind']=='execution-update' and e.get('toolName')=='jobs' for e in events()[n:]),'attach partial')
+ text,ansi=capture('jobs-attach-partial');color,rs=latest_tool(ansi,'jobs attach');case('attach partial single row','PASS' if len([r for _,r in rs if r.strip()])==1 else 'FAIL',rows=rs)
+ key('C-o');wait(lambda:'JOB_LINE_' in plain(),'attach actual streaming text');capture('jobs-attach-partial-expanded');key('C-o')
+ tm('send-keys','-l','-t','check:0.0','\x1b[98;6u')
+ wait(lambda:'CASE_DONE jobs-attach' in plain(),'attach released')
+ text,ansi=capture('jobs-attach-released');case('attach wait release not stop','PASS' if 'following stopped' in text or 'stopped following' in text.lower() else 'FAIL',text=text)
+ pid=int((root/'background.pid').read_text());os.kill(pid,0);case('release preserved actual job PID',pid=pid)
+ # New attach waits for actual OS completion, terminal result is not current partial.
+ n=len(events());send('CASE jobs-attach');wait(lambda:any(e['kind']=='execution-update' and e.get('toolName')=='jobs' for e in events()[n:]),'second attach partial');(root/'background.release').touch()
+ wait(lambda:'CASE_DONE jobs-attach' in plain(),'attach completed');collapsed('jobs-attach-final','jobs attach');capture('jobs-attach-final')
+ case('actual attach partial->final completed')
+ (root/'background.release').unlink();run('job-start');run('jobs-kill');collapsed('jobs-kill','jobs kill');case('actual job kill')
+ run('agent-start');run('agent-result',30);collapsed('agent-result','Offline real child result');expand('agent-result','CHILD_RESULT_24')
+ run('agent-verbose');collapsed('agent-verbose','Offline real child result');key('C-o');wait(lambda:'Agent Conversation' in plain() or 'CHILD_RESULT_24' in plain(),'verbose expanded');capture('agent-verbose-expanded');key('C-o');case('actual child verbose transcript')
+ run('agent-hold');wait(lambda:any(e['kind']=='child-held' for e in events()),'child held',30);run('agent-running');collapsed('agent-running','Offline held child result')
+ n=len(events());send('CASE agent-wait');wait(lambda:any(e['kind']=='execution-start' and e.get('toolName')=='get_subagent_result' for e in events()[n:]),'agent waiting');capture('agent-wait-pending')
+ tm('send-keys','-l','-t','check:0.0','\x1b[98;6u');wait(lambda:'CASE_DONE agent-wait' in plain(),'agent wait released');collapsed('agent-wait-released','get_subagent_result');capture('agent-wait-released')
+ run('agent-running');collapsed('agent-running-after-release','Offline held child result');send('/smoke-release-child');run('agent-missing');collapsed('agent-missing','get_subagent_result')
+ # A final keyboard source trace plus host debug: debug is rendered-lines diagnostic, NOT screen capture.
+ send('/debug');wait(lambda:(root/'agent/pi-debug.log').exists(),'debug created');shutil.copy2(root/'agent/pi-debug.log',OUT/'host-debug.log')
+ case('distinct pending/success/error backgrounds','PASS' if len({SUCCESS,PENDING,ERROR})==3 else 'FAIL',pending=PENDING,success=SUCCESS,error=ERROR)
 except Exception as exc:
  report['error']=str(exc)
  try:capture('failure')

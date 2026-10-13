@@ -50,7 +50,7 @@ rm -rf "$agent_dir"
 - 后续 optional 机制精简后单测 `node --test extensions/beautify/__tests__/retrieval.test.ts` → 7/7、exit0；strict typecheck 同时通过。
 - 最终隔离 `pnpm check` → strict typecheck passed、全量 601/601、exit0（package script 本身带 force-exit；未改变项目脚本）。
 - 最终隔离 `node --test 'extensions/**/__tests__/*.test.ts' 'scripts/*.test.mjs'` → 601/601、exit0，未加 force-exit，真实自然退出；包括 task-ui/process/agent 三模块资源门禁和脚本测试。
-- `python3 .trellis/scripts/task.py validate .trellis/tasks/10-13-beautify-tool-shell-collapse` → implement/check context 全部通过。
+- `python3 .trellis/scripts/task.py validate .trellis/tasks/archive/2026-10/10-13-beautify-tool-shell-collapse` → implement/check context 全部通过。
 - `git diff --check` → 通过；新增文件另检查行尾 whitespace。
 
 完整临时日志 `/tmp/beautify-full-check.log`、`/tmp/beautify-full-natural.log`；定向 `/tmp/beautify-focused-green2.log`。日志不是提交范围。

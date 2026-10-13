@@ -2,7 +2,7 @@
 """Bounded final smoke for optional jobs and pending color; reuse fixture, actual CLI."""
 import pathlib,tempfile,subprocess,os,json,time,shlex,shutil,re
 R=pathlib.Path('/Users/jyxc-dz-0101322/tools/my-pi-preset')
-D=R/'.trellis/tasks/10-13-beautify-tool-shell-collapse/research'
+D=R/'.trellis/tasks/archive/2026-10/10-13-beautify-tool-shell-collapse/research'
 O=D/'tmux-minimal';O.mkdir(exist_ok=True)
 root=pathlib.Path(tempfile.mkdtemp(prefix='beautify-final-'));server=root.name
 for name in ['home','agent','sessions','cwd','logs']:(root/name).mkdir()

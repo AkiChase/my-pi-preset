@@ -36,7 +36,7 @@ F2 不需要新的“先红后修产品”断言：actual fullscreen host 的 14
 命令：
 
 ```sh
-python3 .trellis/tasks/10-13-beautify-tool-shell-collapse/research/tmux-harness/terminal-fix.py green
+python3 .trellis/tasks/archive/2026-10/10-13-beautify-tool-shell-collapse/research/tmux-harness/terminal-fix.py green
 ```
 
 复用既有 `minimal.py`/`driver.py` 的 installed CLI、offline provider 和临时 fixture，只有 Read、长 Bash、Read error 三种调用，不启动子代理／模型／网络。unique `tmux -L`，`env -i`，临时 HOME/agent/cwd/sessions/log，显式 `--tui-mode fullscreen --use-theme dark`，无自动发现、认证复制或现有 panes。现有 PATH 指向已安装工具，不执行安装。
