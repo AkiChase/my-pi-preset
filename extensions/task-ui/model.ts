@@ -1,3 +1,4 @@
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { TaskView } from "./types.ts";
 
 export const FINISHED_LINGER_MS = 4_000;
@@ -72,7 +73,8 @@ export class TaskPanelModel {
 }
 
 /** Counts independent work, not workflow/ordinary-agent descendants twice. */
-export function taskSummary(views: readonly TaskView[]): string | undefined {
+export function taskSummary(views: readonly TaskView[], theme?: Pick<Theme, "fg">): string | undefined {
+    const paint: Theme["fg"] = (color, text) => theme ? theme.fg(color, text) : text;
     const counts = new Map<string, { active: number; queued: number }>();
     for (const view of views) {
         if (view.parentKey || isTerminal(view)) continue;
@@ -82,6 +84,6 @@ export function taskSummary(views: readonly TaskView[]): string | undefined {
     }
     return counts.size ? ["shell", "monitor", "agent", "workflow"].flatMap(kind => {
         const count = counts.get(kind);
-        return count ? [`${kind}: ${count.active} active${count.queued ? ` / ${count.queued} queued` : ""}`] : [];
-    }).join(" · ") : undefined;
+        return count ? [`${paint("accent", kind)}${paint("dim", ":")} ${paint("text", String(count.active))} ${paint("success", "active")}${count.queued ? `${paint("dim", " / ")}${paint("text", String(count.queued))} ${paint("warning", "queued")}` : ""}`] : [];
+    }).join(paint("dim", " · ")) : undefined;
 }

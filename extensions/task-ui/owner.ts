@@ -17,8 +17,9 @@ export function createTaskUIOwner(pi: ExtensionAPI, coordinator: TaskCoordinator
     const active = () => !closed && lifecycle.active;
     const update = () => {
         if (!active() || !ctx || ctx.mode !== "tui") return;
-        const summary = taskSummary(coordinator.list());
-        const text = summary ? `${summary} · ${config.shortcutTaskPanel[0] ?? "/tasks"}` : undefined;
+        const theme = ctx.ui.theme;
+        const summary = taskSummary(coordinator.list(), theme);
+        const text = summary ? summary + theme.fg("dim", " · ") + theme.fg("accent", config.shortcutTaskPanel[0] ?? "/tasks") : undefined;
         if (text === lastStatus) return;
         lastStatus = text;
         const origin = ctx;

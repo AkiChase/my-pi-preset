@@ -34,6 +34,29 @@ Follow [TaskPanel](../../../extensions/task-ui/panel.ts): strip external termina
 
 [status-bar.ts](../../../extensions/status-bar.ts) also uses display-column widths and returns its unsubscribe as `dispose`. New widgets must identify their cleanup owner; `unref()` alone is not disposal. Avoid unbounded full-log rendering, nested replacement dialogs and global listeners that outlive the interaction.
 
+## 任务底栏语义配色
+
+### 1. 范围
+共享 task-ui 摘要由 owner 按字段配色；status-bar 只对 `task-ui` 保留已有 SGR，其他扩展状态仍按原规则绘制，防止通用 muted 覆盖内部语义色。
+
+### 2. 签名
+`taskSummary(views: readonly TaskView[], theme?: Pick<Theme, "fg">): string | undefined`；省略 theme 时返回原纯文本文案。
+
+### 3. 契约
+类型与快捷键用 `accent`，数量用 `text`，active 用 `success`，queued 用 `warning`，冒号、斜线及点分隔符用 `dim`。只计非终态顶层工作，顺序固定为 shell、monitor、agent、workflow。owner 从 `ctx.ui.theme` 取色；例如 `theme.fg("accent", shortcut)`，不得硬编码 RGB。
+
+### 4. 输入矩阵
+无顶层活动／排队任务 → `undefined`；有 queued → 保留 `0 active / N queued` 文案；缺少快捷键 → owner 显示 `/tasks`。颜色不改变可见宽度，status-bar 继续清理非 SGR 控制字符并按 SDK 显示列截断。
+
+### 5. 正常与异常案例
+正常：monitor 与 shell 共享字段语义色；基线：无 theme 与旧文案一致；错误：给整个 task-ui 再套 muted，导致字段 reset 后后续文本丢色。
+
+### 6. 回归
+[summary.test.ts](../../../extensions/task-ui/__tests__/summary.test.ts) 覆盖单／多类型、queued、子任务排除、空状态、配置快捷键与 fallback，以及实际 status-bar 组合后的 SGR 和窄宽度；owner fixture 必须提供 `ui.theme.fg`。
+
+### 7. 错误与正确
+错误：`paint("muted", sanitize(taskText))`；正确：仅 `task-ui` 分支使用 `sanitize(taskText)`，由 owner 提供语义样式，不扩展为任意外部状态免着色。
+
 ## 共享等待与阶段接入边界
 
 - [bash-unified.ts](../../../extensions/bash-unified.ts) 创建唯一 `TaskCoordinator`，向 process factory 和 agent factory 的 typed options 传入同一个实例；不能用 global UI singleton 或在生产 backend 中再创建实例。直接 process factory 的离线 fixture 可省略 options，由其创建局部实例及共享 controls。

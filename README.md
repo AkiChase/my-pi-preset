@@ -323,7 +323,7 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 
 #### `extensions/task-ui/` —— 共享任务面板与等待
 
-`bash-unified.ts` 每次加载创建一个 coordinator、lifecycle 和 UI owner，注入两个独立执行后端；task-ui 是嵌套库，不是另一份扩展。Task Panel 显示当前会话的 shell、monitor、独立 agent、workflow 及其真实子任务，包含前台、后台、启动中、排队和短暂保留的终态。底栏按独立工作分类显示 active／queued 数量，不将父任务和子任务重复计数。
+`bash-unified.ts` 每次加载创建一个 coordinator、lifecycle 和 UI owner，注入两个独立执行后端；task-ui 是嵌套库，不是另一份扩展。Task Panel 显示当前会话的 shell、monitor、独立 agent、workflow 及其真实子任务，包含前台、后台、启动中、排队和短暂保留的终态。底栏按独立工作分类显示 active／queued 数量，不将父任务和子任务重复计数。shell、monitor、agent、workflow 的摘要统一使用主题语义色：类型与快捷键为强调色，数量为明亮文字色，active 为成功色，queued 为警告色，分隔符为暗色；没有活动或排队任务时隐藏摘要。
 
 `/tasks` / `Shift+Down` 打开双栏面板：左侧选择任务，右侧立即显示有界日志、对话或 workflow 进度，无需 Enter 或再开弹窗。workflow 默认展开；普通 agent 的嵌套任务按实际父子关系显示，刷新不覆盖用户收起状态。活跃父组保留已完成子行；整体完成后才开始四秒展示窗口，期间即使早期子结果已消费并遇到元数据 sweep，新打开的面板仍能看到整组。当前选择的最终有界详情在过滤或元数据 sweep 后仍保留到换选项或关闭，不依赖保留后端控制器，也不消费结果。
 

@@ -441,6 +441,11 @@ export default function (pi: ExtensionAPI) {
 					chips.push(paint(percent === null ? "dim" : hitRateColor(percent), chip));
 					continue;
 				}
+				if (key === "task-ui") {
+					// The shared task owner already styles each semantic field.
+					chips.push(sanitize(text));
+					continue;
+				}
 				// Foreign text: `muted` rather than `dim` so a status that another
 				// extension considers important stays readable.
 				chips.push(paint("muted", sanitize(text)));

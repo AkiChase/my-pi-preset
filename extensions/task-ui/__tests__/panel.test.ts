@@ -134,7 +134,7 @@ function uiFixture(f: ReturnType<typeof sourceFixture>, reenter: "status" | "cus
     const lifecycle = new TaskLifecycle(f.coordinator), handlers = new Set<(event: unknown, ctx: ExtensionContext) => unknown>();
     let opens = 0, panel: TaskPanel | undefined, completes = 0;
     const statuses: (string | undefined)[] = [];
-    const ctx = { mode: "tui", hasUI: true, ui: { notify() {},
+    const ctx = { mode: "tui", hasUI: true, ui: { theme: { fg: (_color: string, text: string) => text }, notify() {},
         setStatus(key: string, text: string | undefined) { assert.equal(key, "task-ui"); statuses.push(text); if (reenter === "status" && text) void lifecycle.shutdown(); },
         custom(factory: Parameters<ExtensionContext["ui"]["custom"]>[0]) {
             opens++;
