@@ -370,7 +370,7 @@ export default function (pi: ExtensionAPI) {
 			if (!git?.branch) return "";
 			const parts = [paint("accent", git.detached ? `⌀ ${git.branch}` : git.branch)];
 			if (git.conflicts) parts.push(field("✖", String(git.conflicts), "error"));
-			if (git.modified) parts.push(field("●", String(git.modified), "warning"));
+			if (git.modified) parts.push(field("~", String(git.modified), "warning"));
 			if (git.staged) parts.push(field("+", String(git.staged), "success"));
 			if (git.untracked) parts.push(field("?", String(git.untracked), "muted"));
 			if (git.ahead) parts.push(field("↑", String(git.ahead), "accent"));
