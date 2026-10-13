@@ -124,3 +124,38 @@ Migrated project rules into source-backed preset specs, removed frontend scaffol
 
 - 本地 main 是该分支祖先，建议收尾后 fast-forward 合并；未执行 merge/push，合并前保留无关工作区改动。
 - Pretty/input-history 兼容保持独立 worktree，模型侧 turn-limit 另属任务；未切换日常 Pi 安装或 reload。
+
+
+## Session 4: Pretty 输入历史兼容修复收尾
+<!-- trellis-session: v=2 fp=aff2dca2fd63f63c -->
+
+**Date**: 2026-10-13
+**Task**: Pretty 输入历史兼容修复收尾
+**Branch**: `main`
+
+### Summary
+
+Pretty 编辑器历史兼容修复完成并合并 main；同步最终实施与真实 CLI 验收证据后归档。
+
+### Main Changes
+
+- 独立 worktree 实现原实例装饰、安全回滚与所有权清理，合并保留统一任务组合。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5810141` | fix: preserve input history in Pretty editor integration |
+| `2803ccc` | merge: integrate Pretty history compatibility into main |
+
+### Testing
+
+- [OK] 合并后类型检查及521/521全量、54/54定向自然退出；真实regular CLI双顺序cold/new/reload六组合通过。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- subagent-turn-limit保持planning，本次未改；未推送、未更新个人Pi安装。
