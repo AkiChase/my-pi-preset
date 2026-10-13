@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 6
+- **Total Sessions**: 7
 - **Last Active**: 2026-10-13
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~220 | Active |
+| `journal-1.md` | ~242 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 7 | 2026-10-13 | Monitor session-level notification batching | `4b0d739` | `main` |
 | 6 | 2026-10-13 | 任务摘要语义配色验收与收尾 | `073e276` | `main` |
 | 5 | 2026-10-13 | 完成子代理轮次接口收尾与隔离目录清理 | `02fc35b`, `cc8b88e`, `d842a61` | `main` |
 | 4 | 2026-10-13 | Pretty 输入历史兼容修复收尾 | `5810141`, `2803ccc` | `main` |

@@ -218,3 +218,25 @@ Pretty 编辑器历史兼容修复完成并合并 main；同步最终实施与�
 ### Status
 
 [OK] **Completed**
+
+
+## Session 7: Monitor session-level notification batching
+<!-- trellis-session: v=2 fp=60bf15bf25f6d776 -->
+
+**Date**: 2026-10-13
+**Task**: Monitor session-level notification batching
+**Branch**: `main`
+
+### Summary
+
+Implemented registry-scoped command/WS monitor batching with fixed short windows and shared cadence, preserving independent silence/deadline, terminal/retrieval and epoch/reentry semantics. Added 64KiB notification bound with exclusive log-retained JSONL overflow manifests; synchronized README and monitor/testing specs. Independent checks fixed reset scheduling, unsafe exception diagnostics and premature capacity omission. Final strict TypeScript and 579/579 full tests, 158/158 focused and 519/519 three-module tests passed with natural exit; links and diff checks passed. Archived task after work commit. Unrelated .pi templates/hash, concurrent pi-preset.json and three task-panel planning directories preserved. No push/install/reload or online/TUI verification.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4b0d739` | feat(process-tasks): batch monitor notifications per session |
+
+### Status
+
+[OK] **Completed**
