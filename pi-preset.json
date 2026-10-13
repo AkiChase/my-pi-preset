@@ -23,6 +23,10 @@
     "tui.editor.jumpForward": []
   },
   "files": {
+    "pi-pretty.json": {
+      "theme": "one-dark-pro",
+      "toolStyle": "claudecode"
+    },
     "pi-input-history.json": {
       "searchShortcut": "alt+r"
     }

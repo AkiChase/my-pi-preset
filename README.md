@@ -121,7 +121,7 @@ process-tasks 和 agent-tasks 是一次性拷贝后由本仓库维护的代码�
 
 执行后端、共享等待和会话关闭已接入，旧 AgentWidget/FleetView 已删除，核心 Task Panel 和空编辑器 Down 入口已通过集中自动验证、独立审查及临时配置的真实 Pi PTY 核心交互冒烟。
 
-除了包，清单还声明了两类本机配置：pi 本体的几个偏好 —— 失败重试次数 `retry.maxRetries: 5`，以及把被扩展抢走的内置键 `tui.editor.jumpForward`（`ctrl+]`）禁掉；以及 `pi-input-history` 的搜索键 `searchShortcut: "alt+r"`。格式和语义见 [声明设置和键位](#声明设置和键位)，键位那条的来由见 [键位冲突](#键位冲突)。
+除了包，清单还声明了两类本机配置：pi 本体的几个偏好 —— 失败重试次数 `retry.maxRetries: 5`，以及把被扩展抢走的内置键 `tui.editor.jumpForward`（`ctrl+]`）禁掉；以及 `pi-input-history` 的搜索键 `searchShortcut: "alt+r"`、Pretty 的 Shiki 主题 `one-dark-pro` 和工具风格 `claudecode`。格式和语义见 [声明设置和键位](#声明设置和键位)，键位那条的来由见 [键位冲突](#键位冲突)。
 
 ### 第三方包
 
@@ -370,11 +370,14 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 
 **提供**：覆盖注册 `read`、`bash`、`find`、`grep`（`ls` 默认关闭）；命令 `/fff-health`、`/fff-rescan`（FFF 可用时）；不注册自定义键位，展开折叠用 pi 自带的 `ctrl+o`。
 
-**配置**：配置文件 `~/.pi/agent/pi-pretty.json`（目录可用 `PRETTY_CONFIG_DIR` 改写），优先级是环境变量 > 配置文件 > 默认值。常用键：
+本仓库依赖 `pi-pretty ^0.7.0`，通过清单默认启用 `toolStyle: "claudecode"`：折叠工具显示紧凑状态行及 `└` 结果摘要，连续工具调用可分组；输入框使用普通横线和左对齐 `❯`。`edit` / `write` 等外部工具只接管摘要和分组，不改执行，展开后仍委托原渲染器，因此不等于完整 diff 语法高亮。想恢复上游默认布局，使用 `toolStyle: "default"`；之后同步 preset 会再次对齐为 `claudecode`。
+
+**配置**：配置文件 `~/.pi/agent/pi-pretty.json`（目录可用 `PRETTY_CONFIG_DIR` 改写），优先级是环境变量 > 配置文件 > 默认值。Shiki 主题还会尝试 Pi settings 的主题名，名称不匹配时回退 `github-dark`；preset 单独声明 `one-dark-pro`，不改 Pi 全局主题。常用键：
 
 | 键 | 环境变量 | 默认 |
 | --- | --- | --- |
-| `theme`（Shiki 主题） | `PRETTY_THEME` | `github-dark` |
+| `theme`（Shiki 主题） | `PRETTY_THEME` | 上游 `github-dark`，preset `one-dark-pro` |
+| `toolStyle`（`default` / `claudecode`） | 无 | 上游 `default`，preset `claudecode` |
 | `icons`（`nerd` / `none`） | `PRETTY_ICONS` | `nerd` |
 | `disableTools` / `enableTools` | `PRETTY_DISABLE_TOOLS` / `PRETTY_ENABLE_TOOLS` | `[]` |
 | `maxHlChars` / `maxPreviewLines` | `PRETTY_MAX_HL_CHARS` / `PRETTY_MAX_PREVIEW_LINES` | `80000` / `80` |
@@ -391,11 +394,11 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 
 **做了什么更改**：组合加载本仓库的 process-tasks、agent-tasks 和 pretty；process-tasks 的 bash 只改执行，pretty 的 bash 只改渲染。先用 `Proxy` 截取进程后端的 `bash` 定义，再通过 pretty 的 `deps.sdk` 注入，最终只注册一个 `bash`。agent 后端在根会话注册工具，子会话 guard 避免再次注册 Agent/Workflow 或覆盖根 manager；两后端并未合并执行引擎。
 
-**输入历史兼容**：Pretty 安装输入框时，本仓库会先调用已有的 editor factory，在原实例上添加圆角边框和 `❯` 前缀，而不是重新建一个没有历史的 editor。`pi-input-history` 在 preset 之前或之后加载都不需要调整顺序；同目录跨 session 的 ↑/↓ 历史、Alt+R 搜索，以及原 editor 的输入和应用快捷键保留。冷启动、新建 session 和 reload 都走这个入口；没有已有 factory 时仍使用 Pretty 原生输入框。
+**输入历史兼容**：Pretty 安装输入框时，本仓库会先调用已有的 editor factory，在原实例上添加所选风格的边框和 `❯` 前缀（`claudecode` 为普通横线，`default` 为圆角框），而不是重新建一个没有历史的 editor。`pi-input-history` 在 preset 之前或之后加载都不需要调整顺序；同目录跨 session 的 ↑/↓ 历史、Alt+R 搜索，以及原 editor 的输入和应用快捷键保留。冷启动、新建 session 和 reload 都走这个入口；没有已有 factory 时仍使用 Pretty 原生输入框。
 
 支持 SDK 的 embedded working status、边框 hooks 和可写 render/padding 方法的 editor 保留 Pretty 外观及状态指示。遇到缺少 hooks、只读方法等不能安全装饰的第三方 editor，会保留其原输入框并显示 `preset Pretty editor fallback` 警告，只放弃该输入框的 Pretty 装饰。cleanup 不覆盖后来插件的 render、padding 或 factory；host 安装失败时会经正常 setter 恢复旧 factory，旧 factory 也失效时退回默认输入框并提示（此时无法保证失效插件的历史）。这些兼容逻辑在 [`extensions/pretty-compat/editor.ts`](extensions/pretty-compat/editor.ts)，不是单独加载的扩展。
 
-当前对照验证基于 Pi SDK 1.1.0、Pretty 0.6.31 和 input-history 1.1.3，已在临时配置与 session 下用真实 CLI 验证两种加载顺序的冷启动、`/new`、`/reload`，以及 ↑/↓ 和 Alt+R 搜索接受/取消。该端到端验证使用 regular TUI，不代表 fullscreen 和任意第三方 editor 都已覆盖。自定义 renderer 不委托 SDK hooks 时，无法保证能显示 Pretty 前缀；极窄终端下单列中文递归溢出、聚焦光标越界是 SDK/Pretty 原有边界，本修复未处理；复杂异步补全仍需单独确认。
+之前的真实 CLI 对照验证基于 Pi SDK 1.1.0、Pretty 0.6.31 和 input-history 1.1.3；本次 0.7.0 升级另用真实 SDK 1.2.0 setter/editor 和离线历史 fixture 验证默认及 claudecode 组合，不将其当作新的真实 CLI 验证。此前已在临时配置与 session 下用真实 CLI 验证两种加载顺序的冷启动、`/new`、`/reload`，以及 ↑/↓ 和 Alt+R 搜索接受/取消。该端到端验证使用 regular TUI，不代表 fullscreen 和任意第三方 editor 都已覆盖。自定义 renderer 不委托 SDK hooks 时，无法保证能显示 Pretty 前缀；极窄终端下单列中文递归溢出、聚焦光标越界是 SDK/Pretty 原有边界，本修复未处理；复杂异步补全仍需单独确认。
 
 两个实现细节：pretty 会用自己的 `promptSnippet` 覆盖 patty 的，模型会看不到后台任务提示，所以这里把那句补回去；patty 哪天改了入口、不再注册 `bash`，扩展会直接抛错，不静默退回 pi 原生 bash。
 
@@ -524,7 +527,10 @@ pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDING
   "conflicts": ["npm:pi-patty-bg-tasks", "npm:@heyhuynhgiabuu/pi-pretty", "npm:@tintinweb/pi-subagents"],
   "settings": { "retry": { "maxRetries": 5 } },
   "keybindings": { "tui.editor.jumpForward": [] },
-  "files": { "pi-input-history.json": { "searchShortcut": "alt+r" } },
+  "files": {
+    "pi-pretty.json": { "theme": "one-dark-pro", "toolStyle": "claudecode" },
+    "pi-input-history.json": { "searchShortcut": "alt+r" }
+  },
   "preserve": { "settings": ["theme", "defaultModel"], "keybindings": [] }
 }
 ```
@@ -562,6 +568,7 @@ pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDING
 
 ```json
 "files": {
+  "pi-pretty.json": { "theme": "one-dark-pro", "toolStyle": "claudecode" },
   "pi-input-history.json": { "searchShortcut": "alt+r" }
 }
 ```

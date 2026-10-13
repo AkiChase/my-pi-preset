@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/preset/index.md", "reason": "升级依赖、组合适配、同步配置与验证规范"}
+{"file": ".trellis/spec/preset/repository-guidelines.md", "reason": "升级依赖、组合适配、同步配置与验证规范"}
+{"file": ".trellis/spec/preset/extension-guidelines.md", "reason": "升级依赖、组合适配、同步配置与验证规范"}
+{"file": ".trellis/spec/preset/sync-guidelines.md", "reason": "升级依赖、组合适配、同步配置与验证规范"}
+{"file": ".trellis/spec/preset/testing-guidelines.md", "reason": "升级依赖、组合适配、同步配置与验证规范"}
+{"file": ".trellis/spec/preset/documentation.md", "reason": "升级依赖、组合适配、同步配置与验证规范"}
+{"file": ".trellis/tasks/10-13-pretty-upgrade/research/upgrade-baseline.md", "reason": "版本与风格差异证据"}

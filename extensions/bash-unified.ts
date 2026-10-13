@@ -18,6 +18,7 @@ export { runInChildSessionContext };
 // loudly at load time rather than silently degrading.
 import pretty from "@heyhuynhgiabuu/pi-pretty/src/index.ts";
 import { createPromptEditorClass } from "@heyhuynhgiabuu/pi-pretty/src/prompt-editor.ts";
+import { loadConfig as loadPrettyConfig } from "@heyhuynhgiabuu/pi-pretty/src/config.ts";
 import { adaptPrettyLifecycle } from "./pretty-compat/editor.ts";
 
 // Composition owner for process-tasks, agent-tasks and pi-pretty.
@@ -68,6 +69,9 @@ export default async function bashUnified(pi: ExtensionAPI): Promise<void> {
         }),
       ),
       createPromptEditorClass,
+      // Pretty 0.7.0 uses plain rules for claudecode; decoration must match
+      // its factory even when input-history supplied the live editor first.
+      loadPrettyConfig().toolStyle !== "claudecode",
     ),
     {
       sdk: {

@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
+import { stripVTControlCharacters } from "node:util";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 type FactoryArgs = Parameters<NonNullable<Parameters<ExtensionContext["ui"]["setEditorComponent"]>[0]>>;
 import { adaptPrettyLifecycle, createDecorator } from "../editor.ts";
-import { cleanup, makeHost, loadUnified, pretty, inputHistory, createPromptEditorClass, sdk, themeSdk, tuiSdk, StatusIndicator } from "./harness.mjs";
+import { configurePretty, cleanup, makeHost, loadUnified, pretty, inputHistory, createPromptEditorClass, sdk, themeSdk, tuiSdk, StatusIndicator } from "./harness.mjs";
 
 after(cleanup);
 
@@ -600,7 +601,9 @@ test("non-TUI Pretty lifecycle leaves existing editor/factory alone", async () =
   } finally { await h.fire("session_shutdown"); h.dispose(); }
 });
 
-test("production bash-unified keeps sole process bash ownership, agent tools and decorated history", async () => {
+for (const style of ["default", "claudecode"]) {
+test(`production bash-unified ${style} keeps sole process bash ownership, agent tools and decorated history`, async () => {
+  configurePretty({ toolStyle: style });
   const h = makeHost("production-wrapper");
   const disabled = process.env.PRETTY_DISABLE_TOOLS;
   process.env.PRETTY_DISABLE_TOOLS = "read,find,grep,ls";
@@ -619,12 +622,46 @@ test("production bash-unified keeps sole process bash ownership, agent tools and
     h.editor.handleInput(up);
     assert.equal(h.editor.getText(), "production history");
     assert.match(h.editor.render(80).join("\n"), /❯/);
+    const rendered = stripVTControlCharacters(h.editor.render(80).join("\n"));
+    if (style === "claudecode") {
+      assert.doesNotMatch(rendered, /[╭╮╰╯]/);
+      assert.ok(rendered.split("\n").some((line: string) => line.startsWith("❯ ")));
+      const component = new sdk.ToolExecutionComponent("bash", "style-bash", { command: "printf hello" }, {}, bash[0], h.tui, h.ctx.cwd);
+      component.setArgsComplete();
+      component.markExecutionStarted();
+      component.updateResult({ content: [{ type: "text", text: "hello" }], details: undefined, isError: false });
+      assert.match(stripVTControlCharacters(component.render(80).join("\n")), /✓ Bash/);
+      const second = new sdk.ToolExecutionComponent("bash", "style-second", { command: "printf world" }, {}, bash[0], h.tui, h.ctx.cwd);
+      second.setArgsComplete();
+      second.markExecutionStarted();
+      second.updateResult({ content: [{ type: "text", text: "world" }], details: undefined, isError: false });
+      const group = new tuiSdk.Container();
+      group.addChild(component);
+      group.addChild(second);
+      assert.match(stripVTControlCharacters(group.render(80).join("\n")), /Done/);
+      assert.match(stripVTControlCharacters(group.render(80).join("\n")), /[├└]/);
+      // External edit keeps its real executor and expanded renderer; only the
+      // collapsed row is styled. No file mutation is needed to test display.
+      const editDefinition = sdk.createEditToolDefinition(h.ctx.cwd);
+      const edit = new sdk.ToolExecutionComponent("edit", "style-edit", { path: "sample.ts", edits: [] }, {}, editDefinition, h.tui, h.ctx.cwd);
+      edit.updateResult({ content: [{ type: "text", text: "replaced" }], details: { diff: "-1 before\n+1 after" }, isError: false });
+      assert.match(stripVTControlCharacters(edit.render(80).join("\n")), /✓ Edit/);
+      edit.setExpanded(true);
+      assert.match(stripVTControlCharacters(edit.render(80).join("\n")), /before/);
+      assert.match(stripVTControlCharacters(edit.render(80).join("\n")), /after/);
+      component.setExpanded(true);
+      assert.match(stripVTControlCharacters(component.render(80).join("\n")), /hello/);
+    } else {
+      assert.match(rendered, /╭/);
+    }
   } finally {
+    configurePretty();
     process.env.PRETTY_DISABLE_TOOLS = disabled;
     await h.fire("session_shutdown");
     h.dispose();
   }
 });
+}
 
 test("later freezing visual wrappers leaves safe inactive passthrough on cleanup", () => {
   const h = makeHost("frozen-cleanup");

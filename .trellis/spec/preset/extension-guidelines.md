@@ -12,7 +12,7 @@
 
 [bash-unified.ts](../../../extensions/bash-unified.ts) 通过 [pretty-compat/editor.ts](../../../extensions/pretty-compat/editor.ts) 局部适配 Pretty 的 start/shutdown editor factory，不全局劫持其他插件。已有 factory 时在其创建的原实例上装饰，保留 history、receiver 和 subclass 行为；没有 factory 时沿用 Pretty editor。仅注入已有 constructor 仍会新建实例，不能解决历史丢失。
 
-- 不读取私有 history、不改原型链、不复制 Pretty 渲染算法；RenderBridge 复用运行时 `createPromptEditorClass`。
+- 不读取私有 history、不改原型链、不复制 Pretty 渲染算法；RenderBridge 复用运行时 `createPromptEditorClass`。Pretty 0.7.0 的第三参数是 `boxed`，composition 从同一 Pretty 配置选择 `toolStyle` 并向已有 editor 的装饰透传 `boxed = toolStyle !== "claudecode"`；不能只改新 factory，留下 history-first editor 的旧圆角布局。
 - 装饰前检查 embedded status、border hooks 与可写 data methods。不支持时保留原编辑器并可诊断降级，不能破坏输入区。
 - 方法写入及 host setter 都可能部分成功后失败；回滚经正常 setter 恢复 factory/container/focus，原 factory 失效时尝试默认 editor。
 - 方法与 padding 状态恢复均须检查所有权，不覆盖后来插件。每 slot 只保留一个 live lease，退休 factory 释放 builder 并透传。

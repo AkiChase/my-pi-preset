@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@heyhuynhgiabuu/pi-pretty':
-        specifier: ^0.6.31
-        version: 0.6.31
+        specifier: ^0.7.0
+        version: 0.7.0
       croner:
         specifier: ^10.0.1
         version: 10.0.1
@@ -85,8 +85,8 @@ packages:
     cpu: [x64, arm64]
     os: [darwin, linux, win32, android]
 
-  '@heyhuynhgiabuu/pi-pretty@0.6.31':
-    resolution: {integrity: sha512-6QYtLFbA8RLEzkGr8xt5ig7Sh9lmofQqJoPJd443qhUsP5byNgjHDspY9iIb4syIDsTVJ2mXjP/gpC0pGPM5Kw==}
+  '@heyhuynhgiabuu/pi-pretty@0.7.0':
+    resolution: {integrity: sha512-op0Q6NbsIDP82bxJOHFaYqtWSGEk0SDgMmEHTx22b9mvnhiT+8jNty0moHqkz1DzEiJk4F9Jlg9qUKnRM+qd4w==}
     peerDependencies:
       '@earendil-works/pi-ai': '*'
       '@earendil-works/pi-coding-agent': '*'
@@ -420,7 +420,7 @@ snapshots:
       '@ff-labs/fff-bin-win32-arm64': 0.10.6
       '@ff-labs/fff-bin-win32-x64': 0.10.6
 
-  '@heyhuynhgiabuu/pi-pretty@0.6.31':
+  '@heyhuynhgiabuu/pi-pretty@0.7.0':
     dependencies:
       '@ff-labs/fff-node': 0.10.6
       '@shikijs/cli': 4.5.0

@@ -11,10 +11,15 @@ process.env.PI_CODING_AGENT_DIR = agentDir;
 process.env.PRETTY_CONFIG_DIR = agentDir;
 process.env.PRETTY_DISABLE_TOOLS = "read,bash,find,grep,ls";
 writeFileSync(join(agentDir, "pi-input-history.json"), JSON.stringify({ searchShortcut: "alt+r" }));
-writeFileSync(join(agentDir, "pi-pretty.json"), JSON.stringify({
-  workingIndicator: { text: ["PROTOTYPE-WORKING"], sessionAccent: false },
-  thinkingIndicator: { enabled: false },
-}));
+export function configurePretty(overrides = {}) {
+  writeFileSync(join(agentDir, "pi-pretty.json"), JSON.stringify({
+    theme: "one-dark-pro",
+    workingIndicator: { text: ["PROTOTYPE-WORKING"], sessionAccent: false },
+    thinkingIndicator: { enabled: false },
+    ...overrides,
+  }));
+}
+configurePretty();
 
 const sdkUrl = import.meta.resolve("@earendil-works/pi-coding-agent");
 const sdkRoot = resolve(dirname(fileURLToPath(sdkUrl)), "..");

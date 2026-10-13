@@ -486,6 +486,28 @@ const ONE = { "npm:pi-session-name": "latest" };
   console.log("PASS merge mode keeps undeclared keys in an extension config file");
 }
 
+// The preset's real Pretty declaration merges both visual preferences without
+// discarding machine-local options, and is idempotent on the second sync.
+{
+  const preset = JSON.parse(readFileSync(resolve(scriptDir, "..", "pi-preset.json"), "utf8"));
+  assert.deepEqual(preset.files["pi-pretty.json"], { theme: "one-dark-pro", toolStyle: "claudecode" });
+  const { status, fileTexts } = run({
+    manifest: {},
+    files: { "pi-pretty.json": preset.files["pi-pretty.json"] },
+    seedFiles: { "pi-pretty.json": JSON.stringify({ theme: "github-dark", icons: "none", toolStyle: "default" }) },
+    args: ["--sync", "files"],
+  });
+  assert.equal(status, 0);
+  const expected = { theme: "one-dark-pro", icons: "none", toolStyle: "claudecode" };
+  assert.deepEqual(JSON.parse(fileTexts["pi-pretty.json"]), expected);
+  const repeated = run({ manifest: {}, files: { "pi-pretty.json": preset.files["pi-pretty.json"] },
+    seedFiles: { "pi-pretty.json": JSON.stringify(expected) }, args: ["--sync", "files"] });
+  assert.equal(repeated.status, 0);
+  assert.deepEqual(JSON.parse(repeated.fileTexts["pi-pretty.json"]), expected);
+  assert.doesNotMatch(repeated.stderr, /set\s+files\s+pi-pretty/);
+  console.log("PASS preset Pretty theme/style merge and repeated sync");
+}
+
 // 25d. Prune mode reaches only declared files, and still respects preserve.
 //      A file the manifest never mentions is not even read.
 {

@@ -28,7 +28,7 @@ function canShadow(editor: object, key: string): boolean {
 }
 
 /** Keep the real editor, its receiver, subclass, history and editing state. */
-export function createDecorator(createPrompt: typeof createPromptEditorClass, diagnose: Diagnose = () => {}) {
+export function createDecorator(createPrompt: typeof createPromptEditorClass, diagnose: Diagnose = () => {}, boxed = true) {
   return (editor: CustomEditor, args: Args, color: (text: string) => string): Lease | undefined => {
     const existing = installed.get(editor);
     if (existing) return existing;
@@ -79,7 +79,7 @@ export function createDecorator(createPrompt: typeof createPromptEditorClass, di
     }
     const changed: typeof keys[number][] = [];
     try {
-      const Prompt = createPrompt(RenderBridge, color);
+      const Prompt = createPrompt(RenderBridge, color, boxed);
       let adapter: CustomEditor | undefined = new Prompt(...args);
       const replacements = {
         render(width: number) {
@@ -181,7 +181,7 @@ function createSlot(previous: Factory, build: ((...args: Args) => {
 }
 
 /** Local UI boundary used only by Pretty's start/shutdown handlers. */
-export function adaptPrettyLifecycle(pi: ExtensionAPI, createPrompt: typeof createPromptEditorClass): ExtensionAPI {
+export function adaptPrettyLifecycle(pi: ExtensionAPI, createPrompt: typeof createPromptEditorClass, boxed = true): ExtensionAPI {
   let slot: Slot | undefined;
   return new Proxy(pi, {
     get(target, property) {
@@ -228,7 +228,7 @@ export function adaptPrettyLifecycle(pi: ExtensionAPI, createPrompt: typeof crea
                   return;
                 }
                 const previous = unwrap(hostUi.getEditorComponent());
-                const decorate = createDecorator(createPrompt, diagnose);
+                const decorate = createDecorator(createPrompt, diagnose, boxed);
                 const current = createSlot(previous, (...args: Args) => {
                   const editor = previous?.(...args) ?? prettyFactory(...args);
                   const lease = previous ? decorate(editor as CustomEditor, args, (icon) => {
