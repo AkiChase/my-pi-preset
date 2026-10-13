@@ -17,6 +17,8 @@ export { runInChildSessionContext };
 // There is no `exports` field blocking the subpath today; if upstream adds one, this throws
 // loudly at load time rather than silently degrading.
 import pretty from "@heyhuynhgiabuu/pi-pretty/src/index.ts";
+import { createPromptEditorClass } from "@heyhuynhgiabuu/pi-pretty/src/prompt-editor.ts";
+import { adaptPrettyLifecycle } from "./pretty-compat/editor.ts";
 
 // Composition owner for process-tasks, agent-tasks and pi-pretty.
 // Shared waits, sources, panel and footer are composition-owned.
@@ -57,12 +59,15 @@ export default async function bashUnified(pi: ExtensionAPI): Promise<void> {
   pi.on("session_shutdown", async () => { await lifecycle.shutdown(); });
 
   await pretty(
-    interceptTool(pi, "bash", (tool) =>
-      pi.registerTool({
-        ...tool,
-        // Pretty replaces the snippet with its own, which drops the background-task hint.
-        promptSnippet: `${backgroundBash.promptSnippet ?? "Run shell commands"}. For text search: \`rg -n\`.`,
-      }),
+    adaptPrettyLifecycle(
+      interceptTool(pi, "bash", (tool) =>
+        pi.registerTool({
+          ...tool,
+          // Pretty replaces the snippet with its own, which drops the background-task hint.
+          promptSnippet: `${backgroundBash.promptSnippet ?? "Run shell commands"}. For text search: \`rg -n\`.`,
+        }),
+      ),
+      createPromptEditorClass,
     ),
     {
       sdk: {

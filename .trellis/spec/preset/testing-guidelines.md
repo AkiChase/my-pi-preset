@@ -47,6 +47,18 @@ node --test extensions/agent-tasks/__tests__/*.test.ts
 
 完整检查继续使用真实 SDK路径及临时 agent目录。`.npmrc` 禁止pnpm自动装peers，TypeBox本地开发解析与host运行提供分开；不可为了测试安装第二套SDK或读取个人配置。
 
+## Pretty 兼容验证
+
+[editor.test.ts](../../../extensions/pretty-compat/__tests__/editor.test.ts) 使用实际 SDK setter/reset、editor 与 Pretty，历史插件为独立离线 fixture，不依赖本机 input-history 安装。来源与范围见 [TESTING.md](../../../extensions/pretty-compat/TESTING.md)。定向执行不加 force-exit，验证自然退出：
+
+```sh
+node --test extensions/pretty-compat/__tests__/editor.test.ts
+```
+
+保留原实现 history-first 丢历史的红测与双顺序修复对照；覆盖安全降级、部分安装失败回滚、后来方法/padding/factory 所有权和 reset-before-shutdown。极窄 SDK/Pretty 既有错误须明确对照，不能跳过后宣称修复。
+
+真实插件/CLI 集成验证与离线 fixture 分开：在临时 agent-dir、cwd、session 中用真实 PTY，两个加载顺序验证 cold/new/reload、箭头历史及 Alt+R，禁止个人 auth/config 与模型网络请求。当前验证基于 SDK 1.1.0、Pretty 0.6.31、input-history 1.1.3 的 regular TUI；不能推定 fullscreen、任意 renderer 或未来版本均兼容。
+
 ## Representative Regression Evidence
 
 | Test | Contract to preserve |

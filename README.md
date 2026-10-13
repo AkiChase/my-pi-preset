@@ -388,6 +388,12 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 
 **做了什么更改**：组合加载本仓库的 process-tasks、agent-tasks 和 pretty；process-tasks 的 bash 只改执行，pretty 的 bash 只改渲染。先用 `Proxy` 截取进程后端的 `bash` 定义，再通过 pretty 的 `deps.sdk` 注入，最终只注册一个 `bash`。agent 后端在根会话注册工具，子会话 guard 避免再次注册 Agent/Workflow 或覆盖根 manager；两后端并未合并执行引擎。
 
+**输入历史兼容**：Pretty 安装输入框时，本仓库会先调用已有的 editor factory，在原实例上添加圆角边框和 `❯` 前缀，而不是重新建一个没有历史的 editor。`pi-input-history` 在 preset 之前或之后加载都不需要调整顺序；同目录跨 session 的 ↑/↓ 历史、Alt+R 搜索，以及原 editor 的输入和应用快捷键保留。冷启动、新建 session 和 reload 都走这个入口；没有已有 factory 时仍使用 Pretty 原生输入框。
+
+支持 SDK 的 embedded working status、边框 hooks 和可写 render/padding 方法的 editor 保留 Pretty 外观及状态指示。遇到缺少 hooks、只读方法等不能安全装饰的第三方 editor，会保留其原输入框并显示 `preset Pretty editor fallback` 警告，只放弃该输入框的 Pretty 装饰。cleanup 不覆盖后来插件的 render、padding 或 factory；host 安装失败时会经正常 setter 恢复旧 factory，旧 factory 也失效时退回默认输入框并提示（此时无法保证失效插件的历史）。这些兼容逻辑在 [`extensions/pretty-compat/editor.ts`](extensions/pretty-compat/editor.ts)，不是单独加载的扩展。
+
+当前对照验证基于 Pi SDK 1.1.0、Pretty 0.6.31 和 input-history 1.1.3，已在临时配置与 session 下用真实 CLI 验证两种加载顺序的冷启动、`/new`、`/reload`，以及 ↑/↓ 和 Alt+R 搜索接受/取消。该端到端验证使用 regular TUI，不代表 fullscreen 和任意第三方 editor 都已覆盖。自定义 renderer 不委托 SDK hooks 时，无法保证能显示 Pretty 前缀；极窄终端下单列中文递归溢出、聚焦光标越界是 SDK/Pretty 原有边界，本修复未处理；复杂异步补全仍需单独确认。
+
 两个实现细节：pretty 会用自己的 `promptSnippet` 覆盖 patty 的，模型会看不到后台任务提示，所以这里把那句补回去；patty 哪天改了入口、不再注册 `bash`，扩展会直接抛错，不静默退回 pi 原生 bash。
 
 **和 vendor 目录的关系**：两个后端都作为库由 composition import，不能另被 pi 自动发现。尤其 `extensions/process-tasks/index.ts` 再次加载会重复注册 bash/jobs/monitor 和快捷键；agent 后端也不能另装 standalone 包。挡住 nested discovery 的是 [`package.json`](package.json) 的 `pi.extensions` 声明（只列 `extensions/*.ts`），见 [添加扩展](#添加扩展)。
@@ -651,6 +657,8 @@ Agent backend 实际清理可定向运行 `node --test extensions/agent-tasks/__
 开发回归补充：`node --test extensions/agent-tasks/__tests__/{auxiliary-lifecycle,tool-waits,workflow}.test.ts extensions/task-ui/__tests__/sdk-runtime.test.ts`（同样使用临时 `PI_CODING_AGENT_DIR`、实际 SDK、无 force-exit）。实际 clone 只替换 loader/create 输入，执行 reload/create/prompt/abort/local dispose；scheduler 用 typed timer seam 和真实临时 ScheduleStore，检查旧 interval/once/cron 与 startup/finalize 不串新 binding。SDK runtime 与 reload 同时绑定真实 process/agent 及同一 coordinator/protocol；busy/paused worker、迟到 host gate、CLI workflow、保留 child extension interval、旧 RPC/tool/input 均走实际路径，无模型／网络／真实 git／安装／SDK 写入。非协作第三方 provider／create／shutdown hook 按上述协作式取消边界处理，测试不能声称已强制终止其内部执行；核心共享 UI 和 Down 已通过实际 SDK 编辑器离线测试及隔离真实 Pi PTY 核心冒烟。
 
 另以临时 HOME／agent-dir／cwd／sessions 直接加载当前检出的真实 Pi CLI，运行 140×40 PTY 核心冒烟：无任务／非空 Down、前台-only 开面板、查看／Esc 不解除等待、转后台保持 PID、x 停实际进程、子 agent 排队／即时详情、workflow 默认展开／子详情／整组停止、monitor 输出、`/new` 清理和正常 `/quit`。子 agent 使用 SDK 原生 faux 离线脚本响应，实际创建会话并执行本地 bash；workflow 使用真实 worker。没有在线模型请求，也没有改个人配置或安装。此烟测不覆盖模型自主质量、任意第三方插件／终端尺寸或全部 provider／worktree 场景。
+
+Pretty 兼容回归用实际 SDK setter/reset、CustomEditor 和 Pretty 渲染，但 history 插件使用独立编写的离线 fixture，不读取本机安装的 `pi-input-history`。来源与测试范围见 [`extensions/pretty-compat/TESTING.md`](extensions/pretty-compat/TESTING.md)。可运行 `node --test extensions/pretty-compat/__tests__/editor.test.ts`（不加 `--test-force-exit`）检查退出及生命周期清理。全量 `pnpm check` 前请把 `PI_CODING_AGENT_DIR` 指到 `mktemp -d` 创建的临时目录，同时用 `PI_SDK_DIR` 指向实际 SDK 的 `node_modules`，结束后删除临时目录；部分既有测试仍调用默认配置 loader，不能仅依赖测试自身隔离。
 
 扩展 import 的 `@earendil-works/*`（pi 自己的 SDK）是 peer 依赖，运行时由 pi 提供，所以不装。类型检查和测试前会先跑 [`scripts/link-pi-sdk.mjs`](scripts/link-pi-sdk.mjs)，它在本机 pi 安装里找到这套 SDK 并软链进 `node_modules/`——类型因此永远对着真正加载这些代码的那个 pi 版本。`pnpm install` 之后链接可能被清掉，跑 `pnpm link-sdk` 重建即可；pi 装在别处时用 `PI_SDK_DIR` 或 `PI_BIN` 指过去。
 
