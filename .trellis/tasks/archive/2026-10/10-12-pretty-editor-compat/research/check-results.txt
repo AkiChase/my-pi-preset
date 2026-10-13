@@ -1,0 +1,615 @@
+
+> my-pi-preset@0.1.0 check /Users/jyxc-dz-0101322/tools/my-pi-preset-pretty-editor-compat
+> pnpm run typecheck && pnpm run test
+
+
+> my-pi-preset@0.1.0 typecheck /Users/jyxc-dz-0101322/tools/my-pi-preset-pretty-editor-compat
+> node scripts/link-pi-sdk.mjs && tsc -p tsconfig.json
+
+[2m[link-pi-sdk][0m linked 0 new of 8 @earendil-works/* packages from /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.1.0/node_modules
+
+> my-pi-preset@0.1.0 test /Users/jyxc-dz-0101322/tools/my-pi-preset-pretty-editor-compat
+> node scripts/link-pi-sdk.mjs && node --test --test-force-exit "extensions/**/__tests__/*.test.ts" "scripts/*.test.mjs"
+
+[2m[link-pi-sdk][0m linked 0 new of 8 @earendil-works/* packages from /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.1.0/node_modules
+▶ watchPrompts
+  ✔ brackets a prompt with one block and one release (2.071416ms)
+  ✔ labels a titleless questionnaire from the ask-user payload (0.249416ms)
+  ✔ does not reuse a stale ask-user label for the next prompt (0.161625ms)
+  ✔ ignores an unpaired end so a host is not released twice (0.104625ms)
+  ✔ releases a prompt still open at shutdown (0.111042ms)
+  ✔ keeps going when one sink throws (0.136042ms)
+✔ watchPrompts (3.895667ms)
+▶ herdr sink
+  ✔ emits the blocked pair herdr counts on (0.10825ms)
+✔ herdr sink (0.164125ms)
+▶ cmux sink
+  ✔ skips the kinds cmux already patches (4.824916ms)
+  ✔ notifies for a questionnaire and dismisses it by id (0.548667ms)
+  ✔ dismisses an id that arrives after the answer (0.145125ms)
+  ✔ stays quiet when no notification was posted (0.095833ms)
+✔ cmux sink (5.803125ms)
+▶ host detection
+  ✔ requires herdr's full pane environment (0.116709ms)
+  ✔ needs cmux's socket, workspace and bundled cli, and honors its opt-out (0.086792ms)
+✔ host detection (0.275375ms)
+▶ label helpers
+  ✔ flattens and truncates (0.161542ms)
+  ✔ falls back from header to question text, and ignores the other questions (0.086458ms)
+  ✔ prefers a prompt title over the ask-user label (0.144958ms)
+✔ label helpers (0.512292ms)
+▶ bash_bg — timeout kill is loud
+  ✔ marks the log AND sends a killed notification (1614.277875ms)
+✔ bash_bg — timeout kill is loud (1615.714209ms)
+▶ bash tool — Claude Code tool-result strings
+  ✔ run_in_background returns the generic CC string (no Name fragment) (5.382292ms)
+  ✔ manual background (Ctrl+Shift+B) returns the manual CC string (2015.0855ms)
+  ✔ timeout auto-background returns the same generic CC string (2003.884083ms)
+  ✔ timeout kill (auto-background not allowed) appends 'Command timed out after Ns' to the log (1003.935792ms)
+  ✔ an external signal death is reported as killed ('was stopped'), never completed (303.195541ms)
+✔ bash tool — Claude Code tool-result strings (5332.38475ms)
+▶ bash foreground — Claude Code parity on turn abort
+  ✔ a genuine cancel (Esc) KILLS the foreground command (605.767041ms)
+  ✔ a backgrounding pause (steering / Ctrl+Shift+B) SURVIVES the abort (602.693416ms)
+✔ bash foreground — Claude Code parity on turn abort (1209.526ms)
+▶ commands
+  ✔ /bg-version reports the loaded package version and path (1.086125ms)
+✔ commands (1.551708ms)
+▶ formatConfigReport
+  ✔ says so plainly when nothing is overridden (0.1295ms)
+  ✔ lists only the overridden keys, with their defaults (0.079125ms)
+  ✔ surfaces load warnings (0.075625ms)
+✔ formatConfigReport (0.350125ms)
+▶ loadConfig — no file
+  ✔ returns the defaults with no warnings (2.339584ms)
+✔ loadConfig — no file (2.558625ms)
+▶ loadConfig — valid file
+  ✔ overrides only the keys present (6.085709ms)
+  ✔ accepts a single shortcut key as a string (1.899667ms)
+  ✔ accepts a list of shortcut keys (1.844667ms)
+  ✔ treats "off" as an explicit unbind (2.405625ms)
+  ✔ expands a leading ~ in logDir (1.374417ms)
+  ✔ rounds a fractional number rather than passing it downstream (1.92075ms)
+✔ loadConfig — valid file (15.791833ms)
+▶ loadConfig — malformed input never throws
+  ✔ ignores a file that is not JSON (1.335917ms)
+  ✔ ignores a JSON file that is not an object (2.461417ms)
+  ✔ reports a non-ENOENT read failure (3.526542ms)
+  ✔ falls back and warns on a non-numeric number (1.489458ms)
+  ✔ falls back and warns on an out-of-range number (0.780584ms)
+  ✔ falls back and warns on a shortcut of the wrong type (2.919625ms)
+  ✔ skips non-string entries inside a shortcut list (1.075125ms)
+  ✔ falls back and warns on an empty logDir (1.332208ms)
+  ✔ warns about an unknown key — a typo is silence otherwise (0.593875ms)
+  ✔ uses 30s by default, preserves explicit values/zero and environment precedence without writes (2.639417ms)
+✔ loadConfig — malformed input never throws (18.570916ms)
+▶ loadConfig — environment overrides
+  ✔ derives the variable name from the key (0.046958ms)
+  ✔ takes precedence over the file (0.767375ms)
+  ✔ applies without a file (0.306083ms)
+  ✔ warns and keeps the file value when the variable is invalid (0.510416ms)
+  ✔ can unbind a shortcut (0.338416ms)
+✔ loadConfig — environment overrides (2.090291ms)
+▶ DEFAULTS
+  ✔ is frozen so a caller cannot change the fallbacks (0.032209ms)
+✔ DEFAULTS (0.055458ms)
+▶ readTailLines
+  ✔ returns the last N non-empty lines (4.329458ms)
+  ✔ drops blank lines so the budget is spent on content (2.461ms)
+  ✔ strips ANSI colour and collapses \r progress redraws (2.242167ms)
+  ✔ returns '' for an empty file (2.683875ms)
+  ✔ returns '' for a missing file rather than throwing (0.167459ms)
+  ✔ honours the char bound, keeping the END of a huge log (1.25525ms)
+✔ readTailLines (13.801125ms)
+▶ failureTail
+  ✔ is empty for a completed job — success costs no context (1.022833ms)
+  ✔ carries the log tail for a failed job (1.731792ms)
+  ✔ carries the log tail for a signal death (killed) (1.341042ms)
+  ✔ says '(no output)' when a job failed having printed nothing (0.1435ms)
+✔ failureTail (4.581583ms)
+▶ buildTaskNotification — the tail block
+  ✔ omits the block when there is no tail (0.080583ms)
+  ✔ passes the tail through verbatim — no escaping to undo (0.106541ms)
+✔ buildTaskNotification — the tail block (0.250458ms)
+▶ sendTaskNotification — failure carries its own output
+  ✔ inlines the tail in both the text and details (1.701417ms)
+  ✔ sends no tail for a completed job (0.354708ms)
+✔ sendTaskNotification — failure carries its own output (2.118333ms)
+▶ bash_bg --name 라벨
+  ✔ formatJobLine은 이름 있는 잡에 대해 'name (job-id)' 헤더 사용 (1.10925ms)
+  ✔ 이름 없는 잡은 job-id만 (0.075416ms)
+✔ bash_bg --name 라벨 (2.091708ms)
+▶ jobs.search 정규식 검색
+  ✔ 여러 잡 로그에서 정규식 매치 (5.197958ms)
+✔ jobs.search 정규식 검색 (5.2475ms)
+▶ metadata expiry
+  ✔ 실행 중 잡은 보존, 종료된 잡은 제거 (3.742458ms)
+✔ metadata expiry (3.826292ms)
+▶ jobs.stats
+  ✔ 집계 정확성 (0.476417ms)
+✔ jobs.stats (0.604834ms)
+▶ killProcessTree + processExists 안전성
+  ✔ 잘못된 PID에서 throw하지 않음 (0.602709ms)
+✔ killProcessTree + processExists 안전성 (0.698916ms)
+▶ add/sweep lifecycle
+  ✔ 중복 add는 멱등하지 않음 (counter 누적) (0.079375ms)
+  ✔ an expired ID can be re-registered (0.058ms)
+✔ add/sweep lifecycle (0.180875ms)
+▶ formatDuration
+  ✔ sub-second rounds to 0s (0.99925ms)
+  ✔ seconds only (0.151583ms)
+  ✔ minutes + seconds (0.218084ms)
+✔ formatDuration (2.820833ms)
+▶ truncateTail
+  ✔ returns as-is when within maxChars (0.141792ms)
+  ✔ adds marker + tail when over maxChars (0.245208ms)
+✔ truncateTail (0.578459ms)
+▶ statusLabel
+  ✔ running + backgrounded (0.214625ms)
+  ✔ running + foreground (0.064333ms)
+  ✔ completed (0.046958ms)
+  ✔ failed (0.039084ms)
+  ✔ killed (0.062833ms)
+✔ statusLabel (1.538167ms)
+✔ statusLabel distinguishes foreground and background (0.049875ms)
+▶ oneLine
+  ✔ collapses whitespace runs and trims (0.068625ms)
+✔ oneLine (0.092083ms)
+▶ describeJob
+  ✔ prefers the job name (0.410708ms)
+  ✔ falls back to the command, collapsed to one line (0.109125ms)
+  ✔ truncates a long command (0.07725ms)
+✔ describeJob (0.759292ms)
+▶ formatJobLine
+  ✔ running jobs show duration (0.247584ms)
+  ✔ shows the duration exactly once (0.167375ms)
+  ✔ collapses a multi-line command to one line (0.07575ms)
+  ✔ named jobs show the name first (0.092417ms)
+  ✔ terminal jobs render their status label (0.067042ms)
+  ✔ failed terminal jobs render the failed label (0.093167ms)
+  ✔ running jobs show the bg label (0.062791ms)
+✔ formatJobLine (0.938958ms)
+▶ background hint
+  ✔ names the command, its elapsed time, and the chord (0.83475ms)
+  ✔ collapses a multi-line command onto one row (0.086709ms)
+  ✔ lists every hinted command and pluralises the chord line (0.075708ms)
+  ✔ advertises the configured chord, not the default (0.064167ms)
+  ✔ falls back to /bg when the chord is unbound (0.061167ms)
+  ✔ stays up until the last parallel command is gone (0.101875ms)
+  ✔ a repeated show does not rewrite an unchanged widget (0.049833ms)
+  ✔ clear is a no-op when nothing is shown (0.037209ms)
+  ✔ a dropped slot retires the hint even with no clear call (0.062458ms)
+  ✔ ignores a slot that has not passed the quick window (0.076375ms)
+✔ background hint (2.079458ms)
+▶ session_start — registry is born empty (no revival)
+  ✔ ignores a stale persisted state entry entirely (1.267ms)
+  ✔ session replacement stops old tasks and starts an empty registry (239.361167ms)
+✔ session_start — registry is born empty (no revival) (241.263125ms)
+▶ session_shutdown — kills running tasks on ANY reason
+  ✔ reason "quit" kills running tasks silently (237.420958ms)
+  ✔ reason "reload" kills running tasks silently (240.728916ms)
+✔ session_shutdown — kills running tasks on ANY reason (478.332541ms)
+✔ AC10: monitor progress and terminal renderer show identity/state/log/omissions, width/control safe (2.55325ms)
+▶ input steering (cooperative scheduler)
+  ✔ aborts the turn, backgrounds the job, and resubmits the message as a followUp (1.086541ms)
+  ✔ second input while still active does not double-background or double-resubmit (0.101833ms)
+  ✔ returns continue when no cooperative foreground task is active (0.0505ms)
+  ✔ ignores extension-sourced input (recursion guard) (0.053375ms)
+✔ input steering (cooperative scheduler) (1.823083ms)
+▶ readLogSlice
+  ✔ returns the tail when no offset is given (2.315042ms)
+  ✔ reads an interior range — the part upstream could not reach (0.459042ms)
+  ✔ clamps a range that runs past the end (1.404666ms)
+  ✔ clamps an offset beyond EOF to an empty slice, not an error (0.498208ms)
+  ✔ returns undefined for a missing or empty log (0.430708ms)
+✔ readLogSlice (5.564708ms)
+▶ jobs output — paging
+  ✔ defaults to the tail and says which bytes it showed (1.5945ms)
+  ✔ names the offset to continue from when more remains (0.841125ms)
+  ✔ flags the bytes it skipped so a tail cannot read as the whole log (0.9365ms)
+  ✔ pages the whole log without overlap or gaps (1.248667ms)
+  ✔ says so plainly when the offset lands past the end (0.576833ms)
+✔ jobs output — paging (5.383125ms)
+▶ jobs — required parameters
+  ✔ names the action and the missing parameter (0.405292ms)
+✔ jobs — required parameters (0.447625ms)
+▶ jobs search — scope, case, context
+  ✔ scans every job by default (6.445625ms)
+  ✔ limits the scan to one job when given a jobId (1.948833ms)
+  ✔ errors on an unknown jobId instead of silently scanning everything (0.154416ms)
+  ✔ is case-sensitive by default and case-insensitive on request (3.003417ms)
+  ✔ shows context lines in grep's :/- convention (0.840542ms)
+  ✔ omits context lines that do not exist at the file edges (0.98625ms)
+  ✔ counts every match even when context is on and display is capped (1.279ms)
+  ✔ still reports a context-free search in one line per hit (0.771458ms)
+✔ jobs search — scope, case, context (15.660292ms)
+▶ jobs kill — CC's TaskStopTool
+  ✔ returns the exact CC success string and suppresses the notification (3.297292ms)
+  ✔ unknown id errors with CC's exact string (0.318541ms)
+✔ jobs kill — CC's TaskStopTool (4.121959ms)
+▶ jobs output — a read surfaces the outcome
+  ✔ marks a terminal job surfaced on read (1.108ms)
+  ✔ does NOT mark a still-running job (peek) (2.944ms)
+  ✔ unknown id errors with CC's exact string (0.174917ms)
+✔ jobs output — a read surfaces the outcome (4.345833ms)
+▶ jobs list — retained metadata
+  ✔ lists surfaced terminal records without eviction or duplicates (1.375667ms)
+  ✔ lists a terminal job whose outcome never reached the agent (0.701166ms)
+✔ jobs list — retained metadata (2.153084ms)
+▶ jobs attach — suppression is scoped to the wait
+  ✔ an aborted attach leaves the job able to notify later (0.743458ms)
+  ✔ two concurrent attaches do not cancel each other's suppression (0.842417ms)
+✔ jobs attach — suppression is scoped to the wait (1.642708ms)
+▶ processExists
+  ✔ the current process is alive (0.424ms)
+  ✔ PID 0 is treated as dead (0.039375ms)
+  ✔ a negative PID is treated as dead (0.030625ms)
+  ✔ undefined is treated as dead (0.028083ms)
+✔ processExists (1.043459ms)
+▶ killProcessTree
+  ✔ PID 0 / negative / undefined are no-ops (0.103958ms)
+✔ killProcessTree (0.13825ms)
+▶ statusFromExit
+  ✔ 0 → completed (0.072042ms)
+  ✔ 1 → failed (0.039916ms)
+  ✔ a signal death → killed (external kill, OOM — never completed) (0.051208ms)
+  ✔ a signal wins over a code (0.036917ms)
+  ✔ null without a signal → failed (the spawn-error path passes code 1) (0.069167ms)
+  ✔ undefined → failed (0.03025ms)
+✔ statusFromExit (0.390667ms)
+▶ markTerminal idempotency
+  ✔ a second call after completion is ignored (0.103917ms)
+  ✔ killed → killed (0.027667ms)
+✔ markTerminal idempotency (0.161792ms)
+▶ ensureCompletionPromise
+  ✔ creates donePromise resolvable via resolveDone (0.069083ms)
+✔ ensureCompletionPromise (0.088292ms)
+▶ markKilledSilently
+  ✔ status=killed, outcome marked surfaced (0.034792ms)
+✔ markKilledSilently (0.051166ms)
+▶ createJobAbort / abortJob
+  ✔ registers a controller and is idempotent (0.040625ms)
+  ✔ abortJob aborts the signal and removes the controller (0.074ms)
+  ✔ abortJob on an unknown job is a no-op (0.017958ms)
+✔ createJobAbort / abortJob (0.168625ms)
+▶ BackgroundRegistry defaults
+  ✔ initializes default fields (0.023292ms)
+✔ BackgroundRegistry defaults (0.038667ms)
+▶ backgroundActiveForeground
+  ✔ manual background pauses the slot and toasts — no synthetic agent message (0.135ms)
+✔ backgroundActiveForeground (0.155ms)
+✔ AC12/15: bounded prefix, exact whole/truncated omission counts survive rebatching (1.232708ms)
+✔ AC12/15: characters include newlines; empty lines capped; surrogate pairs not split (1.214958ms)
+✔ AC4/12/19: independent UTF-8 decoders and bounded partials only produce activity at newline (2.594584ms)
+✔ AC12/15: once a prefix is truncated, later small lines/fragments cannot fill its gap (0.115542ms)
+✔ AC12: empty WS preview plus Unicode at zero budget matches direct prefix and omission counts (0.111542ms)
+[bg-tasks] monitor notification failed: Error: sink unavailable
+    at Object.sendMessage (file:///Users/jyxc-dz-0101322/tools/my-pi-preset-pretty-editor-compat/extensions/bg-tasks/__tests__/monitor-session.test.ts:43:83)
+    at emit (file:///Users/jyxc-dz-0101322/tools/my-pi-preset-pretty-editor-compat/extensions/bg-tasks/monitor-session.ts:53:16)
+    at decide (file:///Users/jyxc-dz-0101322/tools/my-pi-preset-pretty-editor-compat/extensions/bg-tasks/monitor-session.ts:91:13)
+    at Object.event (file:///Users/jyxc-dz-0101322/tools/my-pi-preset-pretty-editor-compat/extensions/bg-tasks/monitor-session.ts:116:13)
+    at Object.emit (file:///Users/jyxc-dz-0101322/tools/my-pi-preset-pretty-editor-compat/extensions/bg-tasks/__tests__/monitor-session.test.ts:60:39)
+    at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset-pretty-editor-compat/extensions/bg-tasks/__tests__/monitor-session.test.ts:164:53)
+    at Test.runInAsyncScope (node:async_hooks:228:14)
+    at Test.run (node:internal/test_runner/test:1118:25)
+    at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+    at Test.postRun (node:internal/test_runner/test:1247:19)
+[bg-tasks] task notification failed: Error: sink unavailable
+    at Object.sendMessage (file:///Users/jyxc-dz-0101322/tools/my-pi-preset-pretty-editor-compat/extensions/bg-tasks/__tests__/monitor-session.test.ts:43:83)
+    at sendTaskNotification (file:///Users/jyxc-dz-0101322/tools/my-pi-preset-pretty-editor-compat/extensions/bg-tasks/notify.ts:187:12)
+    at finish (file:///Users/jyxc-dz-0101322/tools/my-pi-preset-pretty-editor-compat/extensions/bg-tasks/monitor-session.ts:67:9)
+    at Object.onExit (file:///Users/jyxc-dz-0101322/tools/my-pi-preset-pretty-editor-compat/extensions/bg-tasks/monitor-session.ts:135:17)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset-pretty-editor-compat/extensions/bg-tasks/lifecycle.ts:74:22
+✔ AC2/3/10: immediate first, minimum 30s, quiet arrival immediate, no passive/empty messages (4.261708ms)
+✔ AC3/13: no silence wake or implicit old deadline (0.730541ms)
+✔ AC4/5/6/7/18: startup silence once, two immediate recoveries, arrival resets silence not status/latch (0.680333ms)
+✔ AC8: same-point absent consumes pending instead of ordinary progress (0.658083ms)
+✔ AC6: ordinary interval restarts at recovery submission (0.583166ms)
+✔ AC9/10: completed combines pending/final once with no repeated failure tail or late timers (0.789666ms)
+✔ AC9/10: failed combines pending/final once with no repeated failure tail or late timers (0.574459ms)
+✔ AC9/10: killed combines pending/final once with no repeated failure tail or late timers (0.572541ms)
+✔ AC9/18: shared panel/jobs stop and session abort suppress pending/final and clean resources (0.535875ms)
+✔ AC14: total deadline wins over silence/progress, drains into one reason terminal (0.681458ms)
+✔ AC11/14: huge finite deadlines/silence are chunked, not Node 1ms overflow (0.547791ms)
+✔ AC15/4: firehose never rate-kills, bounded previews, omitted activity resets silence (0.743417ms)
+✔ AC17: shared maxLogBytes check owns one combined wake, no adjacent passive warning (0.917667ms)
+✔ AC9/17: attach/outcome suppression keeps terminal output from being re-sent (0.711459ms)
+✔ send failure never kills source or marks outcome surfaced (1.718708ms)
+✔ AC9: known finishing prevents same-point timer/final-read leading-edge emission (0.542417ms)
+✔ AC2: zero interval still sends a whole source callback batch, not individual lines (0.501917ms)
+✔ AC18: viewing/closing panel leaves monitor scheduling alone; panel x and jobs kill are silent (3.9435ms)
+✔ AC18: jobs kill of active monitor with pending/silence timer uses the same silent boundary (0.89375ms)
+✔ AC18: replacement registry ignores old callbacks and abort releases source/timer (0.735042ms)
+✔ AC9/14/17: deadline failure to submit never latches outcome surfaced (0.935ms)
+✔ AC9/14/17: deadline terminal obeys attach suppression without marking outcome (0.7315ms)
+✔ AC9/14/17: oversize failure to submit never latches outcome surfaced (0.501791ms)
+✔ AC9/14/17: oversize terminal obeys attach suppression without marking outcome (0.526ms)
+✔ AC10: null send failures isolate progress, reminder, recovery and terminal (0.870375ms)
+✔ AC9/10/14/17: deadline with null sink failure still stops and cleans without latching success (0.570292ms)
+✔ AC9/10/14/17: oversize with null sink failure still stops and cleans without latching success (0.460458ms)
+✔ AC10: undefined send failures isolate progress, reminder, recovery and terminal (0.525209ms)
+✔ AC9/10/14/17: deadline with undefined sink failure still stops and cleans without latching success (0.503042ms)
+✔ AC9/10/14/17: oversize with undefined sink failure still stops and cleans without latching success (0.469875ms)
+✔ AC18: startup UI failure cleans source, abort/timers and completion hooks; late callbacks are inert (0.746708ms)
+✔ AC10: command receive path stays alive across null progress failure and preserves both raw streams (1.358667ms)
+✔ AC10: command receive path stays alive across undefined progress failure and preserves both raw streams (0.663584ms)
+✔ AC12/19: raw merged log, stderr activity, exit zero completed: printf 'OUT\n'; printf 'ERR\n' >&2 (17.249625ms)
+✔ AC12/19: raw merged log, stderr activity, exit zero completed: printf 'ERR\n' >&2 (8.475333ms)
+✔ AC19: user pipe semantics preserved: { printf 'drop-out\nkeep-out\n'; printf 'drop-err\nkeep-err\n' >&2; } | grep keep (10.533416ms)
+✔ AC19: user pipe semantics preserved: { printf 'drop-out\nkeep-out\n'; printf 'drop-err\nkeep-err\n' >&2; } 2>&1 | grep keep (12.987666ms)
+✔ AC19: explicit separate redirects remain separate (7.722334ms)
+✔ AC9/12: exit boundary synchronously drains both pipes, EOF first=true (2.411792ms)
+✔ AC9/12: exit boundary synchronously drains both pipes, EOF first=false (1.431625ms)
+✔ AC12: descendant-held pipes do not keep the monitor alive after main shell exit (6.788458ms)
+✔ AC9: pipe error fails once and destroys both streams (1.322125ms)
+✔ AC12: incomplete UTF-8 is logged as raw bytes and explicitly noted at exit boundary (2.014833ms)
+✔ AC12/19: huge raw dual-stream output stays on disk even when source previews omit it (8.039917ms)
+✔ raw log writer handles short writes; write failure is contained and closes both pipes (7.058083ms)
+▶ monitor tool — validation
+  ✔ rejects when neither command nor ws is given (1.0165ms)
+  ✔ rejects when both command and ws are given (0.157333ms)
+  ✔ rejects a blank description (0.108625ms)
+✔ monitor tool — validation (1.909333ms)
+▶ monitor tool — command lifecycle
+  ✔ streams lines live, and sends one terminal notification (306.341375ms)
+✔ monitor tool — command lifecycle (306.449166ms)
+▶ monitor — split spawn output
+  ✔ writes stdout and stderr to separate files when errPath is set (4.025083ms)
+✔ monitor — split spawn output (4.116083ms)
+▶ monitor — ws source mapping
+  ✔ appends text frames and a binary placeholder to the log (0.780167ms)
+✔ monitor — ws source mapping (0.964666ms)
+✔ AC11: timeout_ms=0 rejected before WS construction or registry insertion (0.188208ms)
+✔ AC11: timeout_ms=-1 rejected before WS construction or registry insertion (0.094833ms)
+✔ AC11: timeout_ms=NaN rejected before WS construction or registry insertion (0.128291ms)
+✔ AC11: timeout_ms=Infinity rejected before WS construction or registry insertion (0.083792ms)
+✔ AC11: wake_absent_ms=0 rejected before WS construction or registry insertion (0.100375ms)
+✔ AC11: wake_absent_ms=-1 rejected before WS construction or registry insertion (0.106875ms)
+✔ AC11: wake_absent_ms=NaN rejected before WS construction or registry insertion (0.067875ms)
+✔ AC11: wake_absent_ms=Infinity rejected before WS construction or registry insertion (0.055541ms)
+✔ AC16: tool schema has optional timeout/silence and no persistent (0.063334ms)
+✔ source constructor failure rolls back started count and registry (0.716541ms)
+✔ AC4/5/6/12/19: WS empty/multiline/omitted messages each reset activity; diagnostics and late messages don't recover (1.309125ms)
+✔ AC17/19: real stderr-only source exceeds shared log cap, stops with one combined terminal (84.342125ms)
+✔ AC18: tool startup sidebar failure closes WS/log fd and rolls back all runtime registration (0.958584ms)
+▶ looksLikePrompt — CC prompt patterns
+  ✔ matches the interactive-prompt set on the last line (0.592375ms)
+  ✔ stays silent on ordinary output (merely-slow commands) (0.056ms)
+✔ looksLikePrompt — CC prompt patterns (1.140917ms)
+▶ watchStalls — 45s latch (fake timers)
+  ✔ fires once after 45s of zero growth on a prompt-like tail, then latches (3.742666ms)
+  ✔ uses the job name as the description when set (1.284084ms)
+  ✔ stays silent on a merely-slow command (no prompt pattern) (1.491875ms)
+  ✔ output growth resets the stall clock (2.199625ms)
+✔ watchStalls — 45s latch (fake timers) (9.117167ms)
+▶ buildTaskNotification — compact text
+  ✔ is two lines for an outcome with no tail (0.391041ms)
+  ✔ omits the status segment when there is none (stall warning) (0.059625ms)
+  ✔ does not escape anything — there is no markup left to break (0.045416ms)
+  ✔ delimits the tail so log text cannot read as our own (0.038083ms)
+✔ buildTaskNotification — compact text (1.027708ms)
+▶ completionSummary — CC's exact strings
+  ✔ bash completed with an exit code (0.13225ms)
+  ✔ bash completed without an exit code omits the suffix (0.032167ms)
+  ✔ bash failed (0.031458ms)
+  ✔ bash killed (0.050084ms)
+  ✔ uses the job name as {desc} when set (0.043333ms)
+  ✔ monitor summaries (0.064875ms)
+✔ completionSummary — CC's exact strings (0.458333ms)
+▶ sendTaskNotification — exactly-once + retention
+  ✔ sends compact text with steer delivery without evicting the job (0.709458ms)
+  ✔ latches exactly-once: a second send is a no-op (0.046875ms)
+  ✔ kill suppression: a pre-latched job is skipped (and not evicted) (0.037917ms)
+  ✔ the monitor's pre-transition send retains its record (0.052667ms)
+  ✔ a failed send strands the job: unsurfaced, listed, and reason recorded (0.061667ms)
+  ✔ skips the send while a jobs attach is waiting, without surfacing (0.039125ms)
+✔ sendTaskNotification — exactly-once + retention (1.017834ms)
+▶ completeJob — exit-path notification
+  ✔ terminal transition releases hooks and freezes counters even when send fails (0.2785ms)
+  ✔ sends the <task-notification> the moment the job exits (0.062625ms)
+  ✔ a job read before exit exits silently and lingers (0.037916ms)
+  ✔ notification "self": the monitor already sent, so this retains silently (0.045666ms)
+  ✔ notification "self" whose send failed keeps the job listed (0.035625ms)
+  ✔ notification "suppressed" + FAILED stays listed instead of vanishing (0.035792ms)
+  ✔ notification "suppressed" + completed retains without notification (0.032834ms)
+✔ completeJob — exit-path notification (0.597834ms)
+✔ terminal null submission failure stays unsurfaced; a later successful call clears error and latches once (0.193625ms)
+✔ terminal undefined submission failure stays unsurfaced; a later successful call clears error and latches once (0.040625ms)
+▶ readBoundedTail
+  ✔ reads small file entirely (4.881583ms)
+  ✔ truncates large file to tail (0.964083ms)
+  ✔ returns fallback for missing file (0.220083ms)
+✔ readBoundedTail (6.697ms)
+▶ pollFileTail
+  ✔ calls onUpdate when file grows (402.669791ms)
+✔ pollFileTail (402.961542ms)
+▶ readLastLine — live progress source
+  ✔ returns the last non-empty line (1.737666ms)
+  ✔ ignores trailing blank lines (0.43475ms)
+  ✔ strips ANSI colour codes but keeps literal brackets (JSON) (0.34275ms)
+  ✔ collapses a carriage-return progress bar to its final segment (0.347584ms)
+  ✔ strips OSC sequences, tabs, and stray control chars (no escape injection) (0.493667ms)
+  ✔ returns empty string when there is no output yet (0.278792ms)
+  ✔ returns empty string for a missing file (0.0885ms)
+✔ readLastLine — live progress source (4.4885ms)
+▶ renderSidebar — footer only
+  ✔ counts background shell and monitor separately, excludes foreground and terminal (0.381916ms)
+  ✔ foreground-only work does not appear in the footer (0.5745ms)
+✔ renderSidebar — footer only (1.028292ms)
+▶ registry IDs and lookup
+  ✔ uses random typed IDs and resolves only retained records (0.729584ms)
+✔ registry IDs and lookup (1.199833ms)
+▶ terminal transitions own lifetime counters
+  ✔ completed is counted once and time freezes at the first transition (0.143916ms)
+  ✔ failed is counted once and time freezes at the first transition (0.037875ms)
+  ✔ killed is counted once and time freezes at the first transition (0.034791ms)
+  ✔ silent kill followed by late exit cannot double-count or overwrite endedAt (0.134084ms)
+  ✔ foreground entries do not affect background lifetime metrics (0.033625ms)
+✔ terminal transitions own lifetime counters (0.478875ms)
+▶ age-based metadata sweep
+  ✔ expires all terminal statuses after ten minutes, never live jobs or log files (2.684958ms)
+  ✔ sweeps every sixty seconds and releases the timer idempotently (0.504875ms)
+✔ age-based metadata sweep (3.319334ms)
+▶ registerShortcuts
+  ✔ binds only the two default chords (0.922334ms)
+  ✔ never binds ctrl+b — pi owns it for cursor-left (0.070542ms)
+  ✔ honours a remapped chord (0.050959ms)
+  ✔ binds nothing for an unbound ([]) action (0.042917ms)
+  ✔ reports a rejected chord but still binds the rest (0.103166ms)
+✔ registerShortcuts (1.745167ms)
+▶ detectBlockedSleep — naive-wait detection
+  ✔ blocks a standalone long sleep (0.620875ms)
+  ✔ blocks an EMBEDDED top-level sleep (the lingering-job case) (0.048709ms)
+  ✔ blocks a newline-separated sleep (bash's primary separator) (0.041584ms)
+  ✔ blocks a backgrounded sleep (sleep 600 &) (0.04075ms)
+  ✔ blocks minute/hour/day durations regardless of number (0.040625ms)
+  ✔ allows sub-2s and float sleeps (deliberate pacing) (0.039458ms)
+  ✔ NEVER flags a sleep inside a polling loop (the correct pattern) (0.03225ms)
+  ✔ does not flag a sleep inside a pipeline or subshell (0.037417ms)
+  ✔ allows commands with no sleep (0.040958ms)
+✔ detectBlockedSleep — naive-wait detection (1.494625ms)
+▶ bash_bg — rejects a backgrounded sleep wait
+  ✔ blocks an embedded sleep in bash_bg (previously unguarded) (0.564458ms)
+  ✔ still allows a real backgrounded command (2.7ms)
+✔ bash_bg — rejects a backgrounded sleep wait (3.329583ms)
+▶ spawnWithFileOutput
+  ✔ captures stdout to log file (13.48425ms)
+  ✔ captures stderr to same log file (5.401583ms)
+  ✔ returns non-zero exit code on failure (3.969084ms)
+  ✔ respects AbortSignal (203.410583ms)
+  ✔ resolves when the shell exits even if a grandchild holds the fds (3.739084ms)
+✔ spawnWithFileOutput (230.654625ms)
+▶ killProcessTree
+  ✔ kills a running process (303.823583ms)
+✔ killProcessTree (303.925209ms)
+▶ takeControl — Ctrl+Shift+B (CC-faithful, never aborts)
+  ✔ backgrounds a foreground command and toasts (no synthetic agent message) (0.561041ms)
+  ✔ backgrounds the foreground command even with a queued message (queue drains at turn end) (0.052416ms)
+  ✔ backgrounds ALL running foreground commands (CC backgroundAll) (0.050083ms)
+  ✔ sets expectations (not abort) when a message is queued but nothing is foregrounded (0.048333ms)
+  ✔ warns when the session is idle with nothing to background (0.043917ms)
+  ✔ says the agent is working when mid-turn with no command and no queue (0.045ms)
+✔ takeControl — Ctrl+Shift+B (CC-faithful, never aborts) (1.353208ms)
+▶ Background Tasks overlay
+  ✔ selection instantly changes details; Tab switches arrows to output scrolling (8.026583ms)
+  ✔ live tail follows new lines, but does not force a scrolled reader back to the bottom (2.275042ms)
+  ✔ copies absolute log path, kills only the selection, and hides the kill hint after completion (13.599708ms)
+  ✔ all terminal statuses hide at four seconds, but the viewed snapshot survives shrink and sweep (1.880459ms)
+  ✔ width-safe rendering handles wide text, resizing, controls and narrow terminals (6.680292ms)
+  ✔ large logs show the skipped-byte range instead of pretending to contain the entire file (3.325292ms)
+  ✔ disposal stops the refresh timer and input, including key release events (1.348708ms)
+  ✔ opens exactly one custom overlay, prevents duplicate opens and releases it on shutdown (0.536791ms)
+  ✔ uses configurable navigation bindings inside the overlay only (1.050959ms)
+✔ Background Tasks overlay (39.430458ms)
+✔ original Pretty history-first: characterize Up history and independent Alt+R (21.13275ms)
+✔ decorated history-first: cold/new/reload Up/Down, current history and Alt+R (4.7455ms)
+✔ working status history-first: real Pretty config, embedded start/stop and shutdown (7.289166ms)
+✔ original Pretty pretty-first: characterize Up history and independent Alt+R (3.961292ms)
+✔ decorated pretty-first: cold/new/reload Up/Down, current history and Alt+R (2.766209ms)
+✔ working status pretty-first: real Pretty config, embedded start/stop and shutdown (1.365667ms)
+✔ instance identity, receiver/subclass, draft/cursor, autocomplete and host app handlers (152.977458ms)
+✔ same decorator is idempotent and restores hooks without stealing a later render wrapper (0.826042ms)
+✔ shutdown preserves later factory ownership; captured wrappers become pass-through on reload (2.914625ms)
+✔ supported render matches real Pretty; extreme CJK failures are characterized with SDK controls (350.156875ms)
+✔ embedded working-status render matches real Pretty at supported narrow widths (2.037125ms)
+✔ non-embedded editor retains editing with a diagnostic fallback (1.358584ms)
+✔ unsupported readonly render: preflight is mutation-free and host history survives (1.358458ms)
+✔ unsupported missing hook: preflight is mutation-free and host history survives (0.484458ms)
+✔ unsupported nonembedded: preflight is mutation-free and host history survives (0.415709ms)
+✔ unsupported nonextensible: preflight is mutation-free and host history survives (0.460958ms)
+✔ adapter constructor partial padding failure rolls back before any method installation (0.2975ms)
+✔ cleanup respects later padding setter ownership (7 is not reset to 0) (0.218541ms)
+✔ cleanup respects later padding underlying value ownership (7 is not reset to 0) (0.175208ms)
+✔ cleanup respects later padding getter ownership (7 is not reset to 0) (0.180708ms)
+✔ host factory failure rebuilds container/factory and permits a fresh install (0.682833ms)
+✔ host padding wiring failure rebuilds container/factory and permits a fresh install (0.615292ms)
+✔ host after installation failure rebuilds container/factory and permits a fresh install (0.609584ms)
+✔ host rollback falls back to default when the previous factory is now broken (0.355ms)
+✔ missing host getter or setter does not replace the editor (0.534667ms)
+✔ bounded repeated actual reset-before-shutdown reload history-first (92.313084ms)
+✔ bounded repeated actual reset-before-shutdown reload pretty-first (12.685584ms)
+✔ independent Alt+R fixture supports query, older/newer, cancel and branch priority (1.303625ms)
+✔ partial method installation (Proxy writes then throws) rolls back methods and padding (0.458708ms)
+✔ later border methods survive cleanup; captured visual methods become pass-through (0.202834ms)
+✔ custom nondelegating render preserves original receiver and content (0.314917ms)
+✔ non-TUI Pretty lifecycle leaves existing editor/factory alone (0.260834ms)
+✔ production bash-unified keeps sole bgTasks bash ownership and decorated history (121.987208ms)
+✔ later freezing visual wrappers leaves safe inactive passthrough on cleanup (0.392083ms)
+✔ accessor render is refused without invoking its setter or changing padding (0.212458ms)
+✔ throwing preflight property is a diagnosed mutation-free fallback (0.206666ms)
+✔ repeated captured factory calls release the previous editor visual lease (2.992584ms)
+✔ shutdown setter throwing after restoring factory falls back without leaving an empty container (1.068667ms)
+▶ package.json pi.extensions
+  ✔ is declared (0.708666ms)
+  ✔ loads every top-level extension file (3.412083ms)
+  ✔ loads nothing from a subdirectory of extensions/ (0.256125ms)
+  ✔ covers the resource types this repo ships (0.076084ms)
+✔ package.json pi.extensions (5.250459ms)
+PASS merge mode keeps unlisted packages
+PASS --prune removes unlisted packages
+PASS version change reinstalls
+PASS pinned version is not updated
+PASS missing install path triggers install
+PASS ssh and https identities match
+PASS --dry-run makes no changes
+PASS unsupported source is rejected
+PASS conflicting package is removed in merge mode
+PASS absent conflict is a no-op
+PASS source in both packages and conflicts is rejected
+PASS merge mode aligns declared keys only
+PASS declared null removes a key
+PASS prune mode keeps preserved and pi-owned keys only
+PASS a deep path is created
+PASS an array value is replaced whole
+PASS an already matching machine is left untouched
+PASS a broken settings.json is not overwritten
+PASS declaring a pi-owned settings key is rejected
+PASS a declared-and-preserved path is rejected
+PASS a segment-array preserve path protects a dotted key
+PASS a dotted settings key is rejected
+PASS a key and a one-element list compare equal
+PASS keybindings.json is created with the declared bindings
+PASS prune mode drops undeclared action ids
+PASS an invalid keybinding value is rejected
+PASS an extension config file is created with the declared key
+PASS merge mode keeps undeclared keys in an extension config file
+PASS prune mode reaches declared files only
+PASS a declared null removes a key from an extension config file
+PASS "files.settings.json" is rejected
+PASS "files.keybindings.json" is rejected
+PASS "files.auth.json" is rejected
+PASS "files.models.json" is rejected
+PASS "files.sub/dir.json" is rejected
+PASS "files.../escape.json" is rejected
+PASS "files.notjson" is rejected
+PASS "files..hidden.json" is rejected
+PASS preserving a key in an undeclared file is rejected
+PASS a declared-and-preserved key in a file is rejected
+PASS a broken extension config file is not overwritten
+PASS --sync packages touches nothing else
+PASS --sync settings never runs pi
+PASS bare --prune applies to the synced domains
+PASS --prune outside --sync is rejected
+PASS an unknown domain is rejected
+PASS --sync none does nothing
+PASS --dev switches git spellings/refs to a space-containing checkout and is repeatable
+PASS normal install switches back to remote, repeats, and preserves third-party/prune order
+PASS both sources installed removes only the opposite source without updating local code
+PASS failed source removal aborts before installing packages or writing configs
+PASS source switching dry-run performs no package actions or writes
+PASS unselected package domain never lists, installs, removes or switches sources
+PASS dev override does not alias unrelated local checkouts
+PASS --dev refuses to remove the checkout it would load as a local package
+PASS --dev rejects downloaded scripts, invalid checkouts/manifests and manifest local sources
+PASS piped installer rejects --dev before downloading or running pi
+
+All sync checks passed.
+✔ scripts/sync.test.mjs (17151.836333ms)
+ℹ tests 363
+ℹ suites 77
+ℹ pass 363
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 18669.067

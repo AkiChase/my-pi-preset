@@ -1,0 +1,46 @@
+✔ original Pretty history-first: characterize Up history and independent Alt+R (18.349084ms)
+✔ decorated history-first: cold/new/reload Up/Down, current history and Alt+R (4.216958ms)
+✔ working status history-first: real Pretty config, embedded start/stop and shutdown (6.56575ms)
+✔ original Pretty pretty-first: characterize Up history and independent Alt+R (1.573875ms)
+✔ decorated pretty-first: cold/new/reload Up/Down, current history and Alt+R (2.49625ms)
+✔ working status pretty-first: real Pretty config, embedded start/stop and shutdown (1.25275ms)
+✔ instance identity, receiver/subclass, draft/cursor, autocomplete and host app handlers (152.901542ms)
+✔ same decorator is idempotent and restores hooks without stealing a later render wrapper (0.957083ms)
+✔ shutdown preserves later factory ownership; captured wrappers become pass-through on reload (3.736084ms)
+✔ supported render matches real Pretty; extreme CJK failures are characterized with SDK controls (313.519375ms)
+✔ embedded working-status render matches real Pretty at supported narrow widths (1.85175ms)
+✔ non-embedded editor retains editing with a diagnostic fallback (0.811125ms)
+✔ unsupported readonly render: preflight is mutation-free and host history survives (1.091458ms)
+✔ unsupported missing hook: preflight is mutation-free and host history survives (0.417083ms)
+✔ unsupported nonembedded: preflight is mutation-free and host history survives (0.380416ms)
+✔ unsupported nonextensible: preflight is mutation-free and host history survives (0.383667ms)
+✔ adapter constructor partial padding failure rolls back before any method installation (0.328333ms)
+✔ cleanup respects later padding setter ownership (7 is not reset to 0) (0.231083ms)
+✔ cleanup respects later padding underlying value ownership (7 is not reset to 0) (0.172917ms)
+✔ cleanup respects later padding getter ownership (7 is not reset to 0) (0.190792ms)
+✔ host factory failure rebuilds container/factory and permits a fresh install (0.644791ms)
+✔ host padding wiring failure rebuilds container/factory and permits a fresh install (0.557708ms)
+✔ host after installation failure rebuilds container/factory and permits a fresh install (0.53825ms)
+✔ host rollback falls back to default when the previous factory is now broken (0.317ms)
+✔ missing host getter or setter does not replace the editor (0.535ms)
+✔ bounded repeated actual reset-before-shutdown reload history-first (70.580875ms)
+✔ bounded repeated actual reset-before-shutdown reload pretty-first (13.967041ms)
+✔ independent Alt+R fixture supports query, older/newer, cancel and branch priority (1.897625ms)
+✔ partial method installation (Proxy writes then throws) rolls back methods and padding (0.387916ms)
+✔ later border methods survive cleanup; captured visual methods become pass-through (0.204917ms)
+✔ custom nondelegating render preserves original receiver and content (0.285ms)
+✔ non-TUI Pretty lifecycle leaves existing editor/factory alone (0.207959ms)
+✔ production bash-unified keeps sole bgTasks bash ownership and decorated history (129.322542ms)
+✔ later freezing visual wrappers leaves safe inactive passthrough on cleanup (0.384292ms)
+✔ accessor render is refused without invoking its setter or changing padding (0.208167ms)
+✔ throwing preflight property is a diagnosed mutation-free fallback (0.195375ms)
+✔ repeated captured factory calls release the previous editor visual lease (2.739083ms)
+✔ shutdown setter throwing after restoring factory falls back without leaving an empty container (0.914667ms)
+ℹ tests 38
+ℹ suites 0
+ℹ pass 38
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1685.8025

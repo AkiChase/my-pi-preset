@@ -1,0 +1,2 @@
+Checked 10 Markdown files, 40 local links and changed/new code whitespace.
+PASS: no missing links/anchors or trailing whitespace.

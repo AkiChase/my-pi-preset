@@ -1,0 +1,20 @@
+✔ original Pretty history-first: characterize Up history and independent Alt+R (19.898292ms)
+✔ decorated history-first: cold/new/reload Up/Down, current history and Alt+R (6.349459ms)
+✔ working status history-first: real Pretty config, embedded start/stop and shutdown (6.477417ms)
+✔ original Pretty pretty-first: characterize Up history and independent Alt+R (1.6665ms)
+✔ decorated pretty-first: cold/new/reload Up/Down, current history and Alt+R (3.083541ms)
+✔ working status pretty-first: real Pretty config, embedded start/stop and shutdown (4.425958ms)
+✔ instance identity, receiver/subclass, draft/cursor, autocomplete and host app handlers (152.510584ms)
+✔ same decorator is idempotent and restores hooks without stealing a later render wrapper (0.728416ms)
+✔ shutdown preserves later factory ownership; captured wrappers become pass-through on reload (2.756791ms)
+✔ supported render matches real Pretty; extreme CJK failures are characterized with SDK controls (229.010416ms)
+✔ embedded working-status render matches real Pretty at supported narrow widths (2.405334ms)
+✔ non-embedded previous editor is an explicit blocker, not a silent loss of status (0.287792ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1329.467916

@@ -1,0 +1,2 @@
+{"order": "history-first", "tuiMode": "regular", "pass": true, "snapshots": 27, "debug": 6, "exitCode": 0, "error": null, "networkAttempts": [], "temporaryTreeRemoved": true}
+{"order": "pretty-first", "tuiMode": "regular", "pass": true, "snapshots": 27, "debug": 6, "exitCode": 0, "error": null, "networkAttempts": [], "temporaryTreeRemoved": true}
