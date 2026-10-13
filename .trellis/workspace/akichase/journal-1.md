@@ -196,3 +196,25 @@ Pretty 编辑器历史兼容修复完成并合并 main；同步最终实施与�
 ### Next Steps
 
 - 按用户选择本地 checkout 加载并重启验收，或 push 后更新远程安装；不自动修改个人安装
+
+
+## Session 6: 任务摘要语义配色验收与收尾
+<!-- trellis-session: v=2 fp=8a1e32c8d3896ed3 -->
+
+**Date**: 2026-10-13
+**Task**: 任务摘要语义配色验收与收尾
+**Branch**: `main`
+
+### Summary
+
+完成 task-summary-colors 全范围验收，独立代码审查无阻塞；pnpm check 类型检查与 533 项测试全部通过，Markdown 链接、任务上下文和 git diff --check 通过。提交语义配色、footer 保色、回归测试和规范，归档任务；此任务直接在 main 完成，未走 PR，归档明确跳过分支校验。保留无关 .pi 集成变更和 monitor-session-batching 规划任务，未 push。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `073e276` | feat(task-ui): add semantic colors to task summaries |
+
+### Status
+
+[OK] **Completed**
