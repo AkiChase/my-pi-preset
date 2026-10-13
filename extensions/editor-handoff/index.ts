@@ -65,4 +65,3 @@ export function preserveHandoff(editor: LiveEditor): () => void {
     } catch (error) { for (const restore of restores.reverse()) restore(); throw error; }
     return () => { for (const restore of restores.reverse()) restore(); };
 }
-
