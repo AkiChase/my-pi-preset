@@ -1,0 +1,17 @@
+(node:675) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ nested actual delegation ignores legacy turn budgets and keeps user defaults across resume (3.481375ms)
+(node:676) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ model Agent schema omits turn limits at root and nested boundaries (10.037417ms)
+✔ legacy model turn limit cannot affect actual foreground new/resume execution or notices (531.415375ms)
+✔ legacy model turn limit cannot affect actual background new/resume execution or notices (526.799167ms)
+✔ model scheduled delegation never persists legacy or default turn budgets and fires with current user configuration (1273.107375ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3190.690791

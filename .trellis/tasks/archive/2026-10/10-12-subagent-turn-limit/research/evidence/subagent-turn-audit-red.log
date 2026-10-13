@@ -1,0 +1,33 @@
+(node:22604) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ trusted scheduler persistence and RPC retain explicit turn limits through actual manager execution (19.906417ms)
+(node:22605) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ actual root delegation preserves frontmatter limits including unlimited, ignores legacy values and resumes stored type (1070.616166ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1955.151959
+
+✖ failing tests:
+
+test at extensions/agent-tasks/__tests__/backend-waits.test.ts:96:6
+✖ trusted scheduler persistence and RPC retain explicit turn limits through actual manager execution (19.906417ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  undefined !== 4
+  
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset-subagent-turn-limit/extensions/agent-tasks/__tests__/backend-waits.test.ts:120:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 4,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

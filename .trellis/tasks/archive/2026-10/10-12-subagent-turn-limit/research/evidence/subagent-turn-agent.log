@@ -1,0 +1,158 @@
+(node:19276) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ actual clone cancellation after reload prevents create, late create only locally disposes (3.555292ms)
+✔ actual clone aborts owned prompt; its retained Agent callback cannot spawn after close (1.222417ms)
+✔ actual clone attempts one forced-background Agent call and never retries a throwing admission (0.385084ms)
+✔ actual scheduler old timer/finalize cannot dispatch or mutate a rebound same-id store (6.350125ms)
+✔ actual scheduler once and cron callbacks retain binding and shutdown cancels its executing child signal (8.103917ms)
+✔ actual workflow host gate observes cancellation and drain waits for the real pi.exec promise (63.967042ms)
+✔ actual RPC retained callbacks and late spawn reply ignore closing activation (11.586333ms)
+✔ actual clone reports only successful admission, preserves origin and forces background once (0.256041ms)
+(node:19277) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ nested actual delegation ignores legacy turn budgets and keeps user defaults across resume (3.194791ms)
+✔ trusted scheduler persistence and RPC retain explicit turn limits through actual manager execution (22.961375ms)
+✔ running foreground detach transfers current lease above a full background pool; later admission waits (1.027125ms)
+✔ queued foreground moves the same admission to background, unlinks queue parent and releases original gate (0.836125ms)
+✔ worktree startup is visible and waitable immediately; detached failure remains a terminal same-ID outcome (1.26875ms)
+✔ detach during successful startup survives later Esc without creating another runner (0.271125ms)
+✔ true foreground Esc stops its run and descendants; queued already-aborted launches settle (0.336208ms)
+✔ completion wins inline once, while detach wins same-tick completion without consuming (0.196541ms)
+✔ resume foreground uses new run controller/admission and the same session, and refuses simultaneous re-entry (0.232875ms)
+✔ multiple retrieval leases count independently; cancellation and /bg never stop or consume execution (0.231917ms)
+✔ source freezes all owned/workflow/queued/no-session views, reads bounded details without consuming, and scopes stop (3.257166ms)
+✔ freeze/stop/dispose releases queued and startup terminal handles without an orphan wait (0.455583ms)
+✔ workflow child stopped through actual source/host returns skipped and never auto-retries that attempt (29.655709ms)
+✔ foreground resume queued admission can migrate to background without losing its original gate (0.322625ms)
+✔ source observer changes and owner retention preserve completed children past sweep without recursive waits (0.397334ms)
+✔ fresh panel after actual sweep retains consumed workflow child at group end + 0ms only within window (5.066667ms)
+✔ fresh panel after actual sweep retains consumed workflow child at group end + 3999ms only within window (1.228167ms)
+✔ fresh panel after actual sweep retains consumed workflow child at group end + 4000ms only within window (0.228916ms)
+✔ 3B1 stop releases the transferred pool once without waiting for noncooperative execution (0.350208ms)
+(node:19278) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ foundation config ignores old names; real agent discovery retains project precedence (844.458542ms)
+✔ child marker preserves unrelated root context, nested awaits and rejection boundaries (5.229667ms)
+✔ cached host loader guards same/different cwd children and isolates overlapping root loads (2658.640041ms)
+(node:19280) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ actual runner cancellation at env never starts a prompt and closes partial sessions once (2.664625ms)
+✔ actual runner cancellation at reload never starts a prompt and closes partial sessions once (0.910375ms)
+✔ actual runner cancellation at create never starts a prompt and closes partial sessions once (4.42825ms)
+✔ actual runner cancellation at bind never starts a prompt and closes partial sessions once (1.774541ms)
+✔ actual runner cancellation at callback never starts a prompt and closes partial sessions once (1.2225ms)
+✔ actual runner cancellation at prompt never starts a prompt and closes partial sessions once (1.059375ms)
+✔ actual runner already-aborted launch/resume do no startup, subscriptions or prompt (3.968916ms)
+✔ actual manager/runner delayed startup stays starting; Esc/x cancels and releases the admission for a replacement (6.421042ms)
+✔ actual runner normal new/resume and parent-detached delayed startup still prompt exactly once per run (2.152625ms)
+✔ actual runner callback failure closes exposed session once even through manager disposal (1.377459ms)
+✔ actual runner structured retry remains cancelled after a first prompt and resume turn accounting resets per invocation (141.135417ms)
+✔ actual resume setup subscription failure releases earlier subscription and abort listener without a prompt (0.891166ms)
+✔ actual new/resume retain soft steering and hard turn limit enforcement (1.076667ms)
+✔ actual prompt failure retains live session for resume unlike disposed startup (1.139208ms)
+✔ actual resume outcome flags and manager terminal priority preserve current text, stats and prior run snapshots (4.382833ms)
+✔ actual workflow host treats hard-aborted resume as non-success without changing workflow decisions (33.589334ms)
+✔ 3B1 stopped terminal is not actual execution drain (new and resume) (2.106041ms)
+✔ 3B1 freeze during actual create/bind only closes late sessions, with stable disposal (2.05575ms)
+✔ 3B1 noncooperative prompt survives bounded close only as an effectless cleanup owner (17.448416ms)
+✔ 3B1 queued/nested stop drains siblings despite throwing observers and output cleanup (2.545333ms)
+✔ 3B1 synchronous onStart closure blocks subsequent resume output setup and prompt (2.44075ms)
+✔ 3B1 throwing subscription disposers cannot strand other subscriptions or parent link (1.282375ms)
+✔ 3B1 new subscription setup failure cleans the first subscription and partial session (0.631209ms)
+✔ 3B1 followup completed retained child releases extension resource before shutdown phase ends (0.721208ms)
+✔ 3B1 followup direct manager dispose runs completed child shutdown hook exactly once (1.584541ms)
+✔ 3B1 followup shutdown stops running child before disposal and includes completed retained parent (1.253ms)
+✔ 3B1 followup throwing completed child hook cannot block sibling resource cleanup (1.542083ms)
+✔ 3B1 followup direct dispose timeout seals late created child hooks and keeps artifacts (12.922458ms)
+✔ 3B1 followup checks host permission at actual hook boundary after hasHandlers (0.730416ms)
+✔ 3B1 followup pending completed child hook retains owner after direct dispose budget (10.703208ms)
+(node:19281) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ model Agent schema omits turn limits at root and nested boundaries (17.628666ms)
+✔ legacy model turn limit cannot affect actual foreground new/resume execution or notices (533.109541ms)
+✔ legacy model turn limit cannot affect actual background new/resume execution or notices (526.823667ms)
+✔ model scheduled delegation never persists legacy or default turn budgets and fires with current user configuration (1271.1175ms)
+✖ actual root delegation preserves frontmatter limits including unlimited, ignores legacy values and resumes stored type (6.460083ms)
+✔ default actual model delegation stays unlimited despite legacy budget (3.569ms)
+✔ actual foreground Agent detaches before startup, keeps activity/transcript and delivers one failure notice (265.74625ms)
+✔ actual Agent completion returns inline despite UI failures and suppresses delayed notification (269.051708ms)
+✔ actual launch detach preserves same run and transcript, later Esc cannot stop it, and resume appends same file (529.81125ms)
+✔ actual result waits during startup count independently, wait:false peeks and same-tick cancelled completion nudges once (519.197917ms)
+✔ actual foreground Esc stops, background result Esc does not, and both naturally release waits (6.014792ms)
+✔ grouped notices recheck consumed/current runs and preserve one upstream group delivery (396.945708ms)
+✔ group completion while retrieval is active does not strand sibling notice or duplicate after cancelled wait (651.833292ms)
+✔ delayed group nudge cannot deliver a resumed run through the old attempt's notification (662.929ms)
+✔ actual background new transcript filesystem failure rolls back before membership and rethrows, without runner/pool/wait orphan (537.616792ms)
+✔ actual background resume transcript stream setup error is rethrown unchanged, stops controller and releases pool (269.25475ms)
+✔ actual background resume filesystem initialization failure cannot start a new run or lose prior transcript (268.617541ms)
+✔ actual foreground detach notifications carry exact new/resume/mention call correlation and terminal per-run turn stats (795.300708ms)
+✔ actual delayed group details retain terminal stats for first/others and omit a consumed member (401.52625ms)
+✔ actual queued background resume stream error settles without prompting or leaking admission, and reports the returned run failure once (269.607708ms)
+✔ actual foreground transcript filesystem failure preserves its existing stop/wait rollback (4.070375ms)
+✔ closed actual factory rejects retained tool callbacks before touching results (3.484917ms)
+[task-ui] sibling dispose failed: Error: optional cleanup
+    at Object.dispose (file:///Users/jyxc-dz-0101322/tools/my-pi-preset-subagent-turn-limit/extensions/agent-tasks/__tests__/tool-waits.test.ts:520:164)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset-subagent-turn-limit/extensions/task-ui/lifecycle.ts:78:84
+    at TaskLifecycle.safely (file:///Users/jyxc-dz-0101322/tools/my-pi-preset-subagent-turn-limit/extensions/task-ui/lifecycle.ts:48:15)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset-subagent-turn-limit/extensions/task-ui/lifecycle.ts:78:48
+✔ explicit source stop silently filters its group member but reports the natural sibling (399.7735ms)
+✔ injected participant freezes both backends before wait cancellation, drains retained child resources and repeated starts (266.500083ms)
+✔ actual factory clone late create cannot fallback or admit an Agent after shutdown (6.589333ms)
+✔ actual factory stops a busy workflow worker without a completion notice and preserves script (350.802667ms)
+✔ actual factory shutdown releases queued launch/retrieval and awaited resume without an old notice (534.763459ms)
+[pi-subagents] Running workflow flag…
+✔ actual factory workflow termination drains its in-flight host gate and blocks late journal/notice (220.688791ms)
+✔ actual CLI workflow repeated start executes once; shutdown forbids late entry/next-turn delivery (325.977958ms)
+✔ actual factory shutdown during delayed worktree startup prevents late child admission and notice (265.983458ms)
+✔ actual workflow natural completion still produces one notice and source stop affects only owned children (711.288459ms)
+✔ direct actual factory owns one local shutdown handler and rejects old callbacks (4.353375ms)
+✔ synchronous shutdown from a completion event blocks subsequent entry and held notice (264.527167ms)
+✔ source publication shutdown cannot recreate terminal input or timers (2.826709ms)
+✔ agent factory never registers legacy terminal navigation even with TUI context (2.149333ms)
+✔ actual background starting source listener shutdown rejects without artifact or owner leaks (2.76675ms)
+✔ actual foreground starting source listener shutdown rejects without artifact or owner leaks (2.511083ms)
+✔ actual clone privately overrides custom frontmatter foreground pin, ordinary Agent still honors it (528.898375ms)
+✔ actual clone Agent model refusal reports original text once without fallback admission (6.115709ms)
+✔ clone throwing after admission gives failure feedback but never retries the admitted run (264.923ms)
+(node:19282) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ real workflow worker executes a no-agent script and shuts down before resolving (50.660875ms)
+✔ real worker RPC invokes a stub host and returns its answer (36.09625ms)
+✔ abort stops a live real worker without a forced test-process exit (41.256ms)
+✔ aborted real worker never starts a gate from a late host result (63.11875ms)
+✔ paused real worker and a throwing host abort still terminate without new launch or retained control (53.173666ms)
+(node:19283) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ actual worktree add signal cancellation preserves partial paths and does not continue git (6.037917ms)
+✔ actual manager worktree add cancelled at close never launches a runner or stale cleanup (9.051417ms)
+✔ actual worktree cleanup failures preserve unsaved files and generated branches (7.203333ms)
+✔ actual cleanup cancellation between awaits starts no subsequent git and keeps artifacts (0.743917ms)
+✔ actual runner cleanup waits for its output hook and in-flight git, stops after close boundary (2.737666ms)
+✔ noncooperative runner close preserves actively written worktree and retained late owner (17.142375ms)
+ℹ tests 111
+ℹ suites 0
+ℹ pass 110
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 13675.073958
+
+✖ failing tests:
+
+test at extensions/agent-tasks/__tests__/tool-waits.test.ts:156:6
+✖ actual root delegation preserves frontmatter limits including unlimited, ignores legacy values and resumes stored type (6.460083ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  7 !== undefined
+  
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset-subagent-turn-limit/extensions/agent-tasks/__tests__/tool-waits.test.ts:164:14)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 7,
+    expected: undefined,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

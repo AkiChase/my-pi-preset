@@ -1,0 +1,52 @@
+(node:43105) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ actual manager/runner freezes 2 turns across delayed bind and resume (10.249125ms)
+✖ actual manager/runner freezes unlimited turns across delayed bind and resume (0.709917ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 717.580583
+
+✖ failing tests:
+
+test at extensions/agent-tasks/__tests__/runner-cancellation.test.ts:133:8
+✖ actual manager/runner freezes 2 turns across delayed bind and resume (10.249125ms)
+  AssertionError [ERR_ASSERTION]: limited run steers at admission limit, not changed default
+  + actual - expected
+  
+    [
+  +   3
+  -   2
+    ]
+  
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset-subagent-turn-limit/extensions/agent-tasks/__tests__/runner-cancellation.test.ts:165:14)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ 3 ],
+    expected: [ 2 ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at extensions/agent-tasks/__tests__/runner-cancellation.test.ts:133:8
+✖ actual manager/runner freezes unlimited turns across delayed bind and resume (0.709917ms)
+  AssertionError [ERR_ASSERTION]: unlimited cannot re-read a later limit
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset-subagent-turn-limit/extensions/agent-tasks/__tests__/runner-cancellation.test.ts:164:14)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

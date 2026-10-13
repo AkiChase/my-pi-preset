@@ -1,0 +1,9 @@
+
+> my-pi-preset@0.1.0 typecheck /Users/jyxc-dz-0101322/tools/my-pi-preset-subagent-turn-limit
+> node scripts/link-pi-sdk.mjs && tsc -p tsconfig.json
+
+[2m[link-pi-sdk][0m linked 0 new of 8 @earendil-works/* packages from /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.1.0/node_modules
+extensions/agent-tasks/__tests__/backend-waits.test.ts(106,28): error TS2741: Property 'consumeResult' is missing in type 'AgentManager' but required in type 'SpawnCapable'.
+extensions/agent-tasks/__tests__/tool-waits.test.ts(110,65): error TS2339: Property 'properties' does not exist on type 'TSchema'.
+extensions/agent-tasks/__tests__/tool-waits.test.ts(111,54): error TS2339: Property 'properties' does not exist on type 'TSchema'.
+ ELIFECYCLE  Command failed with exit code 2.

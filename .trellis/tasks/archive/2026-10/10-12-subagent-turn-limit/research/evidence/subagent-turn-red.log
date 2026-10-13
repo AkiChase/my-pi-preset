@@ -1,0 +1,85 @@
+(node:99089) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ model Agent schema omits turn limits at root and nested boundaries (11.752208ms)
+✖ legacy model turn limit cannot affect actual foreground new/resume execution or notices (6.145416ms)
+✖ legacy model turn limit cannot affect actual background new/resume execution or notices (3.0315ms)
+✖ model scheduled delegation never persists legacy or default turn budgets and fires with current user configuration (4.436916ms)
+ℹ Error: Test "legacy model turn limit cannot affect actual foreground new/resume execution or notices" at extensions/agent-tasks/__tests__/tool-waits.test.ts:115:46 generated asynchronous activity after the test ended. This activity created the error "Error: Agent task activation is closing or closed" and would have caused the test to fail, but instead triggered an unhandledRejection event.
+ℹ tests 4
+ℹ suites 0
+ℹ pass 0
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 822.187958
+
+✖ failing tests:
+
+test at extensions/agent-tasks/__tests__/tool-waits.test.ts:105:6
+✖ model Agent schema omits turn limits at root and nested boundaries (11.752208ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset-subagent-turn-limit/extensions/agent-tasks/__tests__/tool-waits.test.ts:110:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at extensions/agent-tasks/__tests__/tool-waits.test.ts:115:46
+✖ legacy model turn limit cannot affect actual foreground new/resume execution or notices (6.145416ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 7
+  
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset-subagent-turn-limit/extensions/agent-tasks/__tests__/tool-waits.test.ts:119:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 7,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at extensions/agent-tasks/__tests__/tool-waits.test.ts:115:46
+✖ legacy model turn limit cannot affect actual background new/resume execution or notices (3.0315ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 7
+  
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset-subagent-turn-limit/extensions/agent-tasks/__tests__/tool-waits.test.ts:119:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 7,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at extensions/agent-tasks/__tests__/tool-waits.test.ts:138:6
+✖ model scheduled delegation never persists legacy or default turn budgets and fires with current user configuration (4.436916ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset-subagent-turn-limit/extensions/agent-tasks/__tests__/tool-waits.test.ts:145:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
