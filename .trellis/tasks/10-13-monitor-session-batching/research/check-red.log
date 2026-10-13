@@ -1,0 +1,90 @@
+✖ reset during decision callback schedules the new epoch without submitting the old snapshot (2.187417ms)
+✖ unstringifiable submission error cannot escape notification isolation (0.503708ms)
+✖ unstringifiable submission error cannot escape notification isolation (0.187375ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 128.111166
+
+✖ failing tests:
+
+test at extensions/process-tasks/__tests__/monitor-notifications.test.ts:154:1
+✖ reset during decision callback schedules the new epoch without submitting the old snapshot (2.187417ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  0 !== 1
+
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/__tests__/monitor-notifications.test.ts:162:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at extensions/process-tasks/__tests__/monitor-notifications.test.ts:167:5
+✖ unstringifiable submission error cannot escape notification isolation (0.503708ms)
+  AssertionError [ERR_ASSERTION]: Got unwanted exception.
+  Actual message: "Cannot convert object to primitive value"
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/__tests__/monitor-notifications.test.ts:170:16)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: TypeError: Cannot convert object to primitive value
+        at String (<anonymous>)
+        at MonitorNotifications.flush (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/monitor-notifications.ts:209:99)
+        at MonitorNotifications.schedule (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/monitor-notifications.ts:124:33)
+        at MonitorNotifications.enqueue (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/monitor-notifications.ts:81:14)
+        at Object.enqueue (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/__tests__/monitor-notifications.test.ts:24:34)
+        at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/__tests__/monitor-notifications.test.ts:170:37
+        at getActual (node:assert:611:5)
+        at strict.doesNotThrow (node:assert:779:32)
+        at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/__tests__/monitor-notifications.test.ts:170:16)
+        at Test.runInAsyncScope (node:async_hooks:228:14),
+    expected: undefined,
+    operator: 'doesNotThrow',
+    diff: 'simple'
+  }
+
+test at extensions/process-tasks/__tests__/monitor-notifications.test.ts:167:5
+✖ unstringifiable submission error cannot escape notification isolation (0.187375ms)
+  AssertionError [ERR_ASSERTION]: Got unwanted exception.
+  Actual message: "unsafe conversion"
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/__tests__/monitor-notifications.test.ts:170:16)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: Error: unsafe conversion
+        at Object.toString (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/__tests__/monitor-notifications.test.ts:166:64)
+        at String (<anonymous>)
+        at MonitorNotifications.flush (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/monitor-notifications.ts:209:99)
+        at MonitorNotifications.schedule (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/monitor-notifications.ts:124:33)
+        at MonitorNotifications.enqueue (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/monitor-notifications.ts:81:14)
+        at Object.enqueue (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/__tests__/monitor-notifications.test.ts:24:34)
+        at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/__tests__/monitor-notifications.test.ts:170:37
+        at getActual (node:assert:611:5)
+        at strict.doesNotThrow (node:assert:779:32)
+        at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/__tests__/monitor-notifications.test.ts:170:16),
+    expected: undefined,
+    operator: 'doesNotThrow',
+    diff: 'simple'
+  }

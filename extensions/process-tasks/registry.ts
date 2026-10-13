@@ -61,6 +61,7 @@ export function sweepTerminal(reg: BackgroundRegistry, now = Date.now()): number
     let removed = 0;
     for (const [id, job] of reg.jobs) {
         if (isTerminalStatus(job.status) && job.endedAt !== undefined && now - job.endedAt >= TERMINAL_RETENTION_MS) {
+            reg.monitorNotifications.cancel(job);
             reg.jobs.delete(id);
             reg.notificationRetries.delete(id);
             removed++;

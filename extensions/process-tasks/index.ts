@@ -84,9 +84,9 @@ export default function (pi: ExtensionAPI, options: ProcessTasksOptions = {}) {
         theme: { fg(colour: string, text: string): string }
     ) => {
         const details = message.details as
-            | { status?: string; summary?: string; outputTail?: string; monitor?: MonitorNotificationPayload }
+            | { status?: string; summary?: string; outputTail?: string; monitor?: MonitorNotificationPayload; monitorBatch?: unknown }
             | undefined;
-        if (details?.monitor) {
+        if (details?.monitor || details?.monitorBatch) {
             const text = stripTerminalSequences(String(message.content)).replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, "");
             return { render: (width: number) => text.split("\n").map((line) =>
                 truncateToWidth(theme.fg("dim", line), Math.max(0, width))), invalidate: () => {} };
@@ -130,6 +130,7 @@ export default function (pi: ExtensionAPI, options: ProcessTasksOptions = {}) {
         if (reg.closed) return;
         // A fresh context cannot reuse a panel/ticker captured from the prior
         // session. Shutdown normally runs first; this is the switch fallback.
+        reg.monitorNotifications.reset();
         stopSidebarTicker(reg);
         stopRegistrySweep(reg);
         for (const job of reg.jobs.values()) {

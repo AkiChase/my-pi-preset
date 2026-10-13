@@ -31,7 +31,7 @@ for (const boundary of ["silence shutdown", "immediate deadline"] as const) {
         const errors: unknown[][] = [];
         t.mock.method(console, "error", (...args: unknown[]) => { errors.push(args); });
         const dir = mkdtempSync(join(tmpdir(), "monitor-final-decision-"));
-        const h = processActivation(dir);
+        const h = processActivation(dir, { monitorFlushMs: 0 });
         let closing: Promise<void> | undefined;
         // Startup consumes time without any source activity; the LAST decide()
         // therefore emits immediately, after the earlier setup guard already ran.
@@ -80,3 +80,43 @@ for (const boundary of ["silence shutdown", "immediate deadline"] as const) {
         } finally { await h.lifecycle.shutdown(); rmSync(dir, { recursive: true, force: true }); }
     });
 }
+
+void it("default first window allows startup then submission-triggered shutdown clears sibling pending", async t => {
+    t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1000 });
+    class Socket {
+        static instances: Socket[] = [];
+        closes = 0;
+        listeners = new Map<string, ((event: unknown) => void)[]>();
+        constructor() { Socket.instances.push(this); }
+        addEventListener(name: string, callback: (event: unknown) => void) {
+            const list = this.listeners.get(name) ?? []; list.push(callback); this.listeners.set(name, list);
+        }
+        close() { this.closes++; }
+        emit(data: string) { for (const cb of this.listeners.get("message") ?? []) cb({ data }); }
+    }
+    const original = globalThis.WebSocket; globalThis.WebSocket = Socket as unknown as typeof WebSocket;
+    const dir = mkdtempSync(join(tmpdir(), "monitor-delayed-shutdown-"));
+    const h = processActivation(dir);
+    let closing: Promise<void> | undefined;
+    const push = h.messages.push.bind(h.messages);
+    h.messages.push = (...messages: unknown[]) => {
+        const result = push(...messages);
+        Socket.instances[1]!.emit("inside send pending");
+        closing = h.lifecycle.shutdown(); return result;
+    };
+    try {
+        for (const description of ["one", "two"]) {
+            const result = await h.execute("monitor", { ws: { url: "ws://offline.test" }, description });
+            assert.match(result.content[0]!.text ?? "", /started/);
+        }
+        Socket.instances[0]!.emit("first"); Socket.instances[1]!.emit("second");
+        assert.equal(h.messages.length, 0); t.mock.timers.tick(200); await closing;
+        assert.equal(h.messages.length, 1); assert.equal(h.lifecycle.phase, "closed");
+        t.mock.timers.tick(100000); assert.equal(h.messages.length, 1);
+        assert.equal(h.reg.notificationRetries.size, 0); assert.equal(h.reg.jobAborts.size, 0);
+        assert.ok(Socket.instances.every(socket => socket.closes === 1));
+    } finally {
+        await h.lifecycle.shutdown(); globalThis.WebSocket = original;
+        t.mock.timers.reset(); rmSync(dir, { recursive: true, force: true });
+    }
+});

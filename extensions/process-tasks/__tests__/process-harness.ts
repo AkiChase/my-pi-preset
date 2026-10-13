@@ -5,7 +5,7 @@ import { createBashToolDefinition } from "@earendil-works/pi-coding-agent";
 import { TaskCoordinator } from "../../task-ui/coordinator.ts";
 import { TaskLifecycle } from "../../task-ui/lifecycle.ts";
 import { BackgroundRegistry } from "../state.ts";
-import { DEFAULTS } from "../config.ts";
+import { DEFAULTS, type ProcessTasksConfig } from "../config.ts";
 import { registerBashTool } from "../tools/bash.ts";
 import { registerBashBgTool } from "../tools/bash-bg.ts";
 import { registerJobsTool } from "../tools/jobs.ts";
@@ -25,10 +25,10 @@ interface CapturedTool {
     execute(id: string, params: unknown, signal: AbortSignal | undefined, update: undefined, ctx: ExtensionToolContext): Promise<{ content: { text?: string }[] }>;
 }
 
-export function processActivation(dir: string) {
+export function processActivation(dir: string, config: Partial<ProcessTasksConfig> = {}) {
     const coordinator = new TaskCoordinator();
     const lifecycle = new TaskLifecycle(coordinator);
-    const reg = new BackgroundRegistry({ ...DEFAULTS, logDir: dir, maxConcurrentJobs: 20 }, coordinator);
+    const reg = new BackgroundRegistry({ ...DEFAULTS, logDir: dir, maxConcurrentJobs: 20, ...config }, coordinator);
     const tools = new Map<string, CapturedTool>();
     const messages: unknown[] = [];
     const partialPi: Pick<ExtensionAPI, "registerTool" | "sendMessage"> = {

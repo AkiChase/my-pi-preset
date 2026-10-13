@@ -1,0 +1,43 @@
+[process-tasks] monitor notification failed: [Object: null prototype] {}
+[process-tasks] exit hook failed: Error: unsafe inspector
+    at [nodejs.util.inspect.custom] (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/__tests__/monitor-session.test.ts:508:72)
+    at formatValue (node:internal/util/inspect:897:19)
+    at inspect (node:internal/util/inspect:409:10)
+    at formatWithOptionsInternal (node:internal/util/inspect:2645:40)
+    at formatWithOptions (node:internal/util/inspect:2507:10)
+    at console.value (node:internal/console/constructor:377:14)
+    at console.error (node:internal/console/constructor:444:61)
+    at reportNotificationError (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/monitor-notifications.ts:22:13)
+    at MonitorNotifications.flush (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/monitor-notifications.ts:254:13)
+    at MonitorNotifications.schedule (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/monitor-notifications.ts:138:33)
+✔ actual command session does not turn unstringifiable notification failure into source failure (4.432375ms)
+✖ actual command session does not turn unstringifiable notification failure into source failure (1.629083ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 675.480083
+
+✖ failing tests:
+
+test at extensions/process-tasks/__tests__/monitor-session.test.ts:509:1
+✖ actual command session does not turn unstringifiable notification failure into source failure (1.629083ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + 'failed'
+  - 'running'
+
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/__tests__/monitor-session.test.ts:526:16)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'running',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

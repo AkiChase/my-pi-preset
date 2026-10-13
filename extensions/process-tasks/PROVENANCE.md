@@ -23,7 +23,7 @@ The files in this directory started as a one-time copy of the `src/` tree of
 
 - monitor 不再从日志轮询重建活动；命令使用 detached `bash -c` 和 stdout/stderr 双 pipe，收到的原始 bytes 写同一日志，两流独立增量 UTF-8／有界部分行解析。没有整体 `2>&1`、eval、嵌套 shell 或 tee 改写，用户的管道／重定向语义保持；stderr 不代表失败，跨流接收顺序不是实际发生顺序。
 - 新内部 `monitor-buffer.ts` 统一有界前缀与省略计数，复用行数和共享字符预算。源事件先接入 session 再启动，无启动回放队列；WebSocket 保留消息边界，空消息算活动，诊断只进入收尾。
-- `monitorFlushMs` 默认 30 秒，保留显式值及 0；首批和静默后恢复立即发送。进度／静默／恢复使用用户可见的 `DELIVER_STEER`，没有批次之间的 passive 消息。可选 `wake_absent_ms` 从启动／事件到达计时，每段静默只提醒一次，提醒不停止监听。普通合并和静默只由 session 决策，面板不参与。
+- `monitorFlushMs` 默认 30 秒，保留显式值及 0；命令和 WS 在同一 registry 共用通知节奏，首批／及时事件最多等待 min(200ms,F)，0 不延迟。及时刷新带走其他有资格 pending，成功提交重计普通间隔。进度／静默／恢复使用用户可见的 `DELIVER_STEER`，没有批次之间的 passive 消息。可选 `wake_absent_ms` 从启动／事件到达计时，每段静默只提醒一次，提醒不停止监听。普通刷新归 registry 的 monitor-notifications；每源 session 保留事件到达／deadline／silence 决策，面板不参与。
 - 删除 `persistent`、隐式默认截止／上限、速率窗口／连续溢出停止及配置、日志 follower 与轮询配置。可选有限正数 `timeout_ms` 才安排总截止；超出 Node 单次定时范围时分段等待。没有旧参数兼容、迁移或用户配置写入。
 - 主 shell `exit` 同步进入 finishing，暂停并读取 Node 已缓冲的两流 bytes，只加入日志／同一收尾，再销毁 pipes 和关闭 fd。不等待 EOF／孙进程，不加 grace timeout；任一流未结束时说明后续输出可能未记录，未知数量不计入通知省略统计。
 - 自然结束、失败、外部信号、显式截止及共享日志大小保护由一个合并 terminal 通知消费 pending。`notify.ts` 的可选 typed monitor payload 替代 monitor 的 failure-tail 回读，保留 shell 原行为、attach／outcome 抑制及发送失败记录。显式 jobs／panel／session stop 仍静默。进度与 absent/resumed 不修改 Job.status 或结果标记。
@@ -329,3 +329,13 @@ explainable.
 - 主会话strict/full466/466、三模块444/444无forceexit自然退出，日志 `/tmp/pi-bg/b0dk3e0hq.log`；之后核心window/Down增量最终483/461通过。集中审查与窄修已关闭原finding，当前核心PTY已验，前文旧panel/sidebar或Down待验描述为历史偏离记录。
 - source stop 的 once closure 由 monitor session 持有，不依赖可能被 terminal 清掉的 `job.stop`。共享 `startBackgroundJob` 的已取消分支先调用 source hook，再保证 actual execution.stop 和清理；返回已 abort 的 controller 时立即执行静默接线，不等待不会再次触发的 listener。正常批次／wake／decoder 不改。
 - 真正非终态 setup exception 仍撤销 started admission；shutdown 已计入的 stopped metadata／统计保留，日志不删。实际工具／session／WS source（仅 socket transport fake）的重入回归和 terminal throwing-stop 测试覆盖此差异；原 fake command source rollback 的一次 group TERM 断言未弱化。全后端 G3 仍待 3B 与主会话核验。
+
+### 会话级 monitor 通知合并（2026-10-13）
+
+新增 nested `monitor-notifications.ts`，由 BackgroundRegistry 持有，非 SDK/global singleton，不复用 agent finite GroupJoin。普通刷新共享一个 timer，固定首窗／及时窗，输出预览共用 outputPreviewChars 公平预算；描述160、summary/note512、转换16的有界 metadata 单独保留，正文/details同用裁剪预览。自然尾批独立于 source abort，attach/retrieval 重查发送前仍验身份／消费；提交回调重入只消费快照，旧 epoch 不 commit。失败不新增自动重试、不杀源，progress不重放，terminal不标告知。freeze/reset/dispose 清通知 timer／队列／决策订阅。
+
+保留单 monitor details/renderer，新增 monitorBatch 多源格式，一次 steer+triggerTurn；普通 shell 通知正文／时机与 agent join/partial/wait 抑制均不改。source decoder、双流日志、OS execution 和 TERM→KILL 所有权不改。新增 actual scheduler/session/factory 回归，原 F=0 同步启动重入及自然释放 hard assertions 保留。
+
+### Monitor 硬容量与完整批次清单（2026-10-13）
+
+新增nested `monitor-batch.ts`：通知正文＋details合计UTF-8 JSON至多63KiB，预留1KiB信封，独立于共享outputPreviewChars。超量来源只内联有界前缀，完整原metadata逐行／字符串分块写配置logDir下独占uuid JSONL（0600），单条消息显式省略数量和清单路径，不新增配置/admission或拆批。原输出仍在source logs，转换保留最多16次及省略计数。清单与日志同样不由stop/reset/sweep删除；写失败清自己部分文件、关闭fd，不杀监听，省略且未保存终态不消费，明确不可用。提交失败保留文件及未消费结果，不自动重放／重试。actual factory跨registry／epoch与大批终态容量、query、renderer/control、partial-write/fd回归保留既有重入/unknown异常修复。

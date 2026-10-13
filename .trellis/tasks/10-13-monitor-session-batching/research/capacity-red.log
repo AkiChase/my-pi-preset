@@ -1,0 +1,48 @@
+✖ actual factory retains hundreds of terminals beyond admission: bounded single delivery, manifest queries, isolation and fd cleanup (153.039042ms)
+✖ thousands of retained terminal sources: one hard-bounded wire payload, complete original manifest, consumption and log retention (268.880833ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 765.927584
+
+✖ failing tests:
+
+test at extensions/process-tasks/__tests__/index.test.ts:284:1
+✖ actual factory retains hundreds of terminals beyond admission: bounded single delivery, manifest queries, isolation and fd cleanup (153.039042ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+    assert.ok(Buffer.byteLength(JSON.stringify({ content: item.content, details: item.details }), "utf8") <= MONITOR_NOTIFICATION_MAX_BYTES)
+
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/__tests__/index.test.ts:337:20)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at extensions/process-tasks/__tests__/monitor-notifications.test.ts:212:1
+✖ thousands of retained terminal sources: one hard-bounded wire payload, complete original manifest, consumption and log retention (268.880833ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+    assert.ok(Buffer.byteLength(JSON.stringify({ content: message.content, details: message.details }), "utf8") <= MONITOR_NOTIFICATION_MAX_BYTES)
+
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/__tests__/monitor-notifications.test.ts:216:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

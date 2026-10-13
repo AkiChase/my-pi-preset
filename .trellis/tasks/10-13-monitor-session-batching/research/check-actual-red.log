@@ -1,0 +1,48 @@
+✖ factory fallback reset inside deadline decision schedules new source and skips remaining old decisions (5.898542ms)
+✖ actual command session does not turn unstringifiable notification failure into source failure (3.862ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 661.535
+
+✖ failing tests:
+
+test at extensions/process-tasks/__tests__/index.test.ts:234:1
+✖ factory fallback reset inside deadline decision schedules new source and skips remaining old decisions (5.898542ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  0 !== 1
+
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/__tests__/index.test.ts:272:16)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at extensions/process-tasks/__tests__/monitor-session.test.ts:507:1
+✖ actual command session does not turn unstringifiable notification failure into source failure (3.862ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + 'failed'
+  - 'running'
+
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/process-tasks/__tests__/monitor-session.test.ts:525:16)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'running',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

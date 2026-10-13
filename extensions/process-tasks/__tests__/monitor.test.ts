@@ -87,7 +87,7 @@ void describe("monitor tool — validation", () => {
 });
 
 void describe("monitor tool — command lifecycle", () => {
-    void it("streams lines live, and sends one terminal notification", async () => {
+    void it("short command folds live lines into one timely terminal notification", async () => {
         const { tool, ctx, messages } = makeHarness();
         const res = await tool.execute(
             "t4",
@@ -100,19 +100,12 @@ void describe("monitor tool — command lifecycle", () => {
 
         await sleep(300); // let the source exit + terminal notify
 
-        // Stream lines are delivered live as monitor events.
-        const monitorEvents = messages.filter((m) => m.customType === EVENT.monitorEvent);
-        const streamText = monitorEvents
-            .map((m) => (m as unknown as { content: string }).content)
-            .join("\n");
-        assert.ok(monitorEvents.length >= 1, "expected at least one live stream event");
-        assert.match(streamText, /line-A/);
-        assert.match(streamText, /line-B/);
-
-        // The terminal notice is its own task-notification, sent at exit.
+        // An exit inside the short window folds its lines into the terminal.
+        assert.equal(messages.filter(m => m.customType === EVENT.monitorEvent).length, 0);
         const terminals = messages.filter((m) => m.customType === EVENT.taskNotification);
         assert.equal(terminals.length, 1, "exactly one terminal notification");
         const content = (terminals[0] as unknown as { content: string }).content;
+        assert.match(content, /line-A\nline-B/);
         assert.ok(content.includes("· completed]"));
         assert.ok(content.includes(`Monitor "test stream" stream ended`));
     });
@@ -229,14 +222,14 @@ test("AC4/5/6/12/19: WS empty/multiline/omitted messages each reset activity; di
     const ctx = makeHarness().ctx;
     await tool.execute("ws", { ws: { url: "ws://local.invalid" }, description: "ws activity", wake_absent_ms: 1000 }, undefined, undefined, ctx);
     const ws = FakeWS.instances.at(-1)!;
-    ws.dispatch("message", { data: "" }); assert.equal(messages.length, 1);
-    for (let i = 0; i < 5; i++) { t.mock.timers.tick(900); ws.dispatch("message", { data: "abcdef\nmore\nlast" }); }
+    ws.dispatch("message", { data: "" }); t.mock.timers.tick(200); assert.equal(messages.length, 1);
+    for (let i = 0; i < 5; i++) { t.mock.timers.tick(i === 0 ? 700 : 900); ws.dispatch("message", { data: "abcdef\nmore\nlast" }); }
     assert.equal(messages.length, 1, "omitted and buffered events prevent silence");
-    t.mock.timers.tick(1000); assert.equal(messages[1]!.details.monitor.state, "absent");
+    t.mock.timers.tick(1000); t.mock.timers.tick(200); assert.equal(messages[1]!.details.monitor.state, "absent");
     assert.match(messages[1]!.content, /notification omitted/);
-    ws.dispatch("message", { data: "stderr is just text" }); assert.equal(messages[2]!.details.monitor.state, "resumed");
+    ws.dispatch("message", { data: "stderr is just text" }); t.mock.timers.tick(200); assert.equal(messages[2]!.details.monitor.state, "resumed");
     ws.dispatch("error", {}); ws.dispatch("message", { data: "late" }); ws.dispatch("close", { code: 1000, reason: "" });
-    await Promise.resolve(); await Promise.resolve();
+    await Promise.resolve(); await Promise.resolve(); t.mock.timers.tick(200);
     assert.equal(messages.length, 4); assert.equal(messages[3]!.details.monitor.state, "failed");
     assert.match(messages[3]!.content, /WebSocket error/); assert.doesNotMatch(messages[3]!.content, /late/);
     t.mock.timers.tick(100000); assert.equal(messages.length, 4); assert.equal(reg.jobAborts.size, 0);
@@ -249,7 +242,7 @@ test("AC17/19: real stderr-only source exceeds shared log cap, stops with one co
     registerMonitorTool({ registerTool(def: CapturedTool) { tool = def; }, sendMessage(m: typeof sent[number]) { sent.push(m); } } as never, reg);
     t.after(() => { for (const job of reg.jobs.values()) terminateJobSilently(reg, job); });
     await tool.execute("stderr-cap", { command: "while true; do printf 'stderr-output-0123456789\\n' >&2; sleep 0.01; done", description: "stderr cap" }, undefined, undefined, makeHarness().ctx);
-    const job = [...reg.jobs.values()][0]!; await job.donePromise;
+    const job = [...reg.jobs.values()][0]!; await job.donePromise; await sleep(250);
     const terminals = sent.filter(m => m.customType === EVENT.taskNotification);
     assert.equal(terminals.length, 1); assert.match(terminals[0]!.content, /log size exceeded 100 bytes/);
     assert.ok(!sent.some(m => m.customType === EVENT.stall)); assert.equal(job.status, "killed");

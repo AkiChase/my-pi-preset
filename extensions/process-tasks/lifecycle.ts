@@ -31,6 +31,7 @@ export function createProcessLifecycleParticipant(reg: BackgroundRegistry, dispo
         name: "process-tasks",
         freeze() {
             reg.closed = true;
+            reg.monitorNotifications.freeze();
             for (const job of reg.jobs.values()) markOutcomeSurfaced(job);
             reg.notificationRetries.clear();
         },
@@ -46,7 +47,7 @@ export function createProcessLifecycleParticipant(reg: BackgroundRegistry, dispo
         async drain() {
             await Promise.all([...reg.executions.values()].map((execution) => execution.done));
         },
-        dispose() { safely(disposeSource); },
+        dispose() { reg.monitorNotifications.dispose(); safely(disposeSource); },
     };
 }
 
@@ -281,6 +282,7 @@ export function markKilledSilently(reg: BackgroundRegistry, job: Job): void {
 export function terminateJobSilently(reg: BackgroundRegistry, job: Job): void {
     if (isTerminalStatus(job.status)) return;
     markOutcomeSurfaced(job);
+    reg.monitorNotifications.cancel(job);
     reg.notificationRetries.delete(job.id);
     try { terminateJob(job); } catch (error) { console.error("[process-tasks] stop hook failed:", error); }
     finally {

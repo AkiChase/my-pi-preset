@@ -34,16 +34,17 @@ export function registerMonitorTool(pi: ExtensionAPI, reg: BackgroundRegistry): 
         description:
             "Watch a command or WebSocket with visible, agent-waking batched notifications. " +
             "Command stdout and stderr are collected together; complete lines are activity. " +
-            "The first batch is immediate, later progress is coalesced (default 30s). " +
+            "Monitors share one notification cadence (default 30s); first/timely events batch within 200ms (or a smaller configured interval). " +
             "No implicit timeout; the main command exit ends observation.",
         promptSnippet: "Watch event streams with batched notifications and optional silence reminders",
         promptGuidelines: [
             "For one result when done, use bash run_in_background with a loop that exits; use monitor for event streams.",
             "Both stdout and stderr are received. command | grep filters stdout only; command 2>&1 | grep filters both streams.",
             "Flush pipeline stages per line: grep --line-buffered, awk fflush(). A partial command line does not wake the agent.",
-            "Silence is not success. Optional wake_absent_ms reminds once per silence; the first recovery is immediate and the watch continues.",
+            "Silence is not success. Optional wake_absent_ms reminds once per silence; recovery is timely (within 200ms) and the watch continues.",
             "No timeout unless timeout_ms is provided. Stop session-length watches via jobs action='kill'; explicit stop sends no final notification.",
             "Give a specific description. Read the log for output omitted by bounded previews. stderr content alone is not failure.",
+            "Oversized batches include an omitted-source count and local JSONL manifest path; read it for source metadata/log paths. Manifest save failures are explicit, not automatic retries.",
             "WebSocket messages, including empty messages, count as activity; progress is batched, not one notification per line.",
         ],
         parameters: Type.Object({

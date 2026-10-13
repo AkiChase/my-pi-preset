@@ -4,6 +4,7 @@
  * One instance per session, threaded through every tool and helper.
  */
 
+import { MonitorNotifications } from "./monitor-notifications.ts";
 import { TaskCoordinator } from "../task-ui/coordinator.ts";
 import { DEFAULTS as UI_DEFAULTS, type TaskUIConfig } from "../task-ui/config.ts";
 import type { OwnedExecution } from "./spawn.ts";
@@ -18,12 +19,14 @@ export class BackgroundRegistry {
      *  test can `new BackgroundRegistry()` without loading a file. */
     readonly config: ProcessTasksConfig;
 
+    readonly monitorNotifications: MonitorNotifications;
     readonly coordinator: TaskCoordinator;
     readonly uiConfig: TaskUIConfig;
     constructor(config: ProcessTasksConfig = DEFAULTS, coordinator = new TaskCoordinator(), uiConfig: TaskUIConfig = UI_DEFAULTS) {
         this.config = config;
         this.coordinator = coordinator;
         this.uiConfig = uiConfig;
+        this.monitorNotifications = new MonitorNotifications(this);
     }
 
     private readonly listeners = new Set<() => void>();

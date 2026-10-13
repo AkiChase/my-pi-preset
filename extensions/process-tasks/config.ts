@@ -41,7 +41,7 @@ export interface ProcessTasksConfig {
     /** No log growth for this long + a prompt-like tail ⇒ stall warning. */
     stallThresholdMs: number;
     stallTailBytes: number;
-    /** Minimum interval between ordinary monitor progress submissions; 0 sends each source batch. */
+    /** Shared ordinary monitor cadence; first/timely window <= min(200ms,F), 0 sends each source batch. */
     monitorFlushMs: number;
     /** Maximum preview lines per monitor batch. */
     monitorMaxLinesPerEvent: number;

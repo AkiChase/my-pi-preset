@@ -1,13 +1,13 @@
 /** Event-arrival scheduling and single-consumption monitor notifications. */
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { BackgroundRegistry } from "./state.ts";
-import { DELIVER_STEER, EVENT, isTerminalStatus, type Job, type UiContext } from "./types.ts";
+import { isTerminalStatus, type Job, type UiContext } from "./types.ts";
 import { renderSidebar } from "./registry.ts";
 import { abortJob, markTerminal, startBackgroundJob, terminateJob } from "./lifecycle.ts";
 import { killProcessTree } from "./spawn.ts";
 import { MonitorBuffer } from "./monitor-buffer.ts";
 import type { MonitorResult, MonitorSource, MonitorSourceFactory } from "./monitor-source.ts";
-import { buildMonitorNotification, completionSummary, sendTaskNotification,
+import { completionSummary,
     type MonitorNotificationPayload, type TerminalStatus } from "./notify.ts";
 
 const MAX_TIMER_MS = 2_147_483_647;
@@ -28,13 +28,11 @@ export function startMonitorSession(args: {
     // add() publishes synchronously; both the tool and direct callers must
     // recheck admission before constructing a socket/process or opening its fd.
     if (isMonitorSetupCancelled(reg, job)) return "cancelled";
-    const { monitorFlushMs, monitorMaxLinesPerEvent, outputPreviewChars } = reg.config;
+    const { monitorMaxLinesPerEvent, outputPreviewChars } = reg.config;
     const pending = new MonitorBuffer(monitorMaxLinesPerEvent, outputPreviewChars);
     let state: "active" | "absent" | "finishing" | "terminal" = "active";
     const startedAt = Date.now();
     let lastActivity = startedAt;
-    let lastProgress: number | undefined;
-    let pendingActivity = false;
     let timer: NodeJS.Timeout | undefined;
     let source: MonitorSource;
     let sourceStopped = false;
@@ -50,31 +48,23 @@ export function startMonitorSession(args: {
     const beginFinishing = () => {
         if (state === "terminal") return;
         state = "finishing";
+        reg.monitorNotifications.unobserve(job);
+        reg.monitorNotifications.suspend(job);
         cancel();
     };
     const payload = (notificationState: MonitorNotificationPayload["state"], note?: string): MonitorNotificationPayload => {
-        pendingActivity = false;
         return { state: notificationState, description, preview: pending.take(), ...(note ? { note } : {}) };
     };
     const emit = (notificationState: "progress" | "absent" | "resumed", now: number) => {
         const monitor = payload(notificationState);
         if (notificationState === "absent") monitor.silenceMs = now - lastActivity;
-        try {
-            pi.sendMessage({ customType: EVENT.monitorEvent,
-                content: buildMonitorNotification(job, monitor), display: true,
-                details: { jobId: job.id, description, logPath: job.logPath, monitor } }, DELIVER_STEER);
-        } catch (err) {
-            // Local submission failure is not a source failure or a surfaced outcome.
-            job.notifyError = err instanceof Error ? err.message || String(err) : String(err);
-            console.error("[process-tasks] monitor notification failed:", err);
-        }
-        if (notificationState !== "absent") lastProgress = now;
+        reg.monitorNotifications.enqueue(pi, job, monitor);
     };
     const finish = (status: TerminalStatus, summary: string, note?: string) => {
         if (state === "terminal" || !current()) return;
         beginFinishing();
         state = "terminal";
-        sendTaskNotification({ reg, pi, job, status, summary, monitor: payload(status, note) });
+        reg.monitorNotifications.enqueue(pi, job, payload(status, note), summary);
     };
     const stopWithReason = (reason: string) => {
         if (state === "terminal" || state === "finishing" || !current()) return;
@@ -97,39 +87,41 @@ export function startMonitorSession(args: {
         if (state === "active" && wakeAbsentMs !== undefined && now - lastActivity >= wakeAbsentMs) {
             state = "absent";
             emit("absent", now);
-        } else if (pendingActivity && (lastProgress === undefined || now - lastProgress >= monitorFlushMs)) {
-            emit(state === "absent" ? "resumed" : "progress", now);
-            state = "active";
         }
         // An outward callback may synchronously shut down while emitting.
         if (!current()) { cancel(); return; }
         const due: number[] = [];
         if (deadline !== undefined) due.push(deadline);
         if (state === "active" && wakeAbsentMs !== undefined) due.push(lastActivity + wakeAbsentMs);
-        if (pendingActivity) due.push((lastProgress ?? now) + monitorFlushMs);
         if (due.length) {
             const delay = Math.min(MAX_TIMER_MS, Math.max(1, Math.min(...due) - now));
             timer = setTimeout(decide, delay);
             timer.unref();
         }
     };
-    source = args.createSource({
-        event(preview, arrivedAt) {
-            if (state === "finishing" || state === "terminal" || !current()) return;
-            lastActivity = arrivedAt;
-            pending.add(preview);
-            pendingActivity = true;
-            if (state === "absent") {
-                // A total deadline still wins over a recovery arriving at that boundary.
+    reg.monitorNotifications.observe(job, decide);
+    try {
+        source = args.createSource({
+            event(preview, arrivedAt) {
+                if (state === "finishing" || state === "terminal" || !current()) return;
+                lastActivity = arrivedAt;
+                pending.add(preview);
+                // A total deadline wins over any activity at the boundary.
                 if (deadline !== undefined && Date.now() >= deadline) { decide(); return; }
+                const notificationState = state === "absent" ? "resumed" : "progress";
                 state = "active";
-                emit("resumed", Date.now());
-            }
-            decide();
-        },
-        finishing: beginFinishing,
-        final(preview) { if (state === "finishing" && current()) pending.add(preview); },
-    });
+                emit(notificationState, Date.now());
+                decide();
+            },
+            finishing: beginFinishing,
+            final(preview) { if (state === "finishing" && current()) pending.add(preview); },
+        });
+    } catch (error) {
+        cancel();
+        reg.monitorNotifications.cancel(job);
+        state = "terminal";
+        throw error;
+    }
     job.pid = source.pid;
     job.command = source.label;
     const stopOwnedSource = () => {
@@ -141,11 +133,13 @@ export function startMonitorSession(args: {
         }
     };
     const silentAbort = () => {
+        // Natural completion aborts runtime hooks too; its finite tail remains queued.
+        const naturalTerminal = state === "terminal";
         beginFinishing();
         try { stopOwnedSource(); } finally {
             state = "terminal";
+            if (!naturalTerminal) reg.monitorNotifications.cancel(job);
             pending.take();
-            pendingActivity = false;
         }
     };
     job.stop = stopOwnedSource;
@@ -179,8 +173,8 @@ export function startMonitorSession(args: {
             stopOwnedSource();
         } finally {
             state = "terminal";
+            reg.monitorNotifications.cancel(job);
             pending.take();
-            pendingActivity = false;
             abortJob(reg, job.id);
             job.resolveDone?.();
             delete job.resolveDone;

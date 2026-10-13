@@ -141,3 +141,13 @@ node --test extensions/agent-tasks/__tests__/{runner-cancellation,worktree-lifec
 ## Agent participant 辅助执行回归（3B2）
 
 `node --test extensions/agent-tasks/__tests__/{auxiliary-lifecycle,tool-waits,workflow}.test.ts extensions/task-ui/__tests__/sdk-runtime.test.ts`，按上文临时 agent-dir/实际SDK，无 force-exit。actual clone 的 loader/create typed seam 不替换整个 clone；真实 temp ScheduleStore + captured timer callbacks 覆盖 interval/once/cron 与 late startup/finalize；实际 RPC callback、busy/paused worker、host pi.exec signal/late result、CLI workflow、保留 child extension interval和 old tools/input 保留。sdk-runtime 同时注入真实 process/agent 到一个 protocol，驱动实际 new/resume/fork/import/quit/reload；hard loader 的 root/child ALS 和 mixed-waits/monitor 全部断言继续执行。初始行为红证据至少覆盖 retained result tool 与 worker abort 后 late gate，fixture API/grammar 错误另记不冒充产品失败。定向绿色不替代 full strict/full tests/三模块 natural exit，不声明非协作 provider all-stop 或真实 TUI 已通过。
+
+## Monitor 会话级通知调度回归
+
+```sh
+node --test extensions/process-tasks/__tests__/{monitor-notifications,monitor-session,monitor-buffer,monitor,config,index,activation,waits,monitor-setup-result}.test.ts
+```
+
+同样使用实际 SDK 和临时 agent-dir，不加 force-exit。monitor-notifications 直接执行 registry 拥有的真实调度器（fake clock/host sink）；session 执行两源，index factory 执行真实本地 command 与 fake WS transport，校验一次投递、共享节奏、及时竞争、自然 terminal abort、attach/retrieval、发送重入、公平预算、正文/details裁剪一致、epoch reset 和安全 renderer。必须覆盖决策订阅中 session_start fallback 同步 reset 后启动新源，以及 sendMessage 回调 reset 后 enqueue：旧快照不 commit，新 epoch 不因 flushing 守卫遗漏 timer；unknown 异常也须包含无法字符串化及抛错inspect.custom的对象，不mock掉console.error掩盖原对象检查；通过实际 command session 验证不变成源失败。短命令在200ms内退出可把首批折进终态，不要求额外 progress 消息。保留 F=0 的原同步启动重入断言，不用修改源 decoder 或放宽 OS 清理断言适应通知延迟。
+
+硬容量回归必须运行 `monitor-notifications.test.ts` 与 `index.test.ts`：1500个终态及actual factory每批350个（并发上限1），同时测UTF-8 JSON正文/details≤64KiB、一次发送、全量manifest ID/log/summary、跨registry/session独占、partial-write/失败cleanup/fd0与listener继续。清单测试写临时logDir；builtin fs seam只在测试中scoped mock并用syncBuiltinESMExports恢复，不改SDK/生产依赖。容量红证据应局部禁用wire bound/manifest后实际两个测试失败，再立即恢复；无force-exit完整自然退出仍是资源门禁。临界普通batch须先精确计量，不应预留overflow提示而误判；实际message/options信封与content/details63KiB同时断言。JSONL测试覆盖跨字符串块的pair／孤立surrogate、0短写、close前后异常及NUL配置路径／失败终态显式retrieval重查。

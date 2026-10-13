@@ -193,7 +193,7 @@ function outputAction(
     // the outcome surfaced, suppressing the separate <task-notification>.
     // Peeking at a still-running job does NOT mark — its completion must still
     // notify.
-    if (isTerminalStatus(job.status)) markOutcomeSurfaced(job);
+    if (isTerminalStatus(job.status)) markOutcomeSurfaced(job, reg);
 
     const limit = page.limit ?? reg.config.outputPreviewChars;
     const slice = readLogSlice(job.logPath, { offset: page.offset, limit });
@@ -273,7 +273,7 @@ async function attachAction(
         job.attachCount = (job.attachCount ?? 0) + 1;
         const lease = reg.coordinator.registerWait<void>({
             identity: processTaskIdentity(job.id), label, kind: "retrieval", signal,
-            onComplete: () => { markOutcomeSurfaced(job); reg.notificationRetries.delete(job.id); },
+            onComplete: () => { markOutcomeSurfaced(job, reg); reg.notificationRetries.delete(job.id); },
             cleanup: () => {
                 job.attachCount = Math.max(0, (job.attachCount ?? 1) - 1);
                 reg.changed();
@@ -319,7 +319,7 @@ async function attachAction(
     // The attach result IS the outcome report — mark it surfaced so the
     // <task-notification> is suppressed (CC parity). Covers both the "attached
     // to an already-terminal job" and "waited then finished" cases.
-    markOutcomeSurfaced(job);
+    markOutcomeSurfaced(job, reg);
     return {
         content: [textBlock(`${message}. Use jobs output for the full log.`)],
         details: undefined,

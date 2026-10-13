@@ -1,9 +1,10 @@
 /**
  * Task-completion notifications — Claude Code's <task-notification> engine.
  *
- * Every backgrounded job that reaches a terminal state enqueues its OWN
- * notification message, exactly once, the moment it exits. There is no
- * hold-and-flush and no coalescing window: pi's steer delivery queues the
+ * Every backgrounded shell job that reaches a terminal state enqueues its OWN
+ * notification message, exactly once, the moment it exits. Shell notifications
+ * have no hold-and-flush or coalescing window; monitor delivery belongs to the
+ * registry's MonitorNotifications scheduler. Pi's steer delivery queues the
  * message while the agent is streaming and delivers it at the next tool-call
  * boundary (CC's 'next' priority), or starts a turn when the agent is idle
  * (triggerTurn: true).
@@ -41,7 +42,7 @@ export interface MonitorNotificationPayload {
     note?: string;
 }
 
-export function buildMonitorNotification(job: Job, payload: MonitorNotificationPayload, summary?: string): string {
+export function buildMonitorNotification(job: Pick<Job, "id" | "logPath">, payload: MonitorNotificationPayload, summary?: string): string {
     return [
         `[monitor ${job.id} · ${payload.state}] ${payload.description}`,
         ...(summary ? [summary] : []),
@@ -144,8 +145,9 @@ export function completionSummary(job: Job, status?: TerminalStatus): string {
  * outcome WITHOUT a notification: kill paths (before the kill, so the exit
  * handler skips notifying) and terminal reads (jobs output / attach).
  */
-export function markOutcomeSurfaced(job: Job): void {
+export function markOutcomeSurfaced(job: Job, reg?: BackgroundRegistry): void {
     job.outcomeSurfaced = true;
+    if (job.kind === "monitor") reg?.monitorNotifications.cancel(job);
     // The outcome got through by another route, so a stale send failure is no
     // longer worth reporting.
     delete job.notifyError;
