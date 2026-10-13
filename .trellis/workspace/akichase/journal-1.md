@@ -240,3 +240,38 @@ Implemented registry-scoped command/WS monitor batching with fixed short windows
 ### Status
 
 [OK] **Completed**
+
+
+## Session 8: 内置 Beautify 与任务协调入口重命名
+<!-- trellis-session: v=2 fp=75030858ebca4452 -->
+
+**Date**: 2026-10-13
+**Task**: 内置 Beautify 与任务协调入口重命名
+**Branch**: `main`
+
+### Summary
+
+完成独立 Beautify 四工具/输入框美化，移除 Pretty 与专属兼容；入口重命名 task-composition，独立审查通过，两任务归档。
+
+### Main Changes
+
+- 保留原工具执行、模型结果、input-history 与 Task UI；语义复制明确不做
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e3fd258` | feat: add native beautify and rename task composition |
+| `5f1a19f` | chore: clean whitespace in handoff and rename evidence |
+
+### Testing
+
+- [OK] Pi 1.2.0 actual host seam，strict + 583/583 full，583/583 natural exit，77/77 focused
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 未验证真实 PTY/actual input-history/fullscreen；未个人 install/sync/reload；保留无关 .pi 与任务规划
