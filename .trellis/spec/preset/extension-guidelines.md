@@ -65,6 +65,29 @@ Pi1.1.0的publicEditor.isShowingAutocomplete与TUI.getFocusedComponent/hasOverla
 
 关闭先清cell.resources/access、screen/target，再恢复自己仍ownedmethod；lateropaquewrapper保持inactiveforwarder，不通过hostsetter重建丢state。capturedwrapper必须不保旧ctx/TUI/coordinator/panel；测试opaque包装在独立module-scope创建，不能让fixture本身共享create环境保这些资源。独立未来不delegate原factory的editor不自动继承Down，显式入口仍可用。无globalrawinputs，actualSDKsetter/TUI分发/Pretty顺序自动测试已通过；另有用户授权的隔离installedCLI140x40PTY核心冒烟，不覆盖任意插件/尺寸或在线模型自主质量。
 
+## 子代理轮次预算接口
+
+### 1. 范围
+模型不得猜测委派的轮次预算；主／嵌套 `Agent` 删除 `max_turns`，用户配置和可信程序入口仍支持限制。
+
+### 2. 签名
+模型 schema 不含 `max_turns`；`resolveAgentInvocationConfig` 只从 agent 配置读取上限。可信 manager/RPC 的 `maxTurns` 与 scheduler 的 `max_turns` 保留。
+
+### 3. 契约
+旧模型参数忽略，模型 schedule 不保存预算，触发时读用户配置。每个 run 在 admission 解析一次有效值；record、invocation、activity 和 source 使用同一上限。manager → runner 以 `0` 显式冻结无限制，不能传 `undefined` 让异步 bind 后重读默认值；resume 同样处理。
+
+### 4. 输入矩阵
+未配置／用户 `0` → 无限；全局有限 → 该次运行有限；frontmatter `0` → 覆盖全局；旧模型字段 → 无效；启动后配置变化 → 仅影响后续 run。不新增历史数据迁移或来源标记。
+
+### 5. 示例
+正常调用省略预算；用户通过 `agent-tasks.json`／agent 文件设置限制；可信 scheduler 保存显式预算属于程序接口。模型传 `max_turns: 1` 不得改变 execution 或 schedule。
+
+### 6. 回归
+[tool-waits.test.ts](../../../extensions/agent-tasks/__tests__/tool-waits.test.ts) 验证实际 schema／旧参数／通知；[backend-waits.test.ts](../../../extensions/agent-tasks/__tests__/backend-waits.test.ts) 验证嵌套及可信持久化／RPC；[runner-cancellation.test.ts](../../../extensions/agent-tasks/__tests__/runner-cancellation.test.ts) 用真实 runner 延迟 bind，覆盖有限→另一限额、无限→有限及 resume。
+
+### 7. 错误与正确
+错误：只删 schema，resolver 仍读模型参数；或 `maxTurns: record.maxTurns` 在无限制时变成 `undefined`。正确：删除模型解析／schedule 写入，并向 runner 传 `maxTurns: record.maxTurns ?? 0`，读模型继续以 undefined 表示无限。
+
 ### Agent backend 等待与 source 约束
 
 - [agent-manager.ts](../../../extensions/agent-tasks/src/agent-manager.ts) 每次新建/resume 立即创建 namespaced terminal handle（queue/startup/failure 均有），resume 复用 session 但 runId 换代且旧执行未 settle 时拒绝重入。父 signal 只有一个 tracked link；detach 同步注销并转移当前 admission pool，完成幂等释放当前 lease，不由 `isBackground` 临时推断旧 acquire。

@@ -9,6 +9,8 @@ import { TaskCoordinator } from "../../task-ui/coordinator.ts";
 import { TaskPanel } from "../../task-ui/panel.ts";
 import { FINISHED_LINGER_MS } from "../../task-ui/model.ts";
 import { DEFAULTS as UI_DEFAULTS } from "../../task-ui/config.ts";
+const { createNestedSubagentTools } = await import("../src/nested-tools.ts");
+const { setDefaultMaxTurns } = await import("../src/agent-runner.ts");
 const { AgentManager } = await import("../src/agent-manager.ts");
 const { registerAgentWait, canDeliverAgentResult } = await import("../src/waits.ts");
 const { createAgentTaskSource } = await import("../src/source.ts");
@@ -71,6 +73,54 @@ function fixture(extra: AgentManagerDependencies = {}, notify?: (record: import(
     async close() { manager.freezeAdmission(); manager.abortAll(); await tick(); off(); source.dispose(); coordinator.dispose(); await manager.dispose(); },
   };
 }
+
+void it("nested actual delegation ignores legacy turn budgets and keeps user defaults across resume", async () => {
+  const f = fixture();
+  setDefaultMaxTurns(7);
+  try {
+    const tool = createNestedSubagentTools({ manager: f.manager, pi, parentAgentId: "parent", depth: 1,
+      maxSubagentDepth: 2, allowedSubagents: "all", configCwd: ctx.cwd })[0]!;
+    const params = { subagent_type: "general-purpose", description: "nested", prompt: "test", max_turns: 1 };
+    const launch = tool.execute("nested", params, undefined, undefined, ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext); await tick();
+    assert.equal(f.manager.getRecord(f.calls[0]!.id)?.maxTurns, 7);
+    assert.equal(f.manager.getRecord(f.calls[0]!.id)?.invocation?.maxTurns, 7);
+    f.calls[0]!.finish(); await launch;
+    setDefaultMaxTurns(9);
+    const resume = tool.execute("nested-resume", { ...params, resume: f.calls[0]!.id }, undefined, undefined, ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext); await tick();
+    assert.equal(f.resumes[0]!.options?.maxTurns, 9);
+    assert.equal(f.manager.getRecord(f.calls[0]!.id)?.invocation?.maxTurns, 9);
+    f.resumes[0]!.finish(); await resume;
+  } finally { await f.close(); setDefaultMaxTurns(undefined); }
+});
+
+void it("trusted scheduler persistence and RPC retain explicit turn limits through actual manager execution", async () => {
+  const { SubagentScheduler } = await import("../src/schedule.ts");
+  const { ScheduleStore } = await import("../src/schedule-store.ts");
+  const { registerRpcHandlers } = await import("../src/cross-extension-rpc.ts");
+  const root = mkdtempSync(join(tmpdir(), "trusted-turns-")), f = fixture();
+  const callbacks: (() => void)[] = [];
+  const scheduler = new SubagentScheduler({ interval(callback) { callbacks.push(callback); return {} as NodeJS.Timeout; },
+    once() { throw new Error("unexpected once"); }, cron() { throw new Error("unexpected cron"); }, clear() {} });
+  const rpc = new Map<string, (value: unknown) => void>();
+  const handlers = registerRpcHandlers({ events: { on(name, callback) { rpc.set(name, callback); return () => rpc.delete(name); }, emit() {} },
+    pi, getCtx: () => ctx, manager: { spawn: f.manager.spawn.bind(f.manager), awaitStartup: f.manager.awaitStartup.bind(f.manager),
+      getRecord: f.manager.getRecord.bind(f.manager), abort: f.manager.abort.bind(f.manager), consumeResult: () => false } });
+  setDefaultMaxTurns(7);
+  try {
+    const path = join(root, "schedules.json"), store = new ScheduleStore(path);
+    store.add(scheduler.buildJob({ name: "trusted", description: "test", schedule: "1h", subagent_type: "general-purpose", prompt: "test", max_turns: 3 }));
+    scheduler.start({ events: { emit() {} } } as unknown as ExtensionAPI, ctx, f.manager, new ScheduleStore(path)); callbacks[0]!(); await tick();
+    assert.equal(f.manager.getRecord(f.calls[0]!.id)?.maxTurns, 3);
+    assert.equal(f.manager.getRecord(f.calls[0]!.id)?.invocation?.maxTurns, 3);
+    f.calls[0]!.finish(); await scheduler.drain();
+    assert.equal(new ScheduleStore(path).list()[0]?.max_turns, 3);
+    rpc.get("subagents:rpc:spawn")!({ requestId: "trusted", type: "general-purpose", prompt: "test", options: { description: "rpc", maxTurns: 4 } }); await tick();
+    assert.equal(f.calls[1]!.options.maxTurns, 4);
+    assert.equal(f.manager.getRecord(f.calls[1]!.id)?.maxTurns, 4);
+    assert.equal(f.coordinator.list().find(row => row.taskId === f.calls[1]!.id)?.stats.maxTurns, 4);
+    f.calls[1]!.finish(); await tick();
+  } finally { Object.values(handlers).forEach(off => off()); scheduler.stop("shutdown"); await f.close(); await scheduler.drain(); setDefaultMaxTurns(undefined); rmSync(root, { recursive: true, force: true }); }
+});
 
 void it("running foreground detach transfers current lease above a full background pool; later admission waits", async () => {
   const f = fixture();

@@ -6,7 +6,7 @@ import { it } from "node:test";
 import type { AgentSession, AgentSessionEvent, DefaultResourceLoader, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import "./source-loader.mjs";
 import type { AgentRunnerDependencies, RunOptions } from "../src/agent-runner.ts";
-const { runAgent, resumeAgent, setRememberAgents, shutdownChildSession } = await import("../src/agent-runner.ts");
+const { runAgent, resumeAgent, setRememberAgents, shutdownChildSession, setDefaultMaxTurns, getDefaultMaxTurns } = await import("../src/agent-runner.ts");
 const { AgentManager } = await import("../src/agent-manager.ts");
 const { TaskCoordinator } = await import("../../task-ui/coordinator.ts");
 const { registerAgentWait } = await import("../src/waits.ts");
@@ -128,6 +128,54 @@ void it("actual runner normal new/resume and parent-detached delayed startup sti
     await resumeAgent(f.session, "resume"); assert.equal(f.calls.prompt, 2); assert.equal(f.listeners.size, 0);
   } finally { coordinator.dispose(); await manager.dispose(); await f.close(); }
 });
+
+for (const initial of [2, undefined]) {
+  void it(`actual manager/runner freezes ${initial ?? "unlimited"} turns across delayed bind and resume`, async () => {
+    const f = fixture("bind"), coordinator = new TaskCoordinator();
+    const { createAgentTaskSource } = await import("../src/source.ts");
+    const previous = getDefaultMaxTurns();
+    const notices: (number | undefined)[] = [], boundaries: (number | undefined)[] = [];
+    const manager = new AgentManager(record => { notices.push(record.maxTurns); }, 1, undefined, undefined, undefined, {
+      runAgent: (ctx, type, prompt, options) => {
+        boundaries.push(options.maxTurns);
+        return runAgent(ctx, type, prompt, options, f.deps);
+      },
+      resumeAgent: async (session, prompt, options) => {
+        boundaries.push(options?.maxTurns);
+        // A default change before the real resume must not affect this run.
+        setDefaultMaxTurns(9);
+        return resumeAgent(session, prompt, options);
+      },
+    });
+    const source = createAgentTaskSource(manager, coordinator, new Map());
+    let steers = 0;
+    const steerAt: number[] = [];
+    f.session.steer = async () => { steers++; steerAt.push(manager.listAgents()[0]!.turnCount!); return "queued"; };
+    f.session.prompt = async () => {
+      for (let i = 0; i < 3; i++) for (const callback of f.listeners) callback({ type: "turn_end" } as AgentSessionEvent);
+    };
+    try {
+      setDefaultMaxTurns(initial);
+      const id = manager.spawn(f.pi, f.ctx, "general-purpose", "frozen", { description: "frozen", isolated: true, invocation: {} });
+      await f.reached.promise;
+      assert.equal(manager.getRecord(id)?.maxTurns, initial);
+      assert.equal(manager.getRecord(id)?.invocation?.maxTurns, initial);
+      setDefaultMaxTurns(3); f.gate.resolve(); await manager.waitForAll();
+      assert.equal(steers, initial === undefined ? 0 : 1, "unlimited cannot re-read a later limit");
+      assert.deepEqual(steerAt, initial === undefined ? [] : [initial], "limited run steers at admission limit, not changed default");
+      assert.equal(source.list().find(row => row.taskId === id)?.stats.maxTurns, initial);
+      setDefaultMaxTurns(initial);
+      assert.ok(manager.resumeRun(id, "frozen resume")); await manager.waitForAll();
+      assert.equal(steers, initial === undefined ? 0 : 2);
+      assert.equal(manager.getRecord(id)?.maxTurns, initial);
+      assert.equal(manager.getRecord(id)?.invocation?.maxTurns, initial);
+      assert.equal(source.list().find(row => row.taskId === id)?.stats.maxTurns, initial);
+      assert.deepEqual(notices, [initial, initial]);
+      assert.deepEqual(boundaries, [initial ?? 0, initial ?? 0], "runtime unlimited is explicit, never absent");
+      assert.equal(f.listeners.size, 0);
+    } finally { source.dispose(); coordinator.dispose(); await manager.dispose(); await f.close(); setDefaultMaxTurns(previous); }
+  });
+}
 
 void it("actual runner callback failure closes exposed session once even through manager disposal", async () => {
   const f = fixture(), failure = new Error("session callback failure");

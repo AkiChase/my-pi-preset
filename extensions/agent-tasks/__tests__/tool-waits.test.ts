@@ -10,6 +10,8 @@ import { TaskCoordinator } from "../../task-ui/coordinator.ts";
 import type { AgentManagerDependencies } from "../src/agent-manager.ts";
 import type { RunResult } from "../src/agent-runner.ts";
 const { sessionTaskDir } = await import("../src/output-file.ts");
+const { setDefaultMaxTurns } = await import("../src/agent-runner.ts");
+const { createNestedSubagentTools } = await import("../src/nested-tools.ts");
 import type { AgentRecord, NotificationDetails } from "../src/types.ts";
 const { default: agentTasks } = await import("../src/index.ts");
 function deferred<T>() {
@@ -80,7 +82,7 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
   };
   const execute = (name: string, params: Record<string, unknown>, signal?: AbortSignal, call: { id: string | undefined } = { id: "offline-call" }) => tools.get(name)!.execute(call.id!, params, signal, () => { throw new Error("inline renderer failed"); }, ctx);
   return { coordinator, lifecycle, source, calls,
-    shutdownHandlers: () => handlers.get("session_shutdown")!.length, resumes, notices, execute, ctx, registry, root,
+    shutdownHandlers: () => handlers.get("session_shutdown")!.length, tools, resumes, notices, execute, ctx, registry, root,
     input: (text: string) => handlers.get("input")![0]!({ text, source: "interactive" }, ctx),
     repeatStart: () => handlers.get("session_start")![0]!(undefined, ctx),
     artifactDir: sessionTaskDir(cwd, "offline-test"),
@@ -99,6 +101,90 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
 function text(result: Awaited<ReturnType<Parameters<ExtensionAPI["registerTool"]>[0]["execute"]>>): string {
   return result.content.filter(block => block.type === "text").map(block => block.text).join("\n");
 }
+
+void it("model Agent schema omits turn limits at root and nested boundaries", async () => {
+  const f = await factory();
+  try {
+    const nested = createNestedSubagentTools({ manager: {} as import("../src/nested-tools.ts").NestedAgentManager, pi: {} as ExtensionAPI,
+      parentAgentId: "parent", depth: 1, maxSubagentDepth: 2, allowedSubagents: "all", configCwd: f.ctx.cwd });
+    assert.equal(Object.hasOwn(Reflect.get(f.tools.get("Agent")!.parameters, "properties"), "max_turns"), false);
+    assert.equal(Object.hasOwn(Reflect.get(nested[0]!.parameters, "properties"), "max_turns"), false);
+  } finally { await f.close(); }
+});
+
+for (const background of [false, true]) void it(`legacy model turn limit cannot affect actual ${background ? "background" : "foreground"} new/resume execution or notices`, async () => {
+  const f = await factory({ defaultMaxTurns: 7 });
+  const pending: Promise<unknown>[] = [];
+  try {
+    const launch = f.start(background, { max_turns: 1 }); pending.push(launch); void launch.catch(() => {}); await tick();
+    assert.equal(f.calls[0]!.options.maxTurns, 7);
+    const id = f.calls[0]!.options.agentId!;
+    assert.equal(f.registry.getRecord(id)?.maxTurns, 7);
+    assert.equal(f.registry.getRecord(id)?.invocation?.maxTurns, 7);
+    assert.equal(f.coordinator.list()[0]?.stats.maxTurns, 7);
+    if (!background) f.coordinator.detachAll(); await launch;
+    f.calls[0]!.options.onTurnEnd?.(3); f.calls[0]!.finish(); await tick(); await pause(260);
+    assert.equal(f.notices[0]?.details?.maxTurns, 7);
+    setDefaultMaxTurns(9);
+    const resume = f.start(background, { resume: id, subagent_type: "custom", max_turns: 2 }); pending.push(resume); void resume.catch(() => {}); await tick();
+    assert.equal(f.resumes[0]!.options?.maxTurns, 9);
+    assert.equal(f.registry.getRecord(id)?.invocation?.maxTurns, 9);
+    assert.equal(f.coordinator.list()[0]?.stats.maxTurns, 9);
+    if (!background) f.coordinator.detachAll(); await resume;
+    f.resumes[0]!.finish(); await tick(); await pause(260);
+    assert.equal(f.notices[1]?.details?.maxTurns, 9);
+  } finally { await f.close(); await Promise.allSettled(pending); setDefaultMaxTurns(undefined); }
+});
+
+void it("model scheduled delegation never persists legacy or default turn budgets and fires with current user configuration", async () => {
+  const f = await factory({ schedulingEnabled: true, defaultMaxTurns: 7 });
+  try {
+    const result = await f.start(true, { schedule: "1s", max_turns: 1 });
+    assert.match(text(result), /Scheduled/);
+    const path = join(f.ctx.cwd, ".pi", "subagent-schedules", "offline-test.json");
+    const stored = JSON.parse(readFileSync(path, "utf8")) as { jobs: { max_turns?: number }[] };
+    assert.equal(Object.hasOwn(stored.jobs[0]!, "max_turns"), false);
+    setDefaultMaxTurns(9);
+    for (let i = 0; i < 150 && !f.calls.length; i++) await pause(10);
+    assert.equal(f.calls[0]!.options.maxTurns ?? f.registry.getRecord(f.calls[0]!.options.agentId!)?.maxTurns, 9);
+    assert.equal(f.registry.getRecord(f.calls[0]!.options.agentId!)?.invocation?.maxTurns, 9);
+    f.calls[0]!.finish(); await tick(); await pause(260);
+    assert.equal(f.notices[0]?.details?.maxTurns, 9);
+  } finally { await f.close(); setDefaultMaxTurns(undefined); }
+});
+
+void it("actual root delegation preserves frontmatter limits including unlimited, ignores legacy values and resumes stored type", async () => {
+  for (const budget of [0, 4]) {
+    const f = await factory({ defaultMaxTurns: 7 });
+    try {
+      const agentDir = join(f.root, "agent", "agents");
+      mkdirSync(agentDir, { recursive: true });
+      writeFileSync(join(agentDir, "limited.md"), `---\nname: limited\ndescription: Offline configured agent\nmax_turns: ${budget}\n---\nDo work.\n`);
+      await f.start(true, { subagent_type: "limited", max_turns: 1 }); await tick();
+      const id = f.calls[0]!.options.agentId!, effective = budget || undefined;
+      assert.equal(f.calls[0]!.options.maxTurns, budget);
+      assert.equal(f.registry.getRecord(id)?.invocation?.maxTurns, effective);
+      assert.equal(f.coordinator.list()[0]?.stats.maxTurns, effective);
+      f.calls[0]!.finish(); await tick(); await pause(260);
+      assert.equal(f.notices[0]?.details?.maxTurns, effective);
+      await f.start(true, { resume: id, subagent_type: "general-purpose", max_turns: 2 }); await tick();
+      assert.equal(f.resumes[0]!.options?.maxTurns, budget);
+      assert.equal(f.registry.getRecord(id)?.invocation?.maxTurns, effective);
+      f.resumes[0]!.finish(); await tick(); await pause(260);
+      assert.equal(f.notices[1]?.details?.maxTurns, effective);
+    } finally { await f.close(); }
+  }
+});
+
+void it("default actual model delegation stays unlimited despite legacy budget", async () => {
+  const f = await factory({ defaultMaxTurns: 0 });
+  try {
+    await f.start(true, { max_turns: 1 }); await tick();
+    assert.equal(f.calls[0]!.options.maxTurns, 0);
+    assert.equal(f.registry.getRecord(f.calls[0]!.options.agentId!)?.maxTurns, undefined);
+    f.calls[0]!.finish(); await tick();
+  } finally { await f.close(); }
+});
 
 void it("actual foreground Agent detaches before startup, keeps activity/transcript and delivers one failure notice", async () => {
   const startup = deferred<undefined>();
@@ -316,34 +402,39 @@ void it("actual background resume filesystem initialization failure cannot start
 });
 
 void it("actual foreground detach notifications carry exact new/resume/mention call correlation and terminal per-run turn stats", async () => {
-  const f = await factory();
+  const f = await factory({ defaultMaxTurns: 7 });
   try {
-    const tool = f.start(false, { max_turns: 7 }, undefined, { id: "new-call-17" }); await tick();
+    const tool = f.start(false, {}, undefined, { id: "new-call-17" }); await tick();
     const id = f.calls[0]!.options.agentId!;
     f.calls[0]!.options.onTurnEnd?.(3); f.coordinator.detachAll(); await tool;
     f.calls[0]!.finish(); await tick(); await pause(260);
     assert.equal(f.notices[0]?.details?.turnCount, 3); assert.equal(f.notices[0]?.details?.maxTurns, 7);
     assert.equal(f.notices[0]?.details?.toolCallId, "new-call-17");
     assert.match(String(f.notices[0]?.content), /<tool-use-id>new-call-17<\/tool-use-id>/);
-    const resume = f.start(false, { resume: id, max_turns: 9 }, undefined, { id: "resume-call-29" }); await tick();
+    setDefaultMaxTurns(9);
+    const resume = f.start(false, { resume: id }, undefined, { id: "resume-call-29" }); await tick();
     f.resumes[0]!.options?.onTurnEnd?.(2); f.coordinator.detachAll(); await resume;
     f.resumes[0]!.finish(); await tick(); await pause(260);
     assert.equal(f.notices[1]?.details?.turnCount, 2); assert.equal(f.notices[1]?.details?.maxTurns, 9);
     assert.equal(f.notices[1]?.details?.toolCallId, "resume-call-29");
     assert.match(String(f.notices[1]?.content), /<tool-use-id>resume-call-29<\/tool-use-id>/);
     assert.doesNotMatch(String(f.notices[1]?.content), /new-call-17/);
-    const mention = f.start(false, { resume: id, max_turns: 4 }, undefined, { id: undefined }); await tick();
+    setDefaultMaxTurns(4);
+    const mention = f.start(false, { resume: id }, undefined, { id: undefined }); await tick();
     f.resumes[1]!.options?.onTurnEnd?.(1); f.coordinator.detachAll(); await mention;
     f.resumes[1]!.finish(); await tick(); await pause(260);
     assert.equal(f.notices[2]?.details?.toolCallId, undefined); assert.doesNotMatch(String(f.notices[2]?.content), /tool-use-id/);
     assert.equal(f.notices[2]?.details?.turnCount, 1); assert.equal(f.notices[2]?.details?.maxTurns, 4);
-  } finally { await f.close(); }
+  } finally { await f.close(); setDefaultMaxTurns(undefined); }
 });
 
 void it("actual delayed group details retain terminal stats for first/others and omit a consumed member", async () => {
   const f = await factory({ defaultJoinMode: "group" });
   try {
-    for (let i = 0; i < 3; i++) await f.start(true, { max_turns: 6 + i }, undefined, { id: `group-call-${i}` });
+    for (let i = 0; i < 3; i++) {
+      setDefaultMaxTurns(6 + i);
+      await f.start(true, {}, undefined, { id: `group-call-${i}` });
+    }
     await pause(130);
     for (let i = 0; i < 3; i++) { f.calls[i]!.options.onTurnEnd?.(i + 2); f.calls[i]!.finish(`answer-${i}`); }
     await tick(); await f.execute("get_subagent_result", { agent_id: f.calls[1]!.options.agentId, wait: true });
@@ -355,7 +446,7 @@ void it("actual delayed group details retain terminal stats for first/others and
       assert.equal(member.turnCount, i + 2); assert.equal(member.maxTurns, 6 + i); assert.equal(member.toolCallId, `group-call-${i}`);
     }
     assert.ok(!all.some(detail => detail.id === f.calls[1]!.options.agentId));
-  } finally { await f.close(); }
+  } finally { await f.close(); setDefaultMaxTurns(undefined); }
 });
 
 void it("actual queued background resume stream error settles without prompting or leaking admission, and reports the returned run failure once", async () => {

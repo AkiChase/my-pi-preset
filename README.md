@@ -268,6 +268,8 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 
 停止 agent 会先结束当前等待、关闭输出订阅，并取消自己及所属嵌套执行；这不代表 provider 或异步启动已实际退出。manager 单独关闭最多等待 2 秒实际 runner／worktree／会话清理，关闭阶段也运行已完成及保留子会话的 shutdown hooks，释放只归子扩展所有的资源；迟到创建只允许清理，不再 prompt、steer 或发布完成消息；超时后保留私有清理所有者，不恢复任务。正常 prompt 失败仍可显式 resume。正常 worktree 完成仍保存分支；取消或保存失败保留 worktree 路径和文件，不强制删除未知／未保存的更改，也不在关闭后启动 git prune。非协作 provider 无法保证立即停止写入，因此超时不表示所有资源都已关闭。agent 已接入 composition 的统一关闭 participant；mention clone、计划定时器和 workflow worker／host gate 也按原 activation 取消与清理。关闭时旧工具／定向输入／RPC 拒绝或忽略新执行，迟到完成不发旧通知，scheduler 不删除用户计划定义。正常完成仍只报告一次；显式停止不额外发送完成通知，组内其他自然完成成员不受影响。对第三方进程内 provider／create／shutdown hook 采用协作式取消；不响应取消的代码可能继续内部执行或写文件，不保证单独强杀。自有进程、monitor、workflow worker、队列和计划定时器仍必须停止，并隔离旧会话接口与通知、保留文件。
 
+**轮次上限由用户配置，不由模型委派决定**：根／嵌套 `Agent` 工具不再提供 `max_turns`；旧模型参数即使带此字段，新建、resume、嵌套及模型创建的定时任务也会忽略。用户仍可通过 `agent-tasks.json` 的 `defaultMaxTurns` 或 agent Markdown frontmatter 的 `max_turns` 设置上限，`0`／未设置默认为无限制（frontmatter 的 `0` 可覆盖全局上限）。保留 runner 的软收尾及超过 `graceTurns` 后硬中止，以及可信内部 RPC 的 `maxTurns`、scheduler 的 `max_turns`。模型创建的 schedule 不持久化轮次预算，在触发时使用当时用户配置。resume 使用原 agent 类型的当前上限；每次运行在启动前冻结有效值，之后配置变化不影响该次执行，面板、工具结果和通知显示同一有效值。
+
 **配置**：全局 `~/.pi/agent/agent-tasks.json`，项目 `<项目>/.pi/agent-tasks.json`，项目优先，`/agents → Settings` 写项目层；不读取旧 `subagents.json`。自定义 `.md` 类型仍在 agent 目录的 `agents/` 或项目 `.pi/agents/`，项目定义优先。常用键有 `maxConcurrent`（10）、`maxSubagentDepth`（2）、`backgroundByDefault`、`worktreeIsolation`。`schedulingEnabled`、`workflowsEnabled`、`toolDescriptionMode`、`disableDefaultAgents` 改动工具 schema，需重启 pi；其余按现有实现即时生效。
 
 #### `extensions/process-tasks/` —— 进程与 monitor 后端
@@ -643,6 +645,8 @@ pnpm test               # 只跑 node --test
 ```
 
 测试用 `node --test`，没有第三方框架。全部测试都不联网、不碰 `~/.pi`：`scripts/sync.test.mjs` 会使用假的 `pi`，并把 `PI_CODING_AGENT_DIR` 指到临时目录，所以配置读写都发生在那里。它还用带空格路径的临时 git 检出验证 `install.sh --dev`：远程/本地双向切换、不同 git 写法和 ref、重复执行、两份同时注册、移除失败中止、dry-run、域选择、非法检出及管道安装拒绝；第三方包和 prune 保持原来的行为。`scripts/pi-manifest.test.mjs` 只读本仓库清单，校验所有顶层扩展被声明、nested 后端未作为入口、standalone upstream 只在 conflicts，以及运行依赖与 host SDK 边界。
+
+轮次接口回归位于 `tool-waits.test.ts`、`backend-waits.test.ts` 与 `runner-cancellation.test.ts`，执行实际工具／manager／runner／临时 ScheduleStore／RPC，覆盖旧参数忽略、用户及 frontmatter 限额、无限制、resume 显示与通知一致、可信程序入口上限保留，以及异步 bind 期间默认值变化不改变本次上限。
 
 `extensions/agent-tasks/__tests__/loading.test.ts` 在临时 cwd／agent-dir 中通过真实 Pi host loader 验证单一注册、同 cwd／不同 cwd 的根／子会话 guard、重叠根加载和 shutdown；`workflow.test.ts` 使用真实 worker 跑无模型脚本及 stub RPC，验证 abort 后自然退出。vendor 源中的 TypeScript 参数属性需要本地测试的 [`source-loader.mjs`](extensions/agent-tasks/__tests__/source-loader.mjs) 在内存中变换；hook 只覆盖 agent-tasks/src，测试先注册再动态 import，生产仍由 Pi jiti 加载，不生成 dist。可单独运行 `node --test extensions/agent-tasks/__tests__/*.test.ts`，不用 force-exit 掩盖线程或 timer 泄漏。
 
