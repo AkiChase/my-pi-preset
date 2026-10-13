@@ -8,13 +8,6 @@
 
 [bash-unified.ts](../../../extensions/bash-unified.ts) 拥有每次 factory activation 的唯一 `TaskLifecycle`、coordinator 与共享 UI owner。关闭顺序是所有 participant 同步 `freeze()`（admission 与通知）→ close hooks → cancelWaits → silent `stop()` → 最多 2 秒 `drain()` → source/coordinator `dispose()`；异常逐项隔离，shutdown 返回稳定幂等 promise。process 和 agent 都已接入，完整验收仍须实际测试与独立审查。
 
-```ts
-// Existing SDK-derived type; do not invent a parallel tool interface.
-type ToolDef = Parameters<ExtensionAPI["registerTool"]>[0];
-```
-
-Its proxy captures process-tasks' `bash`, forwards other registrations with the original receiver, fails if capture is missing, then injects the captured definition into pretty. Only one final `bash` is registered. Preserve this ownership; do not also install pretty or patty as standalone pi packages ([manifest conflicts](../../../pi-preset.json)). Pretty's deep source import follows its pi entry, not a potentially stale `dist` build; revisit that boundary if its exports change.
-
 ## Pretty 编辑器组合
 
 [bash-unified.ts](../../../extensions/bash-unified.ts) 通过 [pretty-compat/editor.ts](../../../extensions/pretty-compat/editor.ts) 局部适配 Pretty 的 start/shutdown editor factory，不全局劫持其他插件。已有 factory 时在其创建的原实例上装饰，保留 history、receiver 和 subclass 行为；没有 factory 时沿用 Pretty editor。仅注入已有 constructor 仍会新建实例，不能解决历史丢失。
@@ -24,15 +17,6 @@ Its proxy captures process-tasks' `bash`, forwards other registrations with the 
 - 方法写入及 host setter 都可能部分成功后失败；回滚经正常 setter 恢复 factory/container/focus，原 factory 失效时尝试默认 editor。
 - 方法与 padding 状态恢复均须检查所有权，不覆盖后来插件。每 slot 只保留一个 live lease，退休 factory 释放 builder 并透传。
 - Pi reload 在 shutdown 前 reset UI；清理不能重新安装旧 factory。回归见 [editor.test.ts](../../../extensions/pretty-compat/__tests__/editor.test.ts)，版本与验证边界见 [TESTING.md](../../../extensions/pretty-compat/TESTING.md)。
-
-## SDK Types and Configuration
-
-- Use SDK types and `import type` for type-only imports; preserve strict/noEmit checking. Do not mask problems with `any` or `@ts-ignore`; explain any unavoidable suppression or boundary cast.
-- Example of a justified cast: [controls.ts](../../../extensions/task-ui/controls.ts) hands configured chords to SDK registration and catches rejection, rather than duplicating the SDK key table. One invalid chord must not prevent other bindings.
-- Built-in action IDs in `keybindings.json` and extension raw shortcut chords are different surfaces. task-ui's current defaults are exactly `ctrl+shift+b` and `shift+down`, asserted by [shortcuts.test.ts](../../../extensions/task-ui/__tests__/shortcuts.test.ts); no blind kill-latest shortcut exists.
-- [config.ts](../../../extensions/process-tasks/config.ts) resolves file/environment input at load time and stores config on each registry. Reuse `DEFAULTS`, `envNameFor` and parser bounds; do not add an import-time mutable singleton. Malformed input warns/falls back, while registration uses resolved values. [config.test.ts](../../../extensions/process-tasks/__tests__/config.test.ts) covers defaults, malformed input and precedence.
-
-## Session and Resource Ownership
 
 Pi 1.1.0 的 new/resume/fork/import 在旧主会话 abort 后 shutdown，再建立新 factory；reload 也重新激活。before-switch 可取消或因 cwd 无效而无 shutdown，不能永久 freeze/dispose 当前 activation；旧 disposed factory 不复活，不引入 global mutable UI/coordinator。`process-tasks/index.ts` 在最终关闭后拒绝旧工具新执行，释放 foreground/pending/background/monitor/attach/ticker/sweep，保留磁盘日志；新 factory 从空 source 开始。证据见 [activation.test.ts](../../../extensions/process-tasks/__tests__/activation.test.ts)、[sdk-runtime.test.ts](../../../extensions/task-ui/__tests__/sdk-runtime.test.ts)。
 
