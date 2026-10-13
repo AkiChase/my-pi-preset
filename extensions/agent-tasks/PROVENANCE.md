@@ -111,7 +111,7 @@ review `842266a9` 确认旧 `abortAll → drain → dispose` 漏已完成／acti
 - `src/schedule.ts` 每次 start 捕获独立 pi/ctx/manager/store binding，interval/once/cron/startup/finalize 全部重查；stop("shutdown") 取消该 binding 的 child signal，普通 disable 保留已启动执行语义，持久定义不删除。resolveModel 仍同步。cron 格式验证立即 stop 自己创建的验证 timer。
 - `src/workflow/{host,runtime}.ts` 只加取消边界：gate 传 signal、await 前后检查，index-owned promise 不把 worker terminate 冒充 host call drain；late host result 在 schema/gate/journal/action 前检查 settled/aborted，保留 pipeline/parallel/replay/schema/intent retry 算法。停止组成员仍参与 group terminal 结算，但不生成完成通知。
 - 离线实际路径新增 clone/timer/store/RPC/gate/worker/factory/双后端 SDK runtime 与 reload 回归；hard loader 保持 root/child/ALS/工具身份断言，仅将 shutdown 数量更新为 root/child 都是 composition + pretty 两个 handler（agent 不再单独注册）。
-- 不修改已验收 manager/runner/worktree、process/monitor执行语义、shared waits/model max_turns；无真实模型/git/网络/install/reload/SDK 修改。交付时未满足原严格all-stop；后续用户批准协作式取消边界，非协作provider或已开始第三方hook可能超预算继续写，不承诺强杀，自有资源仍须停止。G3按修订PRD与集中审查验收。
+- 不修改已验收 manager/runner/worktree、process/monitor执行语义、shared waits；当时未修改 model max_turns（后续接口偏离见下节）；无真实模型/git/网络/install/reload/SDK 修改。交付时未满足原严格all-stop；后续用户批准协作式取消边界，非协作provider或已开始第三方hook可能超预算继续写，不承诺强杀，自有资源仍须停止。G3按修订PRD与集中审查验收。
 
 ## 核心共享面板切片与旧概览删除
 
@@ -131,5 +131,12 @@ review `842266a9` 确认旧 `abortAll → drain → dispose` 漏已完成／acti
 共享task-ui/editor.ts在实际Pretty注册后参与session_start，Down在严格空编辑器/实际焦点/无补全overlay/press非repeat/有可查看task时打开面板，foreground-only也可。配置downOpener默认true，false不装，显式Shift+Down保留。只装饰liveinstancehandleInput、同步handoff屏蔽SDK冗余publicsetter，finally恢复，不复制privatehistory/undo；shutdown清资源cell/screen/target、only-owneddescriptor恢复，capturedfactory/input退役透传，不重建editor。后续不delegate的独立editor不保证继承入口。
 
 actualSDKhost/editor/Pretty/TUI分发回归与GC4/4资源回收通过（parenttarget26/26、noforce自然退出），无需模型/安装/SDK写。GCfixture外部包装独立module-scope，不让fixture共享环境保资源。独立review复现unsupporteddescriptor在host已clearcontainer后抛错造成输入框未挂载；窄修用同步完成、不挂载publicUIprobe捕获TUI并在setter前预检/装饰，失败保留原mount/factory/focus/继续编辑，已有overlay不hide。actualcontainer/render/focus/cursor/descriptor与accessor/nonconfig/overlay回归已补。完整strict/full483/483、三模块461/461自然退出；独立Down复核14/14与三情形确认失败安装安全、GC回收，原blocking关闭。后续用户授权的真实installedCLI/140x40PTY隔离冒烟分段19项核心交互PASS，最终CLI自然退出/临时PID清理，不调用在线模型或改个人配置/安装；其fixture和中断历史见task tui-smoke-result。原各阶段“Down未实施”为历史状态。
+
+## 模型委派轮次接口偏离
+
+- 删除根与嵌套 `Agent` schema 的 `max_turns`；共享 invocation resolver 不再消费旧模型轮次参数。新建、resume、嵌套与模型定时委派沿用用户配置，不让模型猜测预算。
+- 模型创建的 schedule 不写入轮次预算，触发时解析用户当前限额；可信 scheduler／RPC 的 `max_turns`／`maxTurns`、用户 `defaultMaxTurns` 和 agent frontmatter `max_turns`（含 `0` 无限）保留。可信 scheduler 的持久化格式保持不变。
+- manager 在 admission 只解析一次有效上限，写入 record／invocation，并将有限值或明确的 `0`（无限制）传给实际 new／resume runner，异步 bind／排队期间配置变化不改变本次预算；根 resume 按存储的 agent 类型而非模型填写的 `subagent_type` 计算，source 的轮次统计直接读取 record 的有效上限（包括没有 invocation 的可信调用），保持活动、详情与通知一致。runner 的计数、软 steering 与 grace 后 hard abort 不改。
+- 离线行为证据位于 `__tests__/tool-waits.test.ts`、`__tests__/backend-waits.test.ts`、`__tests__/runner-cancellation.test.ts`；执行实际注册工具、manager、runner 延迟 bind／resume、临时持久化 store 和可信 RPC，不调用模型／网络／真实 git，不修改个人配置。
 
 前文各基础/3A/3B段为对应阶段的历史记录，旧UI保留/participant未接入的描述不是当前状态；以后续条目为准。

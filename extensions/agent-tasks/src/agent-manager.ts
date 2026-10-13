@@ -634,6 +634,7 @@ export class AgentManager {
 
     const id = randomUUID().slice(0, 17);
     const abortController = new AbortController();
+    const maxTurns = resolveEffectiveMaxTurns(type, options.maxTurns);
     const record: AgentRecord = {
       id,
       type,
@@ -656,7 +657,7 @@ export class AgentManager {
       status: options.isBackground ? "queued" : "running",
       toolUses: 0,
       turnCount: 0,
-      maxTurns: resolveEffectiveMaxTurns(type, options.maxTurns),
+      maxTurns,
       startedAt: Date.now(),
       abortController,
       lifetimeUsage: { input: 0, output: 0, cacheWrite: 0, cost: 0 },
@@ -671,7 +672,7 @@ export class AgentManager {
       // of the call that made it — and both settle paths need it long after
       // `options` has stopped being the interesting object.
       blocking: options.blocking,
-      invocation: options.invocation,
+      invocation: options.invocation ? { ...options.invocation, maxTurns } : undefined,
       depth: options.depth ?? 1,
       parentAgentId: options.parentAgentId,
       parentRunId: options.parentAgentId ? this.agents.get(options.parentAgentId)?.runId : undefined,
@@ -829,7 +830,9 @@ export class AgentManager {
       pi,
       agentId: id,
       model: options.model,
-      maxTurns: options.maxTurns,
+      // Admission already resolved this run's limit. Zero explicitly freezes
+      // unlimited; undefined would let the runner re-read config after bind.
+      maxTurns: record.maxTurns ?? 0,
       isolated: options.isolated,
       inheritContext: options.inheritContext,
       thinkingLevel: options.thinkingLevel,
@@ -1169,6 +1172,7 @@ export class AgentManager {
     record.result = undefined; record.error = undefined; record.completedAt = undefined;
     record.activity = undefined; record.turnCount = 0;
     record.maxTurns = resolveEffectiveMaxTurns(record.type, options.maxTurns);
+    if (record.invocation) record.invocation.maxTurns = record.maxTurns;
     record.status = "queued";
     this.beginRun(record, signal);
     this.notifyChanged();
@@ -1223,7 +1227,7 @@ export class AgentManager {
       this.settleRun(record, run);
     };
     this.ownExecution(async () => { await (this.dependencies.resumeAgent ?? resumeAgent)(session, prompt, {
-      maxTurns: record.maxTurns,
+      maxTurns: record.maxTurns ?? 0,
       onToolActivity: activity => {
         if (!this.current(record, run) || record.status === "stopped") return;
         if (activity.type === "end") record.toolUses++;

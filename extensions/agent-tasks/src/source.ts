@@ -86,7 +86,7 @@ export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCo
           waitCount: coordinator.countWaits(identity), startedAt: record.startedAt, endedAt: record.completedAt,
           stats: Object.freeze({ tokens: getLifetimeTotal(record.lifetimeUsage), inputTokens: record.lifetimeUsage.input,
             outputTokens: record.lifetimeUsage.output, cost: record.lifetimeUsage.cost, toolUses: record.toolUses,
-            turnCount: record.turnCount, maxTurns: record.invocation?.maxTurns, activity: record.activity,
+            turnCount: record.turnCount, maxTurns: record.maxTurns, activity: record.activity,
             model: record.invocation?.modelId ?? record.invocation?.modelName, thinking: record.invocation?.thinking,
             durationMs: (record.completedAt ?? Date.now()) - record.startedAt }),
           artifacts: Object.freeze(artifacts), capabilities: Object.freeze({ stop: status === "starting" || status === "running" || status === "queued", details: true }),
