@@ -1,10 +1,16 @@
-# 最终验收与提交前收尾
+# 最终验收与交付记录
+
+## 正式交付与归档
+
+产品已提交为`fe8d0f6b35adc0f52bf93fe26349f22ba971fd5d`（`feat: unify process and agent task interactions`），提交树与预检一致，外部51份文件内容未变。用户随后明确批准正式收尾，任务记录产品提交号、finish/archive并单独提交归档和日志；完成日期2026-10-13，归档路径`.trellis/tasks/archive/2026-10/10-12-subagents-task-ux/`。本轮只改任务材料和日志，不重跑产品检查、不改运行时代码。
+
+分支合回main是下一步建议，本轮仅检查本地分叉与工作区，不执行合并、push、安装或reload。下方“未提交／未授权归档／in_progress”均为先前阶段快照，不能当作当前状态。
 
 ## 后续提交授权
 
 用户随后明确要求“提交吧”，授权按`commit-plan.md`执行限定范围暂存/提交；没有授权finish/archive、push、install/reload。提交前隔离复跑strict/full483/483与三模块461/461自然退出，`/tmp/pi-bg/bx42ym7ad.log` exit0、`COMMIT_CHECK_OK`。下方“本轮仅整理/未提交”是之前验收收尾快照，技术验收边界不变，产品运行时代码未再修改。
 
-## 当前结论与执行边界
+## 提交前结论与执行边界（历史快照）
 
 本任务的核心实现、自动回归、逐段独立审查和授权隔离真实终端冒烟已经完成；当前只整理文档与提交清单，不新增功能、不重复全量测试矩阵。用户本轮“行”批准的是整理提交范围，**不是提交、finish/archive、push或切换日常Pi安装的授权**。任务保持`in_progress`，git index未暂存改动。
 
@@ -21,7 +27,7 @@
 | 核心UI独立审查 | panel/tool/mixed45/45；唯一整组窗口问题窄复核3/3关闭 | [core-panel-review-fix.md](core-panel-review-fix.md) |
 | Down独立审查 | editor14/14＋actualSDK三场景确认安全回退；原blocking关闭；GC4/4 | [down-result.md](down-result.md) |
 | 真实installedCLI/140×40PTY | 分段13＋3＋3共19项PASS | [tui-smoke-result.md](tui-smoke-result.md)；第三轮无error、natural_exit=true |
-| 文档/manifest检查 | 本轮最后运行diff-check、JSONLvalidate及相对路径检查 | 当前JSONL31项各；本轮收尾材料增加后重新validate；不改运行时代码 |
+| 文档/manifest检查 | 两份JSONL各33条，diff与相对路径校验通过；归档时自引用迁往archive后再次validate | 本轮仅任务和日志材料，不改运行时代码 |
 
 真实PTY报告：
 

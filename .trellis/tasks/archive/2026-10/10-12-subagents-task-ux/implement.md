@@ -2,7 +2,7 @@
 
 ## 执行门槛
 
-当前为提交前收尾，核心实现已完成。阶段0–4的进行中/待审查/旧UI保留等说明均为当时历史快照，当前以阶段5、[final-acceptance.md](research/final-acceptance.md)与[commit-plan.md](commit-plan.md)为准；不因历史行重开实施或全量审查。
+核心实现、验证与文档收尾已完成，产品提交`fe8d0f6`。用户随后明确批准finish/archive与日志提交；本任务正式完成并归档。阶段0–4的进行中/待审查/旧UI保留等说明均为当时历史快照，当前以阶段5、[final-acceptance.md](research/final-acceptance.md)与[commit-plan.md](commit-plan.md)为准；不因历史行重开实施或全量审查。
 
 用户已在最终规划评审之后明确批准实施，并要求分阶段使用不同 agent，避免一个 agent 包办。任务已于本轮 `start` 为 `in_progress`。用户随后批准调整推进方式：保留已验证后端，不再为即将删除的旧UI独立修补/反复全量审查；把3B2剩余窄修与阶段4核心面板合成完整切片，删除旧UI后集中验收G3/G4。不同切片使用新agent，切片内先定向验证，完整结果再全量检查与独立审查。主会话核对实际diff；不得在实施agent内递归委派。
 
@@ -177,4 +177,4 @@ python3 .trellis/scripts/task.py validate .trellis/tasks/10-12-subagents-task-ux
 
 ## 完成状态
 
-用户已批准实施，核心实现、自动验证、独立复核与隔离真实PTY冒烟完成，阶段5证据已归并；任务保持in_progress，当前用户只授权整理提交清单。未暂存/提交/归档/改日常安装，不重开功能或未知插件/模型矩阵。完整验证范围和排除项见 [final-acceptance.md](research/final-acceptance.md)，待用户确认 [commit-plan.md](commit-plan.md) 后再执行提交；finish/archive/push/日常加载均不由本轮“行”自动授权。
+用户已批准实施，核心实现、自动验证、独立复核与隔离真实PTY冒烟完成，阶段5证据已归并；产品于`fe8d0f6`提交，用户随后批准任务finish/archive和日志提交。本任务正式完成并归档到`.trellis/tasks/archive/2026-10/10-12-subagents-task-ux/`，不重开功能或未知插件/模型矩阵。完整验证范围和排除项见 [final-acceptance.md](research/final-acceptance.md)，实际提交范围见 [commit-plan.md](commit-plan.md)。main合并、push、日常加载未执行，需单独安排。

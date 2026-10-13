@@ -2,7 +2,7 @@
 
 ## 当前状态（最终收尾）
 
-核心实现已完成，自动 strict/full 483/483、三模块 461/461 自然退出，独立核心面板与 Down 审查发现均关闭；授权隔离真实 CLI/PTY 分段 19 项检查通过。正在整理阶段 5 的证据和提交范围，未提交、未归档、未改个人安装。当前结果见 [final-acceptance.md](final-acceptance.md)；下方按阶段的“未开始／review中／待验”是当时快照，不是当前阻塞。
+核心实现已完成，自动 strict/full 483/483、三模块 461/461 自然退出，独立核心面板与 Down 审查发现均关闭；授权隔离真实 CLI/PTY 分段 19 项检查通过。产品已提交`fe8d0f6`，用户随后批准finish/archive及日志提交，本任务完成并归档。未合并main、push或改个人安装。当前结果见 [final-acceptance.md](final-acceptance.md)；下方按阶段的“未开始／review中／待验”是当时快照，不是当前阻塞。
 
 ## 授权与基线
 

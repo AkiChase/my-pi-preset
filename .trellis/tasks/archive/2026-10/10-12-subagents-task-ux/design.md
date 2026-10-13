@@ -127,4 +127,4 @@ Composition 创建单个 activation 的 `TaskLifecycle` 与 coordinator，两个
 
 详见 [implement.md](implement.md) G0–G4 和 PRD AC1–AC12。优先验证 loader/worker真实运行、detach parent links、queued/startup/resume/completion竞态、wait取消、session epoch、焦点-safe Down、选择快照和 workflow child stop。虚拟 typecheck仅为研究证据，不代替 pnpm check。
 
-本文记录批准后的架构与实际实施策略；G0–G4的限定范围验证已完成。最终strict/full483/483、三模块461/461无forceexit自然退出、独立审查及隔离真实PTY19项核心交互通过。第三方协作式取消与未覆盖场景见 [final-acceptance.md](research/final-acceptance.md)，不能扩大为任意provider/插件全矩阵。当前任务保持in_progress，只整理 [commit-plan.md](commit-plan.md)，不自动提交、归档或切换日常Pi安装。
+本文记录批准后的架构与实际实施策略；G0–G4的限定范围验证已完成。最终strict/full483/483、三模块461/461无forceexit自然退出、独立审查及隔离真实PTY19项核心交互通过。第三方协作式取消与未覆盖场景见 [final-acceptance.md](research/final-acceptance.md)，不能扩大为任意provider/插件全矩阵。产品已提交为`fe8d0f6`，用户随后批准正式finish/archive与日志收尾；任务完成，提交范围见 [commit-plan.md](commit-plan.md)。未合并main、push或切换日常Pi安装。

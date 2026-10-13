@@ -33,4 +33,4 @@ loader 和 worker 在源 TypeScript 下的运行一致性；可解除的队列/�
 
 独立 `.trellis/tasks/10-12-monitor-wake/` 拥有 monitor wake/batching/inactivity 等语义，本任务不接管该需求。monitor 的注册/配置路径可能因 process-tasks 改名机械变化，必须保留其逻辑且与相邻工作协调。
 
-任务处于 in_progress；vendor、共享等待、生命周期、核心面板与 Down 均已实施，独立审查发现已关闭。最终自动 strict/full 483/483、三模块 461/461 自然退出与授权隔离真实 PTY 19 项核心检查通过；详见 [final-acceptance.md](final-acceptance.md)。当前只整理提交范围，不重做开发／测试矩阵，不自动提交、归档或修改日常 Pi 的个人配置和安装。早期阶段的待实施／待审查记录是历史证据，不再代表当前状态。
+本任务已完成；vendor、共享等待、生命周期、核心面板与 Down 均已实施，独立审查发现已关闭。最终自动 strict/full 483/483、三模块 461/461 自然退出与授权隔离真实 PTY 19 项核心检查通过；详见 [final-acceptance.md](final-acceptance.md)。产品已提交`fe8d0f6`，用户随后批准finish/archive与日志提交；未合并main、push或修改日常Pi配置和安装，不重做开发／测试矩阵。早期阶段的待实施／待审查记录是历史证据，不再代表当前状态。

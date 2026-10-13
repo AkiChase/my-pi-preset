@@ -1,5 +1,13 @@
 # 提交范围与授权记录
 
+## 产品提交与正式收尾
+
+已按下方范围提交`fe8d0f6b35adc0f52bf93fe26349f22ba971fd5d`（`feat: unify process and agent task interactions`），提交树与预检一致。混合spec保留SDK/config、ToolDef、singlebashproxy政策，仅在index纳入任务相关内容；外部51份文件及混合workingcopy内容未变。
+
+用户随后批准“做1”，即记录提交号、finish/archive和日志提交。归档位于`.trellis/tasks/archive/2026-10/10-12-subagents-task-ux/`；归档提交只包括原任务目录删除与47份archive材料（JSONL自引用同步），日志提交仅`workspace/akichase/index.md`和`journal-1.md`。不用auto-commit避免带入workflow脚手架或其他任务。当前不合并main、不push、不改日常Pi安装。
+
+下方授权/未授权/未来执行说明为先前阶段的历史快照，产品与收尾均已有用户授权，不应重开确认或重复暂存旧路径。
+
 ## 提交执行授权
 
 用户随后明确要求“提交吧”，已授权按本清单暂存并提交产品、本任务材料和任务相关spec；未授权finish/archive、push或切换日常Pi安装。提交前在临时`PI_CODING_AGENT_DIR`重跑strict/full483/483与三模块461/461无force-exit自然退出，日志`/tmp/pi-bg/bx42ym7ad.log`，exit0、`COMMIT_CHECK_OK`。混合spec仅构造task-onlyindex版本，不改workingcopy的外部hunk。

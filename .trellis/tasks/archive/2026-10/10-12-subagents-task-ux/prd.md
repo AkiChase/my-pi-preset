@@ -111,4 +111,4 @@
 
 用户已批准实施和后续协作式取消边界，核心交互已完成；自动 strict/full 483/483、三模块 461/461 无 force-exit 自然退出，独立审查发现已关闭，隔离真实 Pi PTY 分段 19 项核心检查通过。四秒整组保留、取消与等待区分、焦点安全的 Down 均有实际回归。
 
-当前进行文档与提交范围收尾；任务仍为 `in_progress`，没有提交、归档或改变日常 Pi 安装。验收边界、未覆盖场景与提交建议统一记录于 [final-acceptance.md](research/final-acceptance.md) 和 [commit-plan.md](commit-plan.md)，不把离线脚本响应当作在线模型自主质量，也不把任意非协作第三方代码强杀纳入已批准保证。
+产品已提交为 `fe8d0f6b35adc0f52bf93fe26349f22ba971fd5d`（`feat: unify process and agent task interactions`）。用户随后批准正式收尾，本任务完成并归档到 `.trellis/tasks/archive/2026-10/10-12-subagents-task-ux/`；没有合并分支、推送或改变日常 Pi 安装。验收边界、未覆盖场景与提交范围统一记录于 [final-acceptance.md](research/final-acceptance.md) 和 [commit-plan.md](commit-plan.md)，不把离线脚本响应当作在线模型自主质量，也不把任意非协作第三方代码强杀纳入已批准保证。
