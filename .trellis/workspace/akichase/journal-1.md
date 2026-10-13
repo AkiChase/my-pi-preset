@@ -275,3 +275,25 @@ Implemented registry-scoped command/WS monitor batching with fixed short windows
 ### Next Steps
 
 - 未验证真实 PTY/actual input-history/fullscreen；未个人 install/sync/reload；保留无关 .pi 与任务规划
+
+
+## Session 9: Beautify 六工具背景与单行收缩修复
+<!-- trellis-session: v=2 fp=ff6ab7d8cbe41b88 -->
+
+**Date**: 2026-10-14
+**Task**: Beautify 六工具背景与单行收缩修复
+**Branch**: `main`
+
+### Summary
+
+恢复背景与单行收缩，新增get_result/jobs；671全量和真实tmux9项复验通过，已提交并归档，未push/install/reload。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1b8bb95` | fix: restore Beautify tool backgrounds and single-line collapse |
+
+### Status
+
+[OK] **Completed**
