@@ -8,6 +8,8 @@ import bgTasks from "./bg-tasks/index.ts";
 // There is no `exports` field blocking the subpath today; if upstream adds one, this throws
 // loudly at load time rather than silently degrading.
 import pretty from "@heyhuynhgiabuu/pi-pretty/src/index.ts";
+import { createPromptEditorClass } from "@heyhuynhgiabuu/pi-pretty/src/prompt-editor.ts";
+import { adaptPrettyLifecycle } from "./pretty-compat/editor.ts";
 
 // Loads the vendored bg-tasks extension and pi-pretty as one extension so they can share `bash`.
 //
@@ -47,12 +49,15 @@ export default async function bashUnified(pi: ExtensionAPI): Promise<void> {
   const backgroundBash = capturedBash;
 
   await pretty(
-    interceptTool(pi, "bash", (tool) =>
-      pi.registerTool({
-        ...tool,
-        // Pretty replaces the snippet with its own, which drops the background-task hint.
-        promptSnippet: `${backgroundBash.promptSnippet ?? "Run shell commands"}. For text search: \`rg -n\`.`,
-      }),
+    adaptPrettyLifecycle(
+      interceptTool(pi, "bash", (tool) =>
+        pi.registerTool({
+          ...tool,
+          // Pretty replaces the snippet with its own, which drops the background-task hint.
+          promptSnippet: `${backgroundBash.promptSnippet ?? "Run shell commands"}. For text search: \`rg -n\`.`,
+        }),
+      ),
+      createPromptEditorClass,
     ),
     {
       sdk: {

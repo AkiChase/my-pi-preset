@@ -15,6 +15,16 @@ type ToolDef = Parameters<ExtensionAPI["registerTool"]>[0];
 
 Its proxy captures bg-tasks' `bash`, forwards other registrations with the original receiver, fails if capture is missing, then injects the captured definition into pretty. Only one final `bash` is registered. Preserve this ownership; do not also install pretty or patty as standalone pi packages ([manifest conflicts](../../../pi-preset.json)). Pretty's deep source import follows its pi entry, not a potentially stale `dist` build; revisit that boundary if its exports change.
 
+## Pretty 编辑器组合
+
+[bash-unified.ts](../../../extensions/bash-unified.ts) 通过 [pretty-compat/editor.ts](../../../extensions/pretty-compat/editor.ts) 局部适配 Pretty 的 start/shutdown editor factory，不全局劫持其他插件。已有 factory 时在其创建的原实例上装饰，保留 history、receiver 和 subclass 行为；没有 factory 时沿用 Pretty editor。仅注入已有 constructor 仍会新建实例，不能解决历史丢失。
+
+- 不读取私有 history、不改原型链、不复制 Pretty 渲染算法；RenderBridge 复用运行时 `createPromptEditorClass`。
+- 装饰前检查 embedded status、border hooks 与可写 data methods。不支持时保留原编辑器并可诊断降级，不能破坏输入区。
+- 方法写入及 host setter 都可能部分成功后失败；回滚经正常 setter 恢复 factory/container/focus，原 factory 失效时尝试默认 editor。
+- 方法与 padding 状态恢复均须检查所有权，不覆盖后来插件。每 slot 只保留一个 live lease，退休 factory 释放 builder 并透传。
+- Pi reload 在 shutdown 前 reset UI；清理不能重新安装旧 factory。回归见 [editor.test.ts](../../../extensions/pretty-compat/__tests__/editor.test.ts)，版本与验证边界见 [TESTING.md](../../../extensions/pretty-compat/TESTING.md)。
+
 ## SDK Types and Configuration
 
 - Use SDK types and `import type` for type-only imports; preserve strict/noEmit checking. Do not mask problems with `any` or `@ts-ignore`; explain any unavoidable suppression or boundary cast.

@@ -353,6 +353,12 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 
 **做了什么更改**：两边各只改一半。patty 的 bash 只改执行（渲染沿用 pi 原生），pretty 的 bash 只改渲染（执行交给外部传入的定义）。本扩展把两个包都自己加载，中间做一次拼接：先用 `Proxy` 把 patty 对 `bash` 的注册截下来，再通过 pretty 的 `deps.sdk` 注入点把这个定义交给 pretty。最终注册出的那个 `bash`，是 patty 的执行和参数，配 pretty 的渲染。两边其余的工具、命令、快捷键都原样放行。
 
+**输入历史兼容**：Pretty 安装输入框时，本仓库会先调用已有的 editor factory，在原实例上添加圆角边框和 `❯` 前缀，而不是重新建一个没有历史的 editor。`pi-input-history` 在 preset 之前或之后加载都不需要调整顺序；同目录跨 session 的 ↑/↓ 历史、Alt+R 搜索，以及原 editor 的输入和应用快捷键保留。冷启动、新建 session 和 reload 都走这个入口；没有已有 factory 时仍使用 Pretty 原生输入框。
+
+支持 SDK 的 embedded working status、边框 hooks 和可写 render/padding 方法的 editor 保留 Pretty 外观及状态指示。遇到缺少 hooks、只读方法等不能安全装饰的第三方 editor，会保留其原输入框并显示 `preset Pretty editor fallback` 警告，只放弃该输入框的 Pretty 装饰。cleanup 不覆盖后来插件的 render、padding 或 factory；host 安装失败时会经正常 setter 恢复旧 factory，旧 factory 也失效时退回默认输入框并提示（此时无法保证失效插件的历史）。这些兼容逻辑在 [`extensions/pretty-compat/editor.ts`](extensions/pretty-compat/editor.ts)，不是单独加载的扩展。
+
+当前对照验证基于 Pi SDK 1.1.0、Pretty 0.6.31 和 input-history 1.1.3，已在临时配置与 session 下用真实 CLI 验证两种加载顺序的冷启动、`/new`、`/reload`，以及 ↑/↓ 和 Alt+R 搜索接受/取消。该端到端验证使用 regular TUI，不代表 fullscreen 和任意第三方 editor 都已覆盖。自定义 renderer 不委托 SDK hooks 时，无法保证能显示 Pretty 前缀；极窄终端下单列中文递归溢出、聚焦光标越界是 SDK/Pretty 原有边界，本修复未处理；复杂异步补全仍需单独确认。
+
 两个实现细节：pretty 会用自己的 `promptSnippet` 覆盖 patty 的，模型会看不到后台任务提示，所以这里把那句补回去；patty 哪天改了入口、不再注册 `bash`，扩展会直接抛错，不静默退回 pi 原生 bash。
 
 **和 vendor 目录的关系**：patty 的代码 vendor 在 `extensions/bg-tasks/`，由本扩展当库 import。pi 的自动发现会把 `extensions/` 下**带 `index.ts` 的子目录也当成一个独立扩展**，于是 `bg-tasks` 会被再加载一遍，`bash` / `bash_bg` / `jobs` / `monitor` 和两个快捷键全部注册两次，启动时一片冲突警告。挡住这件事的是 [`package.json`](package.json) 里的 `pi.extensions` 声明（只列 `extensions/*.ts`），见 [添加扩展](#添加扩展)。
@@ -601,6 +607,8 @@ pnpm test               # 只跑 node --test
 ```
 
 测试用 `node --test`，没有第三方框架。全部测试都不联网、不碰 `~/.pi`：`scripts/sync.test.mjs` 会使用假的 `pi`，并把 `PI_CODING_AGENT_DIR` 指到临时目录，所以配置读写都发生在那里。它还用带空格路径的临时 git 检出验证 `install.sh --dev`：远程/本地双向切换、不同 git 写法和 ref、重复执行、两份同时注册、移除失败中止、dry-run、域选择、非法检出及管道安装拒绝；第三方包和 prune 保持原来的行为。`scripts/pi-manifest.test.mjs` 只读本仓库的 `package.json`，校验 `pi.extensions` 还盖得住所有顶层扩展、且没把 `extensions/` 下的子目录放进来。
+
+Pretty 兼容回归用实际 SDK setter/reset、CustomEditor 和 Pretty 渲染，但 history 插件使用独立编写的离线 fixture，不读取本机安装的 `pi-input-history`。来源与测试范围见 [`extensions/pretty-compat/TESTING.md`](extensions/pretty-compat/TESTING.md)。可运行 `node --test extensions/pretty-compat/__tests__/editor.test.ts`（不加 `--test-force-exit`）检查退出及生命周期清理。全量 `pnpm check` 前请把 `PI_CODING_AGENT_DIR` 指到 `mktemp -d` 创建的临时目录，同时用 `PI_SDK_DIR` 指向实际 SDK 的 `node_modules`，结束后删除临时目录；部分既有测试仍调用默认配置 loader，不能仅依赖测试自身隔离。
 
 扩展 import 的 `@earendil-works/*`（pi 自己的 SDK）是 peer 依赖，运行时由 pi 提供，所以不装。类型检查和测试前会先跑 [`scripts/link-pi-sdk.mjs`](scripts/link-pi-sdk.mjs)，它在本机 pi 安装里找到这套 SDK 并软链进 `node_modules/`——类型因此永远对着真正加载这些代码的那个 pi 版本。`pnpm install` 之后链接可能被清掉，跑 `pnpm link-sdk` 重建即可；pi 装在别处时用 `PI_SDK_DIR` 或 `PI_BIN` 指过去。
 
