@@ -24,7 +24,7 @@ Paths below are relative to the repository root.
 - Use pnpm (version in `packageManager`); maintain `pnpm-lock.yaml`, never introduce `package-lock.json`.
 - **Project policy:** keep runtime `dependencies` on permissive ranges. On other machines pi installs git-package runtime dependencies with its own package manager (default npm), not this checkout's pnpm lockfile; `devDependencies` are for checkout development, not distributed runtime requirements.
 - pi supplies `@earendil-works/*` SDK imports at runtime. Keep the SDK peer-based rather than installing another runtime copy. [link-pi-sdk.mjs](../../../scripts/link-pi-sdk.mjs) links the locally installed SDK for checks; see [Testing Guidelines](./testing-guidelines.md).
-- Put a required third-party runtime import in `dependencies`, not only `devDependencies` or preset `packages`. If this preset invokes another pi extension itself, declare its standalone package in `conflicts` to prevent duplicate registrations (example: [bash-unified.ts](../../../extensions/bash-unified.ts)). Local packages need `pnpm install` before `--dev`; pi does not install/update their dependencies in place.
+- Put a required third-party runtime import in `dependencies`, not only `devDependencies` or preset `packages`. If this preset invokes another pi extension itself, declare its standalone package in `conflicts` to prevent duplicate registrations (example: [task-composition.ts](../../../extensions/task-composition.ts)). Local packages need `pnpm install` before `--dev`; pi does not install/update their dependencies in place.
 
 ## Vendored Ownership
 
@@ -40,4 +40,4 @@ A vendor directory with `index.ts` must stay behind the top-level wrapper. Expli
 
 代码、代码注释和提交信息仍使用英文；文档语言遵循上面的中文规则。项目约定统一维护在本规范层，不另建一份规则文件。
 
-Explain **why**, not just what: identify the pi/third-party behavior and version where relevant, and what breaks without the workaround. [bash-unified.ts](../../../extensions/bash-unified.ts) explains pretty's source-entry import and shared bash ownership; [blocked-signal.ts](../../../extensions/blocked-signal.ts) documents host notification gaps. Verify current code/assertions when historical comments or provenance describe an older model; do not turn those comments into new contracts.
+Explain **why**, not just what: identify the pi/third-party behavior and version where relevant, and what breaks without the workaround. [task-composition.ts](../../../extensions/task-composition.ts) 说明共享后端协调所有权；[beautify.ts](../../../extensions/beautify.ts) 独立负责展示，不导入 Pretty； [blocked-signal.ts](../../../extensions/blocked-signal.ts) documents host notification gaps. Verify current code/assertions when historical comments or provenance describe an older model; do not turn those comments into new contracts.

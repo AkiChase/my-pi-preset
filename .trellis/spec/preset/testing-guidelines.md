@@ -39,7 +39,7 @@ The SDK path intentionally reads an existing installation; the temporary agent p
 
 `extensions/agent-tasks/__tests__/source-loader.mjs` 仅用于 node:test：通过 Node 的内存 TypeScript transform 处理 vendor 的参数属性，范围限于 agent-tasks/src，不生成 dist、不修改 SDK。测试先 import hook，再动态 import 被测源；生产仍走 Pi jiti。
 
-`loading.test.ts` 在临时 cwd/agent-dir通过实际 host loader检查单一工具集、pretty bash、根/子 guard和shutdown；不启动真实 session/model。`workflow.test.ts` 跑真实 inline worker的无agent脚本、stub RPC与abort，使用不带 force-exit的定向命令验证自然退出：
+`loading.test.ts` 在临时 cwd/agent-dir通过实际 host loader加载唯一顶层 [task-composition.ts](../../../extensions/task-composition.ts)，检查单一工具集、保留 `runInChildSessionContext` named bridge、独立 beautify renderer、根/子 guard和shutdown；不启动真实 session/model。`workflow.test.ts` 跑真实 inline worker的无agent脚本、stub RPC与abort，使用不带 force-exit的定向命令验证自然退出：
 
 ```sh
 node --test extensions/agent-tasks/__tests__/*.test.ts
@@ -47,17 +47,17 @@ node --test extensions/agent-tasks/__tests__/*.test.ts
 
 完整检查继续使用真实 SDK路径及临时 agent目录。`.npmrc` 禁止pnpm自动装peers，TypeBox本地开发解析与host运行提供分开；不可为了测试安装第二套SDK或读取个人配置。
 
-## Pretty 兼容验证
+## Beautify 验证
 
-[editor.test.ts](../../../extensions/pretty-compat/__tests__/editor.test.ts) 使用实际 SDK setter/reset、editor 与 Pretty，历史插件为独立离线 fixture，不依赖本机 input-history 安装。来源与范围见 [TESTING.md](../../../extensions/pretty-compat/TESTING.md)。定向执行不加 force-exit，验证自然退出：
+[editor.test.ts](../../../extensions/beautify/__tests__/editor.test.ts) 使用实际 SDK setter/reset/editor 和自有 appearance，历史插件是独立离线 fixture，不依赖本机 input-history 安装。[tools.test.ts](../../../extensions/beautify/__tests__/tools.test.ts) 验证原生工具结果、真实 renderer/component、Shiki 与宽度。来源与范围见 [TESTING.md](../../../extensions/beautify/TESTING.md)。定向执行不加 force-exit：
 
 ```sh
-node --test extensions/pretty-compat/__tests__/editor.test.ts
+node --test extensions/beautify/__tests__/*.test.ts
 ```
 
-保留原实现 history-first 丢历史的红测与双顺序修复对照；覆盖安全降级、部分安装失败回滚、后来方法/padding/factory 所有权和 reset-before-shutdown。极窄 SDK/Pretty 既有错误须明确对照，不能跳过后宣称修复。
+覆盖同实例 transient state、history/Down 两种顺序、禁用 Down、安全降级、部分安装失败回滚、后来 wrapper/padding/factory 所有权、reset-before-shutdown 和真实 GC；验证 Read offset/notice、async stale、图片单次、Bash 后台 handle、grep literal/context，以及模型结果不被改写。局部移除行为后回归须失败。
 
-真实插件/CLI 集成验证与离线 fixture 分开：在临时 agent-dir、cwd、session 中用真实 PTY，两个加载顺序验证 cold/new/reload、箭头历史及 Alt+R，禁止个人 auth/config 与模型网络请求。当前验证基于 SDK 1.1.0、Pretty 0.6.31、input-history 1.1.3 的 regular TUI；不能推定 fullscreen、任意 renderer 或未来版本均兼容。
+真实 CLI/PTy 与实际 input-history 包另列验证，不以 fixture 推定终端/IME/任意插件兼容。SDK 极窄中文和聚焦光标异常必须对照记录，不能跳过后称为已修复。测试使用 Pi 1.2.0 实际 SDK 和临时配置目录，不安装第二 SDK，不访问个人配置。
 
 ## Representative Regression Evidence
 
@@ -132,7 +132,7 @@ node --test extensions/agent-tasks/__tests__/{runner-cancellation,worktree-lifec
 
 ## Down actual host/editor 回归
 
-`node --test extensions/task-ui/__tests__/{editor,config,panel}.test.ts extensions/agent-tasks/__tests__/loading.test.ts`，隔离agentdir、只读installedSDK。editor-host.mjs动态加载actualInteractiveMode.setter/ui context和真实CustomEditor/TuiMainScreen/Pretty，不复制host接线。editor测试验证firstsame-instanceinstall保cursor/draft/undo/historybrowse/paste/emptyTabautocomplete；真实focus/overlaydispatch/release/repeat/no tasks和fg-only；appactions/nativeextensionshortcut/submitchange、laterfactory/instancewrapper顺序、关闭退役不资源保留。失败安装要断言实际container仍挂载、render非空、focus/factory/cursor和继续编辑保持，不以sameidentity/methodrestored冒充UIrollback；unsupportedaccessor/nonconfiginput和安装时已有overlay都必须覆盖。GC子进程--expose-gc只验证ctx/TUI/coordinator/panel四项WeakRef回收，opaque包装必须独立函数环境以免fixture自身保资源；不能跳过GC或把unref当释放。完整input-history原包所有加载顺序/任意futureeditor兼容和真实terminal尚不能由等价fixture宣称覆盖。
+`node --test extensions/task-ui/__tests__/{editor,config,panel}.test.ts extensions/agent-tasks/__tests__/loading.test.ts`，隔离agentdir、只读installedSDK。editor-host.mjs动态加载actualInteractiveMode.setter/ui context和真实CustomEditor/TuiMainScreen/Beautify，不复制host接线。editor测试验证firstsame-instanceinstall保cursor/draft/undo/historybrowse/paste/emptyTabautocomplete；真实focus/overlaydispatch/release/repeat/no tasks和fg-only；appactions/nativeextensionshortcut/submitchange、laterfactory/instancewrapper顺序、关闭退役不资源保留。失败安装要断言实际container仍挂载、render非空、focus/factory/cursor和继续编辑保持，不以sameidentity/methodrestored冒充UIrollback；unsupportedaccessor/nonconfiginput和安装时已有overlay都必须覆盖。GC子进程--expose-gc只验证ctx/TUI/coordinator/panel四项WeakRef回收，opaque包装必须独立函数环境以免fixture自身保资源；不能跳过GC或把unref当释放。完整input-history原包所有加载顺序/任意futureeditor兼容和真实terminal尚不能由等价fixture宣称覆盖。
 
 ## 共享核心面板窗口回归
 

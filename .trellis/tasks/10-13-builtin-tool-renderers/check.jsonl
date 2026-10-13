@@ -1,0 +1,9 @@
+{"file": ".trellis/spec/preset/index.md", "reason": "preset 规范入口与检查边界"}
+{"file": ".trellis/spec/preset/repository-guidelines.md", "reason": "运行时依赖、宿主 SDK、来源与文档语言"}
+{"file": ".trellis/spec/preset/extension-guidelines.md", "reason": "唯一注册、编辑器同实例装饰、生命周期和列宽安全"}
+{"file": ".trellis/spec/preset/testing-guidelines.md", "reason": "实际 host seam、离线隔离与自然退出回归"}
+{"file": ".trellis/spec/preset/sync-guidelines.md", "reason": "移除配置声明但不删除个人旧文件"}
+{"file": ".trellis/spec/preset/documentation.md", "reason": "README 更新矩阵"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "复用 handoff 与现有所有权，避免重复执行实现"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "manifest 到执行/展示/文档迁移边界"}
+{"file": ".trellis/tasks/10-13-builtin-tool-renderers/research/runtime-migration.md", "reason": "原始结果结构、公开 renderer 接口及迁移证据"}

@@ -106,13 +106,11 @@ explainable.
 
 - Flattened `src/**` → `extensions/bg-tasks/**`; upstream's root `index.ts`
   (`export { default } from "./src/index.ts"`) was dropped as redundant.
-- Not registered as a pi extension directly. `extensions/bash-unified.ts` imports it and
-  re-registers its `bash` tool through `@heyhuynhgiabuu/pi-pretty`'s renderers.
+- Not registered as a pi extension directly. `extensions/task-composition.ts` imports it and
+  直接注册其原始 `bash`；独立 beautify 仅注册公开 renderer resolver。
 - Type-checked under this repo's `tsconfig.json` (`verbatimModuleSyntax`,
   `noImplicitOverride`, `noFallthroughCasesInSwitch`), which upstream does not enable.
-  `noUncheckedIndexedAccess` is deliberately *not* enabled: `bash-unified.ts` deep-imports
-  pi-pretty's `src/*.ts`, so those sources join the program and `skipLibCheck` (which only
-  covers `.d.ts`) cannot exclude them — the flag is not globally enableable here.
+  `noUncheckedIndexedAccess` 仍未启用；旧 Pretty source-import 限制已随 beautify 迁移移除，本任务不更改全局类型策略。
 - `commands.ts`: `/bg-version` reads the preset's `package.json`. After flattening,
   upstream's `../package.json` pointed at a nonexistent `extensions/package.json`.
 - `format.ts` `formatJobLine()`: dropped the duplicate duration suffix (upstream appended
@@ -339,3 +337,7 @@ explainable.
 ### Monitor 硬容量与完整批次清单（2026-10-13）
 
 新增nested `monitor-batch.ts`：通知正文＋details合计UTF-8 JSON至多63KiB，预留1KiB信封，独立于共享outputPreviewChars。超量来源只内联有界前缀，完整原metadata逐行／字符串分块写配置logDir下独占uuid JSONL（0600），单条消息显式省略数量和清单路径，不新增配置/admission或拆批。原输出仍在source logs，转换保留最多16次及省略计数。清单与日志同样不由stop/reset/sweep删除；写失败清自己部分文件、关闭fd，不杀监听，省略且未保存终态不消费，明确不可用。提交失败保留文件及未消费结果，不自动重放／重试。actual factory跨registry／epoch与大批终态容量、query、renderer/control、partial-write/fd回归保留既有重入/unknown异常修复。
+
+## 2026-10-13：展示与执行分离
+
+顶层 task-composition 直接调用本后端，不截获／重新注入 Bash，不修改 promptSnippet。独立 beautify 通过 SDK 1.2.0 的公开 resolver 美化四类工具，保留 backend schema、execute、guidelines 和结果。Pretty dependency／专属兼容已删除，standalone Pretty 仅作为 conflicts 禁止共存项。真实 host loader 的 root/child 工具集合不再包含 Pretty 重注册的 read/find/grep；这些继续由 Pi 内置工具提供。

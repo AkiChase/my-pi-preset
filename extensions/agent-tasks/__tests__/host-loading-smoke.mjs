@@ -14,7 +14,8 @@ mkdirSync(childCwd);
 mkdirSync(parallelRootCwd);
 const entry = join(parentCwd, "composition-probe.ts");
 writeFileSync(entry, `
-import composition, { runInChildSessionContext } from ${JSON.stringify(join(root, "extensions/bash-unified.ts"))};
+import composition, { runInChildSessionContext } from ${JSON.stringify(join(root, "extensions/task-composition.ts"))};
+import beautify from ${JSON.stringify(join(root, "extensions/beautify.ts"))};
 export default async function (pi) {
   const seen = new Map();
   const proxy = new Proxy(pi, { get(target, prop) {
@@ -29,13 +30,14 @@ export default async function (pi) {
     return typeof value === "function" ? value.bind(target) : value;
   }});
   await composition(proxy);
+  beautify(proxy);
   pi.registerCommand("probe-child", { description: "Test-only child context bridge",
     handler: async (_args, ctx) => runInChildSessionContext(ctx.loadChild) });
 }
 `);
 const registryKey = Symbol.for("pi-subagents:manager");
-const rootToolNames = ["Agent", "SubagentWorkflow", "bash", "bash_bg", "find", "get_subagent_result", "grep", "jobs", "monitor", "read", "steer_subagent"].sort();
-const childToolNames = ["bash", "bash_bg", "find", "grep", "jobs", "monitor", "read"].sort();
+const rootToolNames = ["Agent", "SubagentWorkflow", "bash", "bash_bg", "get_subagent_result", "jobs", "monitor", "steer_subagent"].sort();
+const childToolNames = ["bash", "bash_bg", "jobs", "monitor"].sort();
 const rootOnlyEvents = ["input", "session_before_switch"];
 const removedOverviewEvents = ["tool_execution_start"];
 const liveLoads = new Set();
@@ -61,7 +63,8 @@ const assertRoot = (result) => {
   const ext = result.extensions[0];
   assert.deepEqual([...ext.tools.keys()].sort(), rootToolNames);
   assert.ok(ext.tools.get("bash").definition.parameters.properties.run_in_background);
-  assert.equal(typeof ext.tools.get("bash").definition.renderResult, "function");
+  assert.equal(ext.toolRenderers.length, 1);
+  assert.equal(ext.toolRenderers[0]("bash", () => undefined).renderShell, "self");
   assert.ok(ext.commands.has("agents"));
   for (const event of rootOnlyEvents) assert.equal(ext.handlers.get(event)?.length, 1, `root owns ${event}`);
   for (const event of removedOverviewEvents) assert.equal(ext.handlers.has(event), false, `no legacy overview ${event}`);
@@ -75,11 +78,9 @@ const assertChild = (result, rootExt, label) => {
   }
   assert.equal(ext.commands.has("agents"), false, `${label}: no root manager command`);
   for (const event of [...rootOnlyEvents, ...removedOverviewEvents]) assert.equal(ext.handlers.has(event), false, `${label}: no root manager ${event}`);
-  // Process/pretty/composition retain their handlers; only the agent owner is absent.
-  // One composition handler plus pretty's independent renderer teardown in
-  // both graphs. Agent cleanup adds no separately ordered shutdown handler.
-  assert.equal(rootExt.handlers.get("session_shutdown")?.length, 2);
-  assert.equal(ext.handlers.get("session_shutdown")?.length, 2);
+  // Composition plus appearance/highlighter teardown; no separate agent shutdown.
+  assert.equal(rootExt.handlers.get("session_shutdown")?.length, 3);
+  assert.equal(ext.handlers.get("session_shutdown")?.length, 3);
   for (const event of ["session_start"]) {
     assert.equal(ext.handlers.get(event)?.length, rootExt.handlers.get(event)?.length - 1, `${label}: no agent ${event}`);
   }

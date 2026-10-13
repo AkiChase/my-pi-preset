@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 // AND every subdirectory with an `index.ts` (see collectAutoExtensionEntries /
 // resolveExtensionEntries in pi 1.1.0's core/package-manager.js). That makes the vendored
 // `extensions/process-tasks/index.ts` load a second time as an extension of its own, next to
-// `extensions/bash-unified.ts` which deliberately loads it as a library — so `bash`,
+// `extensions/task-composition.ts` which deliberately loads it as a library — so `bash`,
 // `bash_bg`, `jobs`, `monitor` and two shortcuts get registered twice and pi reports
 // conflicts. The declaration is the only thing keeping vendored directories out.
 
@@ -49,11 +49,18 @@ describe("package.json pi.extensions", () => {
       assert.equal(Object.hasOwn(preset.packages, source), false);
     }
     assert.equal(Object.hasOwn(packageJson.dependencies, "@tintinweb/pi-subagents"), false);
+    assert.equal(Object.hasOwn(packageJson.dependencies, "@heyhuynhgiabuu/pi-pretty"), false);
+    assert.equal(Object.hasOwn(preset.files, "pi-pretty.json"), false);
+    assert.ok(packageJson.dependencies.shiki);
+    assert.ok(packageJson.dependencies["@shikijs/cli"]);
+    assert.equal(declaredExtensions().filter(path => path === "extensions/beautify.ts").length, 1);
     assert.ok(packageJson.dependencies.croner);
     assert.ok(packageJson.dependencies.nanoid);
     assert.ok(packageJson.peerDependencies["@earendil-works/pi-coding-agent"]);
     assert.equal(Object.hasOwn(packageJson.dependencies, "@earendil-works/pi-coding-agent"), false);
-    assert.equal(declaredExtensions().filter(path => path === "extensions/bash-unified.ts").length, 1);
+    assert.equal(declaredExtensions().filter(path => path === "extensions/task-composition.ts").length, 1);
+    assert.equal(declaredExtensions().includes("extensions/bash-unified.ts"), false);
+    assert.equal(existsSync(join(root, "extensions/bash-unified.ts")), false);
     assert.equal(existsSync(join(root, "extensions/agent-tasks/src/index.ts")), true);
     assert.equal(existsSync(join(root, "extensions/agent-tasks/LICENSE.upstream")), true);
   });

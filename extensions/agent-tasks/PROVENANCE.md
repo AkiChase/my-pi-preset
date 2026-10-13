@@ -19,7 +19,7 @@
 - `package/src/**` → `extensions/agent-tasks/src/**`，完整保留 56 个 `.ts` 运行源码及其相对目录，包括 `ui/`、`workflow/`、内联 worker source、默认 agent 定义和辅助模块。
 - `package/LICENSE` → `extensions/agent-tasks/LICENSE.upstream`，内容不修改。
 - 不复制 `dist/`、上游 package/build 配置、媒体、示例和上游测试框架；本仓库只有一份 TS 运行源。本地离线回归放在 `__tests__/`，不引入 Vitest 或构建步骤。
-- 唯一所有者是顶层 [bash-unified.ts](../bash-unified.ts)：组合 process-tasks、agent-tasks 和 pi-pretty。`package.json` 的 `extensions/*.ts` 声明排除 nested vendor 入口；`pi-preset.json` 将 standalone upstream 放入 conflicts 而非 packages，避免重复注册。
+- 唯一所有者是顶层 [task-composition.ts](../task-composition.ts)：组合 process-tasks、agent-tasks；beautify 独立提供展示。`package.json` 的 `extensions/*.ts` 声明排除 nested vendor 入口；`pi-preset.json` 将 standalone upstream 放入 conflicts 而非 packages，避免重复注册。
 - 这是仓库维护的本地 fork，不建立 upstream 同步、旧配置迁移或独立发布义务。
 
 ## 基础阶段的本地偏离
@@ -46,7 +46,7 @@
 
 | 路径 | 结果 |
 | --- | --- |
-| 根加载 | 完整根工具集、单一 pretty bash、根 manager handlers |
+| 根加载 | 完整根工具集、单一 process Bash 与独立 beautify resolver、根 manager handlers |
 | guard 内同 cwd 子加载 | 无 Agent／SubagentWorkflow／结果与 steering 工具、无根 manager command/handlers；子关闭保留原根 registry |
 | guard 内不同临时 cwd 子加载（模拟 worktree） | 同上；新 graph 仍读取原异步 child scope |
 | cwd 改变后重复父加载两次 | 每个 factory 只注册一次工具／命令／快捷键；仍为根工具图，不覆盖原根 registry |
@@ -140,3 +140,7 @@ actualSDKhost/editor/Pretty/TUI分发回归与GC4/4资源回收通过（parentta
 - 离线行为证据位于 `__tests__/tool-waits.test.ts`、`__tests__/backend-waits.test.ts`、`__tests__/runner-cancellation.test.ts`；执行实际注册工具、manager、runner 延迟 bind／resume、临时持久化 store 和可信 RPC，不调用模型／网络／真实 git，不修改个人配置。
 
 前文各基础/3A/3B段为对应阶段的历史记录，旧UI保留/participant未接入的描述不是当前状态；以后续条目为准。
+
+## 2026-10-13：beautify 替换 Pretty
+
+移除 Pretty runtime 与输入框专属代理，保留本后端、root/child ALS guard 与统一生命周期。Down 与 beautify 共享局部 editor-handoff 小工具，两个 session_start 顺序均在实际活实例上安装，Down 禁用仍有外观。原 Pretty editor/host fixture 迁移为真实 SDK + beautify + 离线历史 fixture；hard loader 将 shutdown 断言更新为 composition、appearance、highlighter 三项，原始工具／manager 归属不变。

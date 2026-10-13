@@ -4,10 +4,12 @@ import assert from "node:assert/strict";
 import { it } from "node:test";
 import { CustomEditor, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Container, TuiMainScreen, setKeybindings, type AutocompleteProvider, type EditorComponent } from "@earendil-works/pi-tui";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { InteractiveMode, KeybindingsManager, themeSdk, createPromptEditorClass, pretty, fff } from "./editor-host.mjs";
+import { InteractiveMode, KeybindingsManager, themeSdk } from "./editor-host.mjs";
+import beautify from "../../beautify/index.ts";
+import { decorateAppearance } from "../../beautify/editor/appearance.ts";
 import { registerDownOpener } from "../editor.ts";
 import { TaskCoordinator } from "../coordinator.ts";
 import { TaskLifecycle } from "../lifecycle.ts";
@@ -152,12 +154,11 @@ void it("strict empty/press/focused/no-overlay conditions and actual TUI routing
     } finally { await h.dispose(); }
 });
 
-void it("Pretty live editor first, Down last: actual prompt render and custom action/callback ownership preserved", async () => {
+void it("Beautify live editor first, Down last: actual prompt render and custom action/callback ownership preserved", async () => {
     const h = harness();
     try {
-        const Prompt = createPromptEditorClass(CustomEditor, (text: string) => text);
         let calls = 0;
-        h.ctx.ui.setEditorComponent((tui, theme, keys) => { calls++; return new Prompt(tui, theme, keys); });
+        h.ctx.ui.setEditorComponent((tui, theme, keys) => { calls++; const e = new CustomEditor(tui, theme, keys); decorateAppearance(e); return e; });
         const editor = h.editor;
         let customAction = 0, customSubmit = "";
         editor.onAction("app.model.cycleForward", () => { customAction++; }); editor.onSubmit = text => { customSubmit = text; };
@@ -215,11 +216,8 @@ void it("owner fresh model exposes foreground-only and four-second visibility, r
     } finally { owner.dispose(); await h.dispose(); }
 });
 
-void it("installed Pretty actual session_start before Down and real panel focus/nav/close leave execution waits untouched", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "task-down-pretty-"));
-    const saved = { agent: process.env.PI_CODING_AGENT_DIR, pretty: process.env.PRETTY_CONFIG_DIR, tools: process.env.PRETTY_DISABLE_TOOLS };
-    process.env.PI_CODING_AGENT_DIR = dir; process.env.PRETTY_CONFIG_DIR = dir; process.env.PRETTY_DISABLE_TOOLS = "read,bash,find,grep,ls";
-    writeFileSync(join(dir, "pi-pretty.json"), JSON.stringify({ thinkingIndicator: { enabled: false }, workingIndicator: { enabled: false } }));
+void it("beautify actual session_start before Down and real panel focus/nav/close leave execution waits untouched", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "task-down-beautify-"));
     const h = harness();
     const starts: Array<(event: unknown, ctx: ExtensionContext) => unknown> = [], shuts: Array<(event: unknown, ctx: ExtensionContext) => unknown> = [];
     const rawPi = {
@@ -227,16 +225,14 @@ void it("installed Pretty actual session_start before Down and real panel focus/
             const list = name === "session_start" ? starts : name === "session_shutdown" ? shuts : [];
             list.push(callback); return () => { const index = list.indexOf(callback); if (index >= 0) list.splice(index, 1); };
         },
-        registerCommand() {}, registerFlag() {}, registerMarkdownTransformer() {}, getFlag() {}, registerTool() {},
+        registerCommand() {}, registerFlag() {}, registerMarkdownTransformer() {}, getFlag() {}, registerTool() {}, registerToolRenderer() {},
     };
     const pi = rawPi as unknown as ExtensionAPI;
-    // Native file indexing is outside editor coverage; use the installed FFF service's test seam.
-    fff.getSharedFffService(undefined, dir).tryLoadModule = async () => false;
     let activePanel: TaskPanel | undefined;
     try {
         Object.assign(h.ctx, { cwd: dir, thinkingLevel: "off" });
         Object.assign(h.ctx.ui, { setToolsExpanded() {}, setWorkingVisible() {} });
-        await pretty(pi, { customEditorClass: CustomEditor });
+        beautify(pi);
         const identity = { sourceId: "shell", taskId: "fg", runId: "1" };
         const first: TaskView = { ...identity, key: taskKey(identity), title: "first", kind: "shell", status: "running", executionMode: "foreground", waitCount: 1, stats: {}, artifacts: [], capabilities: { stop: true, details: true } };
         const second = { ...first, taskId: "second", key: taskKey({ ...identity, taskId: "second" }), title: "second" };
@@ -265,10 +261,7 @@ void it("installed Pretty actual session_start before Down and real panel focus/
         for (const shut of shuts) await shut({}, h.ctx);
         assert.equal(h.coordinator.waitCount, 0); assert.equal(h.counts.raw, 0);
     } finally {
-        activePanel?.dispose(); await h.dispose(); fff.resetSharedFffServiceForTests();
-        for (const [key, value] of Object.entries({ PI_CODING_AGENT_DIR: saved.agent, PRETTY_CONFIG_DIR: saved.pretty, PRETTY_DISABLE_TOOLS: saved.tools })) {
-            if (value === undefined) delete process.env[key]; else process.env[key] = value;
-        }
+        activePanel?.dispose(); await h.dispose();
         rmSync(dir, { recursive: true, force: true });
     }
 });

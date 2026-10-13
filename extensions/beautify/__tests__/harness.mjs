@@ -5,21 +5,10 @@ import { dirname, join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
-// Environment isolation must precede imports: both SDK and Pretty read config at load time.
-export const agentDir = mkdtempSync(join(tmpdir(), "pretty-prototype-"));
+// Environment isolation must precede imports: SDK read config at load time.
+export const agentDir = mkdtempSync(join(tmpdir(), "beautify-host-"));
 process.env.PI_CODING_AGENT_DIR = agentDir;
-process.env.PRETTY_CONFIG_DIR = agentDir;
-process.env.PRETTY_DISABLE_TOOLS = "read,bash,find,grep,ls";
 writeFileSync(join(agentDir, "pi-input-history.json"), JSON.stringify({ searchShortcut: "alt+r" }));
-export function configurePretty(overrides = {}) {
-  writeFileSync(join(agentDir, "pi-pretty.json"), JSON.stringify({
-    theme: "one-dark-pro",
-    workingIndicator: { text: ["PROTOTYPE-WORKING"], sessionAccent: false },
-    thinkingIndicator: { enabled: false },
-    ...overrides,
-  }));
-}
-configurePretty();
 
 const sdkUrl = import.meta.resolve("@earendil-works/pi-coding-agent");
 const sdkRoot = resolve(dirname(fileURLToPath(sdkUrl)), "..");
@@ -39,17 +28,10 @@ export const { StatusIndicator } = await import(join(sdkRoot, "dist/modes/intera
 export const themeSdk = await import(join(sdkRoot, "dist/modes/interactive/theme/theme.js"));
 themeSdk.initTheme("dark", false);
 export async function loadUnified() {
-  return (await jiti.import(fileURLToPath(new URL("../../bash-unified.ts", import.meta.url)))).default;
+  return (await jiti.import(fileURLToPath(new URL("../../task-composition.ts", import.meta.url)))).default;
 }
-export const pretty = (await jiti.import(fileURLToPath(import.meta.resolve("@heyhuynhgiabuu/pi-pretty/src/index.ts")))).default;
-export const { createPromptEditorClass } = await jiti.import(fileURLToPath(import.meta.resolve("@heyhuynhgiabuu/pi-pretty/src/prompt-editor.ts")));
-// History behavior is offline and independent of personal package installations.
 export { default as inputHistory } from "./history-fixture.mjs";
-
-// FFF indexing is outside this prototype; prevent native scanning via its shared service seam.
-const fff = await jiti.import(fileURLToPath(import.meta.resolve("@heyhuynhgiabuu/pi-pretty/src/fff.ts")));
-fff.getSharedFffService(undefined, agentDir).tryLoadModule = async () => false;
-export function cleanup() { fff.resetSharedFffServiceForTests(); rmSync(agentDir, { recursive: true, force: true }); }
+export function cleanup() { rmSync(agentDir, { recursive: true, force: true }); }
 
 const terminal = {
   columns: 80, rows: 24, kittyProtocolActive: false,
@@ -96,6 +78,7 @@ export function makeHost(name) {
     /** @type {string | undefined} */
     workingMessage: undefined,
     defaultWorkingMessage: "Working...", idleStatus: { invalidate() {}, render() { return []; } },
+    setCustomEditorComponent: interactive.InteractiveMode.prototype.setCustomEditorComponent,
     clearExtensionTerminalInputListeners() {}, setExtensionFooter() {}, setExtensionHeader() {},
     clearExtensionWidgets() {}, footerDataProvider: { clearExtensionStatuses() {}, setExtensionStatus() {} }, footer: { invalidate() {} },
     autocompleteProviderWrappers: [],
@@ -109,6 +92,7 @@ export function makeHost(name) {
     "clearStatusIndicator", "showWorkingStatusIndicator", "setWorkingVisible", "setWorkingIndicator"]) {
     host[key] = interactive.InteractiveMode.prototype[key];
   }
+  host.editorContainer.addChild(defaultEditor); tui.setFocus(defaultEditor);
   const ui = interactive.InteractiveMode.prototype.createExtensionUIContext.call(host);
   // Search fixture uses real SDK Input but never starts a terminal/overlay loop.
   let searchKeys = ["\r"];
@@ -143,7 +127,7 @@ export function makeHost(name) {
     setAutocompleteProvider() {},
     on(event, handler) { handlers.set(event, [...(handlers.get(event) ?? []), handler]); },
     registerCommand() {}, registerFlag() {}, registerMarkdownTransformer() {}, getFlag() {},
-    registerMessageRenderer() {}, registerTool(tool) { tools.push(tool); }, registerShortcut(key, options) { shortcuts.set(key, options.handler); },
+    registerToolRenderer() {}, registerMessageRenderer() {}, registerTool(tool) { tools.push(tool); }, registerShortcut(key, options) { shortcuts.set(key, options.handler); },
   };
   return {
     host, tui, kb, provider, counts, pi, ctx, shortcuts, diagnostics, tools,

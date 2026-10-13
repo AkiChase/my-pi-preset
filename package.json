@@ -27,7 +27,8 @@
     "typebox": "*"
   },
   "dependencies": {
-    "@heyhuynhgiabuu/pi-pretty": "^0.7.0",
+    "@shikijs/cli": "^4.0.2",
+    "shiki": "^4.0.2",
     "croner": "^10.0.1",
     "nanoid": "^5.1.16"
   },

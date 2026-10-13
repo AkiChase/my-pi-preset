@@ -8,8 +8,7 @@
  * that runs 20-minute builds; `shift+down` may be wanted by another extension),
  * so the knobs live in a file.
  *
- * Precedence: environment variable > config file > default — the same order
- * pi-pretty uses, so the two behave alike.
+ * Precedence: environment variable > config file > default.
  *
  * The loader is deliberately synchronous and total: `pi.registerShortcut` runs
  * while the extension loads, so there is no place to await, and a malformed

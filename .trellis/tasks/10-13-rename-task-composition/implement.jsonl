@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/preset/index.md", "reason": "规范入口与检查范围"}
+{"file": ".trellis/spec/preset/repository-guidelines.md", "reason": "入口发现、文档语言及依赖不变"}
+{"file": ".trellis/spec/preset/extension-guidelines.md", "reason": "共享协调与 child/editor 所有权保持"}
+{"file": ".trellis/spec/preset/testing-guidelines.md", "reason": "实际 loader 与生命周期回归和环境隔离"}
+{"file": ".trellis/spec/preset/documentation.md", "reason": "README 与引用更新矩阵"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "资源到注册与文档边界"}
+{"file": ".trellis/tasks/10-13-rename-task-composition/research/rename-impact.md", "reason": "旧路径消费者与 named child bridge 证据"}

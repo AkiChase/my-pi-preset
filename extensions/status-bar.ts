@@ -13,8 +13,8 @@ import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 //   - setFooter: nothing else uses it, so this extension owns the footer. If a
 //     second extension ever calls setFooter, the last one to call it wins and
 //     this layout silently disappears -- that is the only real conflict.
-//   - setStatus: pi-cache-optimizer ("pi-cache-stats"), extensions/bg-tasks
-//     ("background-jobs") and pi-pretty ("fff") publish statuses. The built-in
+//   - setStatus: pi-cache-optimizer ("pi-cache-stats") and shared task-ui
+//     ("task-ui") publish statuses. The built-in
 //     footer drew them; a custom footer must draw them itself or they vanish.
 //     `renderChips()` below does that: known keys get a compact chip, unknown
 //     keys fall through to their raw (sanitized) text so a newly installed

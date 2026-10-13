@@ -6,7 +6,7 @@
 
 - 清单：[`pi-preset.json`](pi-preset.json)，记录要装哪些包、装什么版本、哪些包不能装，以及哪些 pi 设置和键位由本仓库说了算
 - 同步：[`install.sh`](install.sh) 和 [`scripts/sync.mjs`](scripts/sync.mjs)，负责把本机状态对齐到清单
-- 扩展：[`extensions/`](extensions)，本仓库自带的四个扩展，pi 安装本仓库时会自动发现
+- 扩展：[`extensions/`](extensions)，本仓库自带的五个扩展，pi 安装本仓库时会自动发现
 
 本仓库自己也是清单里的一条（`git:github.com/AkiChase/my-pi-preset`），默认和其他包一样从远程安装、被 pi 管理和更新。本地开发可用 `./install.sh --dev` 只把本仓库切换为当前检出，第三方包仍按清单使用远程来源。
 
@@ -113,15 +113,15 @@ pi 里只有一个本仓库自带的命令：`/statusbar`，在自定义状态�
 | [`@juicesharp/rpiv-ask-user-question`](#npmjuicesharprpiv-ask-user-question) | 让模型给出选项，而不是自己猜 | `~/.config/rpiv-ask-user-question/config.json` | `ctrl+]`，可改 |
 | [`@tifan/pi-recap`](#npmtifanpi-recap) | 会话回到现场：一行 recap，离开后自动生成 | `~/.pi/agent/extensions/pi-recap.json` | 无 |
 | [`process-tasks`](#extensionsprocess-tasks--进程与-monitor-后端) | 前台／后台命令与 monitor | `~/.pi/agent/process-tasks.json` | `ctrl+shift+b` 等，可改 |
-| [`@heyhuynhgiabuu/pi-pretty`](#npmheyhuynhgiabuupi-pretty) | 终端输出美化 | `~/.pi/agent/pi-pretty.json` | 无 |
+| [`beautify`](#extensionsbeautifyts--工具与输入框美化) | Read/Bash/Find/Grep 展示与输入框外观 | 无 | 沿用 pi 工具展开键 |
 
 表中的 session-name、cache-optimizer、input-history、web-access、memory、ask-user-question、recap 是普通第三方包，由 pi 从 npm 安装，来源写在 [`pi-preset.json`](pi-preset.json) 的 `packages` 里，本仓库不动它们的代码。
 
-process-tasks 和 agent-tasks 是一次性拷贝后由本仓库维护的代码，分别来自 patty 和 `pi-subagents@0.20.0`；pretty 是本仓库的 npm 运行时依赖（见 [`package.json`](package.json)）。三者由 `extensions/bash-unified.ts` 亲自组合加载，原 upstream 包写在清单的 `conflicts` 中，**不能**再当成独立 pi 包安装，否则工具会重复注册。
+process-tasks 和 agent-tasks 是一次性拷贝后由本仓库维护的代码，分别来自 patty 和 `pi-subagents@0.20.0`，由 `extensions/task-composition.ts` 组合加载；beautify 独立负责展示。原后端 upstream 包仍在清单 `conflicts` 中，不能独立安装；standalone Pretty 也保留在 conflicts 中，因为它会与 beautify 争用四类 renderer 和输入框，但本仓库不再加载或依赖 Pretty。
 
 执行后端、共享等待和会话关闭已接入，旧 AgentWidget/FleetView 已删除，核心 Task Panel 和空编辑器 Down 入口已通过集中自动验证、独立审查及临时配置的真实 Pi PTY 核心交互冒烟。
 
-除了包，清单还声明了两类本机配置：pi 本体的几个偏好 —— 失败重试次数 `retry.maxRetries: 5`，以及把被扩展抢走的内置键 `tui.editor.jumpForward`（`ctrl+]`）禁掉；以及 `pi-input-history` 的搜索键 `searchShortcut: "alt+r"`、Pretty 的 Shiki 主题 `one-dark-pro` 和工具风格 `claudecode`。格式和语义见 [声明设置和键位](#声明设置和键位)，键位那条的来由见 [键位冲突](#键位冲突)。
+除了包，清单还声明了两类本机配置：pi 本体的几个偏好 —— 失败重试次数 `retry.maxRetries: 5`，以及把被扩展抢走的内置键 `tui.editor.jumpForward`（`ctrl+]`）禁掉；以及 `pi-input-history` 的搜索键 `searchShortcut: "alt+r"`。格式和语义见 [声明设置和键位](#声明设置和键位)，键位那条的来由见 [键位冲突](#键位冲突)。
 
 ### 第三方包
 
@@ -324,7 +324,7 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 
 #### `extensions/task-ui/` —— 共享任务面板与等待
 
-`bash-unified.ts` 每次加载创建一个 coordinator、lifecycle 和 UI owner，注入两个独立执行后端；task-ui 是嵌套库，不是另一份扩展。Task Panel 显示当前会话的 shell、monitor、独立 agent、workflow 及其真实子任务，包含前台、后台、启动中、排队和短暂保留的终态。底栏按独立工作分类显示 active／queued 数量，不将父任务和子任务重复计数。shell、monitor、agent、workflow 的摘要统一使用主题语义色：类型与快捷键为强调色，数量为明亮文字色，active 为成功色，queued 为警告色，分隔符为暗色；没有活动或排队任务时隐藏摘要。
+`task-composition.ts` 每次加载创建一个 coordinator、lifecycle 和 UI owner，注入两个独立执行后端；task-ui 是嵌套库，不是另一份扩展。Task Panel 显示当前会话的 shell、monitor、独立 agent、workflow 及其真实子任务，包含前台、后台、启动中、排队和短暂保留的终态。底栏按独立工作分类显示 active／queued 数量，不将父任务和子任务重复计数。shell、monitor、agent、workflow 的摘要统一使用主题语义色：类型与快捷键为强调色，数量为明亮文字色，active 为成功色，queued 为警告色，分隔符为暗色；没有活动或排队任务时隐藏摘要。
 
 `/tasks` / `Shift+Down` 打开双栏面板：左侧选择任务，右侧立即显示有界日志、对话或 workflow 进度，无需 Enter 或再开弹窗。workflow 默认展开；普通 agent 的嵌套任务按实际父子关系显示，刷新不覆盖用户收起状态。活跃父组保留已完成子行；整体完成后才开始四秒展示窗口，期间即使早期子结果已消费并遇到元数据 sweep，新打开的面板仍能看到整组。当前选择的最终有界详情在过滤或元数据 sweep 后仍保留到换选项或关闭，不依赖保留后端控制器，也不消费结果。
 
@@ -348,7 +348,7 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 - 裸 `Down` 只在编辑器文本严格为空、编辑器持有实际焦点、无补全／可见 overlay、有当前可查看任务且面板未打开时开面板，前台-only 也可用。release／repeat 不打开；非空、无任务或其他 UI 的 Down 继续原编辑器／组件处理。它不注册全局裸 Down 快捷键或 terminal-input 监听，也不解除等待。
 - 首次安装保留已有 live editor 的实例、原输入方法和内部编辑状态；先通过同步完成、不挂载的公开 UI factory 捕获 TUI，在编辑器仍挂载时做兼容性预检。不支持装饰时只禁用 Down，保留输入框和原 factory；已有 overlay 不关闭。只在 SDK 同步交接期间暂时屏蔽同一实例的重复接线，随后恢复属性。关闭只解除自己仍拥有的装饰，不调用 host setter 重建编辑器；后来插件保存的包装退役为无旧会话资源的透传。后续不委托原 factory 的全新编辑器不能自动继承 Down，`/tasks`／`Shift+Down` 仍可用。
 - 完成通过 inline 结果或后台通知报告；取消结果等待后仍可通知，即使完成和解除发生在同一 tick。统计包含前台执行，转后台不重复增加 started。
-- composition 已提供单一 `TaskLifecycle` 关闭协议：参与者同步冻结 admission／通知，关闭入口 hook，再释放等待、silent stop、最多等待 2 秒实际 cleanup，最后释放 source/coordinator。process 和 agent 共用这一个协议，agent 不再另注册先执行的 shutdown handler；pi-pretty 的独立 renderer 清理仍保留。真正换代由 host 关闭旧 factory 再创建新 factory，旧实例不复活；可取消的 before_switch 不永久停止计划或清空执行状态。worker 终止不代表 host gate 已退出，关闭同时取消 gate signal 并等待其实际 promise。两秒预算不能强制终止任意进程内 provider／第三方 hook，超时仍保留迟到清理所有者；这是明确的协作式取消边界，不代表第三方代码已实际停止或无法再写文件。
+- composition 已提供单一 `TaskLifecycle` 关闭协议：参与者同步冻结 admission／通知，关闭入口 hook，再释放等待、silent stop、最多等待 2 秒实际 cleanup，最后释放 source/coordinator。process 和 agent 共用这一个协议，agent 不再另注册先执行的 shutdown handler；beautify 独立清理输入框装饰与高亮缓存。真正换代由 host 关闭旧 factory 再创建新 factory，旧实例不复活；可取消的 before_switch 不永久停止计划或清空执行状态。worker 终止不代表 host gate 已退出，关闭同时取消 gate signal 并等待其实际 promise。两秒预算不能强制终止任意进程内 provider／第三方 hook，超时仍保留迟到清理所有者；这是明确的协作式取消边界，不代表第三方代码已实际停止或无法再写文件。
 
 **配置**：`~/.pi/agent/task-ui.json`（随 `PI_CODING_AGENT_DIR`），可不创建；不读取 process 配置中的旧键或旧环境变量，不做迁移。
 
@@ -360,49 +360,28 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 
 快捷键接受单个键名、数组或 `"off"`。`registerShortcut` 不走 keybinding id，所以需在此文件改键；默认不注册 Pi 已占用的 `ctrl+b`。Down 与显式快捷键独立，由 `downOpener` 开关控制。配置和无效 chord 的警告写加载日志；进程诊断只显示进程配置。
 
-### 由本仓库代为加载的包：pretty
+#### `extensions/beautify.ts` —— 工具与输入框美化
 
-#### `npm:@heyhuynhgiabuu/pi-pretty`
+独立扩展，只通过 Pi 的公开 `registerToolRenderer` resolver 接管 `read`、`bash`、`find`、`grep` 展示。不会重新注册工具、包装执行、修改模型可见的 content/details/structuredContent 或额外读取文件／完整任务日志；`edit`、`write`、`ls` 等保持原 renderer。没有 FFF、文件补全、工具连续分组、用户消息前缀或额外 Working/Thinking 动画。
 
-> 来源：[npm](https://www.npmjs.com/package/@heyhuynhgiabuu/pi-pretty) · [GitHub](https://github.com/heyhuynhgiabuu/pi-pretty)
+- Read：折叠显示路径、返回代码行数与展开提示；展开显示完整路径、1-based 行号、竖线与语法色。offset 与路径尾保持原子，长路径省略中段，长代码行用 `›` 截断。宿主续读／截断说明单独显示，不计代码行；文件尾部空行保留，未知或嵌入代码的说明样式文本不剥离；图片与附件仍由宿主绘制。折叠工具标题中的换行显示为 `\n`，展开按完整原文分行。
+- Bash：保留 `$ command`、timeout、返回输出行数和本次调用耗时（不是后台进程耗时）；展开正文，错误用 Pi error 色。后台返回的 ID、log path 和文案始终可见，不标记为进程已完成；原 timeout/background/任务协调行为不变。
+- Find/Grep：按返回顺序分组目录／文件，标题加粗着色。数量为已展示文件／matching lines，不把 context 和 limit notice 当命中。Grep 的 literal/ignoreCase 影响高亮；路径歧义、无效或不支持的 regex 保守回退原文／无高亮，不影响搜索执行。
+- 工具展开状态沿用 Pi；提示读取当前键位（默认 Ctrl+O，macOS 可显示 Control/Option 名称）。布局用实际 `render(width)` 和 SDK 显示列宽，处理中文、ANSI 与窗口变化；外部终端控制字符先清理。
 
-接管 pi 内置工具的渲染层：文件预览用 Shiki 做带行号的语法高亮，bash 输出和退出码上色，目录列表渲染成带 Nerd Font 图标的树。执行逻辑仍来自 SDK 的原始工具定义（通过 `deps.sdk` 注入），它只替换渲染，这正是 `extensions/bash-unified.ts` 能把它和 patty 拼起来的前提。TUI 上另有用户消息前缀、自定义 working 指示器、思考计时标签，以及基于 FFF 索引的 `@` 文件补全和 find / grep 加速。
+代码高亮直接依赖 `shiki` 与 `@shikijs/cli ^4.0.2`，固定 `one-dark-pro`，不读取个人配置、不改变 Pi 全局主题。未知语言／超过 80k 字符使用 plain；异常只输出一次不含路径或源代码的诊断。缓存最多 128 项、总字符约束 2Mi，关闭时清理；先 plain 后异步刷新，迟到结果不会覆盖新内容、折叠或已关闭 activation。
 
-**提供**：覆盖注册 `read`、`bash`、`find`、`grep`（`ls` 默认关闭）；命令 `/fff-health`、`/fff-rescan`（FFF 可用时）；不注册自定义键位，展开折叠用 pi 自带的 `ctrl+o`。
+**输入框**：使用宿主上下横线，无左右竖边框，首行 `❯`，续行不重复；向上滚动后不补第一行提示，原 working status 和隐藏行提示保留。装饰实际活实例，不复制 history/undo/paste 等私有状态；同实例 handoff 只在同步 setter 接线期间屏蔽冗余写入。input-history 和 task-ui Down 在两个顺序下均可组合，关闭 Down 不影响外观。装饰或安装不安全时保留原可用 UI并输出诊断；后来的方法、padding、factory 所有权不被清理覆盖，reload-before-shutdown 不重装旧输入框。
 
-本仓库依赖 `pi-pretty ^0.7.0`，通过清单默认启用 `toolStyle: "claudecode"`：折叠工具显示紧凑状态行及 `└` 结果摘要，连续工具调用可分组；输入框使用普通横线和左对齐 `❯`。`edit` / `write` 等外部工具只接管摘要和分组，不改执行，展开后仍委托原渲染器，因此不等于完整 diff 语法高亮。想恢复上游默认布局，使用 `toolStyle: "default"`；之后同步 preset 会再次对齐为 `claudecode`。
+不接管鼠标／选区／剪贴板，不保证终端复制能消除软换行。SDK 1.2.0 的单列中文递归错误与极窄聚焦光标越界仍是原生边界；本扩展保留原生行为，不宣称修复。当前证据为真实 host loader/resolver/component/editor/setter 与独立离线 history fixture，不是新一轮真实 CLI／实际 input-history 包或任意第三方 editor 的端到端验收。
 
-**配置**：配置文件 `~/.pi/agent/pi-pretty.json`（目录可用 `PRETTY_CONFIG_DIR` 改写），优先级是环境变量 > 配置文件 > 默认值。Shiki 主题还会尝试 Pi settings 的主题名，名称不匹配时回退 `github-dark`；preset 单独声明 `one-dark-pro`，不改 Pi 全局主题。常用键：
+不再发放、读取或删除 `pi-pretty.json`；个人旧文件可留在原处，同步及 prune 均不触碰。standalone Pretty 仍禁止共存，不再是代加载包。
 
-| 键 | 环境变量 | 默认 |
-| --- | --- | --- |
-| `theme`（Shiki 主题） | `PRETTY_THEME` | 上游 `github-dark`，preset `one-dark-pro` |
-| `toolStyle`（`default` / `claudecode`） | 无 | 上游 `default`，preset `claudecode` |
-| `icons`（`nerd` / `none`） | `PRETTY_ICONS` | `nerd` |
-| `disableTools` / `enableTools` | `PRETTY_DISABLE_TOOLS` / `PRETTY_ENABLE_TOOLS` | `[]` |
-| `maxHlChars` / `maxPreviewLines` | `PRETTY_MAX_HL_CHARS` / `PRETTY_MAX_PREVIEW_LINES` | `80000` / `80` |
-| `workingIndicator.*` | `PRETTY_WORKING_INDICATOR` 等 | 见上游 README |
-| `thinkingIndicator.enabled` | `PRETTY_THINKING_INDICATOR` | `true` |
+#### `extensions/task-composition.ts` —— 组合执行后端与共享任务 UI
 
-想关掉某个工具、恢复 pi 原生渲染，写 `disableTools: ["bash","grep"]` 或 `PRETTY_DISABLE_TOOLS=bash,grep`。注意环境变量非空时是整体覆盖配置文件里的列表，不是合并。
+原入口 `extensions/bash-unified.ts` 已删除，不保留兼容转发。通过 `package.json` 的 `extensions/*.ts` 加载无需调整设置；若自行显式引用旧路径，请改为 `extensions/task-composition.ts`。
 
-### 本仓库自带的顶层入口
-
-#### `extensions/bash-unified.ts` —— 组合执行后端与 pretty
-
-**要解决的问题**：patty 和 pretty 都要注册名为 `bash` 的工具，而 pi 不允许两个扩展占用同一个工具名，后加载的那个会整个加载失败。这不只是丢掉 bash 美化：pretty 整个扩展没加载，`read` / `find` / `grep` 的美化会一起没了。
-
-**做了什么更改**：组合加载本仓库的 process-tasks、agent-tasks 和 pretty；process-tasks 的 bash 只改执行，pretty 的 bash 只改渲染。先用 `Proxy` 截取进程后端的 `bash` 定义，再通过 pretty 的 `deps.sdk` 注入，最终只注册一个 `bash`。agent 后端在根会话注册工具，子会话 guard 避免再次注册 Agent/Workflow 或覆盖根 manager；两后端并未合并执行引擎。
-
-**输入历史兼容**：Pretty 安装输入框时，本仓库会先调用已有的 editor factory，在原实例上添加所选风格的边框和 `❯` 前缀（`claudecode` 为普通横线，`default` 为圆角框），而不是重新建一个没有历史的 editor。`pi-input-history` 在 preset 之前或之后加载都不需要调整顺序；同目录跨 session 的 ↑/↓ 历史、Alt+R 搜索，以及原 editor 的输入和应用快捷键保留。冷启动、新建 session 和 reload 都走这个入口；没有已有 factory 时仍使用 Pretty 原生输入框。
-
-支持 SDK 的 embedded working status、边框 hooks 和可写 render/padding 方法的 editor 保留 Pretty 外观及状态指示。遇到缺少 hooks、只读方法等不能安全装饰的第三方 editor，会保留其原输入框并显示 `preset Pretty editor fallback` 警告，只放弃该输入框的 Pretty 装饰。cleanup 不覆盖后来插件的 render、padding 或 factory；host 安装失败时会经正常 setter 恢复旧 factory，旧 factory 也失效时退回默认输入框并提示（此时无法保证失效插件的历史）。这些兼容逻辑在 [`extensions/pretty-compat/editor.ts`](extensions/pretty-compat/editor.ts)，不是单独加载的扩展。
-
-之前的真实 CLI 对照验证基于 Pi SDK 1.1.0、Pretty 0.6.31 和 input-history 1.1.3；本次 0.7.0 升级另用真实 SDK 1.2.0 setter/editor 和离线历史 fixture 验证默认及 claudecode 组合，不将其当作新的真实 CLI 验证。此前已在临时配置与 session 下用真实 CLI 验证两种加载顺序的冷启动、`/new`、`/reload`，以及 ↑/↓ 和 Alt+R 搜索接受/取消。该端到端验证使用 regular TUI，不代表 fullscreen 和任意第三方 editor 都已覆盖。自定义 renderer 不委托 SDK hooks 时，无法保证能显示 Pretty 前缀；极窄终端下单列中文递归溢出、聚焦光标越界是 SDK/Pretty 原有边界，本修复未处理；复杂异步补全仍需单独确认。
-
-两个实现细节：pretty 会用自己的 `promptSnippet` 覆盖 patty 的，模型会看不到后台任务提示，所以这里把那句补回去；patty 哪天改了入口、不再注册 `bash`，扩展会直接抛错，不静默退回 pi 原生 bash。
-
-**和 vendor 目录的关系**：两个后端都作为库由 composition import，不能另被 pi 自动发现。尤其 `extensions/process-tasks/index.ts` 再次加载会重复注册 bash/jobs/monitor 和快捷键；agent 后端也不能另装 standalone 包。挡住 nested discovery 的是 [`package.json`](package.json) 的 `pi.extensions` 声明（只列 `extensions/*.ts`），见 [添加扩展](#添加扩展)。
+直接调用本仓库 process-tasks 注册唯一 Bash 定义，保留其参数、prompt/guidelines 与 execute；agent-tasks 在根会话注册工具，子会话 guard 保留。两个后端共用一个 coordinator/lifecycle/UI owner，但不合并执行引擎。该入口仅负责后端与任务协调，工具／输入框美化由独立 beautify 提供；不再有 Pretty Proxy、Bash 注入器或 snippet 补丁。
 
 #### `extensions/status-bar.ts` —— 统一状态栏
 
@@ -465,7 +444,6 @@ pi 自己其实把信号发出来了 —— `ui_prompt_start` / `ui_prompt_end` 
 | `~/.pi/agent/pi-cache-optimizer-config.json` | `pi-cache-optimizer` |
 | `~/.pi/agent/pi-input-history.json` | `pi-input-history`，只存快捷键；其中 `searchShortcut` 由清单声明 |
 | `~/.pi/agent/web-search.json` | `pi-web-access`，provider、key、命令开关、快捷键都在这 |
-| `~/.pi/agent/pi-pretty.json` | `@heyhuynhgiabuu/pi-pretty` |
 | `~/.pi/agent/agent-tasks.json`、`<项目>/.pi/agent-tasks.json` | 本仓库 agent-tasks，项目覆盖全局；不读取旧配置名 |
 | `~/.config/rpiv-ask-user-question/config.json` | `@juicesharp/rpiv-ask-user-question`，走 `XDG_CONFIG_HOME`，不在 agent 目录下 |
 | `~/.pi/agent/extensions/pi-recap.json` | `@tifan/pi-recap`，只有 `model` 一键；在 `extensions/` 子目录下，不由清单声明 |
@@ -528,7 +506,6 @@ pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDING
   "settings": { "retry": { "maxRetries": 5 } },
   "keybindings": { "tui.editor.jumpForward": [] },
   "files": {
-    "pi-pretty.json": { "theme": "one-dark-pro", "toolStyle": "claudecode" },
     "pi-input-history.json": { "searchShortcut": "alt+r" }
   },
   "preserve": { "settings": ["theme", "defaultModel"], "keybindings": [] }
@@ -568,7 +545,6 @@ pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDING
 
 ```json
 "files": {
-  "pi-pretty.json": { "theme": "one-dark-pro", "toolStyle": "claudecode" },
   "pi-input-history.json": { "searchShortcut": "alt+r" }
 }
 ```
@@ -626,11 +602,11 @@ pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDING
 "pi": { "extensions": ["extensions/*.ts"] }
 ```
 
-这条 glob 不跨目录，所以顶层每个 `.ts` 都会自动加载，而 `extensions/` 下的子目录一律不会。必须这么写：pi 的自动发现会把任何 `extensions/<name>/index.ts` 也当成独立扩展，`extensions/process-tasks/`（vendor 进来、由 `bash-unified.ts` 当库 import 的那份）会因此被加载两遍、工具和快捷键全部冲突。`scripts/pi-manifest.test.mjs` 盯着这件事。
+这条 glob 不跨目录，所以顶层每个 `.ts` 都会自动加载，而 `extensions/` 下的子目录一律不会。必须这么写：pi 的自动发现会把任何 `extensions/<name>/index.ts` 也当成独立扩展，`extensions/process-tasks/`（vendor 进来、由 `task-composition.ts` 当库 import 的那份）会因此被加载两遍、工具和快捷键全部冲突。`scripts/pi-manifest.test.mjs` 盯着这件事。
 
 两个后果：真想加一个目录式扩展（`extensions/foo/index.ts`），得把它单独列进 `pi.extensions`；有了这段声明，pi 对 `skills/` / `prompts/` / `themes/` 的自动发现也一并关掉，将来真要放这些资源，同样得在 `pi` 里声明（测试会提醒）。
 
-扩展要用第三方 npm 包时，把它写进本仓库 `package.json` 的 `dependencies`：pi 安装 git 来源的包时会在检出目录里装一遍运行时依赖。要是这个包本身也是个 pi 扩展（像上面的 patty 和 pretty），记得同时把它加进 `pi-preset.json` 的 `conflicts`，否则两边会各注册一遍。
+扩展要用第三方 npm 包时，把它写进本仓库 `package.json` 的 `dependencies`：pi 安装 git 来源的包时会在检出目录里装一遍运行时依赖。要是这个包本身也是个 pi 扩展（例如代加载的后端），记得同时把它加进 `pi-preset.json` 的 `conflicts`，否则两边会各注册一遍。
 
 ## 添加第三方包
 
@@ -670,7 +646,7 @@ Agent backend 实际清理可定向运行 `node --test extensions/agent-tasks/__
 
 另以临时 HOME／agent-dir／cwd／sessions 直接加载当前检出的真实 Pi CLI，运行 140×40 PTY 核心冒烟：无任务／非空 Down、前台-only 开面板、查看／Esc 不解除等待、转后台保持 PID、x 停实际进程、子 agent 排队／即时详情、workflow 默认展开／子详情／整组停止、monitor 输出、`/new` 清理和正常 `/quit`。子 agent 使用 SDK 原生 faux 离线脚本响应，实际创建会话并执行本地 bash；workflow 使用真实 worker。没有在线模型请求，也没有改个人配置或安装。此烟测不覆盖模型自主质量、任意第三方插件／终端尺寸或全部 provider／worktree 场景。
 
-Pretty 兼容回归用实际 SDK setter/reset、CustomEditor 和 Pretty 渲染，但 history 插件使用独立编写的离线 fixture，不读取本机安装的 `pi-input-history`。来源与测试范围见 [`extensions/pretty-compat/TESTING.md`](extensions/pretty-compat/TESTING.md)。可运行 `node --test extensions/pretty-compat/__tests__/editor.test.ts`（不加 `--test-force-exit`）检查退出及生命周期清理。全量 `pnpm check` 前请把 `PI_CODING_AGENT_DIR` 指到 `mktemp -d` 创建的临时目录，同时用 `PI_SDK_DIR` 指向实际 SDK 的 `node_modules`，结束后删除临时目录；部分既有测试仍调用默认配置 loader，不能仅依赖测试自身隔离。
+beautify 回归使用实际 SDK loader/resolver/ToolExecutionComponent、setter/reset、CustomEditor 与 TUI，history 使用独立离线 fixture，不读取本机 `pi-input-history`。范围见 [`extensions/beautify/TESTING.md`](extensions/beautify/TESTING.md)。运行 `node --test extensions/beautify/__tests__/*.test.ts extensions/task-ui/__tests__/editor.test.ts`（不加 `--test-force-exit`）检查自然退出。全量 `pnpm check` 前请把 `PI_CODING_AGENT_DIR` 指到 `mktemp -d` 的临时目录，同时用 `PI_SDK_DIR` 指向实际 SDK 的 `node_modules`，结束后删除临时目录；部分既有测试调用默认配置 loader，不能仅依赖测试自身隔离。
 
 扩展 import 的 `@earendil-works/*`（pi 自己的 SDK）是 peer 依赖，运行时由 pi 提供，所以不装。类型检查和测试前会先跑 [`scripts/link-pi-sdk.mjs`](scripts/link-pi-sdk.mjs)，它在本机 pi 安装里找到这套 SDK 并软链进 `node_modules/`——类型因此永远对着真正加载这些代码的那个 pi 版本。`pnpm install` 之后链接可能被清掉，跑 `pnpm link-sdk` 重建即可；pi 装在别处时用 `PI_SDK_DIR` 或 `PI_BIN` 指过去。
 

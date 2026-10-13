@@ -6,17 +6,19 @@
 
 [pi-manifest.test.mjs](../../../scripts/pi-manifest.test.mjs) asserts complete top-level coverage, no nested entries and resource declarations. Do not remove it or replace the glob with recursive discovery: that would load nested vendor entry points twice.
 
-[bash-unified.ts](../../../extensions/bash-unified.ts) 拥有每次 factory activation 的唯一 `TaskLifecycle`、coordinator 与共享 UI owner。关闭顺序是所有 participant 同步 `freeze()`（admission 与通知）→ close hooks → cancelWaits → silent `stop()` → 最多 2 秒 `drain()` → source/coordinator `dispose()`；异常逐项隔离，shutdown 返回稳定幂等 promise。process 和 agent 都已接入，完整验收仍须实际测试与独立审查。
+[task-composition.ts](../../../extensions/task-composition.ts) 拥有每次 factory activation 的唯一 `TaskLifecycle`、coordinator 与共享 UI owner。关闭顺序是所有 participant 同步 `freeze()`（admission 与通知）→ close hooks → cancelWaits → silent `stop()` → 最多 2 秒 `drain()` → source/coordinator `dispose()`；异常逐项隔离，shutdown 返回稳定幂等 promise。process 和 agent 都已接入，完整验收仍须实际测试与独立审查。
 
-## Pretty 编辑器组合
+## Beautify 与编辑器组合
 
-[bash-unified.ts](../../../extensions/bash-unified.ts) 通过 [pretty-compat/editor.ts](../../../extensions/pretty-compat/editor.ts) 局部适配 Pretty 的 start/shutdown editor factory，不全局劫持其他插件。已有 factory 时在其创建的原实例上装饰，保留 history、receiver 和 subclass 行为；没有 factory 时沿用 Pretty editor。仅注入已有 constructor 仍会新建实例，不能解决历史丢失。
+[beautify.ts](../../../extensions/beautify.ts) 是独立美化入口，嵌套 [beautify](../../../extensions/beautify/index.ts) 仅通过公开 `registerToolRenderer` 接管 read/bash/find/grep 展示，不重注册执行、不改 result/content/structuredContent。其他工具调用 next；宿主负责图片。组件使用 render(width) 的真实列宽与 outputPad，不用 stdout.columns 决定布局。Read 的 offset 按 1-based 输入，续读说明不作为代码行，高亮有界且迟到回调不能更新关闭后的 activation。
 
-- 不读取私有 history、不改原型链、不复制 Pretty 渲染算法；RenderBridge 复用运行时 `createPromptEditorClass`。Pretty 0.7.0 的第三参数是 `boxed`，composition 从同一 Pretty 配置选择 `toolStyle` 并向已有 editor 的装饰透传 `boxed = toolStyle !== "claudecode"`；不能只改新 factory，留下 history-first editor 的旧圆角布局。
-- 装饰前检查 embedded status、border hooks 与可写 data methods。不支持时保留原编辑器并可诊断降级，不能破坏输入区。
-- 方法写入及 host setter 都可能部分成功后失败；回滚经正常 setter 恢复 factory/container/focus，原 factory 失效时尝试默认 editor。
-- 方法与 padding 状态恢复均须检查所有权，不覆盖后来插件。每 slot 只保留一个 live lease，退休 factory 释放 builder 并透传。
-- Pi reload 在 shutdown 前 reset UI；清理不能重新安装旧 factory。回归见 [editor.test.ts](../../../extensions/pretty-compat/__tests__/editor.test.ts)，版本与验证边界见 [TESTING.md](../../../extensions/pretty-compat/TESTING.md)。
+输入框 [owner.ts](../../../extensions/beautify/editor/owner.ts) 与 [appearance.ts](../../../extensions/beautify/editor/appearance.ts) 在已有活实例上装饰，保留 history、receiver、subclass、undo/paste/补全与 IME。只提供上下规则和首行 ❯，不接管鼠标/clipboard，不承诺原生复制恢复软换行。
+
+- 不读取私有 history、不改原型链、不通过复制文字新建 editor；共享 [editor-handoff](../../../extensions/editor-handoff/index.ts) 保护宿主重复接线，避免同实例 setter 重置草稿、paste 或 actions。
+- 装饰前检查 border/padding hooks 与可写 data methods；unsupported editor 保留原 UI。局部写入或 host setter 失败须事务回滚，实际 container/focus 可用不能仅凭方法恢复判断。
+- 方法与 padding 恢复必须检查所有权，不覆盖后来插件；退休 wrapper 清引用并成为 inactive delegate。
+- Pi reload 在 shutdown 前 reset UI；cleanup 不重装旧 factory。Beautify 与 Down 两种接线顺序及禁用 Down 都须测试，不依赖顶层文件排序。
+- [editor.test.ts](../../../extensions/beautify/__tests__/editor.test.ts)、[TESTING.md](../../../extensions/beautify/TESTING.md) 记录实际 host 与离线 history fixture 验证范围；不能替代真实 input-history/终端验收。
 
 Pi 1.1.0 的 new/resume/fork/import 在旧主会话 abort 后 shutdown，再建立新 factory；reload 也重新激活。before-switch 可取消或因 cwd 无效而无 shutdown，不能永久 freeze/dispose 当前 activation；旧 disposed factory 不复活，不引入 global mutable UI/coordinator。`process-tasks/index.ts` 在最终关闭后拒绝旧工具新执行，释放 foreground/pending/background/monitor/attach/ticker/sweep，保留磁盘日志；新 factory 从空 source 开始。证据见 [activation.test.ts](../../../extensions/process-tasks/__tests__/activation.test.ts)、[sdk-runtime.test.ts](../../../extensions/task-ui/__tests__/sdk-runtime.test.ts)。
 
@@ -59,7 +61,7 @@ Follow [TaskPanel](../../../extensions/task-ui/panel.ts): strip external termina
 
 ## 共享等待与阶段接入边界
 
-- [bash-unified.ts](../../../extensions/bash-unified.ts) 创建唯一 `TaskCoordinator`，向 process factory 和 agent factory 的 typed options 传入同一个实例；不能用 global UI singleton 或在生产 backend 中再创建实例。直接 process factory 的离线 fixture 可省略 options，由其创建局部实例及共享 controls。
+- [task-composition.ts](../../../extensions/task-composition.ts) 创建唯一 `TaskCoordinator`，向 process factory 和 agent factory 的 typed options 传入同一个实例；不能用 global UI singleton 或在生产 backend 中再创建实例。直接 process factory 的离线 fixture 可省略 options，由其创建局部实例及共享 controls。
 - [types.ts](../../../extensions/task-ui/types.ts) 定义 namespaced `TaskIdentity`、`TaskView`、`TaskSource` 和有限 detail/stop 能力。adapter 复制冻结读模型，不向 UI 返回 mutable Job、promise、controller 或 session。订阅／revision 覆盖后台状态及 waitCount；wait 与 executionMode 分开。
 - coordinator 的 launch/retrieval lease 仅完成、detach、interruption、dispose 中一个胜出，先移除父 signal listener；`onComplete` 在释放抑制前消费结果。`onDetach`／`onInterrupt` 仅 launch 调用，retrieval 不停止执行。`cleanup` 幂等；共享 `/bg` 对所有 lease 操作但不调用 `ctx.abort`。
 - 前台 bash 首次 await 前注册 lease，显式 detach 不等两秒 UI 窗口；backend 保持 exit 归属、terminal metadata 和 log，不 finally unlink。计数包含前台，promotion 不重复 started。
@@ -70,7 +72,7 @@ Follow [TaskPanel](../../../extensions/task-ui/panel.ts): strip external termina
 
 Pi1.1.0的publicEditor.isShowingAutocomplete与TUI.getFocusedComponent/hasOverlay可用，不读取privateeditingstate。初次安装先用publicui.custom的同步完成、不挂载probe获得realTUI，在destructivehostsetter之前完成focusedliveeditor检查与publicdescriptor预检。已有overlay时不done以免SDKhide其他overlay，unsupportedaccessor/nonconfigmethod失败不调用setter，不卸载原UI。随后factory仅返回原liveeditor；host对同一instance仍会setText并重复接线，preserveHandoff仅在同步交接期间暂时屏蔽publicsetters/callback/actionMap，finally恢复仍owned属性。不能再次newEditor并以copytext声称保undo/history/paste。后续factorycall正常delegatepredecessor，实例lease用WeakSet防叠加；不支持安全装饰的editor应diagnose并保留原可用UI。
 
-关闭先清cell.resources/access、screen/target，再恢复自己仍ownedmethod；lateropaquewrapper保持inactiveforwarder，不通过hostsetter重建丢state。capturedwrapper必须不保旧ctx/TUI/coordinator/panel；测试opaque包装在独立module-scope创建，不能让fixture本身共享create环境保这些资源。独立未来不delegate原factory的editor不自动继承Down，显式入口仍可用。无globalrawinputs，actualSDKsetter/TUI分发/Pretty顺序自动测试已通过；另有用户授权的隔离installedCLI140x40PTY核心冒烟，不覆盖任意插件/尺寸或在线模型自主质量。
+关闭先清cell.resources/access、screen/target，再恢复自己仍ownedmethod；lateropaquewrapper保持inactiveforwarder，不通过hostsetter重建丢state。capturedwrapper必须不保旧ctx/TUI/coordinator/panel；测试opaque包装在独立module-scope创建，不能让fixture本身共享create环境保这些资源。独立未来不delegate原factory的editor不自动继承Down，显式入口仍可用。无globalrawinputs，actualSDKsetter/TUI分发及Beautify两种接线顺序由自动测试覆盖；另有用户授权的隔离installedCLI140x40PTY核心冒烟，不覆盖任意插件/尺寸或在线模型自主质量。
 
 ## 子代理轮次预算接口
 

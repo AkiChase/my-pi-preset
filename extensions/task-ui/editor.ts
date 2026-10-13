@@ -2,10 +2,10 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { CustomEditor } from "@earendil-works/pi-coding-agent";
 import { isKeyRelease, isKeyRepeat, matchesKey, type EditorComponent, type TUI } from "@earendil-works/pi-tui";
 import type { TaskLifecycle } from "./lifecycle.ts";
+import { interpose, preserveHandoff, type LiveEditor } from "../editor-handoff/index.ts";
 
 type EditorFactory = NonNullable<Parameters<ExtensionContext["ui"]["setEditorComponent"]>[0]>;
 type FocusScreen = TUI & { getFocusedComponent(): unknown };
-type LiveEditor = EditorComponent & { focused: boolean; isShowingAutocomplete(): boolean };
 export interface DownPanelAccess { canOpen(): boolean; openPanel(ctx: ExtensionContext): Promise<void> }
 interface Resources { ctx: ExtensionContext; panel: DownPanelAccess; leases: Set<() => void>; editors: WeakSet<EditorComponent> }
 interface Cell { resources?: Resources }
@@ -16,31 +16,6 @@ function liveEditor(component: unknown): component is LiveEditor {
     return typeof candidate.handleInput === "function" && typeof candidate.getText === "function" &&
         typeof candidate.setText === "function" && typeof candidate.isShowingAutocomplete === "function" &&
         typeof candidate.focused === "boolean";
-}
-
-/** Restore only a descriptor still owned by this lease, including inherited methods. */
-function interpose(target: object, key: PropertyKey, descriptor: PropertyDescriptor): () => void {
-    const previous = Object.getOwnPropertyDescriptor(target, key);
-    let owner: object | null = target;
-    while (owner) {
-        const existing = Object.getOwnPropertyDescriptor(owner, key);
-        if (existing) {
-            if (!("value" in existing) || (owner === target && existing.configurable !== true)) {
-                throw new Error(`Down opener cannot safely shadow ${String(key)}`);
-            }
-            break;
-        }
-        owner = Object.getPrototypeOf(owner) as object | null;
-    }
-    const replacement = { configurable: true, enumerable: previous?.enumerable ?? false, ...descriptor };
-    Object.defineProperty(target, key, replacement);
-    return () => {
-        const current = Object.getOwnPropertyDescriptor(target, key);
-        if (current?.value !== descriptor.value || current?.get !== descriptor.get || current?.set !== descriptor.set ||
-            current?.configurable !== replacement.configurable || current?.enumerable !== replacement.enumerable ||
-            ("value" in descriptor && current?.writable !== (descriptor.writable ?? false))) return;
-        if (previous) Object.defineProperty(target, key, previous); else Reflect.deleteProperty(target, key);
-    };
 }
 
 // A retained opaque plugin wrapper keeps only the original input function and an empty cell
@@ -74,36 +49,6 @@ function decorate(cell: Cell, tui: TUI, editor: EditorComponent): EditorComponen
     return editor;
 }
 
-/** Pi 1.1's setter redundantly rewires even the SAME live instance. Shield only that
- * synchronous handoff: setText otherwise destroys history draft, cursor, pastes and completion.
- * All properties here are public EditorComponent/CustomEditor API, not editing internals. */
-function preserveHandoff(editor: LiveEditor): () => void {
-    const restores: (() => void)[] = [];
-    try {
-        const setText = editor.setText;
-        restores.push(interpose(editor, "setText", { writable: true, value: function (this: LiveEditor, text: string) {
-            if (text !== this.getText()) setText.call(this, text);
-        } }));
-        for (const key of ["setAutocompleteProvider", "setPaddingX", "setAutocompleteMaxVisible"] as const) {
-            if (typeof editor[key] === "function") restores.push(interpose(editor, key, { writable: true, value: () => {} }));
-        }
-        for (const key of ["onSubmit", "onChange", "borderColor"] as const) {
-            const value = editor[key];
-            restores.push(interpose(editor, key, { get: () => value, set: () => {} }));
-        }
-        // actionHandlers is a PUBLIC CustomEditor Map. Give the host an empty temporary
-        // wiring sink so its default handlers cannot overwrite custom onAction registrations.
-        if ("actionHandlers" in editor && editor.actionHandlers instanceof Map) {
-            restores.push(interpose(editor, "actionHandlers", { writable: true, value: new Map() }));
-            for (const key of ["onEscape", "onCtrlD", "onPasteImage", "onExtensionShortcut"] as const) {
-                const value = Reflect.get(editor, key);
-                restores.push(interpose(editor, key, { get: () => value, set: () => {} }));
-            }
-        }
-    } catch (error) { for (const restore of restores.reverse()) restore(); throw error; }
-    return () => { for (const restore of restores.reverse()) restore(); };
-}
-
 type Handoff = { initial: boolean; editor?: LiveEditor; restore?: () => void };
 function factoryLease(cell: Cell, previous: EditorFactory | undefined, transaction: Handoff): EditorFactory {
     return (tui, theme, keys) => {
@@ -120,7 +65,7 @@ function factoryLease(cell: Cell, previous: EditorFactory | undefined, transacti
     };
 }
 
-/** Register AFTER Pretty's session_start registration, not when the UI owner is created. */
+/** Independent live-instance decoration; safe before or after appearance installation. */
 export function registerDownOpener(pi: ExtensionAPI, lifecycle: TaskLifecycle, enabled: boolean, panel: DownPanelAccess): () => void {
     if (!enabled || !lifecycle.active) return () => {};
     const cell: Cell = {};
