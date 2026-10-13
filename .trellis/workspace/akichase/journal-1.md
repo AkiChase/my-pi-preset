@@ -159,3 +159,40 @@ Pretty 编辑器历史兼容修复完成并合并 main；同步最终实施与�
 ### Next Steps
 
 - subagent-turn-limit保持planning，本次未改；未推送、未更新个人Pi安装。
+
+
+## Session 5: 完成子代理轮次接口收尾与隔离目录清理
+<!-- trellis-session: v=2 fp=30880cf3a2af3545 -->
+
+**Date**: 2026-10-13
+**Task**: 完成子代理轮次接口收尾与隔离目录清理
+**Branch**: `main`
+
+### Summary
+
+删除模型 max_turns 并合回 main；归档任务、保留用户与可信程序上限。清理两个已完成 worktree 及四个已合并分支，未跟踪工作流文件先备份；不 push/install/reload。
+
+### Main Changes
+
+- 主与嵌套模型委派不再接受轮次预算；每 run 冻结实际上限，规范与 README 同步
+- 归档任务；正常移除 turn-limit/Pretty worktree，删除四个已合并 feature 分支
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `02fc35b` | fix: remove model-controlled subagent turn limits |
+| `cc8b88e` | merge: remove model-controlled subagent turn limits |
+| `d842a61` | chore(task): archive subagent turn-limit task |
+
+### Testing
+
+- [OK] 合并后 strict typecheck 与全量 531/531，相关模块无 force-exit 509/509 自然退出；git diff --check 通过
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 按用户选择本地 checkout 加载并重启验收，或 push 后更新远程安装；不自动修改个人安装
