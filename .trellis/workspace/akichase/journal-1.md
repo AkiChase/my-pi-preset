@@ -328,3 +328,34 @@ Implemented registry-scoped command/WS monitor batching with fixed short windows
 ### Next Steps
 
 - 若Pi升级，重跑内部补全接口兼容回归；物理IME/实际input-history/regular/动态resize仍未验
+
+
+## Session 11: 内置会话命名实施与终端验收
+<!-- trellis-session: v=2 fp=62d7d3b532313388 -->
+
+**Date**: 2026-10-14
+**Task**: 内置会话命名实施与终端验收
+**Branch**: `main`
+
+### Summary
+
+完成内置Session Name、全局N轮自动更新及手动标题保护；独立检查和隔离tmux验收通过，用户接受后提交归档。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ae13d8a` | feat: add built-in session naming with automatic refresh |
+
+### Testing
+
+- [OK] 定向25/25自然退出、严格类型检查及全量697/697通过，独立复核无剩余阻塞
+- [OK] 140×40 dark/fullscreen真实CLI16项通过；离线provider，N=2阈值加速验证，失败消息可见，PID/tmux/临时配置均清理
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Recap及其他并行任务未完成；未push/install/sync/reload，在线标题质量和其他终端矩阵未验证
