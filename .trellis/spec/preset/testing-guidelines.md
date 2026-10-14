@@ -77,7 +77,7 @@ node --test extensions/beautify/__tests__/*.test.ts
 
 `node --test extensions/at-path-completion/__tests__/*.test.ts` 使用实际已安装SDK和临时agent目录，不加force-exit。覆盖实际Editor/CustomEditor/host setter/reset、无列表slash与目录接受续提示、唯一项只展示、Enter不误提交、Escape/后续键/鼠标/失焦/overlay/文本替换/关闭的迟到请求；保native Copy、普通Tab和非@ trigger。后装delegating setter只接收一次provider转换，nondelegating替换不回写旧链；GC检查退役wrapper不保editor/screen。native provider仅临时目录，`~/`使用隔离子进程HOME，不扫描个人目录，fd缺失不下载。
 
-原生行为红测须证明两个触发缺口，增强断言另外保留；actual host loader防Node-only子路径import。internal接口存在不证明升级兼容；实际PTY/IME/input-history原包验收与离线fixture分开报告。详见 [TESTING.md](../../../extensions/at-path-completion/TESTING.md) 与 [扩展契约](./extension-guidelines.md#-路径连续补全契约)。
+原生行为红测须证明两个触发缺口，增强断言另外保留；actual host loader防Node-only子路径import。internal接口存在不证明升级兼容；实际PTY/IME/input-history原包验收与离线fixture分开报告。真实终端：另已通过用户授权的隔离tmux、installedCLI dark/fullscreen固定140/80/40列最小路径交互矩阵，原生fd候选与公开观察probe，目录Enter无提交／唯一子项不自动接受。固定宽启动不代表动态resize，capture文本不是图片；两次夹具FAIL保留，修等待和可见项断言后通过。物理IME、实际input-history原包、regular/其他主题仍NOT_RUN。详见 [TESTING.md](../../../extensions/at-path-completion/TESTING.md) 与 [扩展契约](./extension-guidelines.md#-路径连续补全契约)。
 
 ## Representative Regression Evidence
 

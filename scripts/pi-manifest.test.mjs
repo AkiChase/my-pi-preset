@@ -43,6 +43,12 @@ describe("package.json pi.extensions", () => {
     assert.deepEqual(nested, [], `these would load as standalone extensions: ${nested.join(", ")}`);
   });
 
+  it("loads independent path continuation once, never its helpers", () => {
+    assert.equal(declaredExtensions().filter(path => path === "extensions/at-path-completion.ts").length, 1);
+    assert.equal(declaredExtensions().some(path => path.startsWith("extensions/at-path-completion/")), false);
+    assert.ok(existsSync(join(root, "extensions/at-path-completion/index.ts")));
+  });
+
   it("keeps composition-owned packages in conflicts, not standalone packages or runtime copies", () => {
     for (const source of ["npm:pi-patty-bg-tasks", "npm:@heyhuynhgiabuu/pi-pretty", "npm:@tintinweb/pi-subagents"]) {
       assert.ok(preset.conflicts.includes(source));

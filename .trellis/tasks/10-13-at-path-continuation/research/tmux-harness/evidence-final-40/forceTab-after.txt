@@ -1,0 +1,40 @@
+
+ AT_TMUX_READY
+
+
+ ordinary offline message
+
+
+ OFFLINE_SUBMIT_OK
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────
+@local/aa/
+────────────────────────────────────────
+→ onlydir/
+/private/var/folders/fx/bn7t1rq16xn7_...
+↑691 ↓5 W691 CH0.0% 1.1%/128k (auto)  sc

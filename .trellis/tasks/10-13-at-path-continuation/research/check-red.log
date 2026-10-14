@@ -1,0 +1,83 @@
+✖ directory debounce cannot start a visible request after early focus (107.613875ms)
+✖ directory debounce cannot start a visible request after early overlay (104.561084ms)
+✖ unrelated trigger provider retains a pending native request across the native no-op copy action (411.229125ms)
+✖ shutdown does not run a later provider-transforming setter twice (105.232833ms)
+✔ shutdown never overwrites a later nondelegating provider setter with an old chain (104.976375ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 1
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1446.724625
+
+✖ failing tests:
+
+test at extensions/at-path-completion/__tests__/check-regressions.test.ts:6:49
+✖ directory debounce cannot start a visible request after early focus (107.613875ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion/__tests__/check-regressions.test.ts:12:27)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at extensions/at-path-completion/__tests__/check-regressions.test.ts:6:49
+✖ directory debounce cannot start a visible request after early overlay (104.561084ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion/__tests__/check-regressions.test.ts:12:27)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at extensions/at-path-completion/__tests__/check-regressions.test.ts:16:6
+✖ unrelated trigger provider retains a pending native request across the native no-op copy action (411.229125ms)
+  AssertionError [ERR_ASSERTION]: enhanced=true
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion/__tests__/check-regressions.test.ts:25:57)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at extensions/at-path-completion/__tests__/check-regressions.test.ts:40:6
+✖ shutdown does not run a later provider-transforming setter twice (105.232833ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion/__tests__/check-regressions.test.ts:48:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

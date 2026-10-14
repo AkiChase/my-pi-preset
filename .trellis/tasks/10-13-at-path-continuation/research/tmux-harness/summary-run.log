@@ -1,0 +1,136 @@
+{
+  "status": "PASS",
+  "error": null,
+  "runs": [
+    {
+      "attempt": "matrix-visible-140",
+      "status": "PASS",
+      "error": null,
+      "exit_status": 0,
+      "raw_frame": {
+        "bytes": 101345,
+        "initial_full_width_border_offset": 1141,
+        "synchronized_start_count": 278,
+        "synchronized_end_count": 278,
+        "initial_width_proof": "fixed session from initial CLI launch; whole-width border in actual CLI raw stream, not capture-only clipping"
+      },
+      "events": {
+        "count": 561,
+        "submit_records": [
+          {
+            "time": 1791945474333,
+            "kind": "submit",
+            "text": "ordinary offline message",
+            "source": "interactive"
+          }
+        ],
+        "provider_request_count": 1,
+        "terminal_input_count": 264,
+        "bracketed_paste_markers": 0,
+        "shutdown_records": [
+          {
+            "time": 1791945475622,
+            "kind": "shutdown"
+          }
+        ]
+      },
+      "cleanup": {
+        "natural_cli_exit": true,
+        "pane_dead_status": "0",
+        "actual_pid_gone": true,
+        "unique_server_stopped": true,
+        "isolated_config_removed": true
+      }
+    },
+    {
+      "attempt": "final-80",
+      "status": "PASS",
+      "error": null,
+      "exit_status": 0,
+      "raw_frame": {
+        "bytes": 68382,
+        "initial_full_width_border_offset": 1081,
+        "synchronized_start_count": 275,
+        "synchronized_end_count": 275,
+        "initial_width_proof": "fixed session from initial CLI launch; whole-width border in actual CLI raw stream, not capture-only clipping"
+      },
+      "events": {
+        "count": 561,
+        "submit_records": [
+          {
+            "time": 1791945523847,
+            "kind": "submit",
+            "text": "ordinary offline message",
+            "source": "interactive"
+          }
+        ],
+        "provider_request_count": 1,
+        "terminal_input_count": 264,
+        "bracketed_paste_markers": 0,
+        "shutdown_records": [
+          {
+            "time": 1791945525105,
+            "kind": "shutdown"
+          }
+        ]
+      },
+      "cleanup": {
+        "natural_cli_exit": true,
+        "pane_dead_status": "0",
+        "actual_pid_gone": true,
+        "unique_server_stopped": true,
+        "server_probe": {
+          "returncode": 1,
+          "stderr": "no server running on /private/tmp/tmux-501/at-at-tmux-7mvqcrtj"
+        },
+        "cli_pid": 86101,
+        "isolated_config_removed": true
+      }
+    },
+    {
+      "attempt": "final-40",
+      "status": "PASS",
+      "error": null,
+      "exit_status": 0,
+      "raw_frame": {
+        "bytes": 46946,
+        "initial_full_width_border_offset": 1041,
+        "synchronized_start_count": 282,
+        "synchronized_end_count": 282,
+        "initial_width_proof": "fixed session from initial CLI launch; whole-width border in actual CLI raw stream, not capture-only clipping"
+      },
+      "events": {
+        "count": 561,
+        "submit_records": [
+          {
+            "time": 1791945523670,
+            "kind": "submit",
+            "text": "ordinary offline message",
+            "source": "interactive"
+          }
+        ],
+        "provider_request_count": 1,
+        "terminal_input_count": 264,
+        "bracketed_paste_markers": 0,
+        "shutdown_records": [
+          {
+            "time": 1791945524970,
+            "kind": "shutdown"
+          }
+        ]
+      },
+      "cleanup": {
+        "natural_cli_exit": true,
+        "pane_dead_status": "0",
+        "actual_pid_gone": true,
+        "unique_server_stopped": true,
+        "server_probe": {
+          "returncode": 1,
+          "stderr": "no server running on /private/tmp/tmux-501/at-at-tmux-xp31g5f6"
+        },
+        "cli_pid": 86100,
+        "isolated_config_removed": true
+      }
+    }
+  ]
+}

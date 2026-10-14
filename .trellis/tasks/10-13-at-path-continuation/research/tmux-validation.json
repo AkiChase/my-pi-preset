@@ -1,0 +1,1910 @@
+{
+  "status": "PASS",
+  "scope": "Pi 1.2.0 actual installed CLI; dark fullscreen fixed 140/80/40x40; native fd provider; public read-only input/text/submit probe; no private editor calls",
+  "runs": [
+    {
+      "attempt": "matrix-visible-140",
+      "report": "tmux-harness/evidence-matrix-visible-140/report.json",
+      "status": "PASS",
+      "error": null,
+      "exit_status": 0,
+      "elapsed_seconds": 9.05,
+      "cleanup": {
+        "natural_cli_exit": true,
+        "pane_dead_status": "0",
+        "actual_pid_gone": true,
+        "unique_server_stopped": true,
+        "isolated_config_removed": true
+      },
+      "width": 140,
+      "height": 40,
+      "mode": "fullscreen",
+      "theme": "dark",
+      "command": "exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/home USERPROFILE=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/home XDG_CONFIG_HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/home/.config PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/sessions AT_TMUX_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/terminal.raw PATH=/Users/jyxc-dz-0101322/.kimi-code/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/sessions --use-theme dark --tui-mode fullscreen --tools read --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-at-path-continuation/research/tmux-harness/probe.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion.ts --model at-offline/scripted --thinking off",
+      "tmux_command": "/opt/homebrew/bin/tmux -L at-at-tmux-d_jqag8w -f /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/tmux.conf new-session -d -s check -x 140 -y 40 -c /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/cwd 'exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/home USERPROFILE=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/home XDG_CONFIG_HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/home/.config PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/sessions AT_TMUX_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/terminal.raw PATH=/Users/jyxc-dz-0101322/.kimi-code/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/sessions --use-theme dark --tui-mode fullscreen --tools read --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-at-path-continuation/research/tmux-harness/probe.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion.ts --model at-offline/scripted --thinking off'",
+      "cases": [
+        {
+          "case": "installed CLI isolated fullscreen startup",
+          "status": "PASS",
+          "ready": {
+            "time": 1791945467161,
+            "kind": "ready",
+            "pid": 84234,
+            "cwd": "/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/cwd",
+            "home": "/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/home",
+            "mode": "tui"
+          },
+          "pane_pid": 84234
+        },
+        {
+          "case": "CLI initial frame fixed width",
+          "status": "PASS",
+          "raw_bytes": 2563,
+          "width": 140
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "ignored-local before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "ignored-local slash without Tab",
+          "status": "PASS",
+          "text": "@local/manual/",
+          "expected": "@local/manual/",
+          "candidate": "SLASH_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "Tab directory continues single directory display",
+          "status": "PASS",
+          "text": "@local/aa/",
+          "candidate": "onlydir/"
+        },
+        {
+          "case": "Escape no rebound",
+          "status": "PASS",
+          "observation_ms": 320
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "Enter directory continues and does not submit",
+          "status": "PASS",
+          "text": "@local/aa/",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "dot-relative before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "dot-relative slash without Tab",
+          "status": "PASS",
+          "text": "@./dot/",
+          "expected": "@./dot/",
+          "candidate": "DOT_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "parent-relative before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "parent-relative slash without Tab",
+          "status": "PASS",
+          "text": "@../",
+          "expected": "@../",
+          "candidate": "→ cwd/",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "home-relative before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "home-relative slash without Tab",
+          "status": "PASS",
+          "text": "@~/scoped/",
+          "expected": "@~/scoped/",
+          "candidate": "HOME_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "absolute before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "absolute slash without Tab",
+          "status": "PASS",
+          "text": "@/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/cwd/local/manual/",
+          "expected": "@/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/cwd/local/manual/",
+          "candidate": "SLASH_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "quoted before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "quoted slash without Tab",
+          "status": "PASS",
+          "text": "@\"space dir/",
+          "expected": "@\"space dir/",
+          "candidate": "QUOTED_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "file before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "file slash without Tab",
+          "status": "PASS",
+          "text": "@local/manual/",
+          "expected": "@local/manual/",
+          "candidate": "SLASH_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "file acceptance closes with trailing space",
+          "status": "PASS",
+          "text": "@local/manual/SLASH_LEAF.txt "
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "normal Enter submits exactly once offline",
+          "status": "PASS",
+          "submit_count": 1
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "forceTab unique directory accepts then only displays child",
+          "status": "PASS",
+          "text": "@local/aa/",
+          "candidate": "onlydir/",
+          "native_unique_before": "aa/"
+        }
+      ],
+      "product_hashes_before": {
+        "extensions/at-path-completion.ts": "1ac7551f37270b18cead2505705de66fe06797ed7c9e53657b1fce902463cf6c",
+        "extensions/at-path-completion/compat.ts": "d577b5d18a6fd57b43c313bb3761a095d190b33851f2d78c2e19927b67aaae28",
+        "extensions/at-path-completion/editor.ts": "a3acbbbf443035d734859783b55f1727b911ba6e06a732557f2a4c2a6ce96199",
+        "extensions/at-path-completion/index.ts": "d3945839eb643a8939172c085540149e585c5bda03b18fb9a1425707b45dd0c7",
+        "extensions/at-path-completion/provider.ts": "5b8c6ace9636a6a4ca900034b172619ad48d31a3c80e4189f759f103f4e8f788",
+        "extensions/at-path-completion/token.ts": "a5d0466ec585e8cded3f3433db63543b96beb916dee9217c773220fe4e426117"
+      },
+      "product_hashes_after": {
+        "extensions/at-path-completion.ts": "1ac7551f37270b18cead2505705de66fe06797ed7c9e53657b1fce902463cf6c",
+        "extensions/at-path-completion/compat.ts": "d577b5d18a6fd57b43c313bb3761a095d190b33851f2d78c2e19927b67aaae28",
+        "extensions/at-path-completion/editor.ts": "a3acbbbf443035d734859783b55f1727b911ba6e06a732557f2a4c2a6ce96199",
+        "extensions/at-path-completion/index.ts": "d3945839eb643a8939172c085540149e585c5bda03b18fb9a1425707b45dd0c7",
+        "extensions/at-path-completion/provider.ts": "5b8c6ace9636a6a4ca900034b172619ad48d31a3c80e4189f759f103f4e8f788",
+        "extensions/at-path-completion/token.ts": "a5d0466ec585e8cded3f3433db63543b96beb916dee9217c773220fe4e426117"
+      },
+      "product_code_unchanged": true,
+      "files": {
+        "absolute-after.ansi.txt": 1471,
+        "absolute-after.txt": 1328,
+        "absolute-before.ansi.txt": 1455,
+        "absolute-before.txt": 1312,
+        "dot-relative-after.ansi.txt": 1315,
+        "dot-relative-after.txt": 1172,
+        "dot-relative-before.ansi.txt": 1377,
+        "dot-relative-before.txt": 1117,
+        "driver.py": 14283,
+        "enter-after.ansi.txt": 1316,
+        "enter-after.txt": 1173,
+        "escape-after.ansi.txt": 1240,
+        "escape-after.txt": 1121,
+        "events.jsonl": 40574,
+        "file-after.ansi.txt": 1259,
+        "file-after.txt": 1139,
+        "file-before.ansi.txt": 1315,
+        "file-before.txt": 1172,
+        "forceTab-after.ansi.txt": 1408,
+        "forceTab-after.txt": 1220,
+        "forceTab-before-close.ansi.txt": 1399,
+        "forceTab-before-close.txt": 1211,
+        "forceTab-before.ansi.txt": 1331,
+        "forceTab-before.txt": 1167,
+        "home-relative-after.ansi.txt": 1322,
+        "home-relative-after.txt": 1179,
+        "home-relative-before.ansi.txt": 1307,
+        "home-relative-before.txt": 1164,
+        "ignored-local-after.ansi.txt": 1331,
+        "ignored-local-after.txt": 1188,
+        "ignored-local-before.ansi.txt": 1315,
+        "ignored-local-before.txt": 1172,
+        "normal-submit.ansi.txt": 1322,
+        "normal-submit.txt": 1158,
+        "parent-relative-after.ansi.txt": 1593,
+        "parent-relative-after.txt": 1330,
+        "parent-relative-before.ansi.txt": 1233,
+        "parent-relative-before.txt": 1114,
+        "probe.ts": 1818,
+        "quoted-after.ansi.txt": 1327,
+        "quoted-after.txt": 1184,
+        "quoted-before.ansi.txt": 1241,
+        "quoted-before.txt": 1167,
+        "report.json": 10155,
+        "startup.ansi.txt": 1230,
+        "startup.txt": 1111,
+        "tab-after.ansi.txt": 1316,
+        "tab-after.txt": 1173,
+        "tab-before.ansi.txt": 1611,
+        "tab-before.txt": 1372,
+        "terminal.raw": 101345
+      },
+      "raw_frame": {
+        "bytes": 101345,
+        "initial_full_width_border_offset": 1141,
+        "synchronized_start_count": 278,
+        "synchronized_end_count": 278,
+        "initial_width_proof": "fixed session from initial CLI launch; whole-width border in actual CLI raw stream, not capture-only clipping"
+      },
+      "events": {
+        "count": 561,
+        "submit_records": [
+          {
+            "time": 1791945474333,
+            "kind": "submit",
+            "text": "ordinary offline message",
+            "source": "interactive"
+          }
+        ],
+        "provider_request_count": 1,
+        "terminal_input_count": 264,
+        "bracketed_paste_markers": 0,
+        "shutdown_records": [
+          {
+            "time": 1791945475622,
+            "kind": "shutdown"
+          }
+        ]
+      }
+    },
+    {
+      "attempt": "final-80",
+      "report": "tmux-harness/evidence-final-80/report.json",
+      "status": "PASS",
+      "error": null,
+      "exit_status": 0,
+      "elapsed_seconds": 9.12,
+      "cleanup": {
+        "natural_cli_exit": true,
+        "pane_dead_status": "0",
+        "actual_pid_gone": true,
+        "unique_server_stopped": true,
+        "server_probe": {
+          "returncode": 1,
+          "stderr": "no server running on /private/tmp/tmux-501/at-at-tmux-7mvqcrtj"
+        },
+        "cli_pid": 86101,
+        "isolated_config_removed": true
+      },
+      "width": 80,
+      "height": 40,
+      "mode": "fullscreen",
+      "theme": "dark",
+      "command": "exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/home USERPROFILE=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/home XDG_CONFIG_HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/home/.config PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/sessions AT_TMUX_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/terminal.raw PATH=/Users/jyxc-dz-0101322/.kimi-code/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/sessions --use-theme dark --tui-mode fullscreen --tools read --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-at-path-continuation/research/tmux-harness/probe.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion.ts --model at-offline/scripted --thinking off",
+      "tmux_command": "/opt/homebrew/bin/tmux -L at-at-tmux-7mvqcrtj -f /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/tmux.conf new-session -d -s check -x 80 -y 40 -c /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/cwd 'exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/home USERPROFILE=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/home XDG_CONFIG_HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/home/.config PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/sessions AT_TMUX_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/terminal.raw PATH=/Users/jyxc-dz-0101322/.kimi-code/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/sessions --use-theme dark --tui-mode fullscreen --tools read --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-at-path-continuation/research/tmux-harness/probe.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion.ts --model at-offline/scripted --thinking off'",
+      "cases": [
+        {
+          "case": "installed CLI isolated fullscreen startup",
+          "status": "PASS",
+          "ready": {
+            "time": 1791945516650,
+            "kind": "ready",
+            "pid": 86101,
+            "cwd": "/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/cwd",
+            "home": "/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/home",
+            "mode": "tui"
+          },
+          "pane_pid": 86101
+        },
+        {
+          "case": "CLI initial frame fixed width",
+          "status": "PASS",
+          "raw_bytes": 2023,
+          "width": 80
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "ignored-local before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "ignored-local slash without Tab",
+          "status": "PASS",
+          "text": "@local/manual/",
+          "expected": "@local/manual/",
+          "candidate": "SLASH_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "Tab directory continues single directory display",
+          "status": "PASS",
+          "text": "@local/aa/",
+          "candidate": "onlydir/"
+        },
+        {
+          "case": "Escape no rebound",
+          "status": "PASS",
+          "observation_ms": 320
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "Enter directory continues and does not submit",
+          "status": "PASS",
+          "text": "@local/aa/",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "dot-relative before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "dot-relative slash without Tab",
+          "status": "PASS",
+          "text": "@./dot/",
+          "expected": "@./dot/",
+          "candidate": "DOT_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "parent-relative before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "parent-relative slash without Tab",
+          "status": "PASS",
+          "text": "@../",
+          "expected": "@../",
+          "candidate": "→ cwd/",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "home-relative before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "home-relative slash without Tab",
+          "status": "PASS",
+          "text": "@~/scoped/",
+          "expected": "@~/scoped/",
+          "candidate": "HOME_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "absolute before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "absolute slash without Tab",
+          "status": "PASS",
+          "text": "@/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/cwd/local/manual/",
+          "expected": "@/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/cwd/local/manual/",
+          "candidate": "SLASH_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "quoted before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "quoted slash without Tab",
+          "status": "PASS",
+          "text": "@\"space dir/",
+          "expected": "@\"space dir/",
+          "candidate": "QUOTED_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "file before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "file slash without Tab",
+          "status": "PASS",
+          "text": "@local/manual/",
+          "expected": "@local/manual/",
+          "candidate": "SLASH_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "file acceptance closes with trailing space",
+          "status": "PASS",
+          "text": "@local/manual/SLASH_LEAF.txt "
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "normal Enter submits exactly once offline",
+          "status": "PASS",
+          "submit_count": 1
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "forceTab native precondition exactly one directory",
+          "status": "PASS",
+          "captured": "\n AT_TMUX_READY\n\n\n ordinary offline message\n\n\n OFFLINE_SUBMIT_OK\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n────────────────────────────────────────────────────────────────────────────────\n@local/aa\n────────────────────────────────────────────────────────────────────────────────\n→ aa/                             local/aa\n/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/cwd\n↑691 ↓5 W691 CH0.0% 1.1%/128k (auto)                                    scripted\n"
+        },
+        {
+          "case": "forceTab unique directory accepts then only displays child",
+          "status": "PASS",
+          "text": "@local/aa/",
+          "candidate": "onlydir/",
+          "native_unique_before": "aa/"
+        }
+      ],
+      "product_hashes_before": {
+        "extensions/at-path-completion.ts": "1ac7551f37270b18cead2505705de66fe06797ed7c9e53657b1fce902463cf6c",
+        "extensions/at-path-completion/compat.ts": "d577b5d18a6fd57b43c313bb3761a095d190b33851f2d78c2e19927b67aaae28",
+        "extensions/at-path-completion/editor.ts": "a3acbbbf443035d734859783b55f1727b911ba6e06a732557f2a4c2a6ce96199",
+        "extensions/at-path-completion/index.ts": "d3945839eb643a8939172c085540149e585c5bda03b18fb9a1425707b45dd0c7",
+        "extensions/at-path-completion/provider.ts": "5b8c6ace9636a6a4ca900034b172619ad48d31a3c80e4189f759f103f4e8f788",
+        "extensions/at-path-completion/token.ts": "a5d0466ec585e8cded3f3433db63543b96beb916dee9217c773220fe4e426117"
+      },
+      "product_hashes_after": {
+        "extensions/at-path-completion.ts": "1ac7551f37270b18cead2505705de66fe06797ed7c9e53657b1fce902463cf6c",
+        "extensions/at-path-completion/compat.ts": "d577b5d18a6fd57b43c313bb3761a095d190b33851f2d78c2e19927b67aaae28",
+        "extensions/at-path-completion/editor.ts": "a3acbbbf443035d734859783b55f1727b911ba6e06a732557f2a4c2a6ce96199",
+        "extensions/at-path-completion/index.ts": "d3945839eb643a8939172c085540149e585c5bda03b18fb9a1425707b45dd0c7",
+        "extensions/at-path-completion/provider.ts": "5b8c6ace9636a6a4ca900034b172619ad48d31a3c80e4189f759f103f4e8f788",
+        "extensions/at-path-completion/token.ts": "a5d0466ec585e8cded3f3433db63543b96beb916dee9217c773220fe4e426117"
+      },
+      "product_code_unchanged": true,
+      "files": {
+        "absolute-after.ansi.txt": 998,
+        "absolute-after.txt": 855,
+        "absolute-before.ansi.txt": 997,
+        "absolute-before.txt": 854,
+        "dot-relative-after.ansi.txt": 895,
+        "dot-relative-after.txt": 752,
+        "dot-relative-before.ansi.txt": 957,
+        "dot-relative-before.txt": 697,
+        "driver.py": 14664,
+        "enter-after.ansi.txt": 896,
+        "enter-after.txt": 753,
+        "escape-after.ansi.txt": 820,
+        "escape-after.txt": 701,
+        "events.jsonl": 40574,
+        "file-after.ansi.txt": 839,
+        "file-after.txt": 719,
+        "file-before.ansi.txt": 823,
+        "file-before.txt": 704,
+        "forceTab-after.ansi.txt": 988,
+        "forceTab-after.txt": 800,
+        "forceTab-before-close.ansi.txt": 979,
+        "forceTab-before-close.txt": 791,
+        "forceTab-before.ansi.txt": 911,
+        "forceTab-before.txt": 747,
+        "home-relative-after.ansi.txt": 902,
+        "home-relative-after.txt": 759,
+        "home-relative-before.ansi.txt": 819,
+        "home-relative-before.txt": 744,
+        "ignored-local-after.ansi.txt": 911,
+        "ignored-local-after.txt": 768,
+        "ignored-local-before.ansi.txt": 823,
+        "ignored-local-before.txt": 704,
+        "normal-submit.ansi.txt": 902,
+        "normal-submit.txt": 738,
+        "parent-relative-after.ansi.txt": 1173,
+        "parent-relative-after.txt": 910,
+        "parent-relative-before.ansi.txt": 813,
+        "parent-relative-before.txt": 694,
+        "probe.ts": 1818,
+        "quoted-after.ansi.txt": 907,
+        "quoted-after.txt": 764,
+        "quoted-before.ansi.txt": 890,
+        "quoted-before.txt": 747,
+        "report.json": 11264,
+        "startup.ansi.txt": 810,
+        "startup.txt": 691,
+        "tab-after.ansi.txt": 896,
+        "tab-after.txt": 753,
+        "tab-before.ansi.txt": 1191,
+        "tab-before.txt": 952,
+        "terminal.raw": 68382
+      },
+      "raw_frame": {
+        "bytes": 68382,
+        "initial_full_width_border_offset": 1081,
+        "synchronized_start_count": 275,
+        "synchronized_end_count": 275,
+        "initial_width_proof": "fixed session from initial CLI launch; whole-width border in actual CLI raw stream, not capture-only clipping"
+      },
+      "events": {
+        "count": 561,
+        "submit_records": [
+          {
+            "time": 1791945523847,
+            "kind": "submit",
+            "text": "ordinary offline message",
+            "source": "interactive"
+          }
+        ],
+        "provider_request_count": 1,
+        "terminal_input_count": 264,
+        "bracketed_paste_markers": 0,
+        "shutdown_records": [
+          {
+            "time": 1791945525105,
+            "kind": "shutdown"
+          }
+        ]
+      }
+    },
+    {
+      "attempt": "final-40",
+      "report": "tmux-harness/evidence-final-40/report.json",
+      "status": "PASS",
+      "error": null,
+      "exit_status": 0,
+      "elapsed_seconds": 8.98,
+      "cleanup": {
+        "natural_cli_exit": true,
+        "pane_dead_status": "0",
+        "actual_pid_gone": true,
+        "unique_server_stopped": true,
+        "server_probe": {
+          "returncode": 1,
+          "stderr": "no server running on /private/tmp/tmux-501/at-at-tmux-xp31g5f6"
+        },
+        "cli_pid": 86100,
+        "isolated_config_removed": true
+      },
+      "width": 40,
+      "height": 40,
+      "mode": "fullscreen",
+      "theme": "dark",
+      "command": "exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/home USERPROFILE=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/home XDG_CONFIG_HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/home/.config PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/sessions AT_TMUX_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6 PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/terminal.raw PATH=/Users/jyxc-dz-0101322/.kimi-code/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/sessions --use-theme dark --tui-mode fullscreen --tools read --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-at-path-continuation/research/tmux-harness/probe.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion.ts --model at-offline/scripted --thinking off",
+      "tmux_command": "/opt/homebrew/bin/tmux -L at-at-tmux-xp31g5f6 -f /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/tmux.conf new-session -d -s check -x 40 -y 40 -c /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/cwd 'exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/home USERPROFILE=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/home XDG_CONFIG_HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/home/.config PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/sessions AT_TMUX_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6 PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/terminal.raw PATH=/Users/jyxc-dz-0101322/.kimi-code/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/sessions --use-theme dark --tui-mode fullscreen --tools read --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-at-path-continuation/research/tmux-harness/probe.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion.ts --model at-offline/scripted --thinking off'",
+      "cases": [
+        {
+          "case": "installed CLI isolated fullscreen startup",
+          "status": "PASS",
+          "ready": {
+            "time": 1791945516652,
+            "kind": "ready",
+            "pid": 86100,
+            "cwd": "/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/cwd",
+            "home": "/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/home",
+            "mode": "tui"
+          },
+          "pane_pid": 86100
+        },
+        {
+          "case": "CLI initial frame fixed width",
+          "status": "PASS",
+          "raw_bytes": 1653,
+          "width": 40
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "ignored-local before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "ignored-local slash without Tab",
+          "status": "PASS",
+          "text": "@local/manual/",
+          "expected": "@local/manual/",
+          "candidate": "SLASH_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "Tab directory continues single directory display",
+          "status": "PASS",
+          "text": "@local/aa/",
+          "candidate": "onlydir/"
+        },
+        {
+          "case": "Escape no rebound",
+          "status": "PASS",
+          "observation_ms": 320
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "Enter directory continues and does not submit",
+          "status": "PASS",
+          "text": "@local/aa/",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "dot-relative before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "dot-relative slash without Tab",
+          "status": "PASS",
+          "text": "@./dot/",
+          "expected": "@./dot/",
+          "candidate": "DOT_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "parent-relative before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "parent-relative slash without Tab",
+          "status": "PASS",
+          "text": "@../",
+          "expected": "@../",
+          "candidate": "→ cwd/",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "home-relative before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "home-relative slash without Tab",
+          "status": "PASS",
+          "text": "@~/scoped/",
+          "expected": "@~/scoped/",
+          "candidate": "HOME_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "absolute before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "absolute slash without Tab",
+          "status": "PASS",
+          "text": "@/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/cwd/local/manual/",
+          "expected": "@/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/cwd/local/manual/",
+          "candidate": "SLASH_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "quoted before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "quoted slash without Tab",
+          "status": "PASS",
+          "text": "@\"space dir/",
+          "expected": "@\"space dir/",
+          "candidate": "QUOTED_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "file before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "file slash without Tab",
+          "status": "PASS",
+          "text": "@local/manual/",
+          "expected": "@local/manual/",
+          "candidate": "SLASH_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "file acceptance closes with trailing space",
+          "status": "PASS",
+          "text": "@local/manual/SLASH_LEAF.txt "
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "normal Enter submits exactly once offline",
+          "status": "PASS",
+          "submit_count": 1
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "forceTab native precondition exactly one directory",
+          "status": "PASS",
+          "captured": "\n AT_TMUX_READY\n\n\n ordinary offline message\n\n\n OFFLINE_SUBMIT_OK\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n────────────────────────────────────────\n@local/aa\n────────────────────────────────────────\n→ aa/\n/private/var/folders/fx/bn7t1rq16xn7_...\n↑691 ↓5 W691 CH0.0% 1.1%/128k (auto)  sc\n"
+        },
+        {
+          "case": "forceTab unique directory accepts then only displays child",
+          "status": "PASS",
+          "text": "@local/aa/",
+          "candidate": "onlydir/",
+          "native_unique_before": "aa/"
+        }
+      ],
+      "product_hashes_before": {
+        "extensions/at-path-completion.ts": "1ac7551f37270b18cead2505705de66fe06797ed7c9e53657b1fce902463cf6c",
+        "extensions/at-path-completion/compat.ts": "d577b5d18a6fd57b43c313bb3761a095d190b33851f2d78c2e19927b67aaae28",
+        "extensions/at-path-completion/editor.ts": "a3acbbbf443035d734859783b55f1727b911ba6e06a732557f2a4c2a6ce96199",
+        "extensions/at-path-completion/index.ts": "d3945839eb643a8939172c085540149e585c5bda03b18fb9a1425707b45dd0c7",
+        "extensions/at-path-completion/provider.ts": "5b8c6ace9636a6a4ca900034b172619ad48d31a3c80e4189f759f103f4e8f788",
+        "extensions/at-path-completion/token.ts": "a5d0466ec585e8cded3f3433db63543b96beb916dee9217c773220fe4e426117"
+      },
+      "product_hashes_after": {
+        "extensions/at-path-completion.ts": "1ac7551f37270b18cead2505705de66fe06797ed7c9e53657b1fce902463cf6c",
+        "extensions/at-path-completion/compat.ts": "d577b5d18a6fd57b43c313bb3761a095d190b33851f2d78c2e19927b67aaae28",
+        "extensions/at-path-completion/editor.ts": "a3acbbbf443035d734859783b55f1727b911ba6e06a732557f2a4c2a6ce96199",
+        "extensions/at-path-completion/index.ts": "d3945839eb643a8939172c085540149e585c5bda03b18fb9a1425707b45dd0c7",
+        "extensions/at-path-completion/provider.ts": "5b8c6ace9636a6a4ca900034b172619ad48d31a3c80e4189f759f103f4e8f788",
+        "extensions/at-path-completion/token.ts": "a5d0466ec585e8cded3f3433db63543b96beb916dee9217c773220fe4e426117"
+      },
+      "product_code_unchanged": true,
+      "files": {
+        "absolute-after.ansi.txt": 595,
+        "absolute-after.txt": 476,
+        "absolute-before.ansi.txt": 587,
+        "absolute-before.txt": 468,
+        "dot-relative-after.ansi.txt": 516,
+        "dot-relative-after.txt": 397,
+        "dot-relative-before.ansi.txt": 475,
+        "dot-relative-before.txt": 380,
+        "driver.py": 14664,
+        "enter-after.ansi.txt": 510,
+        "enter-after.txt": 396,
+        "escape-after.ansi.txt": 479,
+        "escape-after.txt": 384,
+        "events.jsonl": 40574,
+        "file-after.ansi.txt": 498,
+        "file-after.txt": 402,
+        "file-before.ansi.txt": 482,
+        "file-before.txt": 398,
+        "forceTab-after.ansi.txt": 602,
+        "forceTab-after.txt": 443,
+        "forceTab-before-close.ansi.txt": 600,
+        "forceTab-before-close.txt": 437,
+        "forceTab-before.ansi.txt": 569,
+        "forceTab-before.txt": 430,
+        "home-relative-after.ansi.txt": 520,
+        "home-relative-after.txt": 401,
+        "home-relative-before.ansi.txt": 512,
+        "home-relative-before.txt": 394,
+        "ignored-local-after.ansi.txt": 525,
+        "ignored-local-after.txt": 406,
+        "ignored-local-before.ansi.txt": 517,
+        "ignored-local-before.txt": 387,
+        "normal-submit.ansi.txt": 561,
+        "normal-submit.txt": 421,
+        "parent-relative-after.ansi.txt": 566,
+        "parent-relative-after.txt": 423,
+        "parent-relative-before.ansi.txt": 472,
+        "parent-relative-before.txt": 377,
+        "probe.ts": 1818,
+        "quoted-after.ansi.txt": 524,
+        "quoted-after.txt": 405,
+        "quoted-before.ansi.txt": 518,
+        "quoted-before.txt": 399,
+        "report.json": 10910,
+        "startup.ansi.txt": 469,
+        "startup.txt": 374,
+        "tab-after.ansi.txt": 510,
+        "tab-after.txt": 396,
+        "tab-before.ansi.txt": 557,
+        "tab-before.txt": 438,
+        "terminal.raw": 46946
+      },
+      "raw_frame": {
+        "bytes": 46946,
+        "initial_full_width_border_offset": 1041,
+        "synchronized_start_count": 282,
+        "synchronized_end_count": 282,
+        "initial_width_proof": "fixed session from initial CLI launch; whole-width border in actual CLI raw stream, not capture-only clipping"
+      },
+      "events": {
+        "count": 561,
+        "submit_records": [
+          {
+            "time": 1791945523670,
+            "kind": "submit",
+            "text": "ordinary offline message",
+            "source": "interactive"
+          }
+        ],
+        "provider_request_count": 1,
+        "terminal_input_count": 264,
+        "bracketed_paste_markers": 0,
+        "shutdown_records": [
+          {
+            "time": 1791945524970,
+            "kind": "shutdown"
+          }
+        ]
+      }
+    }
+  ],
+  "attempts": [
+    {
+      "attempt": "first-140",
+      "report": "tmux-harness/evidence-first-140/report.json",
+      "status": "FAIL",
+      "error": "Escape no rebound: candidate reappeared",
+      "exit_status": 1,
+      "elapsed_seconds": 1.85,
+      "cleanup": {
+        "natural_cli_exit": true,
+        "pane_dead_status": "0",
+        "actual_pid_gone": true,
+        "unique_server_stopped": true,
+        "isolated_config_removed": true
+      },
+      "classification": "Fixture paint barrier missing; preserved FAIL, not confirmed product failure"
+    },
+    {
+      "attempt": "minimal-fixed-140",
+      "report": "tmux-harness/evidence-minimal-fixed-140/report.json",
+      "status": "PASS",
+      "error": null,
+      "exit_status": 0,
+      "elapsed_seconds": 4.66,
+      "cleanup": {
+        "natural_cli_exit": true,
+        "pane_dead_status": "0",
+        "actual_pid_gone": true,
+        "unique_server_stopped": true,
+        "isolated_config_removed": true
+      }
+    },
+    {
+      "attempt": "matrix-140",
+      "report": "tmux-harness/evidence-matrix-140/report.json",
+      "status": "FAIL",
+      "error": "Timeout: parent-relative native candidates after slash",
+      "exit_status": 1,
+      "elapsed_seconds": 9.89,
+      "cleanup": {
+        "natural_cli_exit": true,
+        "pane_dead_status": "0",
+        "actual_pid_gone": true,
+        "unique_server_stopped": true,
+        "isolated_config_removed": true
+      },
+      "classification": "Fixture expected offscreen native candidate; preserved FAIL, not confirmed product failure"
+    },
+    {
+      "attempt": "matrix-visible-140",
+      "report": "tmux-harness/evidence-matrix-visible-140/report.json",
+      "status": "PASS",
+      "error": null,
+      "exit_status": 0,
+      "elapsed_seconds": 9.05,
+      "cleanup": {
+        "natural_cli_exit": true,
+        "pane_dead_status": "0",
+        "actual_pid_gone": true,
+        "unique_server_stopped": true,
+        "isolated_config_removed": true
+      },
+      "width": 140,
+      "height": 40,
+      "mode": "fullscreen",
+      "theme": "dark",
+      "command": "exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/home USERPROFILE=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/home XDG_CONFIG_HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/home/.config PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/sessions AT_TMUX_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/terminal.raw PATH=/Users/jyxc-dz-0101322/.kimi-code/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/sessions --use-theme dark --tui-mode fullscreen --tools read --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-at-path-continuation/research/tmux-harness/probe.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion.ts --model at-offline/scripted --thinking off",
+      "tmux_command": "/opt/homebrew/bin/tmux -L at-at-tmux-d_jqag8w -f /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/tmux.conf new-session -d -s check -x 140 -y 40 -c /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/cwd 'exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/home USERPROFILE=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/home XDG_CONFIG_HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/home/.config PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/sessions AT_TMUX_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/terminal.raw PATH=/Users/jyxc-dz-0101322/.kimi-code/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/sessions --use-theme dark --tui-mode fullscreen --tools read --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-at-path-continuation/research/tmux-harness/probe.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion.ts --model at-offline/scripted --thinking off'",
+      "cases": [
+        {
+          "case": "installed CLI isolated fullscreen startup",
+          "status": "PASS",
+          "ready": {
+            "time": 1791945467161,
+            "kind": "ready",
+            "pid": 84234,
+            "cwd": "/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/cwd",
+            "home": "/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/home",
+            "mode": "tui"
+          },
+          "pane_pid": 84234
+        },
+        {
+          "case": "CLI initial frame fixed width",
+          "status": "PASS",
+          "raw_bytes": 2563,
+          "width": 140
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "ignored-local before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "ignored-local slash without Tab",
+          "status": "PASS",
+          "text": "@local/manual/",
+          "expected": "@local/manual/",
+          "candidate": "SLASH_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "Tab directory continues single directory display",
+          "status": "PASS",
+          "text": "@local/aa/",
+          "candidate": "onlydir/"
+        },
+        {
+          "case": "Escape no rebound",
+          "status": "PASS",
+          "observation_ms": 320
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "Enter directory continues and does not submit",
+          "status": "PASS",
+          "text": "@local/aa/",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "dot-relative before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "dot-relative slash without Tab",
+          "status": "PASS",
+          "text": "@./dot/",
+          "expected": "@./dot/",
+          "candidate": "DOT_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "parent-relative before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "parent-relative slash without Tab",
+          "status": "PASS",
+          "text": "@../",
+          "expected": "@../",
+          "candidate": "→ cwd/",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "home-relative before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "home-relative slash without Tab",
+          "status": "PASS",
+          "text": "@~/scoped/",
+          "expected": "@~/scoped/",
+          "candidate": "HOME_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "absolute before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "absolute slash without Tab",
+          "status": "PASS",
+          "text": "@/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/cwd/local/manual/",
+          "expected": "@/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-d_jqag8w/cwd/local/manual/",
+          "candidate": "SLASH_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "quoted before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "quoted slash without Tab",
+          "status": "PASS",
+          "text": "@\"space dir/",
+          "expected": "@\"space dir/",
+          "candidate": "QUOTED_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "file before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "file slash without Tab",
+          "status": "PASS",
+          "text": "@local/manual/",
+          "expected": "@local/manual/",
+          "candidate": "SLASH_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "file acceptance closes with trailing space",
+          "status": "PASS",
+          "text": "@local/manual/SLASH_LEAF.txt "
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "normal Enter submits exactly once offline",
+          "status": "PASS",
+          "submit_count": 1
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "forceTab unique directory accepts then only displays child",
+          "status": "PASS",
+          "text": "@local/aa/",
+          "candidate": "onlydir/",
+          "native_unique_before": "aa/"
+        }
+      ],
+      "product_hashes_before": {
+        "extensions/at-path-completion.ts": "1ac7551f37270b18cead2505705de66fe06797ed7c9e53657b1fce902463cf6c",
+        "extensions/at-path-completion/compat.ts": "d577b5d18a6fd57b43c313bb3761a095d190b33851f2d78c2e19927b67aaae28",
+        "extensions/at-path-completion/editor.ts": "a3acbbbf443035d734859783b55f1727b911ba6e06a732557f2a4c2a6ce96199",
+        "extensions/at-path-completion/index.ts": "d3945839eb643a8939172c085540149e585c5bda03b18fb9a1425707b45dd0c7",
+        "extensions/at-path-completion/provider.ts": "5b8c6ace9636a6a4ca900034b172619ad48d31a3c80e4189f759f103f4e8f788",
+        "extensions/at-path-completion/token.ts": "a5d0466ec585e8cded3f3433db63543b96beb916dee9217c773220fe4e426117"
+      },
+      "product_hashes_after": {
+        "extensions/at-path-completion.ts": "1ac7551f37270b18cead2505705de66fe06797ed7c9e53657b1fce902463cf6c",
+        "extensions/at-path-completion/compat.ts": "d577b5d18a6fd57b43c313bb3761a095d190b33851f2d78c2e19927b67aaae28",
+        "extensions/at-path-completion/editor.ts": "a3acbbbf443035d734859783b55f1727b911ba6e06a732557f2a4c2a6ce96199",
+        "extensions/at-path-completion/index.ts": "d3945839eb643a8939172c085540149e585c5bda03b18fb9a1425707b45dd0c7",
+        "extensions/at-path-completion/provider.ts": "5b8c6ace9636a6a4ca900034b172619ad48d31a3c80e4189f759f103f4e8f788",
+        "extensions/at-path-completion/token.ts": "a5d0466ec585e8cded3f3433db63543b96beb916dee9217c773220fe4e426117"
+      },
+      "product_code_unchanged": true,
+      "files": {
+        "absolute-after.ansi.txt": 1471,
+        "absolute-after.txt": 1328,
+        "absolute-before.ansi.txt": 1455,
+        "absolute-before.txt": 1312,
+        "dot-relative-after.ansi.txt": 1315,
+        "dot-relative-after.txt": 1172,
+        "dot-relative-before.ansi.txt": 1377,
+        "dot-relative-before.txt": 1117,
+        "driver.py": 14283,
+        "enter-after.ansi.txt": 1316,
+        "enter-after.txt": 1173,
+        "escape-after.ansi.txt": 1240,
+        "escape-after.txt": 1121,
+        "events.jsonl": 40574,
+        "file-after.ansi.txt": 1259,
+        "file-after.txt": 1139,
+        "file-before.ansi.txt": 1315,
+        "file-before.txt": 1172,
+        "forceTab-after.ansi.txt": 1408,
+        "forceTab-after.txt": 1220,
+        "forceTab-before-close.ansi.txt": 1399,
+        "forceTab-before-close.txt": 1211,
+        "forceTab-before.ansi.txt": 1331,
+        "forceTab-before.txt": 1167,
+        "home-relative-after.ansi.txt": 1322,
+        "home-relative-after.txt": 1179,
+        "home-relative-before.ansi.txt": 1307,
+        "home-relative-before.txt": 1164,
+        "ignored-local-after.ansi.txt": 1331,
+        "ignored-local-after.txt": 1188,
+        "ignored-local-before.ansi.txt": 1315,
+        "ignored-local-before.txt": 1172,
+        "normal-submit.ansi.txt": 1322,
+        "normal-submit.txt": 1158,
+        "parent-relative-after.ansi.txt": 1593,
+        "parent-relative-after.txt": 1330,
+        "parent-relative-before.ansi.txt": 1233,
+        "parent-relative-before.txt": 1114,
+        "probe.ts": 1818,
+        "quoted-after.ansi.txt": 1327,
+        "quoted-after.txt": 1184,
+        "quoted-before.ansi.txt": 1241,
+        "quoted-before.txt": 1167,
+        "report.json": 10155,
+        "startup.ansi.txt": 1230,
+        "startup.txt": 1111,
+        "tab-after.ansi.txt": 1316,
+        "tab-after.txt": 1173,
+        "tab-before.ansi.txt": 1611,
+        "tab-before.txt": 1372,
+        "terminal.raw": 101345
+      },
+      "raw_frame": {
+        "bytes": 101345,
+        "initial_full_width_border_offset": 1141,
+        "synchronized_start_count": 278,
+        "synchronized_end_count": 278,
+        "initial_width_proof": "fixed session from initial CLI launch; whole-width border in actual CLI raw stream, not capture-only clipping"
+      },
+      "events": {
+        "count": 561,
+        "submit_records": [
+          {
+            "time": 1791945474333,
+            "kind": "submit",
+            "text": "ordinary offline message",
+            "source": "interactive"
+          }
+        ],
+        "provider_request_count": 1,
+        "terminal_input_count": 264,
+        "bracketed_paste_markers": 0,
+        "shutdown_records": [
+          {
+            "time": 1791945475622,
+            "kind": "shutdown"
+          }
+        ]
+      }
+    },
+    {
+      "attempt": "final-80",
+      "report": "tmux-harness/evidence-final-80/report.json",
+      "status": "PASS",
+      "error": null,
+      "exit_status": 0,
+      "elapsed_seconds": 9.12,
+      "cleanup": {
+        "natural_cli_exit": true,
+        "pane_dead_status": "0",
+        "actual_pid_gone": true,
+        "unique_server_stopped": true,
+        "server_probe": {
+          "returncode": 1,
+          "stderr": "no server running on /private/tmp/tmux-501/at-at-tmux-7mvqcrtj"
+        },
+        "cli_pid": 86101,
+        "isolated_config_removed": true
+      },
+      "width": 80,
+      "height": 40,
+      "mode": "fullscreen",
+      "theme": "dark",
+      "command": "exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/home USERPROFILE=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/home XDG_CONFIG_HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/home/.config PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/sessions AT_TMUX_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/terminal.raw PATH=/Users/jyxc-dz-0101322/.kimi-code/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/sessions --use-theme dark --tui-mode fullscreen --tools read --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-at-path-continuation/research/tmux-harness/probe.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion.ts --model at-offline/scripted --thinking off",
+      "tmux_command": "/opt/homebrew/bin/tmux -L at-at-tmux-7mvqcrtj -f /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/tmux.conf new-session -d -s check -x 80 -y 40 -c /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/cwd 'exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/home USERPROFILE=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/home XDG_CONFIG_HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/home/.config PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/sessions AT_TMUX_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/terminal.raw PATH=/Users/jyxc-dz-0101322/.kimi-code/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/sessions --use-theme dark --tui-mode fullscreen --tools read --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-at-path-continuation/research/tmux-harness/probe.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion.ts --model at-offline/scripted --thinking off'",
+      "cases": [
+        {
+          "case": "installed CLI isolated fullscreen startup",
+          "status": "PASS",
+          "ready": {
+            "time": 1791945516650,
+            "kind": "ready",
+            "pid": 86101,
+            "cwd": "/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/cwd",
+            "home": "/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/home",
+            "mode": "tui"
+          },
+          "pane_pid": 86101
+        },
+        {
+          "case": "CLI initial frame fixed width",
+          "status": "PASS",
+          "raw_bytes": 2023,
+          "width": 80
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "ignored-local before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "ignored-local slash without Tab",
+          "status": "PASS",
+          "text": "@local/manual/",
+          "expected": "@local/manual/",
+          "candidate": "SLASH_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "Tab directory continues single directory display",
+          "status": "PASS",
+          "text": "@local/aa/",
+          "candidate": "onlydir/"
+        },
+        {
+          "case": "Escape no rebound",
+          "status": "PASS",
+          "observation_ms": 320
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "Enter directory continues and does not submit",
+          "status": "PASS",
+          "text": "@local/aa/",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "dot-relative before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "dot-relative slash without Tab",
+          "status": "PASS",
+          "text": "@./dot/",
+          "expected": "@./dot/",
+          "candidate": "DOT_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "parent-relative before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "parent-relative slash without Tab",
+          "status": "PASS",
+          "text": "@../",
+          "expected": "@../",
+          "candidate": "→ cwd/",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "home-relative before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "home-relative slash without Tab",
+          "status": "PASS",
+          "text": "@~/scoped/",
+          "expected": "@~/scoped/",
+          "candidate": "HOME_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "absolute before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "absolute slash without Tab",
+          "status": "PASS",
+          "text": "@/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/cwd/local/manual/",
+          "expected": "@/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/cwd/local/manual/",
+          "candidate": "SLASH_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "quoted before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "quoted slash without Tab",
+          "status": "PASS",
+          "text": "@\"space dir/",
+          "expected": "@\"space dir/",
+          "candidate": "QUOTED_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "file before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "file slash without Tab",
+          "status": "PASS",
+          "text": "@local/manual/",
+          "expected": "@local/manual/",
+          "candidate": "SLASH_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "file acceptance closes with trailing space",
+          "status": "PASS",
+          "text": "@local/manual/SLASH_LEAF.txt "
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "normal Enter submits exactly once offline",
+          "status": "PASS",
+          "submit_count": 1
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "forceTab native precondition exactly one directory",
+          "status": "PASS",
+          "captured": "\n AT_TMUX_READY\n\n\n ordinary offline message\n\n\n OFFLINE_SUBMIT_OK\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n────────────────────────────────────────────────────────────────────────────────\n@local/aa\n────────────────────────────────────────────────────────────────────────────────\n→ aa/                             local/aa\n/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-7mvqcrtj/cwd\n↑691 ↓5 W691 CH0.0% 1.1%/128k (auto)                                    scripted\n"
+        },
+        {
+          "case": "forceTab unique directory accepts then only displays child",
+          "status": "PASS",
+          "text": "@local/aa/",
+          "candidate": "onlydir/",
+          "native_unique_before": "aa/"
+        }
+      ],
+      "product_hashes_before": {
+        "extensions/at-path-completion.ts": "1ac7551f37270b18cead2505705de66fe06797ed7c9e53657b1fce902463cf6c",
+        "extensions/at-path-completion/compat.ts": "d577b5d18a6fd57b43c313bb3761a095d190b33851f2d78c2e19927b67aaae28",
+        "extensions/at-path-completion/editor.ts": "a3acbbbf443035d734859783b55f1727b911ba6e06a732557f2a4c2a6ce96199",
+        "extensions/at-path-completion/index.ts": "d3945839eb643a8939172c085540149e585c5bda03b18fb9a1425707b45dd0c7",
+        "extensions/at-path-completion/provider.ts": "5b8c6ace9636a6a4ca900034b172619ad48d31a3c80e4189f759f103f4e8f788",
+        "extensions/at-path-completion/token.ts": "a5d0466ec585e8cded3f3433db63543b96beb916dee9217c773220fe4e426117"
+      },
+      "product_hashes_after": {
+        "extensions/at-path-completion.ts": "1ac7551f37270b18cead2505705de66fe06797ed7c9e53657b1fce902463cf6c",
+        "extensions/at-path-completion/compat.ts": "d577b5d18a6fd57b43c313bb3761a095d190b33851f2d78c2e19927b67aaae28",
+        "extensions/at-path-completion/editor.ts": "a3acbbbf443035d734859783b55f1727b911ba6e06a732557f2a4c2a6ce96199",
+        "extensions/at-path-completion/index.ts": "d3945839eb643a8939172c085540149e585c5bda03b18fb9a1425707b45dd0c7",
+        "extensions/at-path-completion/provider.ts": "5b8c6ace9636a6a4ca900034b172619ad48d31a3c80e4189f759f103f4e8f788",
+        "extensions/at-path-completion/token.ts": "a5d0466ec585e8cded3f3433db63543b96beb916dee9217c773220fe4e426117"
+      },
+      "product_code_unchanged": true,
+      "files": {
+        "absolute-after.ansi.txt": 998,
+        "absolute-after.txt": 855,
+        "absolute-before.ansi.txt": 997,
+        "absolute-before.txt": 854,
+        "dot-relative-after.ansi.txt": 895,
+        "dot-relative-after.txt": 752,
+        "dot-relative-before.ansi.txt": 957,
+        "dot-relative-before.txt": 697,
+        "driver.py": 14664,
+        "enter-after.ansi.txt": 896,
+        "enter-after.txt": 753,
+        "escape-after.ansi.txt": 820,
+        "escape-after.txt": 701,
+        "events.jsonl": 40574,
+        "file-after.ansi.txt": 839,
+        "file-after.txt": 719,
+        "file-before.ansi.txt": 823,
+        "file-before.txt": 704,
+        "forceTab-after.ansi.txt": 988,
+        "forceTab-after.txt": 800,
+        "forceTab-before-close.ansi.txt": 979,
+        "forceTab-before-close.txt": 791,
+        "forceTab-before.ansi.txt": 911,
+        "forceTab-before.txt": 747,
+        "home-relative-after.ansi.txt": 902,
+        "home-relative-after.txt": 759,
+        "home-relative-before.ansi.txt": 819,
+        "home-relative-before.txt": 744,
+        "ignored-local-after.ansi.txt": 911,
+        "ignored-local-after.txt": 768,
+        "ignored-local-before.ansi.txt": 823,
+        "ignored-local-before.txt": 704,
+        "normal-submit.ansi.txt": 902,
+        "normal-submit.txt": 738,
+        "parent-relative-after.ansi.txt": 1173,
+        "parent-relative-after.txt": 910,
+        "parent-relative-before.ansi.txt": 813,
+        "parent-relative-before.txt": 694,
+        "probe.ts": 1818,
+        "quoted-after.ansi.txt": 907,
+        "quoted-after.txt": 764,
+        "quoted-before.ansi.txt": 890,
+        "quoted-before.txt": 747,
+        "report.json": 11264,
+        "startup.ansi.txt": 810,
+        "startup.txt": 691,
+        "tab-after.ansi.txt": 896,
+        "tab-after.txt": 753,
+        "tab-before.ansi.txt": 1191,
+        "tab-before.txt": 952,
+        "terminal.raw": 68382
+      },
+      "raw_frame": {
+        "bytes": 68382,
+        "initial_full_width_border_offset": 1081,
+        "synchronized_start_count": 275,
+        "synchronized_end_count": 275,
+        "initial_width_proof": "fixed session from initial CLI launch; whole-width border in actual CLI raw stream, not capture-only clipping"
+      },
+      "events": {
+        "count": 561,
+        "submit_records": [
+          {
+            "time": 1791945523847,
+            "kind": "submit",
+            "text": "ordinary offline message",
+            "source": "interactive"
+          }
+        ],
+        "provider_request_count": 1,
+        "terminal_input_count": 264,
+        "bracketed_paste_markers": 0,
+        "shutdown_records": [
+          {
+            "time": 1791945525105,
+            "kind": "shutdown"
+          }
+        ]
+      }
+    },
+    {
+      "attempt": "final-40",
+      "report": "tmux-harness/evidence-final-40/report.json",
+      "status": "PASS",
+      "error": null,
+      "exit_status": 0,
+      "elapsed_seconds": 8.98,
+      "cleanup": {
+        "natural_cli_exit": true,
+        "pane_dead_status": "0",
+        "actual_pid_gone": true,
+        "unique_server_stopped": true,
+        "server_probe": {
+          "returncode": 1,
+          "stderr": "no server running on /private/tmp/tmux-501/at-at-tmux-xp31g5f6"
+        },
+        "cli_pid": 86100,
+        "isolated_config_removed": true
+      },
+      "width": 40,
+      "height": 40,
+      "mode": "fullscreen",
+      "theme": "dark",
+      "command": "exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/home USERPROFILE=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/home XDG_CONFIG_HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/home/.config PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/sessions AT_TMUX_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6 PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/terminal.raw PATH=/Users/jyxc-dz-0101322/.kimi-code/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/sessions --use-theme dark --tui-mode fullscreen --tools read --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-at-path-continuation/research/tmux-harness/probe.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion.ts --model at-offline/scripted --thinking off",
+      "tmux_command": "/opt/homebrew/bin/tmux -L at-at-tmux-xp31g5f6 -f /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/tmux.conf new-session -d -s check -x 40 -y 40 -c /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/cwd 'exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/home USERPROFILE=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/home XDG_CONFIG_HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/home/.config PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/sessions AT_TMUX_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6 PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/terminal.raw PATH=/Users/jyxc-dz-0101322/.kimi-code/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/sessions --use-theme dark --tui-mode fullscreen --tools read --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-at-path-continuation/research/tmux-harness/probe.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion.ts --model at-offline/scripted --thinking off'",
+      "cases": [
+        {
+          "case": "installed CLI isolated fullscreen startup",
+          "status": "PASS",
+          "ready": {
+            "time": 1791945516652,
+            "kind": "ready",
+            "pid": 86100,
+            "cwd": "/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/cwd",
+            "home": "/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/home",
+            "mode": "tui"
+          },
+          "pane_pid": 86100
+        },
+        {
+          "case": "CLI initial frame fixed width",
+          "status": "PASS",
+          "raw_bytes": 1653,
+          "width": 40
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "ignored-local before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "ignored-local slash without Tab",
+          "status": "PASS",
+          "text": "@local/manual/",
+          "expected": "@local/manual/",
+          "candidate": "SLASH_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "Tab directory continues single directory display",
+          "status": "PASS",
+          "text": "@local/aa/",
+          "candidate": "onlydir/"
+        },
+        {
+          "case": "Escape no rebound",
+          "status": "PASS",
+          "observation_ms": 320
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "Enter directory continues and does not submit",
+          "status": "PASS",
+          "text": "@local/aa/",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "dot-relative before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "dot-relative slash without Tab",
+          "status": "PASS",
+          "text": "@./dot/",
+          "expected": "@./dot/",
+          "candidate": "DOT_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "parent-relative before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "parent-relative slash without Tab",
+          "status": "PASS",
+          "text": "@../",
+          "expected": "@../",
+          "candidate": "→ cwd/",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "home-relative before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "home-relative slash without Tab",
+          "status": "PASS",
+          "text": "@~/scoped/",
+          "expected": "@~/scoped/",
+          "candidate": "HOME_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "absolute before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "absolute slash without Tab",
+          "status": "PASS",
+          "text": "@/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/cwd/local/manual/",
+          "expected": "@/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-xp31g5f6/cwd/local/manual/",
+          "candidate": "SLASH_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "quoted before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "quoted slash without Tab",
+          "status": "PASS",
+          "text": "@\"space dir/",
+          "expected": "@\"space dir/",
+          "candidate": "QUOTED_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "file before slash closed",
+          "status": "PASS"
+        },
+        {
+          "case": "file slash without Tab",
+          "status": "PASS",
+          "text": "@local/manual/",
+          "expected": "@local/manual/",
+          "candidate": "SLASH_LEAF.txt",
+          "submit_count": 0
+        },
+        {
+          "case": "file acceptance closes with trailing space",
+          "status": "PASS",
+          "text": "@local/manual/SLASH_LEAF.txt "
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "normal Enter submits exactly once offline",
+          "status": "PASS",
+          "submit_count": 1
+        },
+        {
+          "case": "clear real editor",
+          "status": "PASS"
+        },
+        {
+          "case": "forceTab native precondition exactly one directory",
+          "status": "PASS",
+          "captured": "\n AT_TMUX_READY\n\n\n ordinary offline message\n\n\n OFFLINE_SUBMIT_OK\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n────────────────────────────────────────\n@local/aa\n────────────────────────────────────────\n→ aa/\n/private/var/folders/fx/bn7t1rq16xn7_...\n↑691 ↓5 W691 CH0.0% 1.1%/128k (auto)  sc\n"
+        },
+        {
+          "case": "forceTab unique directory accepts then only displays child",
+          "status": "PASS",
+          "text": "@local/aa/",
+          "candidate": "onlydir/",
+          "native_unique_before": "aa/"
+        }
+      ],
+      "product_hashes_before": {
+        "extensions/at-path-completion.ts": "1ac7551f37270b18cead2505705de66fe06797ed7c9e53657b1fce902463cf6c",
+        "extensions/at-path-completion/compat.ts": "d577b5d18a6fd57b43c313bb3761a095d190b33851f2d78c2e19927b67aaae28",
+        "extensions/at-path-completion/editor.ts": "a3acbbbf443035d734859783b55f1727b911ba6e06a732557f2a4c2a6ce96199",
+        "extensions/at-path-completion/index.ts": "d3945839eb643a8939172c085540149e585c5bda03b18fb9a1425707b45dd0c7",
+        "extensions/at-path-completion/provider.ts": "5b8c6ace9636a6a4ca900034b172619ad48d31a3c80e4189f759f103f4e8f788",
+        "extensions/at-path-completion/token.ts": "a5d0466ec585e8cded3f3433db63543b96beb916dee9217c773220fe4e426117"
+      },
+      "product_hashes_after": {
+        "extensions/at-path-completion.ts": "1ac7551f37270b18cead2505705de66fe06797ed7c9e53657b1fce902463cf6c",
+        "extensions/at-path-completion/compat.ts": "d577b5d18a6fd57b43c313bb3761a095d190b33851f2d78c2e19927b67aaae28",
+        "extensions/at-path-completion/editor.ts": "a3acbbbf443035d734859783b55f1727b911ba6e06a732557f2a4c2a6ce96199",
+        "extensions/at-path-completion/index.ts": "d3945839eb643a8939172c085540149e585c5bda03b18fb9a1425707b45dd0c7",
+        "extensions/at-path-completion/provider.ts": "5b8c6ace9636a6a4ca900034b172619ad48d31a3c80e4189f759f103f4e8f788",
+        "extensions/at-path-completion/token.ts": "a5d0466ec585e8cded3f3433db63543b96beb916dee9217c773220fe4e426117"
+      },
+      "product_code_unchanged": true,
+      "files": {
+        "absolute-after.ansi.txt": 595,
+        "absolute-after.txt": 476,
+        "absolute-before.ansi.txt": 587,
+        "absolute-before.txt": 468,
+        "dot-relative-after.ansi.txt": 516,
+        "dot-relative-after.txt": 397,
+        "dot-relative-before.ansi.txt": 475,
+        "dot-relative-before.txt": 380,
+        "driver.py": 14664,
+        "enter-after.ansi.txt": 510,
+        "enter-after.txt": 396,
+        "escape-after.ansi.txt": 479,
+        "escape-after.txt": 384,
+        "events.jsonl": 40574,
+        "file-after.ansi.txt": 498,
+        "file-after.txt": 402,
+        "file-before.ansi.txt": 482,
+        "file-before.txt": 398,
+        "forceTab-after.ansi.txt": 602,
+        "forceTab-after.txt": 443,
+        "forceTab-before-close.ansi.txt": 600,
+        "forceTab-before-close.txt": 437,
+        "forceTab-before.ansi.txt": 569,
+        "forceTab-before.txt": 430,
+        "home-relative-after.ansi.txt": 520,
+        "home-relative-after.txt": 401,
+        "home-relative-before.ansi.txt": 512,
+        "home-relative-before.txt": 394,
+        "ignored-local-after.ansi.txt": 525,
+        "ignored-local-after.txt": 406,
+        "ignored-local-before.ansi.txt": 517,
+        "ignored-local-before.txt": 387,
+        "normal-submit.ansi.txt": 561,
+        "normal-submit.txt": 421,
+        "parent-relative-after.ansi.txt": 566,
+        "parent-relative-after.txt": 423,
+        "parent-relative-before.ansi.txt": 472,
+        "parent-relative-before.txt": 377,
+        "probe.ts": 1818,
+        "quoted-after.ansi.txt": 524,
+        "quoted-after.txt": 405,
+        "quoted-before.ansi.txt": 518,
+        "quoted-before.txt": 399,
+        "report.json": 10910,
+        "startup.ansi.txt": 469,
+        "startup.txt": 374,
+        "tab-after.ansi.txt": 510,
+        "tab-after.txt": 396,
+        "tab-before.ansi.txt": 557,
+        "tab-before.txt": 438,
+        "terminal.raw": 46946
+      },
+      "raw_frame": {
+        "bytes": 46946,
+        "initial_full_width_border_offset": 1041,
+        "synchronized_start_count": 282,
+        "synchronized_end_count": 282,
+        "initial_width_proof": "fixed session from initial CLI launch; whole-width border in actual CLI raw stream, not capture-only clipping"
+      },
+      "events": {
+        "count": 561,
+        "submit_records": [
+          {
+            "time": 1791945523670,
+            "kind": "submit",
+            "text": "ordinary offline message",
+            "source": "interactive"
+          }
+        ],
+        "provider_request_count": 1,
+        "terminal_input_count": 264,
+        "bracketed_paste_markers": 0,
+        "shutdown_records": [
+          {
+            "time": 1791945524970,
+            "kind": "shutdown"
+          }
+        ]
+      }
+    }
+  ],
+  "not_run": [
+    "physical terminal/IME/attached client forwarding",
+    "actual input-history package, closed-quote cursor position, and arbitrary third-party extensions",
+    "regular mode, light/system theme",
+    "resize transition (fixed independent sessions instead)",
+    "agent/model online matrix and paste/rapid async lifecycle stress; covered only by previous separate offline tests"
+  ],
+  "error": null,
+  "exit_status": 0
+}

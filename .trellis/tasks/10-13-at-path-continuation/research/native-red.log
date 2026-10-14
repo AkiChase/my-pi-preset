@@ -1,0 +1,82 @@
+✖ RED native: closed-list slash must display suggestions (105.539959ms)
+✖ RED native: list "\t" directory acceptance must continue (203.66825ms)
+✖ RED native: list "\r" directory acceptance must continue (204.104375ms)
+✖ RED native: force Tab single directory must continue without accepting its only child (101.769083ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 0
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1117.205875
+
+✖ failing tests:
+
+test at extensions/at-path-completion/__tests__/native-red.test.ts:24:6
+✖ RED native: closed-list slash must display suggestions (105.539959ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion/__tests__/native-red.test.ts:26:125)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at extensions/at-path-completion/__tests__/native-red.test.ts:29:38
+✖ RED native: list "\t" directory acceptance must continue (203.66825ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion/__tests__/native-red.test.ts:33:96)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at extensions/at-path-completion/__tests__/native-red.test.ts:29:38
+✖ RED native: list "\r" directory acceptance must continue (204.104375ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion/__tests__/native-red.test.ts:33:96)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at extensions/at-path-completion/__tests__/native-red.test.ts:36:6
+✖ RED native: force Tab single directory must continue without accepting its only child (101.769083ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion/__tests__/native-red.test.ts:38:126)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,4 @@
+# Exact test/terminal evidence retains screen padding, CRLF and diagnostic spacing.
+research/**/*.raw -diff
+research/**/*.txt whitespace=-blank-at-eol,-blank-at-eof
+research/*.log whitespace=-blank-at-eol,-blank-at-eof

@@ -1,0 +1,112 @@
+{
+  "status": "PASS",
+  "error": null,
+  "width": 140,
+  "height": 40,
+  "mode": "fullscreen",
+  "theme": "dark",
+  "root": "/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-t1ikr2ca",
+  "server": "at-at-tmux-t1ikr2ca",
+  "cases": [
+    {
+      "case": "installed CLI isolated fullscreen startup",
+      "status": "PASS",
+      "ready": {
+        "time": 1791945343111,
+        "kind": "ready",
+        "pid": 49656,
+        "cwd": "/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-t1ikr2ca/cwd",
+        "home": "/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-t1ikr2ca/home",
+        "mode": "tui"
+      },
+      "pane_pid": 49656
+    },
+    {
+      "case": "CLI initial frame fixed width",
+      "status": "PASS",
+      "raw_bytes": 2612,
+      "width": 140
+    },
+    {
+      "case": "clear real editor",
+      "status": "PASS"
+    },
+    {
+      "case": "ignored-local before slash closed",
+      "status": "PASS"
+    },
+    {
+      "case": "ignored-local slash without Tab",
+      "status": "PASS",
+      "text": "@local/manual/",
+      "expected": "@local/manual/",
+      "candidate": "SLASH_LEAF.txt",
+      "submit_count": 0
+    },
+    {
+      "case": "clear real editor",
+      "status": "PASS"
+    },
+    {
+      "case": "Tab directory continues single directory display",
+      "status": "PASS",
+      "text": "@local/aa/",
+      "candidate": "onlydir/"
+    },
+    {
+      "case": "Escape no rebound",
+      "status": "PASS",
+      "observation_ms": 320
+    },
+    {
+      "case": "clear real editor",
+      "status": "PASS"
+    },
+    {
+      "case": "Enter directory continues and does not submit",
+      "status": "PASS",
+      "text": "@local/aa/",
+      "submit_count": 0
+    },
+    {
+      "case": "extra path/file/submit/forceTab matrix",
+      "status": "NOT_RUN",
+      "reason": "Smallest first run; --full follows only after fixture review."
+    }
+  ],
+  "cleanup": {
+    "natural_cli_exit": true,
+    "pane_dead_status": "0",
+    "actual_pid_gone": true,
+    "unique_server_stopped": true,
+    "isolated_config_removed": true
+  },
+  "scope": "Actual installed Pi CLI, native fd provider, real tmux send-keys; public probe observes only.",
+  "product_hashes_before": {
+    "extensions/at-path-completion.ts": "1ac7551f37270b18cead2505705de66fe06797ed7c9e53657b1fce902463cf6c",
+    "extensions/at-path-completion/compat.ts": "d577b5d18a6fd57b43c313bb3761a095d190b33851f2d78c2e19927b67aaae28",
+    "extensions/at-path-completion/editor.ts": "a3acbbbf443035d734859783b55f1727b911ba6e06a732557f2a4c2a6ce96199",
+    "extensions/at-path-completion/index.ts": "d3945839eb643a8939172c085540149e585c5bda03b18fb9a1425707b45dd0c7",
+    "extensions/at-path-completion/provider.ts": "5b8c6ace9636a6a4ca900034b172619ad48d31a3c80e4189f759f103f4e8f788",
+    "extensions/at-path-completion/token.ts": "a5d0466ec585e8cded3f3433db63543b96beb916dee9217c773220fe4e426117"
+  },
+  "command": "exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-t1ikr2ca/home USERPROFILE=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-t1ikr2ca/home XDG_CONFIG_HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-t1ikr2ca/home/.config PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-t1ikr2ca/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-t1ikr2ca/sessions AT_TMUX_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-t1ikr2ca PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-t1ikr2ca/terminal.raw PATH=/Users/jyxc-dz-0101322/.kimi-code/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-t1ikr2ca GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-t1ikr2ca/sessions --use-theme dark --tui-mode fullscreen --tools read --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-at-path-continuation/research/tmux-harness/probe.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion.ts --model at-offline/scripted --thinking off",
+  "tmux_command": "/opt/homebrew/bin/tmux -L at-at-tmux-t1ikr2ca -f /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-t1ikr2ca/tmux.conf new-session -d -s check -x 140 -y 40 -c /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-t1ikr2ca/cwd 'exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-t1ikr2ca/home USERPROFILE=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-t1ikr2ca/home XDG_CONFIG_HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-t1ikr2ca/home/.config PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-t1ikr2ca/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-t1ikr2ca/sessions AT_TMUX_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-t1ikr2ca PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-t1ikr2ca/terminal.raw PATH=/Users/jyxc-dz-0101322/.kimi-code/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-t1ikr2ca GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-t1ikr2ca/sessions --use-theme dark --tui-mode fullscreen --tools read --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-at-path-continuation/research/tmux-harness/probe.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion.ts --model at-offline/scripted --thinking off'",
+  "versions": {
+    "pi": "1.2.0",
+    "node": "v24.14.1",
+    "tmux": "tmux 3.6a",
+    "fd": "fd 10.4.2"
+  },
+  "elapsed_seconds": 4.66,
+  "product_hashes_after": {
+    "extensions/at-path-completion.ts": "1ac7551f37270b18cead2505705de66fe06797ed7c9e53657b1fce902463cf6c",
+    "extensions/at-path-completion/compat.ts": "d577b5d18a6fd57b43c313bb3761a095d190b33851f2d78c2e19927b67aaae28",
+    "extensions/at-path-completion/editor.ts": "a3acbbbf443035d734859783b55f1727b911ba6e06a732557f2a4c2a6ce96199",
+    "extensions/at-path-completion/index.ts": "d3945839eb643a8939172c085540149e585c5bda03b18fb9a1425707b45dd0c7",
+    "extensions/at-path-completion/provider.ts": "5b8c6ace9636a6a4ca900034b172619ad48d31a3c80e4189f759f103f4e8f788",
+    "extensions/at-path-completion/token.ts": "a5d0466ec585e8cded3f3433db63543b96beb916dee9217c773220fe4e426117"
+  },
+  "product_code_unchanged": true,
+  "exit_status": 0
+}

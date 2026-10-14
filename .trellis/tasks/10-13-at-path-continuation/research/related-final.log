@@ -1,0 +1,98 @@
+✔ child marker preserves unrelated root context, nested awaits and rejection boundaries (4.332833ms)
+✔ cached host loader guards same/different cwd children and isolates overlapping root loads (1168.779792ms)
+✔ actual host history=first, Down=first/true (31.118917ms)
+✔ actual host history=first, Down=first/false (3.9955ms)
+✔ actual host history=first, Down=last/true (5.2135ms)
+✔ actual host history=first, Down=last/false (5.282833ms)
+✔ actual host history=last, Down=first/true (4.406209ms)
+✔ actual host history=last, Down=first/false (5.450708ms)
+✔ actual host history=last, Down=last/true (4.157833ms)
+✔ actual host history=last, Down=last/false (3.049958ms)
+[beautify] Editor installation failed; keeping original editing UI.
+[beautify] Editor installation failed; keeping original editing UI.
+[beautify] Editor installation failed; keeping original editing UI.
+[beautify] Editor installation failed; keeping original editing UI.
+[beautify] Editor installation failed; keeping original editing UI.
+[beautify] Editor installation failed; keeping original editing UI.
+✔ live handoff preserves subclass, cursor/undo, history draft, paste, autocomplete, IME and callbacks (193.51075ms)
+✔ appearance keeps native working status, scroll labels and only first prompt (0.961458ms)
+✔ unsupported accessor leaves native UI mounted and usable (1.356375ms)
+✔ unsupported locked leaves native UI mounted and usable (0.912708ms)
+✔ unsupported missing leaves native UI mounted and usable (0.298875ms)
+✔ unsupported nonextensible leaves native UI mounted and usable (0.232958ms)
+✔ actual host partial after setter rollback keeps same UI, focus and undo (0.388458ms)
+✔ actual host partial focus rollback keeps same UI, focus and undo (0.281208ms)
+✔ later opaque render/factory, user padding and reset-before-shutdown remain owned (0.29075ms)
+[beautify] Editor installation failed; keeping original editing UI.
+✔ production composition registers only backend tools and native presentation stays independent (1014.8115ms)
+✔ opaque retired appearance/factory release context and TUI under real GC (530.236917ms)
+✔ descriptor partial mutation and locked later visual wrapper restore safely (14.829125ms)
+✔ active overlay and non-TUI modes do not unmount or replace an editor (1.752333ms)
+[beautify] Editor installation failed; keeping original editing UI.
+✔ decoration during active history/paste/autocomplete preserves their native transient state (6.341291ms)
+✔ cleanup retains later padding setter ownership (0.389375ms)
+✔ cleanup retains later padding getter ownership (0.187125ms)
+✔ cleanup retains later padding underlying ownership (0.190709ms)
+✔ padding mutation then failure restores native methods, physical padding and usable UI (0.387875ms)
+[beautify] Editor installation failed; keeping original editing UI.
+✔ captured future factory keeps a single live visual lease and history (2.172667ms)
+✔ handoff descriptor failure before setter restores appearance and all earlier handoff methods (0.459792ms)
+✔ appearance preserves native non-finite padding behavior and never consumes source indentation after a later takeover (0.256834ms)
+✔ migrated Alt+R query, older/newer navigation, cancel and branch priority stay intact (1.292333ms)
+✔ migrated later border wrapper and nondelegating render retain their receivers and content (0.326792ms)
+✔ actual host first installation keeps live default/custom identity, draft cursor, undo and native callbacks (7.158167ms)
+✔ first handoff preserves real history browsing draft, large paste expansion and explicit empty Tab autocomplete (6.369083ms)
+✔ strict empty/press/focused/no-overlay conditions and actual TUI routing; no-task native history survives (1.153417ms)
+✔ Beautify live editor first, Down last: actual prompt render and custom action/callback ownership preserved (0.571208ms)
+✔ history-equivalent instance wrapper before, later factory delegation and inactive opaque wrappers (0.473167ms)
+✔ history-equivalent instance wrapper after, later factory delegation and inactive opaque wrappers (0.279125ms)
+✔ owner fresh model exposes foreground-only and four-second visibility, refuses open/closed interaction (0.704542ms)
+[task-ui] Down opener installation failed: Error: Editor handoff cannot safely shadow setText
+    at interpose (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/editor-handoff/index.ts:12:23)
+    at preserveHandoff (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/editor-handoff/index.ts:46:23)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/editor.ts:110:35
+    at async Object.start (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:69:62)
+    at async TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:299:22)
+    at async Test.run (node:internal/test_runner/test:1125:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+[task-ui] Down opener installation failed: Error: Down opener installation deferred by an active overlay
+    at ctx.ui.custom.overlay (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/editor.ts:97:45)
+    at file:///Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/interactive-mode.js:2354:29
+    at new Promise (<anonymous>)
+    at Object.showExtensionCustom (file:///Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/interactive-mode.js:2334:16)
+    at Object.custom (file:///Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/interactive-mode.js:2074:48)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/editor.ts:96:26
+    at Object.start (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:69:68)
+    at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:316:30)
+    at Test.runInAsyncScope (node:async_hooks:228:14)
+    at Test.run (node:internal/test_runner/test:1118:25)
+[task-ui] Down opener installation failed: Error: Editor handoff cannot safely shadow handleInput
+    at interpose (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/editor-handoff/index.ts:12:23)
+    at decorate (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/editor.ts:42:21)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/editor.ts:112:34
+    at async Object.start (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:69:62)
+    at async TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:332:22)
+    at async Test.run (node:internal/test_runner/test:1125:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+[task-ui] Down opener installation failed: Error: host setter failure
+    at h.ctx.ui.setEditorComponent (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:359:137)
+    at file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/editor.ts:114:20
+    at async Object.start (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:69:62)
+    at async TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-ui/__tests__/editor.test.ts:361:26)
+    at async Test.run (node:internal/test_runner/test:1125:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+✔ beautify actual session_start before Down and real panel focus/nav/close leave execution waits untouched (14.333958ms)
+✔ later same-object factory does not stack input leases; descriptor ownership and scoped host setters are restored (1.750917ms)
+✔ unsupported accessor live editor is diagnosed without invoking private setters or changing its methods (1.680875ms)
+✔ Down preflight with an existing overlay never hides it or mutates the mounted editor (0.794625ms)
+✔ non-configurable input failure rolls back public handoff properties before any host unmount (0.566334ms)
+✔ opaque retired input/factory release ctx, TUI, coordinator and panel under real GC (772.810667ms)
+✔ disabled/noninteractive/missing editor APIs do not access or install; reentrant setter close/throw leaves no active lease (1.540333ms)
+ℹ tests 47
+ℹ suites 0
+ℹ pass 47
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2499.304542

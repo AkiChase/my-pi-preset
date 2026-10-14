@@ -1,0 +1,27 @@
+
+> my-pi-preset@0.1.0 check /Users/jyxc-dz-0101322/tools/my-pi-preset
+> pnpm run typecheck && pnpm run test
+
+
+> my-pi-preset@0.1.0 typecheck /Users/jyxc-dz-0101322/tools/my-pi-preset
+> node scripts/link-pi-sdk.mjs && tsc -p tsconfig.json
+
+[2m[link-pi-sdk][0m linked 0 new of 7 @earendil-works/* packages from /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules
+
+> my-pi-preset@0.1.0 test /Users/jyxc-dz-0101322/tools/my-pi-preset
+> node scripts/link-pi-sdk.mjs && node --test --test-force-exit "extensions/**/__tests__/*.test.ts" "scripts/*.test.mjs"
+
+[2m[link-pi-sdk][0m linked 0 new of 7 @earendil-works/* packages from /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules
+▶ watchPrompts
+PASS piped installer rejects --dev before downloading or running pi
+
+All sync checks passed.
+✔ scripts/sync.test.mjs (15794.847875ms)
+ℹ tests 671
+ℹ suites 72
+ℹ pass 671
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 24702.712625

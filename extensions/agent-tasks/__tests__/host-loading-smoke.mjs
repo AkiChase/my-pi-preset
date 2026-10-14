@@ -16,6 +16,7 @@ const entry = join(parentCwd, "composition-probe.ts");
 writeFileSync(entry, `
 import composition, { runInChildSessionContext } from ${JSON.stringify(join(root, "extensions/task-composition.ts"))};
 import beautify from ${JSON.stringify(join(root, "extensions/beautify.ts"))};
+import atPathCompletion from ${JSON.stringify(join(root, "extensions/at-path-completion.ts"))};
 export default async function (pi) {
   const seen = new Map();
   const proxy = new Proxy(pi, { get(target, prop) {
@@ -31,6 +32,7 @@ export default async function (pi) {
   }});
   await composition(proxy);
   beautify(proxy);
+  atPathCompletion(proxy);
   pi.registerCommand("probe-child", { description: "Test-only child context bridge",
     handler: async (_args, ctx) => runInChildSessionContext(ctx.loadChild) });
 }
@@ -78,9 +80,9 @@ const assertChild = (result, rootExt, label) => {
   }
   assert.equal(ext.commands.has("agents"), false, `${label}: no root manager command`);
   for (const event of [...rootOnlyEvents, ...removedOverviewEvents]) assert.equal(ext.handlers.has(event), false, `${label}: no root manager ${event}`);
-  // Composition plus appearance/highlighter teardown; no separate agent shutdown.
-  assert.equal(rootExt.handlers.get("session_shutdown")?.length, 3);
-  assert.equal(ext.handlers.get("session_shutdown")?.length, 3);
+  // Composition, appearance/highlighter and path continuation teardown; no separate agent shutdown.
+  assert.equal(rootExt.handlers.get("session_shutdown")?.length, 4);
+  assert.equal(ext.handlers.get("session_shutdown")?.length, 4);
   for (const event of ["session_start"]) {
     assert.equal(ext.handlers.get(event)?.length, rootExt.handlers.get(event)?.length - 1, `${label}: no agent ${event}`);
   }

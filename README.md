@@ -113,6 +113,7 @@ pi 里只有一个本仓库自带的命令：`/statusbar`，在自定义状态�
 | [`@juicesharp/rpiv-ask-user-question`](#npmjuicesharprpiv-ask-user-question) | 让模型给出选项，而不是自己猜 | `~/.config/rpiv-ask-user-question/config.json` | `ctrl+]`，可改 |
 | [`@tifan/pi-recap`](#npmtifanpi-recap) | 会话回到现场：一行 recap，离开后自动生成 | `~/.pi/agent/extensions/pi-recap.json` | 无 |
 | [`process-tasks`](#extensionsprocess-tasks--进程与-monitor-后端) | 前台／后台命令与 monitor | `~/.pi/agent/process-tasks.json` | `ctrl+shift+b` 等，可改 |
+| [`at-path-completion`](#extensionsat-path-completionts--路径连续补全) | `@` 目录连续原生提示，只展示不自动接受下一层 | 无 | 沿用原生 Tab／Enter／Escape |
 | [`beautify`](#extensionsbeautifyts--工具与输入框美化) | 六类工具单行展示与输入框外观 | 无 | 沿用 pi 工具展开键 |
 
 表中的 session-name、cache-optimizer、input-history、web-access、memory、ask-user-question、recap 是普通第三方包，由 pi 从 npm 安装，来源写在 [`pi-preset.json`](pi-preset.json) 的 `packages` 里，本仓库不动它们的代码。
@@ -379,6 +380,14 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 除宿主工具展开点击外，不新增鼠标／选区／剪贴板处理，不保证终端复制能消除软换行。SDK 1.2.0 的单列中文递归错误、Box 在不足两侧 padding 加一列正文时仍保留最小内宽、极窄聚焦光标越界仍是原生边界；本扩展保留原生行为，不宣称修复。当前自动证据为真实 host loader/resolver/component/editor/setter 与独立离线 history fixture；另已完成隔离 dark/fullscreen tmux 的原四工具单行与键盘往返、jobs list 和长标题连续背景/40列提示定向复验，不代表实际 input-history 包、全部 jobs action/get_result child 或任意第三方 editor 的端到端验收。
 
 不再发放、读取或删除 `pi-pretty.json`；个人旧文件可留在原处，同步及 prune 均不触碰。standalone Pretty 仍禁止共存，不再是代加载包。
+
+#### `extensions/at-path-completion.ts` —— @ 路径连续补全
+
+在 `@local/`、`@./`、`@../`、`@~/`、绝对路径或 `@"带空格目录/"` 中，手动输入 `/` 后自动展示原生候选；Tab、Enter 或原生列表点击接受目录后也会继续提示下一轮。新一轮即使只有一个子项也只展示，不自动接受。目录为空时保持原生关闭列表，接受文件仍补尾随空格，目录接受 Enter 不提交消息。Escape 关闭后不会仅因路径仍以 `/` 结尾反弹；正文 `/`、slash commands、email、agent handles、跳转和整段粘贴不触发额外浏览。
+
+该扩展可独立加载，不依赖 Beautify、Task UI、Pretty 或 fff，不增加配置、键位或搜索实现。provider 链、排序、ignore、递归搜索与最多 20 项的原生限制均保留，不将目录搜索改成严格单层列表。它装饰活编辑器，保留 history、undo、cursor、paste 和原回调／receiver；后续输入、鼠标、编辑器切换及 shutdown 会使待续请求失效。
+
+验证基线为 Pi 1.2.0。为复用原生候选 UI，唯一内部兼容依赖是 `tryTriggerAutocomplete(false)`；没有模拟 Tab、临时字符或 SDK 修改。不兼容时停止增强、输出一次英文诊断并保留原生 Tab。Pi 升级后须重跑回归，方法存在不代表内部语义未变。安装公开 provider 会按宿主规则重建链并取消当时的补全列表／请求；这不重建编辑器或复制草稿。自动验证覆盖实际 SDK/editor/setter、fd 临时目录和离线 history／agent provider 组合；另已通过真实 installed CLI 的隔离 tmux 验收：dark/fullscreen 固定 140、80、40 列，真实逐字符输入、Tab／Enter 目录续提示、唯一子项只展示、文件尾空格、Escape 与正常离线提交。物理 IME、实际 input-history、regular／其他主题和动态 resize 未验收，见 [`TESTING.md`](extensions/at-path-completion/TESTING.md)。
 
 #### `extensions/task-composition.ts` —— 组合执行后端与共享任务 UI
 
@@ -648,6 +657,8 @@ Agent backend 实际清理可定向运行 `node --test extensions/agent-tasks/__
 开发回归补充：`node --test extensions/agent-tasks/__tests__/{auxiliary-lifecycle,tool-waits,workflow}.test.ts extensions/task-ui/__tests__/sdk-runtime.test.ts`（同样使用临时 `PI_CODING_AGENT_DIR`、实际 SDK、无 force-exit）。实际 clone 只替换 loader/create 输入，执行 reload/create/prompt/abort/local dispose；scheduler 用 typed timer seam 和真实临时 ScheduleStore，检查旧 interval/once/cron 与 startup/finalize 不串新 binding。SDK runtime 与 reload 同时绑定真实 process/agent 及同一 coordinator/protocol；busy/paused worker、迟到 host gate、CLI workflow、保留 child extension interval、旧 RPC/tool/input 均走实际路径，无模型／网络／真实 git／安装／SDK 写入。非协作第三方 provider／create／shutdown hook 按上述协作式取消边界处理，测试不能声称已强制终止其内部执行；核心共享 UI 和 Down 已通过实际 SDK 编辑器离线测试及隔离真实 Pi PTY 核心冒烟。
 
 另以临时 HOME／agent-dir／cwd／sessions 直接加载当前检出的真实 Pi CLI，运行 140×40 PTY 核心冒烟：无任务／非空 Down、前台-only 开面板、查看／Esc 不解除等待、转后台保持 PID、x 停实际进程、子 agent 排队／即时详情、workflow 默认展开／子详情／整组停止、monitor 输出、`/new` 清理和正常 `/quit`。子 agent 使用 SDK 原生 faux 离线脚本响应，实际创建会话并执行本地 bash；workflow 使用真实 worker。没有在线模型请求，也没有改个人配置或安装。此烟测不覆盖模型自主质量、任意第三方插件／终端尺寸或全部 provider／worktree 场景。
+
+路径连续补全可定向运行 `node --test extensions/at-path-completion/__tests__/*.test.ts`，不带 force-exit，并使用下述临时 agent-dir 与既有 SDK。回归包含原生对照、目录 Tab／Enter／唯一候选、异步取消、实际 host setter 与多顺序组合、安全降级和 GC；native fd 在临时目录验证 ignored scoped、相对／绝对／引号、递归与 20 项上限，`~/` 在临时 HOME 子进程验证，不扫描个人 home。fd 不可用时不安装替代工具，相关集成限制须单独报告。
 
 beautify 回归使用实际 SDK loader/resolver/ToolExecutionComponent、setter/reset、CustomEditor 与 TUI，history 使用独立离线 fixture，不读取本机 `pi-input-history`。范围见 [`extensions/beautify/TESTING.md`](extensions/beautify/TESTING.md)。运行 `node --test extensions/beautify/__tests__/*.test.ts extensions/task-ui/__tests__/editor.test.ts`（不加 `--test-force-exit`）检查自然退出。全量 `pnpm check` 前请把 `PI_CODING_AGENT_DIR` 指到 `mktemp -d` 的临时目录，同时用 `PI_SDK_DIR` 指向实际 SDK 的 `node_modules`，结束后删除临时目录；部分既有测试调用默认配置 loader，不能仅依赖测试自身隔离。
 

@@ -1,0 +1,68 @@
+{
+  "status": "PASS",
+  "runs": [
+    {
+      "attempt": "first-140",
+      "pid": 30287,
+      "ps_returncode": 1,
+      "ps_stdout": "",
+      "unique_server": "at-at-tmux-yewzyhej",
+      "tmux_returncode": 1,
+      "tmux_stderr": "no server running on /private/tmp/tmux-501/at-at-tmux-yewzyhej",
+      "temporary_root_removed": true
+    },
+    {
+      "attempt": "minimal-fixed-140",
+      "pid": 49656,
+      "ps_returncode": 1,
+      "ps_stdout": "",
+      "unique_server": "at-at-tmux-t1ikr2ca",
+      "tmux_returncode": 1,
+      "tmux_stderr": "no server running on /private/tmp/tmux-501/at-at-tmux-t1ikr2ca",
+      "temporary_root_removed": true
+    },
+    {
+      "attempt": "matrix-140",
+      "pid": 68146,
+      "ps_returncode": 1,
+      "ps_stdout": "",
+      "unique_server": "at-at-tmux-gys9_0ds",
+      "tmux_returncode": 1,
+      "tmux_stderr": "no server running on /private/tmp/tmux-501/at-at-tmux-gys9_0ds",
+      "temporary_root_removed": true
+    },
+    {
+      "attempt": "matrix-visible-140",
+      "pid": 84234,
+      "ps_returncode": 1,
+      "ps_stdout": "",
+      "unique_server": "at-at-tmux-d_jqag8w",
+      "tmux_returncode": 1,
+      "tmux_stderr": "no server running on /private/tmp/tmux-501/at-at-tmux-d_jqag8w",
+      "temporary_root_removed": true
+    },
+    {
+      "attempt": "final-80",
+      "pid": 86101,
+      "ps_returncode": 1,
+      "ps_stdout": "",
+      "unique_server": "at-at-tmux-7mvqcrtj",
+      "tmux_returncode": 1,
+      "tmux_stderr": "no server running on /private/tmp/tmux-501/at-at-tmux-7mvqcrtj",
+      "temporary_root_removed": true
+    },
+    {
+      "attempt": "final-40",
+      "pid": 86100,
+      "ps_returncode": 1,
+      "ps_stdout": "",
+      "unique_server": "at-at-tmux-xp31g5f6",
+      "tmux_returncode": 1,
+      "tmux_stderr": "no server running on /private/tmp/tmux-501/at-at-tmux-xp31g5f6",
+      "temporary_root_removed": true
+    }
+  ],
+  "credential_files_copied": [],
+  "evidence_bytes": 798591,
+  "oversized_files": []
+}

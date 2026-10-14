@@ -1,0 +1,16 @@
+▶ package.json pi.extensions
+  ✔ is declared (0.411625ms)
+  ✔ loads every top-level extension file (3.37075ms)
+  ✔ loads nothing from a subdirectory of extensions/ (0.261875ms)
+  ✔ loads independent path continuation once, never its helpers (0.513875ms)
+  ✔ keeps composition-owned packages in conflicts, not standalone packages or runtime copies (1.086375ms)
+  ✔ covers the resource types this repo ships (0.071792ms)
+✔ package.json pi.extensions (6.331042ms)
+ℹ tests 6
+ℹ suites 1
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 87.187209

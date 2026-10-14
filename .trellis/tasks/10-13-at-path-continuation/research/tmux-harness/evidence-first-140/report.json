@@ -1,0 +1,81 @@
+{
+  "status": "FAIL",
+  "error": "Escape no rebound: candidate reappeared",
+  "width": 140,
+  "height": 40,
+  "mode": "fullscreen",
+  "theme": "dark",
+  "root": "/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-yewzyhej",
+  "server": "at-at-tmux-yewzyhej",
+  "cases": [
+    {
+      "case": "installed CLI isolated fullscreen startup",
+      "status": "PASS",
+      "ready": {
+        "time": 1791945274425,
+        "kind": "ready",
+        "pid": 30287,
+        "cwd": "/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-yewzyhej/cwd",
+        "home": "/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-yewzyhej/home",
+        "mode": "tui"
+      },
+      "pane_pid": 30287
+    },
+    {
+      "case": "CLI initial frame fixed width",
+      "status": "PASS",
+      "raw_bytes": 2563,
+      "width": 140
+    },
+    {
+      "case": "clear real editor",
+      "status": "PASS"
+    },
+    {
+      "case": "ignored-local before slash closed",
+      "status": "PASS"
+    },
+    {
+      "case": "ignored-local slash without Tab",
+      "status": "PASS",
+      "text": "@local/manual/",
+      "expected": "@local/manual/",
+      "candidate": "SLASH_LEAF.txt",
+      "submit_count": 0
+    },
+    {
+      "case": "clear real editor",
+      "status": "PASS"
+    },
+    {
+      "case": "Tab directory continues single directory display",
+      "status": "PASS",
+      "text": "@local/aa/",
+      "candidate": "onlydir/"
+    },
+    {
+      "case": "harness or product interruption",
+      "status": "FAIL",
+      "error": "Escape no rebound: candidate reappeared"
+    }
+  ],
+  "cleanup": {
+    "natural_cli_exit": true,
+    "pane_dead_status": "0",
+    "actual_pid_gone": true,
+    "unique_server_stopped": true,
+    "isolated_config_removed": true
+  },
+  "scope": "Actual installed Pi CLI, native fd provider, real tmux send-keys; public probe observes only.",
+  "command": "exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-yewzyhej/home USERPROFILE=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-yewzyhej/home XDG_CONFIG_HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-yewzyhej/home/.config PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-yewzyhej/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-yewzyhej/sessions AT_TMUX_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-yewzyhej PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-yewzyhej/terminal.raw PATH=/Users/jyxc-dz-0101322/.kimi-code/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-yewzyhej GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-yewzyhej/sessions --use-theme dark --tui-mode fullscreen --tools read --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-at-path-continuation/research/tmux-harness/probe.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion.ts --model at-offline/scripted --thinking off",
+  "tmux_command": "/opt/homebrew/bin/tmux -L at-at-tmux-yewzyhej -f /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-yewzyhej/tmux.conf new-session -d -s check -x 140 -y 40 -c /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-yewzyhej/cwd 'exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-yewzyhej/home USERPROFILE=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-yewzyhej/home XDG_CONFIG_HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-yewzyhej/home/.config PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-yewzyhej/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-yewzyhej/sessions AT_TMUX_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-yewzyhej PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-yewzyhej/terminal.raw PATH=/Users/jyxc-dz-0101322/.kimi-code/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-yewzyhej GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/at-tmux-yewzyhej/sessions --use-theme dark --tui-mode fullscreen --tools read --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-at-path-continuation/research/tmux-harness/probe.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion.ts --model at-offline/scripted --thinking off'",
+  "versions": {
+    "pi": "1.2.0",
+    "node": "v24.14.1",
+    "tmux": "tmux 3.6a",
+    "fd": "fd 10.4.2"
+  },
+  "traceback": "Traceback (most recent call last):\n  File \"/Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-at-path-continuation/research/tmux-harness/driver.py\", line 116, in <module>\n    key('Escape');stable_absent('onlydir/','Escape no rebound');capture('escape-after');check('Escape no rebound',observe()['text']=='@local/aa/' and 'onlydir/' not in screen(),observation_ms=320)\n                  ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-at-path-continuation/research/tmux-harness/driver.py\", line 87, in stable_absent\n    wait(done,label,seconds+2)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-at-path-continuation/research/tmux-harness/driver.py\", line 49, in wait\n    v=f()\n  File \"/Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-13-at-path-continuation/research/tmux-harness/driver.py\", line 85, in done\n    if token in txt:raise AssertionError(label+': candidate reappeared')\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: Escape no rebound: candidate reappeared\n",
+  "elapsed_seconds": 1.85,
+  "exit_status": 1
+}

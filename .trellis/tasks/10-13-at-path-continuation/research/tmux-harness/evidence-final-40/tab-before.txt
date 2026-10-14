@@ -1,0 +1,40 @@
+
+ AT_TMUX_READY
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────
+@local/
+────────────────────────────────────────
+→ aa/
+  manual/
+  FILE_LEAF.txt
+  onlydir/
+  SLASH_LEAF.txt
+/private/var/folders/fx/bn7t1rq16xn7_...
+0.0%/128k (auto)                scripted

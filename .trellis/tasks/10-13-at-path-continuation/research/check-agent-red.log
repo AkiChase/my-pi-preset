@@ -1,0 +1,36 @@
+✔ native lock-modified printable slash continues suggestions "\u001b[27;65;47~" (107.044125ms)
+✔ native lock-modified printable slash continues suggestions "\u001b[27;129;47~" (104.292125ms)
+✔ native lock-modified printable slash continues suggestions "\u001b[27;66;47~" (103.773833ms)
+✔ directory debounce cannot start a visible request after early focus (103.565ms)
+✔ directory debounce cannot start a visible request after early overlay (102.931125ms)
+✔ unrelated trigger provider retains a pending native request across the native no-op copy action (413.066167ms)
+✖ agent mention provider retains native suggestions across no-op copy (209.096584ms)
+✔ shutdown does not run a later provider-transforming setter twice (104.359209ms)
+✔ shutdown never overwrites a later nondelegating provider setter with an old chain (104.151625ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 8
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1777.429958
+
+✖ failing tests:
+
+test at extensions/at-path-completion/__tests__/check-regressions.test.ts:38:6
+✖ agent mention provider retains native suggestions across no-op copy (209.096584ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/at-path-completion/__tests__/check-regressions.test.ts:44:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

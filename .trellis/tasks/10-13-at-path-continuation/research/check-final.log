@@ -1,0 +1,30 @@
+
+> my-pi-preset@0.1.0 check /Users/jyxc-dz-0101322/tools/my-pi-preset
+> pnpm run typecheck && pnpm run test
+
+
+> my-pi-preset@0.1.0 typecheck /Users/jyxc-dz-0101322/tools/my-pi-preset
+> node scripts/link-pi-sdk.mjs && tsc -p tsconfig.json
+
+[2m[link-pi-sdk][0m linked 0 new of 7 @earendil-works/* packages from /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules
+
+> my-pi-preset@0.1.0 test /Users/jyxc-dz-0101322/tools/my-pi-preset
+> node scripts/link-pi-sdk.mjs && node --test --test-force-exit "extensions/**/__tests__/*.test.ts" "scripts/*.test.mjs"
+
+[2m[link-pi-sdk][0m linked 0 new of 7 @earendil-works/* packages from /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules
+▶ watchPrompts
+  ✔ brackets a prompt with one block and one release (5.741167ms)
+  ✔ labels a titleless questionnaire from the ask-user payload (0.133875ms)
+  ✔ does not reuse a stale ask-user label for the next prompt (0.078417ms)
+PASS piped installer rejects --dev before downloading or running pi
+
+All sync checks passed.
+✔ scripts/sync.test.mjs (15658.538125ms)
+ℹ tests 656
+ℹ suites 72
+ℹ pass 656
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 25236.927792
