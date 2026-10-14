@@ -359,3 +359,25 @@ Implemented registry-scoped command/WS monitor batching with fixed short windows
 ### Next Steps
 
 - Recap及其他并行任务未完成；未push/install/sync/reload，在线标题质量和其他终端矩阵未验证
+
+
+## Session 12: 修复终端交互分类并收尾
+<!-- trellis-session: v=2 fp=ccf0065f1db203e5 -->
+
+**Date**: 2026-10-14
+**Task**: 修复终端交互分类并收尾
+**Branch**: `main`
+
+### Summary
+
+custom 浏览不再误报 blocked，问卷使用明确 attention 事件，聚合等待与 cmux 迟到通知隔离。用户取消压缩状态修复并接受交付，已归档 host-agent-state。主自检：focused22/22 natural exit0、strict/full705/705；未真实 Herdr/cmux端到端、安装、sync、reload或push。保留并行修改。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d86b38b` | fix: distinguish explicit attention waits from custom browsers |
+
+### Status
+
+[OK] **Completed**
