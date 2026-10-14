@@ -78,6 +78,8 @@ Task composition 把命令进程、Monitor、子 Agent 和 workflow 放进同一
 
 `SubagentWorkflow` 用于运行多阶段或动态数量的 Agent 编排，后台启动后通知结果；`/agents` 可以管理相应运行和定时任务。
 
+完成通知发送失败时，会显示简短警告；没有 UI 时输出简短日志，结果仍可通过 `get_subagent_result` 获取，不自动重发。组内手动停止的 Agent 不发送自己的完成通知，也不会让已经完成的兄弟任务继续等它退出。
+
 轮次上限由用户设置 `defaultMaxTurns` 或 Agent 类型文件中的 `max_turns`，不由模型的工具调用参数决定。`0` 表示无限制；达到软上限后有收尾宽限，超出宽限才中止，部分结果不能当成完整完成。
 
 ## 配置

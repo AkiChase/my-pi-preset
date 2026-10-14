@@ -146,6 +146,8 @@ actualSDKhost/editor/Pretty/TUI分发回归与GC4/4资源回收通过（parentta
 - 程序化 spawn 的缺省/null/空白 description 回退到已解析的 agent 类型名；非空字符串保留，非法类型在 manager admission 前拒绝。RPC 与全局 registry 保留原模型/cwd/内部 capability 限制，不要求外部调用方补描述。
 - RPC 对派发必需的 type/prompt/options 做最小结构校验；有效 requestId 在等待启动前捕获，成功/失败回复不会因调用方修改请求对象而换地址。无有效地址的请求不派发、不生成 undefined reply channel。协议版本仍为 v2。
 - runner 不新增描述参数；record 与 worktree cleanup 使用同一规范化描述。实际 factory/RPC/manager 和离线真实宿主回归记录在本任务材料。
+- 完成通知构造或同步提交失败时仅简短 UI warning（无 UI 时安全日志），不新增持久诊断、不自动重试；提示错误不能影响结果检索或 cleanup。individual/group发送后按捕获run身份标记SDK已提交，不宣称持久化ACK。
+- stopped组成员按公开终态结算，即使非合作runner仍在drain也不拖延兄弟通知；自身不发完成通知，真正running成员保留partial timeout。
 
 ## 2026-10-13：beautify 替换 Pretty
 

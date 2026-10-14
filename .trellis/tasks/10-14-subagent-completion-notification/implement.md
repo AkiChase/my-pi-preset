@@ -23,11 +23,11 @@
 
 ## 阶段 3：stopped group 结算及整体集成
 
-- [ ] terminal stopped 即计入组，actual execution 未退出不能阻塞兄弟通知。
-- [ ] 用非合作 delayed runner 验证即时关闭、文案、重复回调、resume 与真正 partial timeout。
-- [ ] 更新中文功能文档到根 docs/（核对并行 docs 组织，禁止把小功能说明塞入 .trellis/spec）；必要时更新 provenance。通用规范只在有可复用证据时另评估。
-- [ ] 定向、整体 strict/test、独立 review、主最终 diff/PRD AC 复核，立即 scoped commit。
-- [ ] 报告 remaining dirty/真实验证限制；不自行归档或推送。
+- [x] terminal stopped 即计入组，actual execution 未退出不能阻塞兄弟通知。
+- [x] 用非合作 delayed runner 验证即时关闭、文案、重复回调、resume 回归与真正 partial timeout。
+- [x] 更新中文功能文档到根 docs/，补 provenance；现有通用规范已覆盖，无需新增spec。
+- [x] 定向、整体 strict/test、独立 review、主最终 diff/PRD AC 复核，阶段提交证据见 research/stage3.md。
+- [x] 报告 remaining dirty/真实验证限制；用户已授权验收后自行归档收尾，不推送。
 
 ## 验证命令
 

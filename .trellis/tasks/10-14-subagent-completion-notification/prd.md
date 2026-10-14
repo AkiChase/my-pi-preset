@@ -24,7 +24,7 @@
 
 - 程序化公共入口与 manager admission 使用一致契约：缺省、null、空白描述回退为已解析 agent 类型名；非空字符串保留；数字、对象、数组等非法类型在创建 record/runner 前拒绝。
 - 对 RPC type、prompt、options 做必要结构校验，不扩大为所有配置重构；缺省 options 仍合法，错误请求可按有效 requestId 返回明确失败。
-- 规范化描述传入 record、runner 与 cleanup；不以 `String(undefined)` 或仅 renderer fallback 掩盖错误。
+- 规范化描述传入 record 与 cleanup；runner 不读取描述、不新增参数。不以 `String(undefined)` 或仅 renderer fallback 掩盖错误。
 - 不依赖 pi-trellis 补描述，不更改其产品源码或公开 RPC version。
 
 ### R2：通知失败可见
@@ -54,14 +54,14 @@
 
 ## 验收标准
 
-- [ ] AC1 / R1：实际 RPC 不传/null/空白 description 均使用默认类型名完成，通知恰好一次；非空字符串正常。
-- [ ] AC2 / R1：非法描述及必要的 malformed RPC payload admission 前失败，无 record、runner 或池计数残留。
-- [ ] AC3 / R2：合法通知构造/同步投递失败有安全可见诊断，未标已通知、结果仍可取，不自动重试。
-- [ ] AC4 / R2：warning/日志 sink 抛错不阻塞兄弟通知或 cleanup；不产生持久诊断 entry。
-- [ ] AC5 / R3：sendMessage 内同步 resume 同一 agent，旧通知不会污染新 run，新 run 完成可正常通知。
-- [ ] AC6 / R4：组内 stopped runner 不退出，已完成兄弟无需等待 30 秒即可通知，文案不误称 stopped 成员仍在运行。
-- [ ] AC7：正常消费、取消等待、group partial、resume 与 shutdown 现有回归保持通过；不改变实际取消与执行清理机制。
-- [ ] AC8：针对性测试、strict 与整体测试通过；独立检查及主会话实际 diff 复核完成，明确未执行的真实 provider/PTY 验证。
+- [x] AC1 / R1：实际 RPC 不传/null/空白 description 均使用默认类型名完成，通知恰好一次；非空字符串正常。
+- [x] AC2 / R1：非法描述及必要的 malformed RPC payload admission 前失败，无 record、runner 或池计数残留。
+- [x] AC3 / R2：合法通知构造/同步投递失败有简短安全 warning/日志，未标已通知、结果仍可取，不自动重试。
+- [x] AC4 / R2：warning/日志 sink 抛错不阻塞兄弟通知或 cleanup；不产生持久诊断 entry。
+- [x] AC5 / R3：sendMessage 内同步 resume 同一 agent，旧通知不会污染新 run，新 run 完成可正常通知。
+- [x] AC6 / R4：组内 stopped runner 不退出，已完成兄弟无需等待 30 秒即可通知，文案不误称 stopped 成员仍在运行。
+- [x] AC7：正常消费、取消等待、group partial、resume 与 shutdown 现有回归保持通过；不改变实际取消与执行清理机制。
+- [x] AC8：针对性测试、strict 与整体测试通过；独立检查及主会话实际 diff 复核完成，明确未执行的真实 provider/PTY 验证。
 
 ## 排除与风险
 

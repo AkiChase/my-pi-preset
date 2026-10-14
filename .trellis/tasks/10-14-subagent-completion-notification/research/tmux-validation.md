@@ -19,4 +19,6 @@ Pi 1.2.0，已有 CLI 与 tmux；120×40 dark fullscreen，独立 `tmux -L compl
 
 日志 `/tmp/pi-bg/b4hlvqf62.log`，证据 root `/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/completion-tmux-j7jpswak`；screen 是 capture-pane 文本，不是图片。unique server 已停止，owned config/cwd 已删除，ps 检查无测试 CLI/child 残留。
 
-仅最小矩阵；提示失败、同步 resume、noncooperative stopped group 在最终集成后补验证。未跑在线模型、物理 IME/mouse、任意主题/plugin 组合。
+仅最小矩阵；noncooperative stopped group及同步resume由actual factory/manager定向验证，不声称真实provider验证。
+
+最终源码同一脚本重跑五项PASS，exit0：`/tmp/pi-bg/bnbd74yz1.log`，root `completion-tmux-1nqwb4wk`；新增formatter故障通过测试registry注入，实际CLI显示简短warning。提示异常、同步resume和stopped group自动回归覆盖完整；未跑在线模型、物理 IME/mouse、任意主题/plugin 组合。

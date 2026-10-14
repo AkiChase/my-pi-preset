@@ -559,7 +559,10 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     scheduleNudge(record.id, () => emitIndividualNudge(record, runId));
   }
   function reconsiderAgentNotice(record: AgentRecord): void {
-    if (!active() || manager.getRecord(record.id) !== record || manager.isRunActive(record.id) || record.completedAt === undefined) return;
+    if (!active() || manager.getRecord(record.id) !== record || record.completedAt === undefined) return;
+    // Public stopped terminal state closes group membership even while its
+    // noncooperative runner drains; other outcomes still wait for cleanup.
+    if (manager.isRunActive(record.id) && record.status !== "stopped") return;
     if (currentBatchAgents.some(a => a.id === record.id && a.runId === record.runId)) return;
     // Group ownership must observe ALL terminal members, even consumed/waited
     // ones; otherwise a suppressed member strands its siblings until timeout.
@@ -1325,7 +1328,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
         const record = manager.getRecord(id);
         if (!record) continue;
         record.groupId = groupId;
-        if (record.completedAt != null && !manager.isRunActive(record.id)) {
+        if (record.completedAt != null && (!manager.isRunActive(record.id) || record.status === "stopped")) {
           groupJoin.onAgentComplete(record);
         }
       }

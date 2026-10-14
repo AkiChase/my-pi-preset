@@ -924,3 +924,80 @@ void it("group send synchronous resume marks only the original submitted runs", 
     assert.equal(f.notices.length, 2); assert.match(String(f.notices[1]?.content), /new group member answer/);
   } finally { await f.close(); }
 });
+
+
+for (const beforeBatch of [false, true]) void it(`stopped noncooperative grouped runner closes membership ${beforeBatch ? "before" : "after"} batch without delaying sibling`, async () => {
+  const pending = deferred<RunResult>();
+  let heldSession!: AgentSession, heldOptions!: Parameters<NonNullable<AgentManagerDependencies["runAgent"]>>[3], runners = 0;
+  const f = await factory({ defaultJoinMode: "group" }, { runAgent: async (_ctx, _type, _prompt, options) => {
+    const session = { messages: [], sessionManager: { getSessionFile: () => undefined }, subscribe: () => () => {}, dispose() {}, getContextUsage: () => undefined } as unknown as AgentSession;
+    options.onSessionCreated?.(session);
+    if (++runners === 1) { heldSession = session; heldOptions = options; return pending.promise; }
+    return { session, responseText: "natural sibling", aborted: false, steered: false };
+  } });
+  try {
+    await f.start(true); await f.start(true);
+    if (!beforeBatch) await pause(130);
+    const row = f.coordinator.list().find(row => row.taskId === heldOptions.agentId)!;
+    assert.equal(f.source.stop!(row), true);
+    assert.equal(f.registry.getRecord(row.taskId)?.status, "stopped");
+    assert.equal(f.lifecycle.active, true);
+    await tick(); await pause(400);
+    assert.equal(f.notices.length, 1, "must not wait thirty seconds for stopped execution");
+    assert.match(String(f.notices[0]?.content), /natural sibling/);
+    assert.doesNotMatch(String(f.notices[0]?.content), /partial|others still running|<status>Stopped/i);
+    pending.resolve({ session: heldSession, responseText: "late stopped", aborted: false, steered: false });
+    await tick(); await pause(260);
+    assert.equal(f.notices.length, 1, "late runner settle cannot duplicate group notification");
+  } finally { pending.resolve({ session: heldSession, responseText: "late stopped", aborted: false, steered: false }); await f.close(); }
+});
+
+
+void it("genuine running group member retains partial timeout and later straggler delivery", async t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const held = deferred<RunResult>(); let calls = 0;
+  const session = { messages: [], sessionManager: { getSessionFile: () => undefined }, subscribe: () => () => {}, dispose() {}, getContextUsage: () => undefined } as unknown as AgentSession;
+  const f = await factory({ defaultJoinMode: "group" }, { runAgent: async (_ctx, _type, _prompt, options) => {
+    options.onSessionCreated?.(session);
+    if (++calls === 1) return held.promise;
+    return { session, responseText: "early member", aborted: false, steered: false };
+  } });
+  try {
+    await f.start(true); await f.start(true); await tick();
+    t.mock.timers.tick(100); await tick();
+    t.mock.timers.tick(29_999); await tick(); assert.equal(f.notices.length, 0);
+    t.mock.timers.tick(1); await tick(); t.mock.timers.tick(200); await tick();
+    assert.equal(f.notices.length, 1); assert.match(String(f.notices[0]?.content), /partial.*others still running/);
+    held.resolve({ session, responseText: "straggler", aborted: false, steered: false }); await tick();
+    t.mock.timers.tick(200); await tick();
+    assert.equal(f.notices.length, 2); assert.match(String(f.notices[1]?.content), /straggler/);
+  } finally { held.resolve({ session, responseText: "done", aborted: false, steered: false }); await f.close(); }
+});
+
+
+void it("mixed completed stopped and running group reports partial only for genuinely running member", async t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const stopped = deferred<RunResult>(), running = deferred<RunResult>(); let calls = 0;
+  const session = { messages: [], sessionManager: { getSessionFile: () => undefined }, subscribe: () => () => {}, dispose() {}, getContextUsage: () => undefined } as unknown as AgentSession;
+  const f = await factory({ defaultJoinMode: "group" }, { runAgent: async (_ctx, _type, _prompt, options) => {
+    options.onSessionCreated?.(session);
+    if (++calls === 1) return stopped.promise;
+    if (calls === 2) return running.promise;
+    return { session, responseText: "completed member", aborted: false, steered: false };
+  } });
+  try {
+    await f.start(true); const stopRow = f.coordinator.list()[0]!;
+    await f.start(true); await f.start(true); await tick(); t.mock.timers.tick(100); await tick();
+    f.source.stop!(stopRow); await tick(); t.mock.timers.tick(30_200); await tick(); t.mock.timers.tick(200); await tick();
+    assert.equal(f.notices.length, 1); assert.match(String(f.notices[0]?.content), /partial.*others still running/);
+    assert.match(String(f.notices[0]?.content), /completed member/);
+    assert.equal(f.notices[0]?.details?.others, undefined, "stopped member excluded from submitted results");
+    running.resolve({ session, responseText: "last running member", aborted: false, steered: false }); await tick(); t.mock.timers.tick(200); await tick();
+    assert.equal(f.notices.length, 2); assert.doesNotMatch(String(f.notices[1]?.content), /partial|others still running/);
+    stopped.resolve({ session, responseText: "late stopped", aborted: false, steered: false }); await tick(); t.mock.timers.tick(1_000); await tick();
+    assert.equal(f.notices.length, 2);
+  } finally {
+    stopped.resolve({ session, responseText: "done", aborted: false, steered: false });
+    running.resolve({ session, responseText: "done", aborted: false, steered: false }); await f.close();
+  }
+});
