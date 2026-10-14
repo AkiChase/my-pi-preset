@@ -1,0 +1,1224 @@
+{"time":1791962991572,"kind":"ready","pid":9754,"cwd":"/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-pzdu5ack/cwd","home":"/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-pzdu5ack/home","mode":"tui","sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec"}
+{"time":1791962991639,"kind":"terminal-input","data":"B"}
+{"time":1791962991640,"kind":"terminal-input","data":"u"}
+{"time":1791962991641,"kind":"terminal-input","data":"i"}
+{"time":1791962991641,"kind":"terminal-input","data":"l"}
+{"time":1791962991641,"kind":"terminal-input","data":"d"}
+{"time":1791962991642,"kind":"terminal-input","data":" "}
+{"time":1791962991642,"kind":"terminal-input","data":"a"}
+{"time":1791962991642,"kind":"terminal-input","data":" "}
+{"time":1791962991643,"kind":"terminal-input","data":"l"}
+{"time":1791962991643,"kind":"terminal-input","data":"o"}
+{"time":1791962991643,"kind":"terminal-input","data":"c"}
+{"time":1791962991643,"kind":"terminal-input","data":"a"}
+{"time":1791962991643,"kind":"terminal-input","data":"l"}
+{"time":1791962991644,"kind":"terminal-input","data":" "}
+{"time":1791962991644,"kind":"terminal-input","data":"o"}
+{"time":1791962991644,"kind":"terminal-input","data":"f"}
+{"time":1791962991644,"kind":"terminal-input","data":"f"}
+{"time":1791962991644,"kind":"terminal-input","data":"l"}
+{"time":1791962991644,"kind":"terminal-input","data":"i"}
+{"time":1791962991645,"kind":"terminal-input","data":"n"}
+{"time":1791962991645,"kind":"terminal-input","data":"e"}
+{"time":1791962991645,"kind":"terminal-input","data":" "}
+{"time":1791962991645,"kind":"terminal-input","data":"s"}
+{"time":1791962991645,"kind":"terminal-input","data":"e"}
+{"time":1791962991645,"kind":"terminal-input","data":"s"}
+{"time":1791962991645,"kind":"terminal-input","data":"s"}
+{"time":1791962991645,"kind":"terminal-input","data":"i"}
+{"time":1791962991645,"kind":"terminal-input","data":"o"}
+{"time":1791962991645,"kind":"terminal-input","data":"n"}
+{"time":1791962991646,"kind":"terminal-input","data":" "}
+{"time":1791962991646,"kind":"terminal-input","data":"n"}
+{"time":1791962991646,"kind":"terminal-input","data":"a"}
+{"time":1791962991646,"kind":"terminal-input","data":"m"}
+{"time":1791962991646,"kind":"terminal-input","data":"i"}
+{"time":1791962991646,"kind":"terminal-input","data":"n"}
+{"time":1791962991647,"kind":"terminal-input","data":"g"}
+{"time":1791962991647,"kind":"terminal-input","data":" "}
+{"time":1791962991647,"kind":"terminal-input","data":"v"}
+{"time":1791962991647,"kind":"terminal-input","data":"a"}
+{"time":1791962991647,"kind":"terminal-input","data":"l"}
+{"time":1791962991647,"kind":"terminal-input","data":"i"}
+{"time":1791962991647,"kind":"terminal-input","data":"d"}
+{"time":1791962991648,"kind":"terminal-input","data":"a"}
+{"time":1791962991648,"kind":"terminal-input","data":"t"}
+{"time":1791962991648,"kind":"terminal-input","data":"o"}
+{"time":1791962991648,"kind":"terminal-input","data":"r"}
+{"time":1791962991649,"kind":"after-input","data":"B","text":"Build a local offline session naming validator"}
+{"time":1791962991649,"kind":"after-input","data":"u","text":"Build a local offline session naming validator"}
+{"time":1791962991650,"kind":"after-input","data":"i","text":"Build a local offline session naming validator"}
+{"time":1791962991650,"kind":"after-input","data":"l","text":"Build a local offline session naming validator"}
+{"time":1791962991650,"kind":"after-input","data":"d","text":"Build a local offline session naming validator"}
+{"time":1791962991650,"kind":"after-input","data":" ","text":"Build a local offline session naming validator"}
+{"time":1791962991650,"kind":"after-input","data":"a","text":"Build a local offline session naming validator"}
+{"time":1791962991650,"kind":"after-input","data":" ","text":"Build a local offline session naming validator"}
+{"time":1791962991650,"kind":"after-input","data":"l","text":"Build a local offline session naming validator"}
+{"time":1791962991650,"kind":"after-input","data":"o","text":"Build a local offline session naming validator"}
+{"time":1791962991650,"kind":"after-input","data":"c","text":"Build a local offline session naming validator"}
+{"time":1791962991650,"kind":"after-input","data":"a","text":"Build a local offline session naming validator"}
+{"time":1791962991650,"kind":"after-input","data":"l","text":"Build a local offline session naming validator"}
+{"time":1791962991650,"kind":"after-input","data":" ","text":"Build a local offline session naming validator"}
+{"time":1791962991650,"kind":"after-input","data":"o","text":"Build a local offline session naming validator"}
+{"time":1791962991650,"kind":"after-input","data":"f","text":"Build a local offline session naming validator"}
+{"time":1791962991650,"kind":"after-input","data":"f","text":"Build a local offline session naming validator"}
+{"time":1791962991650,"kind":"after-input","data":"l","text":"Build a local offline session naming validator"}
+{"time":1791962991650,"kind":"after-input","data":"i","text":"Build a local offline session naming validator"}
+{"time":1791962991650,"kind":"after-input","data":"n","text":"Build a local offline session naming validator"}
+{"time":1791962991651,"kind":"after-input","data":"e","text":"Build a local offline session naming validator"}
+{"time":1791962991651,"kind":"after-input","data":" ","text":"Build a local offline session naming validator"}
+{"time":1791962991651,"kind":"after-input","data":"s","text":"Build a local offline session naming validator"}
+{"time":1791962991651,"kind":"after-input","data":"e","text":"Build a local offline session naming validator"}
+{"time":1791962991651,"kind":"after-input","data":"s","text":"Build a local offline session naming validator"}
+{"time":1791962991651,"kind":"after-input","data":"s","text":"Build a local offline session naming validator"}
+{"time":1791962991651,"kind":"after-input","data":"i","text":"Build a local offline session naming validator"}
+{"time":1791962991651,"kind":"after-input","data":"o","text":"Build a local offline session naming validator"}
+{"time":1791962991651,"kind":"after-input","data":"n","text":"Build a local offline session naming validator"}
+{"time":1791962991651,"kind":"after-input","data":" ","text":"Build a local offline session naming validator"}
+{"time":1791962991651,"kind":"after-input","data":"n","text":"Build a local offline session naming validator"}
+{"time":1791962991651,"kind":"after-input","data":"a","text":"Build a local offline session naming validator"}
+{"time":1791962991651,"kind":"after-input","data":"m","text":"Build a local offline session naming validator"}
+{"time":1791962991651,"kind":"after-input","data":"i","text":"Build a local offline session naming validator"}
+{"time":1791962991651,"kind":"after-input","data":"n","text":"Build a local offline session naming validator"}
+{"time":1791962991651,"kind":"after-input","data":"g","text":"Build a local offline session naming validator"}
+{"time":1791962991651,"kind":"after-input","data":" ","text":"Build a local offline session naming validator"}
+{"time":1791962991651,"kind":"after-input","data":"v","text":"Build a local offline session naming validator"}
+{"time":1791962991651,"kind":"after-input","data":"a","text":"Build a local offline session naming validator"}
+{"time":1791962991651,"kind":"after-input","data":"l","text":"Build a local offline session naming validator"}
+{"time":1791962991651,"kind":"after-input","data":"i","text":"Build a local offline session naming validator"}
+{"time":1791962991652,"kind":"after-input","data":"d","text":"Build a local offline session naming validator"}
+{"time":1791962991652,"kind":"after-input","data":"a","text":"Build a local offline session naming validator"}
+{"time":1791962991652,"kind":"after-input","data":"t","text":"Build a local offline session naming validator"}
+{"time":1791962991652,"kind":"after-input","data":"o","text":"Build a local offline session naming validator"}
+{"time":1791962991652,"kind":"after-input","data":"r","text":"Build a local offline session naming validator"}
+{"time":1791962991668,"kind":"terminal-input","data":"\r"}
+{"time":1791962991670,"kind":"input","text":"Build a local offline session naming validator","source":"interactive"}
+{"time":1791962991673,"kind":"request","naming":false,"id":1,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","mode":"ok"}
+{"time":1791962991675,"kind":"settled","aborted":false,"title":null}
+{"time":1791962991676,"kind":"request","naming":true,"id":1,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","mode":"ok","title":"Initial Offline Goal"}
+{"time":1791962991677,"kind":"title","name":"Initial Offline Goal","sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec"}
+{"time":1791962991677,"kind":"after-input","data":"\r","text":""}
+{"time":1791962991704,"kind":"terminal-input","data":"\u001b[20~"}
+{"time":1791962991704,"kind":"observe","text":"","sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","title":"Initial Offline Goal","state":{"type":"custom","customType":"preset.session-name.v1","data":{"progress":{"version":1,"count":1,"evaluated":1,"retryAt":0,"observedIds":["199f6eb1"]},"ownership":{"version":1,"titleEntryId":"fba2b6bf","title":"Initial Offline Goal","owned":true}},"id":"6d87e588","parentId":"fba2b6bf","timestamp":"2026-10-14T07:29:51.677Z"},"names":1,"mains":1}
+{"time":1791962991705,"kind":"after-input","data":"\u001b[20~","text":""}
+{"time":1791962991746,"kind":"terminal-input","data":"/"}
+{"time":1791962991747,"kind":"terminal-input","data":"s"}
+{"time":1791962991748,"kind":"terminal-input","data":"e"}
+{"time":1791962991748,"kind":"terminal-input","data":"s"}
+{"time":1791962991748,"kind":"terminal-input","data":"s"}
+{"time":1791962991749,"kind":"terminal-input","data":"i"}
+{"time":1791962991749,"kind":"terminal-input","data":"o"}
+{"time":1791962991749,"kind":"terminal-input","data":"n"}
+{"time":1791962991749,"kind":"terminal-input","data":"-"}
+{"time":1791962991749,"kind":"terminal-input","data":"n"}
+{"time":1791962991749,"kind":"terminal-input","data":"a"}
+{"time":1791962991749,"kind":"terminal-input","data":"m"}
+{"time":1791962991750,"kind":"terminal-input","data":"e"}
+{"time":1791962991751,"kind":"after-input","data":"/","text":"/session-name"}
+{"time":1791962991751,"kind":"after-input","data":"s","text":"/session-name"}
+{"time":1791962991751,"kind":"after-input","data":"e","text":"/session-name"}
+{"time":1791962991751,"kind":"after-input","data":"s","text":"/session-name"}
+{"time":1791962991751,"kind":"after-input","data":"s","text":"/session-name"}
+{"time":1791962991752,"kind":"after-input","data":"i","text":"/session-name"}
+{"time":1791962991752,"kind":"after-input","data":"o","text":"/session-name"}
+{"time":1791962991752,"kind":"after-input","data":"n","text":"/session-name"}
+{"time":1791962991752,"kind":"after-input","data":"-","text":"/session-name"}
+{"time":1791962991752,"kind":"after-input","data":"n","text":"/session-name"}
+{"time":1791962991752,"kind":"after-input","data":"a","text":"/session-name"}
+{"time":1791962991752,"kind":"after-input","data":"m","text":"/session-name"}
+{"time":1791962991752,"kind":"after-input","data":"e","text":"/session-name"}
+{"time":1791962991787,"kind":"terminal-input","data":"\u001b"}
+{"time":1791962991788,"kind":"after-input","data":"\u001b","text":"/session-name"}
+{"time":1791962991807,"kind":"terminal-input","data":"\r"}
+{"time":1791962991808,"kind":"request","naming":true,"id":2,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","mode":"ok","title":"Manual Offline Refresh"}
+{"time":1791962991809,"kind":"title","name":"Manual Offline Refresh","sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec"}
+{"time":1791962991809,"kind":"after-input","data":"\r","text":""}
+{"time":1791962991843,"kind":"terminal-input","data":"\u001b[20~"}
+{"time":1791962991844,"kind":"observe","text":"","sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","title":"Manual Offline Refresh","state":{"type":"custom","customType":"preset.session-name.v1","data":{"progress":{"version":1,"count":1,"evaluated":1,"retryAt":0,"observedIds":["199f6eb1"]},"ownership":{"version":1,"titleEntryId":"500d9a86","title":"Manual Offline Refresh","owned":true}},"id":"22a965c6","parentId":"500d9a86","timestamp":"2026-10-14T07:29:51.809Z"},"names":2,"mains":1}
+{"time":1791962991845,"kind":"after-input","data":"\u001b[20~","text":""}
+{"time":1791962991888,"kind":"terminal-input","data":"/"}
+{"time":1791962991889,"kind":"terminal-input","data":"s"}
+{"time":1791962991889,"kind":"terminal-input","data":"e"}
+{"time":1791962991889,"kind":"terminal-input","data":"s"}
+{"time":1791962991890,"kind":"terminal-input","data":"s"}
+{"time":1791962991890,"kind":"terminal-input","data":"i"}
+{"time":1791962991890,"kind":"terminal-input","data":"o"}
+{"time":1791962991891,"kind":"terminal-input","data":"n"}
+{"time":1791962991891,"kind":"terminal-input","data":"-"}
+{"time":1791962991891,"kind":"terminal-input","data":"n"}
+{"time":1791962991891,"kind":"terminal-input","data":"a"}
+{"time":1791962991892,"kind":"terminal-input","data":"m"}
+{"time":1791962991892,"kind":"terminal-input","data":"e"}
+{"time":1791962991892,"kind":"terminal-input","data":" "}
+{"time":1791962991892,"kind":"terminal-input","data":"c"}
+{"time":1791962991893,"kind":"terminal-input","data":"o"}
+{"time":1791962991893,"kind":"terminal-input","data":"n"}
+{"time":1791962991893,"kind":"terminal-input","data":"f"}
+{"time":1791962991893,"kind":"terminal-input","data":"i"}
+{"time":1791962991893,"kind":"terminal-input","data":"g"}
+{"time":1791962991895,"kind":"after-input","data":"/","text":"/session-name config"}
+{"time":1791962991895,"kind":"after-input","data":"s","text":"/session-name config"}
+{"time":1791962991895,"kind":"after-input","data":"e","text":"/session-name config"}
+{"time":1791962991895,"kind":"after-input","data":"s","text":"/session-name config"}
+{"time":1791962991895,"kind":"after-input","data":"s","text":"/session-name config"}
+{"time":1791962991895,"kind":"after-input","data":"i","text":"/session-name config"}
+{"time":1791962991896,"kind":"after-input","data":"o","text":"/session-name config"}
+{"time":1791962991896,"kind":"after-input","data":"n","text":"/session-name config"}
+{"time":1791962991896,"kind":"after-input","data":"-","text":"/session-name config"}
+{"time":1791962991896,"kind":"after-input","data":"n","text":"/session-name config"}
+{"time":1791962991896,"kind":"after-input","data":"a","text":"/session-name config"}
+{"time":1791962991896,"kind":"after-input","data":"m","text":"/session-name config"}
+{"time":1791962991896,"kind":"after-input","data":"e","text":"/session-name config"}
+{"time":1791962991896,"kind":"after-input","data":" ","text":"/session-name config"}
+{"time":1791962991897,"kind":"after-input","data":"c","text":"/session-name config"}
+{"time":1791962991897,"kind":"after-input","data":"o","text":"/session-name config"}
+{"time":1791962991897,"kind":"after-input","data":"n","text":"/session-name config"}
+{"time":1791962991897,"kind":"after-input","data":"f","text":"/session-name config"}
+{"time":1791962991897,"kind":"after-input","data":"i","text":"/session-name config"}
+{"time":1791962991897,"kind":"after-input","data":"g","text":"/session-name config"}
+{"time":1791962991928,"kind":"terminal-input","data":"\u001b"}
+{"time":1791962991929,"kind":"after-input","data":"\u001b","text":"/session-name config"}
+{"time":1791962991950,"kind":"terminal-input","data":"\r"}
+{"time":1791962991953,"kind":"after-input","data":"\r","text":""}
+{"time":1791962992010,"kind":"terminal-input","data":"\u001b"}
+{"time":1791962992011,"kind":"after-input","data":"\u001b","text":""}
+{"time":1791962992036,"kind":"terminal-input","data":"/"}
+{"time":1791962992037,"kind":"terminal-input","data":"s"}
+{"time":1791962992037,"kind":"terminal-input","data":"e"}
+{"time":1791962992037,"kind":"terminal-input","data":"s"}
+{"time":1791962992037,"kind":"terminal-input","data":"s"}
+{"time":1791962992038,"kind":"terminal-input","data":"i"}
+{"time":1791962992038,"kind":"terminal-input","data":"o"}
+{"time":1791962992038,"kind":"terminal-input","data":"n"}
+{"time":1791962992038,"kind":"terminal-input","data":"-"}
+{"time":1791962992038,"kind":"terminal-input","data":"n"}
+{"time":1791962992039,"kind":"terminal-input","data":"a"}
+{"time":1791962992039,"kind":"terminal-input","data":"m"}
+{"time":1791962992039,"kind":"terminal-input","data":"e"}
+{"time":1791962992039,"kind":"terminal-input","data":" "}
+{"time":1791962992039,"kind":"terminal-input","data":"c"}
+{"time":1791962992040,"kind":"terminal-input","data":"o"}
+{"time":1791962992040,"kind":"terminal-input","data":"n"}
+{"time":1791962992040,"kind":"terminal-input","data":"f"}
+{"time":1791962992040,"kind":"terminal-input","data":"i"}
+{"time":1791962992040,"kind":"terminal-input","data":"g"}
+{"time":1791962992042,"kind":"after-input","data":"/","text":"/session-name config"}
+{"time":1791962992042,"kind":"after-input","data":"s","text":"/session-name config"}
+{"time":1791962992042,"kind":"after-input","data":"e","text":"/session-name config"}
+{"time":1791962992042,"kind":"after-input","data":"s","text":"/session-name config"}
+{"time":1791962992042,"kind":"after-input","data":"s","text":"/session-name config"}
+{"time":1791962992042,"kind":"after-input","data":"i","text":"/session-name config"}
+{"time":1791962992042,"kind":"after-input","data":"o","text":"/session-name config"}
+{"time":1791962992043,"kind":"after-input","data":"n","text":"/session-name config"}
+{"time":1791962992043,"kind":"after-input","data":"-","text":"/session-name config"}
+{"time":1791962992043,"kind":"after-input","data":"n","text":"/session-name config"}
+{"time":1791962992043,"kind":"after-input","data":"a","text":"/session-name config"}
+{"time":1791962992043,"kind":"after-input","data":"m","text":"/session-name config"}
+{"time":1791962992043,"kind":"after-input","data":"e","text":"/session-name config"}
+{"time":1791962992043,"kind":"after-input","data":" ","text":"/session-name config"}
+{"time":1791962992043,"kind":"after-input","data":"c","text":"/session-name config"}
+{"time":1791962992043,"kind":"after-input","data":"o","text":"/session-name config"}
+{"time":1791962992043,"kind":"after-input","data":"n","text":"/session-name config"}
+{"time":1791962992043,"kind":"after-input","data":"f","text":"/session-name config"}
+{"time":1791962992043,"kind":"after-input","data":"i","text":"/session-name config"}
+{"time":1791962992044,"kind":"after-input","data":"g","text":"/session-name config"}
+{"time":1791962992079,"kind":"terminal-input","data":"\u001b"}
+{"time":1791962992080,"kind":"after-input","data":"\u001b","text":"/session-name config"}
+{"time":1791962992098,"kind":"terminal-input","data":"\r"}
+{"time":1791962992099,"kind":"after-input","data":"\r","text":""}
+{"time":1791962992131,"kind":"terminal-input","data":"\u001b[B"}
+{"time":1791962992132,"kind":"after-input","data":"\u001b[B","text":""}
+{"time":1791962992165,"kind":"terminal-input","data":"\r"}
+{"time":1791962992167,"kind":"after-input","data":"\r","text":""}
+{"time":1791962992223,"kind":"terminal-input","data":"I"}
+{"time":1791962992224,"kind":"terminal-input","data":"n"}
+{"time":1791962992224,"kind":"terminal-input","data":"p"}
+{"time":1791962992224,"kind":"terminal-input","data":"u"}
+{"time":1791962992224,"kind":"terminal-input","data":"t"}
+{"time":1791962992225,"kind":"terminal-input","data":" "}
+{"time":1791962992225,"kind":"terminal-input","data":"w"}
+{"time":1791962992225,"kind":"terminal-input","data":"h"}
+{"time":1791962992225,"kind":"terminal-input","data":"i"}
+{"time":1791962992225,"kind":"terminal-input","data":"l"}
+{"time":1791962992226,"kind":"terminal-input","data":"e"}
+{"time":1791962992226,"kind":"terminal-input","data":" "}
+{"time":1791962992226,"kind":"terminal-input","data":"a"}
+{"time":1791962992226,"kind":"terminal-input","data":"u"}
+{"time":1791962992226,"kind":"terminal-input","data":"t"}
+{"time":1791962992227,"kind":"terminal-input","data":"o"}
+{"time":1791962992227,"kind":"terminal-input","data":"m"}
+{"time":1791962992227,"kind":"terminal-input","data":"a"}
+{"time":1791962992227,"kind":"terminal-input","data":"t"}
+{"time":1791962992227,"kind":"terminal-input","data":"i"}
+{"time":1791962992227,"kind":"terminal-input","data":"c"}
+{"time":1791962992227,"kind":"terminal-input","data":" "}
+{"time":1791962992228,"kind":"terminal-input","data":"n"}
+{"time":1791962992228,"kind":"terminal-input","data":"a"}
+{"time":1791962992228,"kind":"terminal-input","data":"m"}
+{"time":1791962992228,"kind":"terminal-input","data":"i"}
+{"time":1791962992228,"kind":"terminal-input","data":"n"}
+{"time":1791962992228,"kind":"terminal-input","data":"g"}
+{"time":1791962992229,"kind":"terminal-input","data":" "}
+{"time":1791962992229,"kind":"terminal-input","data":"i"}
+{"time":1791962992229,"kind":"terminal-input","data":"s"}
+{"time":1791962992229,"kind":"terminal-input","data":" "}
+{"time":1791962992229,"kind":"terminal-input","data":"d"}
+{"time":1791962992229,"kind":"terminal-input","data":"i"}
+{"time":1791962992230,"kind":"terminal-input","data":"s"}
+{"time":1791962992230,"kind":"terminal-input","data":"a"}
+{"time":1791962992230,"kind":"terminal-input","data":"b"}
+{"time":1791962992230,"kind":"terminal-input","data":"l"}
+{"time":1791962992230,"kind":"terminal-input","data":"e"}
+{"time":1791962992230,"kind":"terminal-input","data":"d"}
+{"time":1791962992231,"kind":"after-input","data":"I","text":"Input while automatic naming is disabled"}
+{"time":1791962992232,"kind":"after-input","data":"n","text":"Input while automatic naming is disabled"}
+{"time":1791962992232,"kind":"after-input","data":"p","text":"Input while automatic naming is disabled"}
+{"time":1791962992232,"kind":"after-input","data":"u","text":"Input while automatic naming is disabled"}
+{"time":1791962992232,"kind":"after-input","data":"t","text":"Input while automatic naming is disabled"}
+{"time":1791962992232,"kind":"after-input","data":" ","text":"Input while automatic naming is disabled"}
+{"time":1791962992232,"kind":"after-input","data":"w","text":"Input while automatic naming is disabled"}
+{"time":1791962992232,"kind":"after-input","data":"h","text":"Input while automatic naming is disabled"}
+{"time":1791962992232,"kind":"after-input","data":"i","text":"Input while automatic naming is disabled"}
+{"time":1791962992232,"kind":"after-input","data":"l","text":"Input while automatic naming is disabled"}
+{"time":1791962992233,"kind":"after-input","data":"e","text":"Input while automatic naming is disabled"}
+{"time":1791962992233,"kind":"after-input","data":" ","text":"Input while automatic naming is disabled"}
+{"time":1791962992233,"kind":"after-input","data":"a","text":"Input while automatic naming is disabled"}
+{"time":1791962992233,"kind":"after-input","data":"u","text":"Input while automatic naming is disabled"}
+{"time":1791962992233,"kind":"after-input","data":"t","text":"Input while automatic naming is disabled"}
+{"time":1791962992233,"kind":"after-input","data":"o","text":"Input while automatic naming is disabled"}
+{"time":1791962992233,"kind":"after-input","data":"m","text":"Input while automatic naming is disabled"}
+{"time":1791962992233,"kind":"after-input","data":"a","text":"Input while automatic naming is disabled"}
+{"time":1791962992233,"kind":"after-input","data":"t","text":"Input while automatic naming is disabled"}
+{"time":1791962992234,"kind":"after-input","data":"i","text":"Input while automatic naming is disabled"}
+{"time":1791962992234,"kind":"after-input","data":"c","text":"Input while automatic naming is disabled"}
+{"time":1791962992234,"kind":"after-input","data":" ","text":"Input while automatic naming is disabled"}
+{"time":1791962992234,"kind":"after-input","data":"n","text":"Input while automatic naming is disabled"}
+{"time":1791962992234,"kind":"after-input","data":"a","text":"Input while automatic naming is disabled"}
+{"time":1791962992234,"kind":"after-input","data":"m","text":"Input while automatic naming is disabled"}
+{"time":1791962992234,"kind":"after-input","data":"i","text":"Input while automatic naming is disabled"}
+{"time":1791962992235,"kind":"after-input","data":"n","text":"Input while automatic naming is disabled"}
+{"time":1791962992235,"kind":"after-input","data":"g","text":"Input while automatic naming is disabled"}
+{"time":1791962992235,"kind":"after-input","data":" ","text":"Input while automatic naming is disabled"}
+{"time":1791962992235,"kind":"after-input","data":"i","text":"Input while automatic naming is disabled"}
+{"time":1791962992235,"kind":"after-input","data":"s","text":"Input while automatic naming is disabled"}
+{"time":1791962992235,"kind":"after-input","data":" ","text":"Input while automatic naming is disabled"}
+{"time":1791962992235,"kind":"after-input","data":"d","text":"Input while automatic naming is disabled"}
+{"time":1791962992235,"kind":"after-input","data":"i","text":"Input while automatic naming is disabled"}
+{"time":1791962992236,"kind":"after-input","data":"s","text":"Input while automatic naming is disabled"}
+{"time":1791962992236,"kind":"after-input","data":"a","text":"Input while automatic naming is disabled"}
+{"time":1791962992236,"kind":"after-input","data":"b","text":"Input while automatic naming is disabled"}
+{"time":1791962992236,"kind":"after-input","data":"l","text":"Input while automatic naming is disabled"}
+{"time":1791962992236,"kind":"after-input","data":"e","text":"Input while automatic naming is disabled"}
+{"time":1791962992236,"kind":"after-input","data":"d","text":"Input while automatic naming is disabled"}
+{"time":1791962992255,"kind":"terminal-input","data":"\r"}
+{"time":1791962992256,"kind":"input","text":"Input while automatic naming is disabled","source":"interactive"}
+{"time":1791962992257,"kind":"request","naming":false,"id":2,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","mode":"ok"}
+{"time":1791962992257,"kind":"settled","aborted":false,"title":"Manual Offline Refresh"}
+{"time":1791962992257,"kind":"after-input","data":"\r","text":""}
+{"time":1791962992533,"kind":"terminal-input","data":"\u001b[20~"}
+{"time":1791962992533,"kind":"observe","text":"","sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","title":"Manual Offline Refresh","state":{"type":"custom","customType":"preset.session-name.v1","data":{"progress":{"version":1,"count":2,"evaluated":1,"retryAt":0,"observedIds":["199f6eb1","20d665d3"]},"ownership":{"version":1,"titleEntryId":"500d9a86","title":"Manual Offline Refresh","owned":true}},"id":"46c369e0","parentId":"979c4ff1","timestamp":"2026-10-14T07:29:52.257Z"},"names":2,"mains":2}
+{"time":1791962992534,"kind":"after-input","data":"\u001b[20~","text":""}
+{"time":1791962992582,"kind":"terminal-input","data":"/"}
+{"time":1791962992583,"kind":"terminal-input","data":"s"}
+{"time":1791962992583,"kind":"terminal-input","data":"e"}
+{"time":1791962992583,"kind":"terminal-input","data":"s"}
+{"time":1791962992583,"kind":"terminal-input","data":"s"}
+{"time":1791962992583,"kind":"terminal-input","data":"i"}
+{"time":1791962992584,"kind":"terminal-input","data":"o"}
+{"time":1791962992584,"kind":"terminal-input","data":"n"}
+{"time":1791962992584,"kind":"terminal-input","data":"-"}
+{"time":1791962992584,"kind":"terminal-input","data":"n"}
+{"time":1791962992584,"kind":"terminal-input","data":"a"}
+{"time":1791962992584,"kind":"terminal-input","data":"m"}
+{"time":1791962992584,"kind":"terminal-input","data":"e"}
+{"time":1791962992585,"kind":"terminal-input","data":" "}
+{"time":1791962992585,"kind":"terminal-input","data":"c"}
+{"time":1791962992585,"kind":"terminal-input","data":"o"}
+{"time":1791962992585,"kind":"terminal-input","data":"n"}
+{"time":1791962992585,"kind":"terminal-input","data":"f"}
+{"time":1791962992585,"kind":"terminal-input","data":"i"}
+{"time":1791962992586,"kind":"terminal-input","data":"g"}
+{"time":1791962992587,"kind":"after-input","data":"/","text":"/session-name config"}
+{"time":1791962992587,"kind":"after-input","data":"s","text":"/session-name config"}
+{"time":1791962992587,"kind":"after-input","data":"e","text":"/session-name config"}
+{"time":1791962992587,"kind":"after-input","data":"s","text":"/session-name config"}
+{"time":1791962992587,"kind":"after-input","data":"s","text":"/session-name config"}
+{"time":1791962992587,"kind":"after-input","data":"i","text":"/session-name config"}
+{"time":1791962992587,"kind":"after-input","data":"o","text":"/session-name config"}
+{"time":1791962992587,"kind":"after-input","data":"n","text":"/session-name config"}
+{"time":1791962992588,"kind":"after-input","data":"-","text":"/session-name config"}
+{"time":1791962992588,"kind":"after-input","data":"n","text":"/session-name config"}
+{"time":1791962992588,"kind":"after-input","data":"a","text":"/session-name config"}
+{"time":1791962992588,"kind":"after-input","data":"m","text":"/session-name config"}
+{"time":1791962992588,"kind":"after-input","data":"e","text":"/session-name config"}
+{"time":1791962992588,"kind":"after-input","data":" ","text":"/session-name config"}
+{"time":1791962992588,"kind":"after-input","data":"c","text":"/session-name config"}
+{"time":1791962992588,"kind":"after-input","data":"o","text":"/session-name config"}
+{"time":1791962992588,"kind":"after-input","data":"n","text":"/session-name config"}
+{"time":1791962992589,"kind":"after-input","data":"f","text":"/session-name config"}
+{"time":1791962992589,"kind":"after-input","data":"i","text":"/session-name config"}
+{"time":1791962992589,"kind":"after-input","data":"g","text":"/session-name config"}
+{"time":1791962992625,"kind":"terminal-input","data":"\u001b"}
+{"time":1791962992627,"kind":"after-input","data":"\u001b","text":"/session-name config"}
+{"time":1791962992650,"kind":"terminal-input","data":"\r"}
+{"time":1791962992651,"kind":"after-input","data":"\r","text":""}
+{"time":1791962992690,"kind":"terminal-input","data":"\u001b[B"}
+{"time":1791962992691,"kind":"after-input","data":"\u001b[B","text":""}
+{"time":1791962992726,"kind":"terminal-input","data":"\u001b[B"}
+{"time":1791962992727,"kind":"after-input","data":"\u001b[B","text":""}
+{"time":1791962992738,"kind":"terminal-input","data":"\r"}
+{"time":1791962992740,"kind":"after-input","data":"\r","text":""}
+{"time":1791962992792,"kind":"terminal-input","data":"\u0015"}
+{"time":1791962992793,"kind":"after-input","data":"\u0015","text":""}
+{"time":1791962992824,"kind":"terminal-input","data":"2"}
+{"time":1791962992825,"kind":"after-input","data":"2","text":""}
+{"time":1791962992856,"kind":"terminal-input","data":"\r"}
+{"time":1791962992860,"kind":"after-input","data":"\r","text":""}
+{"time":1791962992944,"kind":"terminal-input","data":"/"}
+{"time":1791962992944,"kind":"terminal-input","data":"s"}
+{"time":1791962992944,"kind":"terminal-input","data":"e"}
+{"time":1791962992945,"kind":"terminal-input","data":"s"}
+{"time":1791962992945,"kind":"terminal-input","data":"s"}
+{"time":1791962992945,"kind":"terminal-input","data":"i"}
+{"time":1791962992945,"kind":"terminal-input","data":"o"}
+{"time":1791962992946,"kind":"terminal-input","data":"n"}
+{"time":1791962992946,"kind":"terminal-input","data":"-"}
+{"time":1791962992946,"kind":"terminal-input","data":"n"}
+{"time":1791962992946,"kind":"terminal-input","data":"a"}
+{"time":1791962992947,"kind":"terminal-input","data":"m"}
+{"time":1791962992947,"kind":"terminal-input","data":"e"}
+{"time":1791962992947,"kind":"terminal-input","data":" "}
+{"time":1791962992947,"kind":"terminal-input","data":"c"}
+{"time":1791962992947,"kind":"terminal-input","data":"o"}
+{"time":1791962992948,"kind":"terminal-input","data":"n"}
+{"time":1791962992948,"kind":"terminal-input","data":"f"}
+{"time":1791962992948,"kind":"terminal-input","data":"i"}
+{"time":1791962992948,"kind":"terminal-input","data":"g"}
+{"time":1791962992949,"kind":"after-input","data":"/","text":"/session-name config"}
+{"time":1791962992949,"kind":"after-input","data":"s","text":"/session-name config"}
+{"time":1791962992949,"kind":"after-input","data":"e","text":"/session-name config"}
+{"time":1791962992949,"kind":"after-input","data":"s","text":"/session-name config"}
+{"time":1791962992949,"kind":"after-input","data":"s","text":"/session-name config"}
+{"time":1791962992950,"kind":"after-input","data":"i","text":"/session-name config"}
+{"time":1791962992950,"kind":"after-input","data":"o","text":"/session-name config"}
+{"time":1791962992950,"kind":"after-input","data":"n","text":"/session-name config"}
+{"time":1791962992950,"kind":"after-input","data":"-","text":"/session-name config"}
+{"time":1791962992950,"kind":"after-input","data":"n","text":"/session-name config"}
+{"time":1791962992950,"kind":"after-input","data":"a","text":"/session-name config"}
+{"time":1791962992950,"kind":"after-input","data":"m","text":"/session-name config"}
+{"time":1791962992950,"kind":"after-input","data":"e","text":"/session-name config"}
+{"time":1791962992951,"kind":"after-input","data":" ","text":"/session-name config"}
+{"time":1791962992951,"kind":"after-input","data":"c","text":"/session-name config"}
+{"time":1791962992951,"kind":"after-input","data":"o","text":"/session-name config"}
+{"time":1791962992951,"kind":"after-input","data":"n","text":"/session-name config"}
+{"time":1791962992951,"kind":"after-input","data":"f","text":"/session-name config"}
+{"time":1791962992951,"kind":"after-input","data":"i","text":"/session-name config"}
+{"time":1791962992951,"kind":"after-input","data":"g","text":"/session-name config"}
+{"time":1791962992987,"kind":"terminal-input","data":"\u001b"}
+{"time":1791962992988,"kind":"after-input","data":"\u001b","text":"/session-name config"}
+{"time":1791962993007,"kind":"terminal-input","data":"\r"}
+{"time":1791962993009,"kind":"after-input","data":"\r","text":""}
+{"time":1791962993046,"kind":"terminal-input","data":"\r"}
+{"time":1791962993047,"kind":"after-input","data":"\r","text":""}
+{"time":1791962993095,"kind":"terminal-input","data":"/"}
+{"time":1791962993095,"kind":"terminal-input","data":"s"}
+{"time":1791962993096,"kind":"terminal-input","data":"e"}
+{"time":1791962993096,"kind":"terminal-input","data":"s"}
+{"time":1791962993096,"kind":"terminal-input","data":"s"}
+{"time":1791962993096,"kind":"terminal-input","data":"i"}
+{"time":1791962993096,"kind":"terminal-input","data":"o"}
+{"time":1791962993096,"kind":"terminal-input","data":"n"}
+{"time":1791962993097,"kind":"terminal-input","data":"-"}
+{"time":1791962993097,"kind":"terminal-input","data":"n"}
+{"time":1791962993097,"kind":"terminal-input","data":"a"}
+{"time":1791962993097,"kind":"terminal-input","data":"m"}
+{"time":1791962993097,"kind":"terminal-input","data":"e"}
+{"time":1791962993099,"kind":"after-input","data":"/","text":"/session-name"}
+{"time":1791962993099,"kind":"after-input","data":"s","text":"/session-name"}
+{"time":1791962993099,"kind":"after-input","data":"e","text":"/session-name"}
+{"time":1791962993099,"kind":"after-input","data":"s","text":"/session-name"}
+{"time":1791962993099,"kind":"after-input","data":"s","text":"/session-name"}
+{"time":1791962993099,"kind":"after-input","data":"i","text":"/session-name"}
+{"time":1791962993099,"kind":"after-input","data":"o","text":"/session-name"}
+{"time":1791962993099,"kind":"after-input","data":"n","text":"/session-name"}
+{"time":1791962993099,"kind":"after-input","data":"-","text":"/session-name"}
+{"time":1791962993099,"kind":"after-input","data":"n","text":"/session-name"}
+{"time":1791962993100,"kind":"after-input","data":"a","text":"/session-name"}
+{"time":1791962993100,"kind":"after-input","data":"m","text":"/session-name"}
+{"time":1791962993100,"kind":"after-input","data":"e","text":"/session-name"}
+{"time":1791962993137,"kind":"terminal-input","data":"\u001b"}
+{"time":1791962993138,"kind":"after-input","data":"\u001b","text":"/session-name"}
+{"time":1791962993156,"kind":"terminal-input","data":"\r"}
+{"time":1791962993157,"kind":"request","naming":true,"id":3,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","mode":"ok","title":"N Round Baseline"}
+{"time":1791962993158,"kind":"title","name":"N Round Baseline","sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec"}
+{"time":1791962993158,"kind":"after-input","data":"\r","text":""}
+{"time":1791962993208,"kind":"terminal-input","data":"\u001b[20~"}
+{"time":1791962993209,"kind":"observe","text":"","sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","title":"N Round Baseline","state":{"type":"custom","customType":"preset.session-name.v1","data":{"progress":{"version":1,"count":2,"evaluated":2,"retryAt":0,"observedIds":["199f6eb1","20d665d3"]},"ownership":{"version":1,"titleEntryId":"4a8671ab","title":"N Round Baseline","owned":true}},"id":"18145fff","parentId":"4a8671ab","timestamp":"2026-10-14T07:29:53.158Z"},"names":3,"mains":2}
+{"time":1791962993210,"kind":"after-input","data":"\u001b[20~","text":""}
+{"time":1791962993255,"kind":"terminal-input","data":"F"}
+{"time":1791962993255,"kind":"terminal-input","data":"i"}
+{"time":1791962993255,"kind":"terminal-input","data":"r"}
+{"time":1791962993256,"kind":"terminal-input","data":"s"}
+{"time":1791962993256,"kind":"terminal-input","data":"t"}
+{"time":1791962993256,"kind":"terminal-input","data":" "}
+{"time":1791962993256,"kind":"terminal-input","data":"N"}
+{"time":1791962993256,"kind":"terminal-input","data":" "}
+{"time":1791962993256,"kind":"terminal-input","data":"r"}
+{"time":1791962993256,"kind":"terminal-input","data":"o"}
+{"time":1791962993256,"kind":"terminal-input","data":"u"}
+{"time":1791962993257,"kind":"terminal-input","data":"n"}
+{"time":1791962993257,"kind":"terminal-input","data":"d"}
+{"time":1791962993257,"kind":"terminal-input","data":" "}
+{"time":1791962993257,"kind":"terminal-input","data":"i"}
+{"time":1791962993257,"kind":"terminal-input","data":"n"}
+{"time":1791962993257,"kind":"terminal-input","data":"p"}
+{"time":1791962993257,"kind":"terminal-input","data":"u"}
+{"time":1791962993258,"kind":"terminal-input","data":"t"}
+{"time":1791962993258,"kind":"after-input","data":"F","text":"First N round input"}
+{"time":1791962993258,"kind":"after-input","data":"i","text":"First N round input"}
+{"time":1791962993259,"kind":"after-input","data":"r","text":"First N round input"}
+{"time":1791962993259,"kind":"after-input","data":"s","text":"First N round input"}
+{"time":1791962993259,"kind":"after-input","data":"t","text":"First N round input"}
+{"time":1791962993259,"kind":"after-input","data":" ","text":"First N round input"}
+{"time":1791962993259,"kind":"after-input","data":"N","text":"First N round input"}
+{"time":1791962993259,"kind":"after-input","data":" ","text":"First N round input"}
+{"time":1791962993259,"kind":"after-input","data":"r","text":"First N round input"}
+{"time":1791962993259,"kind":"after-input","data":"o","text":"First N round input"}
+{"time":1791962993259,"kind":"after-input","data":"u","text":"First N round input"}
+{"time":1791962993259,"kind":"after-input","data":"n","text":"First N round input"}
+{"time":1791962993259,"kind":"after-input","data":"d","text":"First N round input"}
+{"time":1791962993260,"kind":"after-input","data":" ","text":"First N round input"}
+{"time":1791962993260,"kind":"after-input","data":"i","text":"First N round input"}
+{"time":1791962993260,"kind":"after-input","data":"n","text":"First N round input"}
+{"time":1791962993260,"kind":"after-input","data":"p","text":"First N round input"}
+{"time":1791962993260,"kind":"after-input","data":"u","text":"First N round input"}
+{"time":1791962993260,"kind":"after-input","data":"t","text":"First N round input"}
+{"time":1791962993289,"kind":"terminal-input","data":"\r"}
+{"time":1791962993291,"kind":"input","text":"First N round input","source":"interactive"}
+{"time":1791962993293,"kind":"request","naming":false,"id":3,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","mode":"ok"}
+{"time":1791962993294,"kind":"settled","aborted":false,"title":"N Round Baseline"}
+{"time":1791962993294,"kind":"after-input","data":"\r","text":""}
+{"time":1791962993582,"kind":"terminal-input","data":"\u001b[20~"}
+{"time":1791962993582,"kind":"observe","text":"","sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","title":"N Round Baseline","state":{"type":"custom","customType":"preset.session-name.v1","data":{"progress":{"version":1,"count":3,"evaluated":2,"retryAt":0,"observedIds":["199f6eb1","20d665d3","96bda6f4"]},"ownership":{"version":1,"titleEntryId":"4a8671ab","title":"N Round Baseline","owned":true}},"id":"cc65e07b","parentId":"4de9fc55","timestamp":"2026-10-14T07:29:53.294Z"},"names":3,"mains":3}
+{"time":1791962993583,"kind":"after-input","data":"\u001b[20~","text":""}
+{"time":1791962993634,"kind":"terminal-input","data":"S"}
+{"time":1791962993634,"kind":"terminal-input","data":"e"}
+{"time":1791962993635,"kind":"terminal-input","data":"c"}
+{"time":1791962993635,"kind":"terminal-input","data":"o"}
+{"time":1791962993635,"kind":"terminal-input","data":"n"}
+{"time":1791962993635,"kind":"terminal-input","data":"d"}
+{"time":1791962993636,"kind":"terminal-input","data":" "}
+{"time":1791962993636,"kind":"terminal-input","data":"N"}
+{"time":1791962993636,"kind":"terminal-input","data":" "}
+{"time":1791962993636,"kind":"terminal-input","data":"r"}
+{"time":1791962993637,"kind":"terminal-input","data":"o"}
+{"time":1791962993637,"kind":"terminal-input","data":"u"}
+{"time":1791962993637,"kind":"terminal-input","data":"n"}
+{"time":1791962993637,"kind":"terminal-input","data":"d"}
+{"time":1791962993637,"kind":"terminal-input","data":" "}
+{"time":1791962993637,"kind":"terminal-input","data":"i"}
+{"time":1791962993638,"kind":"terminal-input","data":"n"}
+{"time":1791962993638,"kind":"terminal-input","data":"p"}
+{"time":1791962993638,"kind":"terminal-input","data":"u"}
+{"time":1791962993638,"kind":"terminal-input","data":"t"}
+{"time":1791962993639,"kind":"after-input","data":"S","text":"Second N round input"}
+{"time":1791962993639,"kind":"after-input","data":"e","text":"Second N round input"}
+{"time":1791962993640,"kind":"after-input","data":"c","text":"Second N round input"}
+{"time":1791962993640,"kind":"after-input","data":"o","text":"Second N round input"}
+{"time":1791962993640,"kind":"after-input","data":"n","text":"Second N round input"}
+{"time":1791962993640,"kind":"after-input","data":"d","text":"Second N round input"}
+{"time":1791962993640,"kind":"after-input","data":" ","text":"Second N round input"}
+{"time":1791962993640,"kind":"after-input","data":"N","text":"Second N round input"}
+{"time":1791962993640,"kind":"after-input","data":" ","text":"Second N round input"}
+{"time":1791962993640,"kind":"after-input","data":"r","text":"Second N round input"}
+{"time":1791962993641,"kind":"after-input","data":"o","text":"Second N round input"}
+{"time":1791962993641,"kind":"after-input","data":"u","text":"Second N round input"}
+{"time":1791962993641,"kind":"after-input","data":"n","text":"Second N round input"}
+{"time":1791962993641,"kind":"after-input","data":"d","text":"Second N round input"}
+{"time":1791962993641,"kind":"after-input","data":" ","text":"Second N round input"}
+{"time":1791962993641,"kind":"after-input","data":"i","text":"Second N round input"}
+{"time":1791962993641,"kind":"after-input","data":"n","text":"Second N round input"}
+{"time":1791962993641,"kind":"after-input","data":"p","text":"Second N round input"}
+{"time":1791962993642,"kind":"after-input","data":"u","text":"Second N round input"}
+{"time":1791962993642,"kind":"after-input","data":"t","text":"Second N round input"}
+{"time":1791962993669,"kind":"terminal-input","data":"\r"}
+{"time":1791962993671,"kind":"input","text":"Second N round input","source":"interactive"}
+{"time":1791962993672,"kind":"request","naming":false,"id":4,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","mode":"ok"}
+{"time":1791962993673,"kind":"settled","aborted":false,"title":"N Round Baseline"}
+{"time":1791962993673,"kind":"request","naming":true,"id":4,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","mode":"ok","title":"N Round Updated"}
+{"time":1791962993674,"kind":"title","name":"N Round Updated","sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec"}
+{"time":1791962993674,"kind":"after-input","data":"\r","text":""}
+{"time":1791962993713,"kind":"terminal-input","data":"\u001b[20~"}
+{"time":1791962993714,"kind":"observe","text":"","sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","title":"N Round Updated","state":{"type":"custom","customType":"preset.session-name.v1","data":{"progress":{"version":1,"count":4,"evaluated":4,"retryAt":0,"observedIds":["199f6eb1","20d665d3","96bda6f4","5a0451e2"]},"ownership":{"version":1,"titleEntryId":"75f5472b","title":"N Round Updated","owned":true}},"id":"7f390b5b","parentId":"75f5472b","timestamp":"2026-10-14T07:29:53.674Z"},"names":4,"mains":4}
+{"time":1791962993715,"kind":"after-input","data":"\u001b[20~","text":""}
+{"time":1791962993777,"kind":"terminal-input","data":"/"}
+{"time":1791962993777,"kind":"terminal-input","data":"n"}
+{"time":1791962993778,"kind":"terminal-input","data":"a"}
+{"time":1791962993778,"kind":"terminal-input","data":"m"}
+{"time":1791962993778,"kind":"terminal-input","data":"e"}
+{"time":1791962993778,"kind":"terminal-input","data":" "}
+{"time":1791962993778,"kind":"terminal-input","data":"N"}
+{"time":1791962993779,"kind":"terminal-input","data":"a"}
+{"time":1791962993779,"kind":"terminal-input","data":"t"}
+{"time":1791962993779,"kind":"terminal-input","data":"i"}
+{"time":1791962993779,"kind":"terminal-input","data":"v"}
+{"time":1791962993779,"kind":"terminal-input","data":"e"}
+{"time":1791962993779,"kind":"terminal-input","data":" "}
+{"time":1791962993780,"kind":"terminal-input","data":"P"}
+{"time":1791962993780,"kind":"terminal-input","data":"r"}
+{"time":1791962993780,"kind":"terminal-input","data":"o"}
+{"time":1791962993780,"kind":"terminal-input","data":"t"}
+{"time":1791962993780,"kind":"terminal-input","data":"e"}
+{"time":1791962993781,"kind":"terminal-input","data":"c"}
+{"time":1791962993781,"kind":"terminal-input","data":"t"}
+{"time":1791962993781,"kind":"terminal-input","data":"e"}
+{"time":1791962993781,"kind":"terminal-input","data":"d"}
+{"time":1791962993782,"kind":"after-input","data":"/","text":"/name Native Protected"}
+{"time":1791962993782,"kind":"after-input","data":"n","text":"/name Native Protected"}
+{"time":1791962993782,"kind":"after-input","data":"a","text":"/name Native Protected"}
+{"time":1791962993782,"kind":"after-input","data":"m","text":"/name Native Protected"}
+{"time":1791962993783,"kind":"after-input","data":"e","text":"/name Native Protected"}
+{"time":1791962993783,"kind":"after-input","data":" ","text":"/name Native Protected"}
+{"time":1791962993783,"kind":"after-input","data":"N","text":"/name Native Protected"}
+{"time":1791962993783,"kind":"after-input","data":"a","text":"/name Native Protected"}
+{"time":1791962993783,"kind":"after-input","data":"t","text":"/name Native Protected"}
+{"time":1791962993783,"kind":"after-input","data":"i","text":"/name Native Protected"}
+{"time":1791962993783,"kind":"after-input","data":"v","text":"/name Native Protected"}
+{"time":1791962993784,"kind":"after-input","data":"e","text":"/name Native Protected"}
+{"time":1791962993784,"kind":"after-input","data":" ","text":"/name Native Protected"}
+{"time":1791962993784,"kind":"after-input","data":"P","text":"/name Native Protected"}
+{"time":1791962993784,"kind":"after-input","data":"r","text":"/name Native Protected"}
+{"time":1791962993784,"kind":"after-input","data":"o","text":"/name Native Protected"}
+{"time":1791962993784,"kind":"after-input","data":"t","text":"/name Native Protected"}
+{"time":1791962993784,"kind":"after-input","data":"e","text":"/name Native Protected"}
+{"time":1791962993784,"kind":"after-input","data":"c","text":"/name Native Protected"}
+{"time":1791962993784,"kind":"after-input","data":"t","text":"/name Native Protected"}
+{"time":1791962993784,"kind":"after-input","data":"e","text":"/name Native Protected"}
+{"time":1791962993784,"kind":"after-input","data":"d","text":"/name Native Protected"}
+{"time":1791962993820,"kind":"terminal-input","data":"\u001b"}
+{"time":1791962993822,"kind":"after-input","data":"\u001b","text":"/name Native Protected"}
+{"time":1791962993844,"kind":"terminal-input","data":"\r"}
+{"time":1791962993845,"kind":"title","name":"Native Protected","sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec"}
+{"time":1791962993847,"kind":"after-input","data":"\r","text":""}
+{"time":1791962993888,"kind":"terminal-input","data":"\u001b[20~"}
+{"time":1791962993889,"kind":"observe","text":"","sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","title":"Native Protected","state":{"type":"custom","customType":"preset.session-name.v1","data":{"progress":{"version":1,"count":4,"evaluated":4,"retryAt":0,"observedIds":["199f6eb1","20d665d3","96bda6f4","5a0451e2"]},"ownership":{"version":1,"titleEntryId":"6c28210a","title":"Native Protected","owned":false}},"id":"3a7cf056","parentId":"6c28210a","timestamp":"2026-10-14T07:29:53.847Z"},"names":4,"mains":4}
+{"time":1791962993892,"kind":"after-input","data":"\u001b[20~","text":""}
+{"time":1791962993937,"kind":"terminal-input","data":"P"}
+{"time":1791962993938,"kind":"terminal-input","data":"r"}
+{"time":1791962993938,"kind":"terminal-input","data":"o"}
+{"time":1791962993938,"kind":"terminal-input","data":"t"}
+{"time":1791962993939,"kind":"terminal-input","data":"e"}
+{"time":1791962993939,"kind":"terminal-input","data":"c"}
+{"time":1791962993939,"kind":"terminal-input","data":"t"}
+{"time":1791962993939,"kind":"terminal-input","data":"e"}
+{"time":1791962993939,"kind":"terminal-input","data":"d"}
+{"time":1791962993939,"kind":"terminal-input","data":" "}
+{"time":1791962993940,"kind":"terminal-input","data":"f"}
+{"time":1791962993940,"kind":"terminal-input","data":"i"}
+{"time":1791962993940,"kind":"terminal-input","data":"r"}
+{"time":1791962993940,"kind":"terminal-input","data":"s"}
+{"time":1791962993940,"kind":"terminal-input","data":"t"}
+{"time":1791962993941,"kind":"terminal-input","data":" "}
+{"time":1791962993941,"kind":"terminal-input","data":"u"}
+{"time":1791962993941,"kind":"terminal-input","data":"s"}
+{"time":1791962993941,"kind":"terminal-input","data":"e"}
+{"time":1791962993941,"kind":"terminal-input","data":"r"}
+{"time":1791962993942,"kind":"terminal-input","data":" "}
+{"time":1791962993942,"kind":"terminal-input","data":"i"}
+{"time":1791962993942,"kind":"terminal-input","data":"n"}
+{"time":1791962993942,"kind":"terminal-input","data":"p"}
+{"time":1791962993942,"kind":"terminal-input","data":"u"}
+{"time":1791962993943,"kind":"terminal-input","data":"t"}
+{"time":1791962993943,"kind":"after-input","data":"P","text":"Protected first user input"}
+{"time":1791962993943,"kind":"after-input","data":"r","text":"Protected first user input"}
+{"time":1791962993944,"kind":"after-input","data":"o","text":"Protected first user input"}
+{"time":1791962993944,"kind":"after-input","data":"t","text":"Protected first user input"}
+{"time":1791962993944,"kind":"after-input","data":"e","text":"Protected first user input"}
+{"time":1791962993944,"kind":"after-input","data":"c","text":"Protected first user input"}
+{"time":1791962993944,"kind":"after-input","data":"t","text":"Protected first user input"}
+{"time":1791962993944,"kind":"after-input","data":"e","text":"Protected first user input"}
+{"time":1791962993944,"kind":"after-input","data":"d","text":"Protected first user input"}
+{"time":1791962993944,"kind":"after-input","data":" ","text":"Protected first user input"}
+{"time":1791962993944,"kind":"after-input","data":"f","text":"Protected first user input"}
+{"time":1791962993944,"kind":"after-input","data":"i","text":"Protected first user input"}
+{"time":1791962993945,"kind":"after-input","data":"r","text":"Protected first user input"}
+{"time":1791962993945,"kind":"after-input","data":"s","text":"Protected first user input"}
+{"time":1791962993945,"kind":"after-input","data":"t","text":"Protected first user input"}
+{"time":1791962993945,"kind":"after-input","data":" ","text":"Protected first user input"}
+{"time":1791962993945,"kind":"after-input","data":"u","text":"Protected first user input"}
+{"time":1791962993945,"kind":"after-input","data":"s","text":"Protected first user input"}
+{"time":1791962993945,"kind":"after-input","data":"e","text":"Protected first user input"}
+{"time":1791962993945,"kind":"after-input","data":"r","text":"Protected first user input"}
+{"time":1791962993945,"kind":"after-input","data":" ","text":"Protected first user input"}
+{"time":1791962993946,"kind":"after-input","data":"i","text":"Protected first user input"}
+{"time":1791962993946,"kind":"after-input","data":"n","text":"Protected first user input"}
+{"time":1791962993946,"kind":"after-input","data":"p","text":"Protected first user input"}
+{"time":1791962993946,"kind":"after-input","data":"u","text":"Protected first user input"}
+{"time":1791962993946,"kind":"after-input","data":"t","text":"Protected first user input"}
+{"time":1791962993971,"kind":"terminal-input","data":"\r"}
+{"time":1791962993973,"kind":"input","text":"Protected first user input","source":"interactive"}
+{"time":1791962993974,"kind":"request","naming":false,"id":5,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","mode":"ok"}
+{"time":1791962993975,"kind":"settled","aborted":false,"title":"Native Protected"}
+{"time":1791962993975,"kind":"after-input","data":"\r","text":""}
+{"time":1791962994010,"kind":"terminal-input","data":"P"}
+{"time":1791962994011,"kind":"terminal-input","data":"r"}
+{"time":1791962994011,"kind":"terminal-input","data":"o"}
+{"time":1791962994011,"kind":"terminal-input","data":"t"}
+{"time":1791962994011,"kind":"terminal-input","data":"e"}
+{"time":1791962994012,"kind":"terminal-input","data":"c"}
+{"time":1791962994012,"kind":"terminal-input","data":"t"}
+{"time":1791962994012,"kind":"terminal-input","data":"e"}
+{"time":1791962994012,"kind":"terminal-input","data":"d"}
+{"time":1791962994012,"kind":"terminal-input","data":" "}
+{"time":1791962994013,"kind":"terminal-input","data":"s"}
+{"time":1791962994013,"kind":"terminal-input","data":"e"}
+{"time":1791962994013,"kind":"terminal-input","data":"c"}
+{"time":1791962994013,"kind":"terminal-input","data":"o"}
+{"time":1791962994013,"kind":"terminal-input","data":"n"}
+{"time":1791962994013,"kind":"terminal-input","data":"d"}
+{"time":1791962994014,"kind":"terminal-input","data":" "}
+{"time":1791962994014,"kind":"terminal-input","data":"u"}
+{"time":1791962994014,"kind":"terminal-input","data":"s"}
+{"time":1791962994014,"kind":"terminal-input","data":"e"}
+{"time":1791962994015,"kind":"terminal-input","data":"r"}
+{"time":1791962994015,"kind":"terminal-input","data":" "}
+{"time":1791962994015,"kind":"terminal-input","data":"i"}
+{"time":1791962994015,"kind":"terminal-input","data":"n"}
+{"time":1791962994015,"kind":"terminal-input","data":"p"}
+{"time":1791962994015,"kind":"terminal-input","data":"u"}
+{"time":1791962994016,"kind":"terminal-input","data":"t"}
+{"time":1791962994017,"kind":"after-input","data":"P","text":"Protected second user input"}
+{"time":1791962994017,"kind":"after-input","data":"r","text":"Protected second user input"}
+{"time":1791962994017,"kind":"after-input","data":"o","text":"Protected second user input"}
+{"time":1791962994017,"kind":"after-input","data":"t","text":"Protected second user input"}
+{"time":1791962994017,"kind":"after-input","data":"e","text":"Protected second user input"}
+{"time":1791962994017,"kind":"after-input","data":"c","text":"Protected second user input"}
+{"time":1791962994017,"kind":"after-input","data":"t","text":"Protected second user input"}
+{"time":1791962994017,"kind":"after-input","data":"e","text":"Protected second user input"}
+{"time":1791962994017,"kind":"after-input","data":"d","text":"Protected second user input"}
+{"time":1791962994018,"kind":"after-input","data":" ","text":"Protected second user input"}
+{"time":1791962994018,"kind":"after-input","data":"s","text":"Protected second user input"}
+{"time":1791962994018,"kind":"after-input","data":"e","text":"Protected second user input"}
+{"time":1791962994018,"kind":"after-input","data":"c","text":"Protected second user input"}
+{"time":1791962994018,"kind":"after-input","data":"o","text":"Protected second user input"}
+{"time":1791962994018,"kind":"after-input","data":"n","text":"Protected second user input"}
+{"time":1791962994018,"kind":"after-input","data":"d","text":"Protected second user input"}
+{"time":1791962994018,"kind":"after-input","data":" ","text":"Protected second user input"}
+{"time":1791962994018,"kind":"after-input","data":"u","text":"Protected second user input"}
+{"time":1791962994018,"kind":"after-input","data":"s","text":"Protected second user input"}
+{"time":1791962994019,"kind":"after-input","data":"e","text":"Protected second user input"}
+{"time":1791962994019,"kind":"after-input","data":"r","text":"Protected second user input"}
+{"time":1791962994019,"kind":"after-input","data":" ","text":"Protected second user input"}
+{"time":1791962994019,"kind":"after-input","data":"i","text":"Protected second user input"}
+{"time":1791962994019,"kind":"after-input","data":"n","text":"Protected second user input"}
+{"time":1791962994019,"kind":"after-input","data":"p","text":"Protected second user input"}
+{"time":1791962994019,"kind":"after-input","data":"u","text":"Protected second user input"}
+{"time":1791962994019,"kind":"after-input","data":"t","text":"Protected second user input"}
+{"time":1791962994043,"kind":"terminal-input","data":"\r"}
+{"time":1791962994045,"kind":"input","text":"Protected second user input","source":"interactive"}
+{"time":1791962994046,"kind":"request","naming":false,"id":6,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","mode":"ok"}
+{"time":1791962994046,"kind":"settled","aborted":false,"title":"Native Protected"}
+{"time":1791962994047,"kind":"after-input","data":"\r","text":""}
+{"time":1791962994327,"kind":"terminal-input","data":"\u001b[20~"}
+{"time":1791962994328,"kind":"observe","text":"","sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","title":"Native Protected","state":{"type":"custom","customType":"preset.session-name.v1","data":{"progress":{"version":1,"count":6,"evaluated":4,"retryAt":0,"observedIds":["199f6eb1","20d665d3","96bda6f4","5a0451e2","49e1b9a5","d9c9ce74"]},"ownership":{"version":1,"titleEntryId":"6c28210a","title":"Native Protected","owned":false}},"id":"b250105a","parentId":"9e8fe879","timestamp":"2026-10-14T07:29:54.046Z"},"names":4,"mains":6}
+{"time":1791962994329,"kind":"after-input","data":"\u001b[20~","text":""}
+{"time":1791962994382,"kind":"terminal-input","data":"/"}
+{"time":1791962994383,"kind":"terminal-input","data":"s"}
+{"time":1791962994383,"kind":"terminal-input","data":"e"}
+{"time":1791962994383,"kind":"terminal-input","data":"s"}
+{"time":1791962994384,"kind":"terminal-input","data":"s"}
+{"time":1791962994384,"kind":"terminal-input","data":"i"}
+{"time":1791962994384,"kind":"terminal-input","data":"o"}
+{"time":1791962994384,"kind":"terminal-input","data":"n"}
+{"time":1791962994384,"kind":"terminal-input","data":"-"}
+{"time":1791962994384,"kind":"terminal-input","data":"n"}
+{"time":1791962994384,"kind":"terminal-input","data":"a"}
+{"time":1791962994385,"kind":"terminal-input","data":"m"}
+{"time":1791962994385,"kind":"terminal-input","data":"e"}
+{"time":1791962994386,"kind":"after-input","data":"/","text":"/session-name"}
+{"time":1791962994386,"kind":"after-input","data":"s","text":"/session-name"}
+{"time":1791962994386,"kind":"after-input","data":"e","text":"/session-name"}
+{"time":1791962994386,"kind":"after-input","data":"s","text":"/session-name"}
+{"time":1791962994387,"kind":"after-input","data":"s","text":"/session-name"}
+{"time":1791962994387,"kind":"after-input","data":"i","text":"/session-name"}
+{"time":1791962994387,"kind":"after-input","data":"o","text":"/session-name"}
+{"time":1791962994387,"kind":"after-input","data":"n","text":"/session-name"}
+{"time":1791962994387,"kind":"after-input","data":"-","text":"/session-name"}
+{"time":1791962994387,"kind":"after-input","data":"n","text":"/session-name"}
+{"time":1791962994387,"kind":"after-input","data":"a","text":"/session-name"}
+{"time":1791962994388,"kind":"after-input","data":"m","text":"/session-name"}
+{"time":1791962994388,"kind":"after-input","data":"e","text":"/session-name"}
+{"time":1791962994427,"kind":"terminal-input","data":"\u001b"}
+{"time":1791962994429,"kind":"after-input","data":"\u001b","text":"/session-name"}
+{"time":1791962994451,"kind":"terminal-input","data":"\r"}
+{"time":1791962994453,"kind":"request","naming":true,"id":5,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","mode":"ok","title":"Ownership Resumed"}
+{"time":1791962994454,"kind":"title","name":"Ownership Resumed","sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec"}
+{"time":1791962994454,"kind":"after-input","data":"\r","text":""}
+{"time":1791962994502,"kind":"terminal-input","data":"\u001b[20~"}
+{"time":1791962994502,"kind":"observe","text":"","sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","title":"Ownership Resumed","state":{"type":"custom","customType":"preset.session-name.v1","data":{"progress":{"version":1,"count":6,"evaluated":6,"retryAt":0,"observedIds":["199f6eb1","20d665d3","96bda6f4","5a0451e2","49e1b9a5","d9c9ce74"]},"ownership":{"version":1,"titleEntryId":"cf277bc8","title":"Ownership Resumed","owned":true}},"id":"62cc8153","parentId":"cf277bc8","timestamp":"2026-10-14T07:29:54.454Z"},"names":5,"mains":6}
+{"time":1791962994504,"kind":"after-input","data":"\u001b[20~","text":""}
+{"time":1791962994557,"kind":"terminal-input","data":"F"}
+{"time":1791962994557,"kind":"terminal-input","data":"a"}
+{"time":1791962994557,"kind":"terminal-input","data":"i"}
+{"time":1791962994558,"kind":"terminal-input","data":"l"}
+{"time":1791962994558,"kind":"terminal-input","data":"u"}
+{"time":1791962994558,"kind":"terminal-input","data":"r"}
+{"time":1791962994558,"kind":"terminal-input","data":"e"}
+{"time":1791962994558,"kind":"terminal-input","data":" "}
+{"time":1791962994559,"kind":"terminal-input","data":"t"}
+{"time":1791962994559,"kind":"terminal-input","data":"h"}
+{"time":1791962994559,"kind":"terminal-input","data":"r"}
+{"time":1791962994559,"kind":"terminal-input","data":"e"}
+{"time":1791962994560,"kind":"terminal-input","data":"s"}
+{"time":1791962994560,"kind":"terminal-input","data":"h"}
+{"time":1791962994560,"kind":"terminal-input","data":"o"}
+{"time":1791962994560,"kind":"terminal-input","data":"l"}
+{"time":1791962994560,"kind":"terminal-input","data":"d"}
+{"time":1791962994561,"kind":"terminal-input","data":" "}
+{"time":1791962994561,"kind":"terminal-input","data":"f"}
+{"time":1791962994561,"kind":"terminal-input","data":"i"}
+{"time":1791962994561,"kind":"terminal-input","data":"r"}
+{"time":1791962994561,"kind":"terminal-input","data":"s"}
+{"time":1791962994562,"kind":"terminal-input","data":"t"}
+{"time":1791962994563,"kind":"after-input","data":"F","text":"Failure threshold first"}
+{"time":1791962994563,"kind":"after-input","data":"a","text":"Failure threshold first"}
+{"time":1791962994563,"kind":"after-input","data":"i","text":"Failure threshold first"}
+{"time":1791962994563,"kind":"after-input","data":"l","text":"Failure threshold first"}
+{"time":1791962994563,"kind":"after-input","data":"u","text":"Failure threshold first"}
+{"time":1791962994563,"kind":"after-input","data":"r","text":"Failure threshold first"}
+{"time":1791962994563,"kind":"after-input","data":"e","text":"Failure threshold first"}
+{"time":1791962994563,"kind":"after-input","data":" ","text":"Failure threshold first"}
+{"time":1791962994564,"kind":"after-input","data":"t","text":"Failure threshold first"}
+{"time":1791962994564,"kind":"after-input","data":"h","text":"Failure threshold first"}
+{"time":1791962994564,"kind":"after-input","data":"r","text":"Failure threshold first"}
+{"time":1791962994564,"kind":"after-input","data":"e","text":"Failure threshold first"}
+{"time":1791962994564,"kind":"after-input","data":"s","text":"Failure threshold first"}
+{"time":1791962994564,"kind":"after-input","data":"h","text":"Failure threshold first"}
+{"time":1791962994564,"kind":"after-input","data":"o","text":"Failure threshold first"}
+{"time":1791962994564,"kind":"after-input","data":"l","text":"Failure threshold first"}
+{"time":1791962994565,"kind":"after-input","data":"d","text":"Failure threshold first"}
+{"time":1791962994565,"kind":"after-input","data":" ","text":"Failure threshold first"}
+{"time":1791962994565,"kind":"after-input","data":"f","text":"Failure threshold first"}
+{"time":1791962994565,"kind":"after-input","data":"i","text":"Failure threshold first"}
+{"time":1791962994565,"kind":"after-input","data":"r","text":"Failure threshold first"}
+{"time":1791962994565,"kind":"after-input","data":"s","text":"Failure threshold first"}
+{"time":1791962994565,"kind":"after-input","data":"t","text":"Failure threshold first"}
+{"time":1791962994590,"kind":"terminal-input","data":"\r"}
+{"time":1791962994591,"kind":"input","text":"Failure threshold first","source":"interactive"}
+{"time":1791962994592,"kind":"request","naming":false,"id":7,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","mode":"fail"}
+{"time":1791962994593,"kind":"settled","aborted":false,"title":"Ownership Resumed"}
+{"time":1791962994593,"kind":"after-input","data":"\r","text":""}
+{"time":1791962994626,"kind":"terminal-input","data":"F"}
+{"time":1791962994626,"kind":"terminal-input","data":"a"}
+{"time":1791962994626,"kind":"terminal-input","data":"i"}
+{"time":1791962994627,"kind":"terminal-input","data":"l"}
+{"time":1791962994627,"kind":"terminal-input","data":"u"}
+{"time":1791962994627,"kind":"terminal-input","data":"r"}
+{"time":1791962994627,"kind":"terminal-input","data":"e"}
+{"time":1791962994627,"kind":"terminal-input","data":" "}
+{"time":1791962994627,"kind":"terminal-input","data":"t"}
+{"time":1791962994627,"kind":"terminal-input","data":"h"}
+{"time":1791962994628,"kind":"terminal-input","data":"r"}
+{"time":1791962994628,"kind":"terminal-input","data":"e"}
+{"time":1791962994628,"kind":"terminal-input","data":"s"}
+{"time":1791962994628,"kind":"terminal-input","data":"h"}
+{"time":1791962994628,"kind":"terminal-input","data":"o"}
+{"time":1791962994628,"kind":"terminal-input","data":"l"}
+{"time":1791962994629,"kind":"terminal-input","data":"d"}
+{"time":1791962994629,"kind":"terminal-input","data":" "}
+{"time":1791962994629,"kind":"terminal-input","data":"s"}
+{"time":1791962994629,"kind":"terminal-input","data":"e"}
+{"time":1791962994629,"kind":"terminal-input","data":"c"}
+{"time":1791962994629,"kind":"terminal-input","data":"o"}
+{"time":1791962994630,"kind":"terminal-input","data":"n"}
+{"time":1791962994630,"kind":"terminal-input","data":"d"}
+{"time":1791962994631,"kind":"after-input","data":"F","text":"Failure threshold second"}
+{"time":1791962994631,"kind":"after-input","data":"a","text":"Failure threshold second"}
+{"time":1791962994631,"kind":"after-input","data":"i","text":"Failure threshold second"}
+{"time":1791962994631,"kind":"after-input","data":"l","text":"Failure threshold second"}
+{"time":1791962994631,"kind":"after-input","data":"u","text":"Failure threshold second"}
+{"time":1791962994631,"kind":"after-input","data":"r","text":"Failure threshold second"}
+{"time":1791962994631,"kind":"after-input","data":"e","text":"Failure threshold second"}
+{"time":1791962994631,"kind":"after-input","data":" ","text":"Failure threshold second"}
+{"time":1791962994631,"kind":"after-input","data":"t","text":"Failure threshold second"}
+{"time":1791962994631,"kind":"after-input","data":"h","text":"Failure threshold second"}
+{"time":1791962994631,"kind":"after-input","data":"r","text":"Failure threshold second"}
+{"time":1791962994632,"kind":"after-input","data":"e","text":"Failure threshold second"}
+{"time":1791962994632,"kind":"after-input","data":"s","text":"Failure threshold second"}
+{"time":1791962994632,"kind":"after-input","data":"h","text":"Failure threshold second"}
+{"time":1791962994632,"kind":"after-input","data":"o","text":"Failure threshold second"}
+{"time":1791962994632,"kind":"after-input","data":"l","text":"Failure threshold second"}
+{"time":1791962994632,"kind":"after-input","data":"d","text":"Failure threshold second"}
+{"time":1791962994632,"kind":"after-input","data":" ","text":"Failure threshold second"}
+{"time":1791962994632,"kind":"after-input","data":"s","text":"Failure threshold second"}
+{"time":1791962994632,"kind":"after-input","data":"e","text":"Failure threshold second"}
+{"time":1791962994632,"kind":"after-input","data":"c","text":"Failure threshold second"}
+{"time":1791962994632,"kind":"after-input","data":"o","text":"Failure threshold second"}
+{"time":1791962994633,"kind":"after-input","data":"n","text":"Failure threshold second"}
+{"time":1791962994633,"kind":"after-input","data":"d","text":"Failure threshold second"}
+{"time":1791962994666,"kind":"terminal-input","data":"\r"}
+{"time":1791962994668,"kind":"input","text":"Failure threshold second","source":"interactive"}
+{"time":1791962994669,"kind":"request","naming":false,"id":8,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","mode":"fail"}
+{"time":1791962994669,"kind":"settled","aborted":false,"title":"Ownership Resumed"}
+{"time":1791962994670,"kind":"request","naming":true,"id":6,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","mode":"fail","title":"Ownership Resumed"}
+{"time":1791962994671,"kind":"after-input","data":"\r","text":""}
+{"time":1791962994710,"kind":"terminal-input","data":"\u001b[20~"}
+{"time":1791962994710,"kind":"observe","text":"","sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","title":"Ownership Resumed","state":{"type":"custom","customType":"preset.session-name.v1","data":{"progress":{"version":1,"count":8,"evaluated":6,"retryAt":10,"observedIds":["199f6eb1","20d665d3","96bda6f4","5a0451e2","49e1b9a5","d9c9ce74","91452325","3b224474"]},"ownership":{"version":1,"titleEntryId":"cf277bc8","title":"Ownership Resumed","owned":true}},"id":"9f8abc4b","parentId":"2068491c","timestamp":"2026-10-14T07:29:54.670Z"},"names":6,"mains":8}
+{"time":1791962994712,"kind":"after-input","data":"\u001b[20~","text":""}
+{"time":1791962995016,"kind":"terminal-input","data":"F"}
+{"time":1791962995017,"kind":"terminal-input","data":"a"}
+{"time":1791962995017,"kind":"terminal-input","data":"i"}
+{"time":1791962995017,"kind":"terminal-input","data":"l"}
+{"time":1791962995017,"kind":"terminal-input","data":"u"}
+{"time":1791962995018,"kind":"terminal-input","data":"r"}
+{"time":1791962995018,"kind":"terminal-input","data":"e"}
+{"time":1791962995018,"kind":"terminal-input","data":" "}
+{"time":1791962995018,"kind":"terminal-input","data":"r"}
+{"time":1791962995019,"kind":"terminal-input","data":"e"}
+{"time":1791962995019,"kind":"terminal-input","data":"t"}
+{"time":1791962995019,"kind":"terminal-input","data":"r"}
+{"time":1791962995019,"kind":"terminal-input","data":"y"}
+{"time":1791962995019,"kind":"terminal-input","data":" "}
+{"time":1791962995019,"kind":"terminal-input","data":"f"}
+{"time":1791962995019,"kind":"terminal-input","data":"i"}
+{"time":1791962995020,"kind":"terminal-input","data":"r"}
+{"time":1791962995020,"kind":"terminal-input","data":"s"}
+{"time":1791962995020,"kind":"terminal-input","data":"t"}
+{"time":1791962995020,"kind":"terminal-input","data":" "}
+{"time":1791962995020,"kind":"terminal-input","data":"i"}
+{"time":1791962995020,"kind":"terminal-input","data":"n"}
+{"time":1791962995021,"kind":"terminal-input","data":"p"}
+{"time":1791962995021,"kind":"terminal-input","data":"u"}
+{"time":1791962995021,"kind":"terminal-input","data":"t"}
+{"time":1791962995022,"kind":"after-input","data":"F","text":"Failure retry first input"}
+{"time":1791962995022,"kind":"after-input","data":"a","text":"Failure retry first input"}
+{"time":1791962995022,"kind":"after-input","data":"i","text":"Failure retry first input"}
+{"time":1791962995022,"kind":"after-input","data":"l","text":"Failure retry first input"}
+{"time":1791962995022,"kind":"after-input","data":"u","text":"Failure retry first input"}
+{"time":1791962995023,"kind":"after-input","data":"r","text":"Failure retry first input"}
+{"time":1791962995023,"kind":"after-input","data":"e","text":"Failure retry first input"}
+{"time":1791962995023,"kind":"after-input","data":" ","text":"Failure retry first input"}
+{"time":1791962995023,"kind":"after-input","data":"r","text":"Failure retry first input"}
+{"time":1791962995023,"kind":"after-input","data":"e","text":"Failure retry first input"}
+{"time":1791962995023,"kind":"after-input","data":"t","text":"Failure retry first input"}
+{"time":1791962995023,"kind":"after-input","data":"r","text":"Failure retry first input"}
+{"time":1791962995023,"kind":"after-input","data":"y","text":"Failure retry first input"}
+{"time":1791962995023,"kind":"after-input","data":" ","text":"Failure retry first input"}
+{"time":1791962995023,"kind":"after-input","data":"f","text":"Failure retry first input"}
+{"time":1791962995024,"kind":"after-input","data":"i","text":"Failure retry first input"}
+{"time":1791962995024,"kind":"after-input","data":"r","text":"Failure retry first input"}
+{"time":1791962995024,"kind":"after-input","data":"s","text":"Failure retry first input"}
+{"time":1791962995024,"kind":"after-input","data":"t","text":"Failure retry first input"}
+{"time":1791962995024,"kind":"after-input","data":" ","text":"Failure retry first input"}
+{"time":1791962995024,"kind":"after-input","data":"i","text":"Failure retry first input"}
+{"time":1791962995024,"kind":"after-input","data":"n","text":"Failure retry first input"}
+{"time":1791962995024,"kind":"after-input","data":"p","text":"Failure retry first input"}
+{"time":1791962995024,"kind":"after-input","data":"u","text":"Failure retry first input"}
+{"time":1791962995025,"kind":"after-input","data":"t","text":"Failure retry first input"}
+{"time":1791962995048,"kind":"terminal-input","data":"\r"}
+{"time":1791962995049,"kind":"input","text":"Failure retry first input","source":"interactive"}
+{"time":1791962995051,"kind":"request","naming":false,"id":9,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","mode":"ok"}
+{"time":1791962995052,"kind":"settled","aborted":false,"title":"Ownership Resumed"}
+{"time":1791962995052,"kind":"after-input","data":"\r","text":""}
+{"time":1791962995352,"kind":"terminal-input","data":"F"}
+{"time":1791962995352,"kind":"terminal-input","data":"a"}
+{"time":1791962995353,"kind":"terminal-input","data":"i"}
+{"time":1791962995353,"kind":"terminal-input","data":"l"}
+{"time":1791962995353,"kind":"terminal-input","data":"u"}
+{"time":1791962995353,"kind":"terminal-input","data":"r"}
+{"time":1791962995353,"kind":"terminal-input","data":"e"}
+{"time":1791962995354,"kind":"terminal-input","data":" "}
+{"time":1791962995354,"kind":"terminal-input","data":"r"}
+{"time":1791962995354,"kind":"terminal-input","data":"e"}
+{"time":1791962995354,"kind":"terminal-input","data":"t"}
+{"time":1791962995354,"kind":"terminal-input","data":"r"}
+{"time":1791962995355,"kind":"terminal-input","data":"y"}
+{"time":1791962995355,"kind":"terminal-input","data":" "}
+{"time":1791962995355,"kind":"terminal-input","data":"s"}
+{"time":1791962995355,"kind":"terminal-input","data":"e"}
+{"time":1791962995355,"kind":"terminal-input","data":"c"}
+{"time":1791962995356,"kind":"terminal-input","data":"o"}
+{"time":1791962995356,"kind":"terminal-input","data":"n"}
+{"time":1791962995356,"kind":"terminal-input","data":"d"}
+{"time":1791962995356,"kind":"terminal-input","data":" "}
+{"time":1791962995356,"kind":"terminal-input","data":"i"}
+{"time":1791962995357,"kind":"terminal-input","data":"n"}
+{"time":1791962995357,"kind":"terminal-input","data":"p"}
+{"time":1791962995357,"kind":"terminal-input","data":"u"}
+{"time":1791962995357,"kind":"terminal-input","data":"t"}
+{"time":1791962995358,"kind":"after-input","data":"F","text":"Failure retry second input"}
+{"time":1791962995358,"kind":"after-input","data":"a","text":"Failure retry second input"}
+{"time":1791962995358,"kind":"after-input","data":"i","text":"Failure retry second input"}
+{"time":1791962995359,"kind":"after-input","data":"l","text":"Failure retry second input"}
+{"time":1791962995359,"kind":"after-input","data":"u","text":"Failure retry second input"}
+{"time":1791962995359,"kind":"after-input","data":"r","text":"Failure retry second input"}
+{"time":1791962995359,"kind":"after-input","data":"e","text":"Failure retry second input"}
+{"time":1791962995359,"kind":"after-input","data":" ","text":"Failure retry second input"}
+{"time":1791962995359,"kind":"after-input","data":"r","text":"Failure retry second input"}
+{"time":1791962995359,"kind":"after-input","data":"e","text":"Failure retry second input"}
+{"time":1791962995359,"kind":"after-input","data":"t","text":"Failure retry second input"}
+{"time":1791962995359,"kind":"after-input","data":"r","text":"Failure retry second input"}
+{"time":1791962995360,"kind":"after-input","data":"y","text":"Failure retry second input"}
+{"time":1791962995360,"kind":"after-input","data":" ","text":"Failure retry second input"}
+{"time":1791962995360,"kind":"after-input","data":"s","text":"Failure retry second input"}
+{"time":1791962995360,"kind":"after-input","data":"e","text":"Failure retry second input"}
+{"time":1791962995360,"kind":"after-input","data":"c","text":"Failure retry second input"}
+{"time":1791962995360,"kind":"after-input","data":"o","text":"Failure retry second input"}
+{"time":1791962995360,"kind":"after-input","data":"n","text":"Failure retry second input"}
+{"time":1791962995360,"kind":"after-input","data":"d","text":"Failure retry second input"}
+{"time":1791962995360,"kind":"after-input","data":" ","text":"Failure retry second input"}
+{"time":1791962995360,"kind":"after-input","data":"i","text":"Failure retry second input"}
+{"time":1791962995361,"kind":"after-input","data":"n","text":"Failure retry second input"}
+{"time":1791962995361,"kind":"after-input","data":"p","text":"Failure retry second input"}
+{"time":1791962995361,"kind":"after-input","data":"u","text":"Failure retry second input"}
+{"time":1791962995361,"kind":"after-input","data":"t","text":"Failure retry second input"}
+{"time":1791962995388,"kind":"terminal-input","data":"\r"}
+{"time":1791962995389,"kind":"input","text":"Failure retry second input","source":"interactive"}
+{"time":1791962995391,"kind":"request","naming":false,"id":10,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","mode":"ok"}
+{"time":1791962995392,"kind":"settled","aborted":false,"title":"Ownership Resumed"}
+{"time":1791962995392,"kind":"request","naming":true,"id":7,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","mode":"ok","title":"Retry After Two Inputs"}
+{"time":1791962995393,"kind":"title","name":"Retry After Two Inputs","sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec"}
+{"time":1791962995393,"kind":"after-input","data":"\r","text":""}
+{"time":1791962995429,"kind":"terminal-input","data":"\u001b[20~"}
+{"time":1791962995429,"kind":"observe","text":"","sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","title":"Retry After Two Inputs","state":{"type":"custom","customType":"preset.session-name.v1","data":{"progress":{"version":1,"count":10,"evaluated":10,"retryAt":0,"observedIds":["199f6eb1","20d665d3","96bda6f4","5a0451e2","49e1b9a5","d9c9ce74","91452325","3b224474","197531de","cd0f45af"]},"ownership":{"version":1,"titleEntryId":"2d7d69b1","title":"Retry After Two Inputs","owned":true}},"id":"047cbbe0","parentId":"2d7d69b1","timestamp":"2026-10-14T07:29:55.393Z"},"names":7,"mains":10}
+{"time":1791962995431,"kind":"after-input","data":"\u001b[20~","text":""}
+{"time":1791962995482,"kind":"terminal-input","data":"L"}
+{"time":1791962995483,"kind":"terminal-input","data":"a"}
+{"time":1791962995483,"kind":"terminal-input","data":"t"}
+{"time":1791962995483,"kind":"terminal-input","data":"e"}
+{"time":1791962995483,"kind":"terminal-input","data":" "}
+{"time":1791962995484,"kind":"terminal-input","data":"c"}
+{"time":1791962995484,"kind":"terminal-input","data":"a"}
+{"time":1791962995484,"kind":"terminal-input","data":"n"}
+{"time":1791962995484,"kind":"terminal-input","data":"c"}
+{"time":1791962995484,"kind":"terminal-input","data":"e"}
+{"time":1791962995485,"kind":"terminal-input","data":"l"}
+{"time":1791962995485,"kind":"terminal-input","data":"l"}
+{"time":1791962995485,"kind":"terminal-input","data":"a"}
+{"time":1791962995485,"kind":"terminal-input","data":"t"}
+{"time":1791962995485,"kind":"terminal-input","data":"i"}
+{"time":1791962995485,"kind":"terminal-input","data":"o"}
+{"time":1791962995485,"kind":"terminal-input","data":"n"}
+{"time":1791962995486,"kind":"terminal-input","data":" "}
+{"time":1791962995486,"kind":"terminal-input","data":"f"}
+{"time":1791962995486,"kind":"terminal-input","data":"i"}
+{"time":1791962995486,"kind":"terminal-input","data":"r"}
+{"time":1791962995486,"kind":"terminal-input","data":"s"}
+{"time":1791962995486,"kind":"terminal-input","data":"t"}
+{"time":1791962995487,"kind":"after-input","data":"L","text":"Late cancellation first"}
+{"time":1791962995487,"kind":"after-input","data":"a","text":"Late cancellation first"}
+{"time":1791962995487,"kind":"after-input","data":"t","text":"Late cancellation first"}
+{"time":1791962995487,"kind":"after-input","data":"e","text":"Late cancellation first"}
+{"time":1791962995488,"kind":"after-input","data":" ","text":"Late cancellation first"}
+{"time":1791962995488,"kind":"after-input","data":"c","text":"Late cancellation first"}
+{"time":1791962995488,"kind":"after-input","data":"a","text":"Late cancellation first"}
+{"time":1791962995488,"kind":"after-input","data":"n","text":"Late cancellation first"}
+{"time":1791962995488,"kind":"after-input","data":"c","text":"Late cancellation first"}
+{"time":1791962995488,"kind":"after-input","data":"e","text":"Late cancellation first"}
+{"time":1791962995488,"kind":"after-input","data":"l","text":"Late cancellation first"}
+{"time":1791962995488,"kind":"after-input","data":"l","text":"Late cancellation first"}
+{"time":1791962995488,"kind":"after-input","data":"a","text":"Late cancellation first"}
+{"time":1791962995489,"kind":"after-input","data":"t","text":"Late cancellation first"}
+{"time":1791962995489,"kind":"after-input","data":"i","text":"Late cancellation first"}
+{"time":1791962995489,"kind":"after-input","data":"o","text":"Late cancellation first"}
+{"time":1791962995489,"kind":"after-input","data":"n","text":"Late cancellation first"}
+{"time":1791962995489,"kind":"after-input","data":" ","text":"Late cancellation first"}
+{"time":1791962995489,"kind":"after-input","data":"f","text":"Late cancellation first"}
+{"time":1791962995489,"kind":"after-input","data":"i","text":"Late cancellation first"}
+{"time":1791962995489,"kind":"after-input","data":"r","text":"Late cancellation first"}
+{"time":1791962995489,"kind":"after-input","data":"s","text":"Late cancellation first"}
+{"time":1791962995490,"kind":"after-input","data":"t","text":"Late cancellation first"}
+{"time":1791962995516,"kind":"terminal-input","data":"\r"}
+{"time":1791962995517,"kind":"input","text":"Late cancellation first","source":"interactive"}
+{"time":1791962995518,"kind":"request","naming":false,"id":11,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","mode":"hold"}
+{"time":1791962995519,"kind":"settled","aborted":false,"title":"Retry After Two Inputs"}
+{"time":1791962995519,"kind":"after-input","data":"\r","text":""}
+{"time":1791962995554,"kind":"terminal-input","data":"L"}
+{"time":1791962995554,"kind":"terminal-input","data":"a"}
+{"time":1791962995554,"kind":"terminal-input","data":"t"}
+{"time":1791962995554,"kind":"terminal-input","data":"e"}
+{"time":1791962995555,"kind":"terminal-input","data":" "}
+{"time":1791962995555,"kind":"terminal-input","data":"c"}
+{"time":1791962995555,"kind":"terminal-input","data":"a"}
+{"time":1791962995555,"kind":"terminal-input","data":"n"}
+{"time":1791962995555,"kind":"terminal-input","data":"c"}
+{"time":1791962995556,"kind":"terminal-input","data":"e"}
+{"time":1791962995556,"kind":"terminal-input","data":"l"}
+{"time":1791962995556,"kind":"terminal-input","data":"l"}
+{"time":1791962995556,"kind":"terminal-input","data":"a"}
+{"time":1791962995556,"kind":"terminal-input","data":"t"}
+{"time":1791962995557,"kind":"terminal-input","data":"i"}
+{"time":1791962995557,"kind":"terminal-input","data":"o"}
+{"time":1791962995557,"kind":"terminal-input","data":"n"}
+{"time":1791962995557,"kind":"terminal-input","data":" "}
+{"time":1791962995557,"kind":"terminal-input","data":"s"}
+{"time":1791962995557,"kind":"terminal-input","data":"e"}
+{"time":1791962995558,"kind":"terminal-input","data":"c"}
+{"time":1791962995558,"kind":"terminal-input","data":"o"}
+{"time":1791962995558,"kind":"terminal-input","data":"n"}
+{"time":1791962995558,"kind":"terminal-input","data":"d"}
+{"time":1791962995559,"kind":"after-input","data":"L","text":"Late cancellation second"}
+{"time":1791962995559,"kind":"after-input","data":"a","text":"Late cancellation second"}
+{"time":1791962995559,"kind":"after-input","data":"t","text":"Late cancellation second"}
+{"time":1791962995559,"kind":"after-input","data":"e","text":"Late cancellation second"}
+{"time":1791962995559,"kind":"after-input","data":" ","text":"Late cancellation second"}
+{"time":1791962995559,"kind":"after-input","data":"c","text":"Late cancellation second"}
+{"time":1791962995560,"kind":"after-input","data":"a","text":"Late cancellation second"}
+{"time":1791962995560,"kind":"after-input","data":"n","text":"Late cancellation second"}
+{"time":1791962995560,"kind":"after-input","data":"c","text":"Late cancellation second"}
+{"time":1791962995560,"kind":"after-input","data":"e","text":"Late cancellation second"}
+{"time":1791962995560,"kind":"after-input","data":"l","text":"Late cancellation second"}
+{"time":1791962995560,"kind":"after-input","data":"l","text":"Late cancellation second"}
+{"time":1791962995560,"kind":"after-input","data":"a","text":"Late cancellation second"}
+{"time":1791962995560,"kind":"after-input","data":"t","text":"Late cancellation second"}
+{"time":1791962995560,"kind":"after-input","data":"i","text":"Late cancellation second"}
+{"time":1791962995561,"kind":"after-input","data":"o","text":"Late cancellation second"}
+{"time":1791962995561,"kind":"after-input","data":"n","text":"Late cancellation second"}
+{"time":1791962995561,"kind":"after-input","data":" ","text":"Late cancellation second"}
+{"time":1791962995561,"kind":"after-input","data":"s","text":"Late cancellation second"}
+{"time":1791962995561,"kind":"after-input","data":"e","text":"Late cancellation second"}
+{"time":1791962995561,"kind":"after-input","data":"c","text":"Late cancellation second"}
+{"time":1791962995561,"kind":"after-input","data":"o","text":"Late cancellation second"}
+{"time":1791962995561,"kind":"after-input","data":"n","text":"Late cancellation second"}
+{"time":1791962995561,"kind":"after-input","data":"d","text":"Late cancellation second"}
+{"time":1791962995590,"kind":"terminal-input","data":"\r"}
+{"time":1791962995591,"kind":"input","text":"Late cancellation second","source":"interactive"}
+{"time":1791962995592,"kind":"request","naming":false,"id":12,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","mode":"hold"}
+{"time":1791962995592,"kind":"settled","aborted":false,"title":"Retry After Two Inputs"}
+{"time":1791962995592,"kind":"request","naming":true,"id":8,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","mode":"hold","title":"Stale Must Never Commit"}
+{"time":1791962995593,"kind":"after-input","data":"\r","text":""}
+{"time":1791962995639,"kind":"terminal-input","data":"N"}
+{"time":1791962995640,"kind":"terminal-input","data":"e"}
+{"time":1791962995640,"kind":"terminal-input","data":"w"}
+{"time":1791962995640,"kind":"terminal-input","data":" "}
+{"time":1791962995641,"kind":"terminal-input","data":"i"}
+{"time":1791962995641,"kind":"terminal-input","data":"n"}
+{"time":1791962995641,"kind":"terminal-input","data":"p"}
+{"time":1791962995641,"kind":"terminal-input","data":"u"}
+{"time":1791962995641,"kind":"terminal-input","data":"t"}
+{"time":1791962995642,"kind":"terminal-input","data":" "}
+{"time":1791962995642,"kind":"terminal-input","data":"c"}
+{"time":1791962995642,"kind":"terminal-input","data":"a"}
+{"time":1791962995642,"kind":"terminal-input","data":"n"}
+{"time":1791962995642,"kind":"terminal-input","data":"c"}
+{"time":1791962995643,"kind":"terminal-input","data":"e"}
+{"time":1791962995643,"kind":"terminal-input","data":"l"}
+{"time":1791962995643,"kind":"terminal-input","data":"s"}
+{"time":1791962995643,"kind":"terminal-input","data":" "}
+{"time":1791962995643,"kind":"terminal-input","data":"h"}
+{"time":1791962995643,"kind":"terminal-input","data":"e"}
+{"time":1791962995643,"kind":"terminal-input","data":"l"}
+{"time":1791962995644,"kind":"terminal-input","data":"d"}
+{"time":1791962995644,"kind":"terminal-input","data":" "}
+{"time":1791962995644,"kind":"terminal-input","data":"n"}
+{"time":1791962995644,"kind":"terminal-input","data":"a"}
+{"time":1791962995644,"kind":"terminal-input","data":"m"}
+{"time":1791962995644,"kind":"terminal-input","data":"i"}
+{"time":1791962995645,"kind":"terminal-input","data":"n"}
+{"time":1791962995645,"kind":"terminal-input","data":"g"}
+{"time":1791962995645,"kind":"terminal-input","data":" "}
+{"time":1791962995645,"kind":"terminal-input","data":"r"}
+{"time":1791962995645,"kind":"terminal-input","data":"e"}
+{"time":1791962995645,"kind":"terminal-input","data":"s"}
+{"time":1791962995646,"kind":"terminal-input","data":"p"}
+{"time":1791962995646,"kind":"terminal-input","data":"o"}
+{"time":1791962995646,"kind":"terminal-input","data":"n"}
+{"time":1791962995646,"kind":"terminal-input","data":"s"}
+{"time":1791962995646,"kind":"terminal-input","data":"e"}
+{"time":1791962995647,"kind":"after-input","data":"N","text":"New input cancels held naming response"}
+{"time":1791962995647,"kind":"after-input","data":"e","text":"New input cancels held naming response"}
+{"time":1791962995647,"kind":"after-input","data":"w","text":"New input cancels held naming response"}
+{"time":1791962995647,"kind":"after-input","data":" ","text":"New input cancels held naming response"}
+{"time":1791962995647,"kind":"after-input","data":"i","text":"New input cancels held naming response"}
+{"time":1791962995647,"kind":"after-input","data":"n","text":"New input cancels held naming response"}
+{"time":1791962995648,"kind":"after-input","data":"p","text":"New input cancels held naming response"}
+{"time":1791962995648,"kind":"after-input","data":"u","text":"New input cancels held naming response"}
+{"time":1791962995648,"kind":"after-input","data":"t","text":"New input cancels held naming response"}
+{"time":1791962995648,"kind":"after-input","data":" ","text":"New input cancels held naming response"}
+{"time":1791962995648,"kind":"after-input","data":"c","text":"New input cancels held naming response"}
+{"time":1791962995648,"kind":"after-input","data":"a","text":"New input cancels held naming response"}
+{"time":1791962995648,"kind":"after-input","data":"n","text":"New input cancels held naming response"}
+{"time":1791962995648,"kind":"after-input","data":"c","text":"New input cancels held naming response"}
+{"time":1791962995648,"kind":"after-input","data":"e","text":"New input cancels held naming response"}
+{"time":1791962995648,"kind":"after-input","data":"l","text":"New input cancels held naming response"}
+{"time":1791962995649,"kind":"after-input","data":"s","text":"New input cancels held naming response"}
+{"time":1791962995649,"kind":"after-input","data":" ","text":"New input cancels held naming response"}
+{"time":1791962995649,"kind":"after-input","data":"h","text":"New input cancels held naming response"}
+{"time":1791962995649,"kind":"after-input","data":"e","text":"New input cancels held naming response"}
+{"time":1791962995649,"kind":"after-input","data":"l","text":"New input cancels held naming response"}
+{"time":1791962995649,"kind":"after-input","data":"d","text":"New input cancels held naming response"}
+{"time":1791962995649,"kind":"after-input","data":" ","text":"New input cancels held naming response"}
+{"time":1791962995649,"kind":"after-input","data":"n","text":"New input cancels held naming response"}
+{"time":1791962995649,"kind":"after-input","data":"a","text":"New input cancels held naming response"}
+{"time":1791962995649,"kind":"after-input","data":"m","text":"New input cancels held naming response"}
+{"time":1791962995649,"kind":"after-input","data":"i","text":"New input cancels held naming response"}
+{"time":1791962995650,"kind":"after-input","data":"n","text":"New input cancels held naming response"}
+{"time":1791962995650,"kind":"after-input","data":"g","text":"New input cancels held naming response"}
+{"time":1791962995650,"kind":"after-input","data":" ","text":"New input cancels held naming response"}
+{"time":1791962995650,"kind":"after-input","data":"r","text":"New input cancels held naming response"}
+{"time":1791962995650,"kind":"after-input","data":"e","text":"New input cancels held naming response"}
+{"time":1791962995650,"kind":"after-input","data":"s","text":"New input cancels held naming response"}
+{"time":1791962995650,"kind":"after-input","data":"p","text":"New input cancels held naming response"}
+{"time":1791962995650,"kind":"after-input","data":"o","text":"New input cancels held naming response"}
+{"time":1791962995650,"kind":"after-input","data":"n","text":"New input cancels held naming response"}
+{"time":1791962995650,"kind":"after-input","data":"s","text":"New input cancels held naming response"}
+{"time":1791962995651,"kind":"after-input","data":"e","text":"New input cancels held naming response"}
+{"time":1791962995674,"kind":"terminal-input","data":"\r"}
+{"time":1791962995675,"kind":"input","text":"New input cancels held naming response","source":"interactive"}
+{"time":1791962995676,"kind":"request-aborted","id":8}
+{"time":1791962995677,"kind":"request","naming":false,"id":13,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","mode":"ok"}
+{"time":1791962995678,"kind":"settled","aborted":false,"title":"Retry After Two Inputs"}
+{"time":1791962995679,"kind":"request","naming":true,"id":9,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","mode":"ok","title":"Fresh After Cancellation"}
+{"time":1791962995679,"kind":"title","name":"Fresh After Cancellation","sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec"}
+{"time":1791962995680,"kind":"after-input","data":"\r","text":""}
+{"time":1791962995723,"kind":"late-provider-return","id":8,"aborted":true}
+{"time":1791962995992,"kind":"terminal-input","data":"\u001b[20~"}
+{"time":1791962995993,"kind":"observe","text":"","sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","title":"Fresh After Cancellation","state":{"type":"custom","customType":"preset.session-name.v1","data":{"progress":{"version":1,"count":13,"evaluated":13,"retryAt":0,"observedIds":["199f6eb1","20d665d3","96bda6f4","5a0451e2","49e1b9a5","d9c9ce74","91452325","3b224474","197531de","cd0f45af","2f0545da","6b37a1b3","960d9cc3"]},"ownership":{"version":1,"titleEntryId":"9a02cb21","title":"Fresh After Cancellation","owned":true}},"id":"7f2b66fc","parentId":"9a02cb21","timestamp":"2026-10-14T07:29:55.680Z"},"names":9,"mains":13}
+{"time":1791962995994,"kind":"after-input","data":"\u001b[20~","text":""}
+{"time":1791962996049,"kind":"terminal-input","data":"\u001b[20~"}
+{"time":1791962996049,"kind":"observe","text":"","sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","title":"Fresh After Cancellation","state":{"type":"custom","customType":"preset.session-name.v1","data":{"progress":{"version":1,"count":13,"evaluated":13,"retryAt":0,"observedIds":["199f6eb1","20d665d3","96bda6f4","5a0451e2","49e1b9a5","d9c9ce74","91452325","3b224474","197531de","cd0f45af","2f0545da","6b37a1b3","960d9cc3"]},"ownership":{"version":1,"titleEntryId":"9a02cb21","title":"Fresh After Cancellation","owned":true}},"id":"7f2b66fc","parentId":"9a02cb21","timestamp":"2026-10-14T07:29:55.680Z"},"names":9,"mains":13}
+{"time":1791962996050,"kind":"after-input","data":"\u001b[20~","text":""}
+{"time":1791962996088,"kind":"terminal-input","data":"/"}
+{"time":1791962996088,"kind":"terminal-input","data":"s"}
+{"time":1791962996089,"kind":"terminal-input","data":"e"}
+{"time":1791962996089,"kind":"terminal-input","data":"s"}
+{"time":1791962996089,"kind":"terminal-input","data":"s"}
+{"time":1791962996089,"kind":"terminal-input","data":"i"}
+{"time":1791962996089,"kind":"terminal-input","data":"o"}
+{"time":1791962996090,"kind":"terminal-input","data":"n"}
+{"time":1791962996090,"kind":"terminal-input","data":"-"}
+{"time":1791962996090,"kind":"terminal-input","data":"n"}
+{"time":1791962996090,"kind":"terminal-input","data":"a"}
+{"time":1791962996090,"kind":"terminal-input","data":"m"}
+{"time":1791962996090,"kind":"terminal-input","data":"e"}
+{"time":1791962996092,"kind":"after-input","data":"/","text":"/session-name"}
+{"time":1791962996092,"kind":"after-input","data":"s","text":"/session-name"}
+{"time":1791962996092,"kind":"after-input","data":"e","text":"/session-name"}
+{"time":1791962996092,"kind":"after-input","data":"s","text":"/session-name"}
+{"time":1791962996092,"kind":"after-input","data":"s","text":"/session-name"}
+{"time":1791962996092,"kind":"after-input","data":"i","text":"/session-name"}
+{"time":1791962996092,"kind":"after-input","data":"o","text":"/session-name"}
+{"time":1791962996093,"kind":"after-input","data":"n","text":"/session-name"}
+{"time":1791962996093,"kind":"after-input","data":"-","text":"/session-name"}
+{"time":1791962996093,"kind":"after-input","data":"n","text":"/session-name"}
+{"time":1791962996093,"kind":"after-input","data":"a","text":"/session-name"}
+{"time":1791962996093,"kind":"after-input","data":"m","text":"/session-name"}
+{"time":1791962996093,"kind":"after-input","data":"e","text":"/session-name"}
+{"time":1791962996136,"kind":"terminal-input","data":"\u001b"}
+{"time":1791962996138,"kind":"after-input","data":"\u001b","text":"/session-name"}
+{"time":1791962996157,"kind":"terminal-input","data":"\r"}
+{"time":1791962996160,"kind":"request","naming":true,"id":10,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a13951-4ae7-719f-b89e-bf80643dfaec","mode":"hold","title":"Old Session Must Never Commit"}
+{"time":1791962996160,"kind":"after-input","data":"\r","text":""}
+{"time":1791962996212,"kind":"terminal-input","data":"/"}
+{"time":1791962996212,"kind":"terminal-input","data":"n"}
+{"time":1791962996213,"kind":"terminal-input","data":"e"}
+{"time":1791962996213,"kind":"terminal-input","data":"w"}
+{"time":1791962996214,"kind":"after-input","data":"/","text":"/new"}
+{"time":1791962996214,"kind":"after-input","data":"n","text":"/new"}
+{"time":1791962996214,"kind":"after-input","data":"e","text":"/new"}
+{"time":1791962996214,"kind":"after-input","data":"w","text":"/new"}
+{"time":1791962996259,"kind":"terminal-input","data":"\u001b"}
+{"time":1791962996261,"kind":"after-input","data":"\u001b","text":"/new"}
+{"time":1791962996279,"kind":"terminal-input","data":"\r"}
+{"time":1791962996279,"kind":"request-aborted","id":10}
+{"time":1791962996281,"kind":"shutdown"}

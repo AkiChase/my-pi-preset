@@ -1,0 +1,2 @@
+# Preserve terminal capture spacing and raw streams exactly as recorded.
+research/tmux-validation/** -whitespace

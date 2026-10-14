@@ -1,0 +1,40 @@
+
+[38;2;108;118;123m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[7m[39m [0m
+[38;2;108;118;123m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[38;2;126;136;142m/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-pzdu5ack/cwd • Fresh After Cancellation[39m
+[38;2;126;136;142m↑5.4k ↓65 R4.8k W5.4k CH95.9% 0.7%/128k                                                                                             scripted
+[39mpi exiting due to uncaughtException:
+Error: This extension ctx is stale after session replacement or reload. Do not use a captured pi or command ctx after ctx.newSession(), ctx.
+fork(), ctx.switchSession(), or ctx.reload(). For newSession, fork, and switchSession, move post-replacement work into withSession and use t
+he ctx passed to withSession. For reload, do not use the old ctx after await ctx.reload().
+    at ExtensionRunner.assertActive (file:///Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/[4m@earendil-works/pi-coding-a
+gent[0m/dist/core/extensions/runner.js:490:19)
+    at get ui (file:///Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/[4m@earendil-works/pi-coding-agent[0m/dist/core/extensi
+ons/runner.js:619:24)
+    at Immediate.<anonymous> (/Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-14-builtin-session-name/research/tmux-validation/p
+robe.ts:43:127)
+[90m    at process.processImmediate (node:internal/timers:504:21)[39m
+
+A stack frame came from loaded extension `/Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-14-builtin-session-name/research/tmux-
+validation/probe.ts`, which may be involved. Try disabling it with `pi config`, or run `pi -ne` to confirm.
+
+To report this crash: run `pi -r` to resume the session, then run /bug. The crash details are attached automatically.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Pane is dead (status 1, Wed Oct 14 15:29:56 2026)

@@ -1,0 +1,118 @@
+{
+  "status": "PASS",
+  "runs": [
+    {
+      "attempt": "evidence-final",
+      "status": "FAIL",
+      "error": "Timeout: key processed Enter",
+      "pass_assertions": 14,
+      "elapsed_seconds": 17.61,
+      "cli_pid": 9754,
+      "ps": {
+        "returncode": 1,
+        "stdout": ""
+      },
+      "server": "name-name-tmux-pzdu5ack",
+      "server_probe": {
+        "returncode": 1,
+        "stderr": "no server running on /private/tmp/tmux-501/name-name-tmux-pzdu5ack"
+      },
+      "root_removed": true,
+      "cleanup_verified": true,
+      "source_unchanged": true,
+      "raw_bytes": 125421,
+      "sync_start": 118,
+      "sync_end": 118,
+      "input_events": 575,
+      "naming_requests": 10,
+      "visible_failure_capture": true
+    },
+    {
+      "attempt": "evidence-final-safe",
+      "status": "PASS",
+      "error": null,
+      "pass_assertions": 16,
+      "elapsed_seconds": 5.24,
+      "cli_pid": 19043,
+      "ps": {
+        "returncode": 1,
+        "stdout": ""
+      },
+      "server": "name-name-tmux-byk4v62o",
+      "server_probe": {
+        "returncode": 1,
+        "stderr": "no server running on /private/tmp/tmux-501/name-name-tmux-byk4v62o"
+      },
+      "root_removed": true,
+      "cleanup_verified": true,
+      "source_unchanged": true,
+      "raw_bytes": 134141,
+      "sync_start": 132,
+      "sync_end": 132,
+      "input_events": 639,
+      "naming_requests": 11,
+      "visible_failure_capture": true
+    },
+    {
+      "attempt": "evidence-keyboard-fixed",
+      "status": "FAIL",
+      "error": "stale not visible",
+      "pass_assertions": 13,
+      "elapsed_seconds": 4.72,
+      "cli_pid": 5210,
+      "ps": {
+        "returncode": 1,
+        "stdout": ""
+      },
+      "server": "name-name-tmux-b0fwqw3y",
+      "server_probe": {
+        "returncode": 1,
+        "stderr": "no server running on /private/tmp/tmux-501/name-name-tmux-b0fwqw3y"
+      },
+      "root_removed": true,
+      "cleanup_verified": true,
+      "source_unchanged": true,
+      "raw_bytes": 124522,
+      "sync_start": 115,
+      "sync_end": 115,
+      "input_events": 561,
+      "naming_requests": 9,
+      "visible_failure_capture": true
+    },
+    {
+      "attempt": "evidence-minimal",
+      "status": "FAIL",
+      "error": "Timeout: actual select menu",
+      "pass_assertions": 3,
+      "elapsed_seconds": 14.93,
+      "cli_pid": 961,
+      "ps": {
+        "returncode": 1,
+        "stdout": ""
+      },
+      "server": "name-name-tmux-uot1ekxl",
+      "server_probe": {
+        "returncode": 1,
+        "stderr": "no server running on /private/tmp/tmux-501/name-name-tmux-uot1ekxl"
+      },
+      "root_removed": true,
+      "cleanup_verified": true,
+      "source_unchanged": true,
+      "raw_bytes": 10909,
+      "sync_start": 18,
+      "sync_end": 18,
+      "input_events": 91,
+      "naming_requests": 2,
+      "visible_failure_capture": false
+    }
+  ],
+  "suspicious_credential_files": [],
+  "evidence_bytes": 1095231,
+  "not_claimed": [
+    "physical keyboard/IME",
+    "online generation quality",
+    "other themes/modes/widths",
+    "branch navigation",
+    "120-second timeout"
+  ]
+}

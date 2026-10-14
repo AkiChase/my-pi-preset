@@ -94,6 +94,22 @@ function run({
   return out;
 }
 
+// Session naming replacement must also remove the old package in ordinary merge mode.
+{
+  const preset = JSON.parse(readFileSync(resolve(scriptDir, "..", "pi-preset.json"), "utf8"));
+  const titleConfig = '{"automatic":false,"interval":17}';
+  const result = run({
+    manifest: preset.packages, conflicts: preset.conflicts,
+    listOutput: "User packages:\n  npm:pi-session-name@0.1.7\n    /p/session-name",
+    seedFiles: { "session-name.json": titleConfig }, args: ["--sync", "packages"],
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(result.calls.includes("remove npm:pi-session-name@0.1.7") || result.calls.includes("remove npm:pi-session-name"));
+  assert.equal(result.calls.some(call => /^(install|update) npm:pi-session-name/.test(call)), false);
+  assert.equal(result.fileTexts["session-name.json"], titleConfig);
+  console.log("PASS session-name conflict replacement preserves global naming configuration");
+}
+
 // Composition replacement is a real offline dry-run plan, not a comment-only guard.
 {
   const preset = JSON.parse(readFileSync(resolve(scriptDir, "..", "pi-preset.json"), "utf8"));

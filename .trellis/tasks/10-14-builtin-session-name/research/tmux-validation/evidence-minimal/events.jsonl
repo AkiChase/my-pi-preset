@@ -1,0 +1,102 @@
+{"time":1791962666099,"kind":"ready","pid":961,"cwd":"/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-uot1ekxl/cwd","home":"/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-uot1ekxl/home","mode":"tui","sessionId":"01a1394c-53d6-735a-b160-3178503557ad"}
+{"time":1791962666161,"kind":"terminal-input","data":"B"}
+{"time":1791962666162,"kind":"terminal-input","data":"u"}
+{"time":1791962666163,"kind":"terminal-input","data":"i"}
+{"time":1791962666163,"kind":"terminal-input","data":"l"}
+{"time":1791962666163,"kind":"terminal-input","data":"d"}
+{"time":1791962666163,"kind":"terminal-input","data":" "}
+{"time":1791962666163,"kind":"terminal-input","data":"a"}
+{"time":1791962666164,"kind":"terminal-input","data":" "}
+{"time":1791962666164,"kind":"terminal-input","data":"l"}
+{"time":1791962666164,"kind":"terminal-input","data":"o"}
+{"time":1791962666164,"kind":"terminal-input","data":"c"}
+{"time":1791962666164,"kind":"terminal-input","data":"a"}
+{"time":1791962666164,"kind":"terminal-input","data":"l"}
+{"time":1791962666164,"kind":"terminal-input","data":" "}
+{"time":1791962666165,"kind":"terminal-input","data":"o"}
+{"time":1791962666165,"kind":"terminal-input","data":"f"}
+{"time":1791962666165,"kind":"terminal-input","data":"f"}
+{"time":1791962666165,"kind":"terminal-input","data":"l"}
+{"time":1791962666165,"kind":"terminal-input","data":"i"}
+{"time":1791962666165,"kind":"terminal-input","data":"n"}
+{"time":1791962666165,"kind":"terminal-input","data":"e"}
+{"time":1791962666165,"kind":"terminal-input","data":" "}
+{"time":1791962666168,"kind":"terminal-input","data":"s"}
+{"time":1791962666168,"kind":"terminal-input","data":"e"}
+{"time":1791962666168,"kind":"terminal-input","data":"s"}
+{"time":1791962666168,"kind":"terminal-input","data":"s"}
+{"time":1791962666168,"kind":"terminal-input","data":"i"}
+{"time":1791962666169,"kind":"terminal-input","data":"o"}
+{"time":1791962666169,"kind":"terminal-input","data":"n"}
+{"time":1791962666169,"kind":"terminal-input","data":" "}
+{"time":1791962666169,"kind":"terminal-input","data":"n"}
+{"time":1791962666169,"kind":"terminal-input","data":"a"}
+{"time":1791962666169,"kind":"terminal-input","data":"m"}
+{"time":1791962666169,"kind":"terminal-input","data":"i"}
+{"time":1791962666169,"kind":"terminal-input","data":"n"}
+{"time":1791962666169,"kind":"terminal-input","data":"g"}
+{"time":1791962666169,"kind":"terminal-input","data":" "}
+{"time":1791962666170,"kind":"terminal-input","data":"v"}
+{"time":1791962666170,"kind":"terminal-input","data":"a"}
+{"time":1791962666170,"kind":"terminal-input","data":"l"}
+{"time":1791962666170,"kind":"terminal-input","data":"i"}
+{"time":1791962666170,"kind":"terminal-input","data":"d"}
+{"time":1791962666170,"kind":"terminal-input","data":"a"}
+{"time":1791962666170,"kind":"terminal-input","data":"t"}
+{"time":1791962666170,"kind":"terminal-input","data":"o"}
+{"time":1791962666170,"kind":"terminal-input","data":"r"}
+{"time":1791962666170,"kind":"terminal-input","data":"\r"}
+{"time":1791962666171,"kind":"input","text":"Build a local offline session naming validator","source":"interactive"}
+{"time":1791962666174,"kind":"request","naming":false,"id":1,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a1394c-53d6-735a-b160-3178503557ad","mode":"ok"}
+{"time":1791962666175,"kind":"settled","aborted":false,"title":null}
+{"time":1791962666176,"kind":"request","naming":true,"id":1,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a1394c-53d6-735a-b160-3178503557ad","mode":"ok","title":"Initial Offline Goal"}
+{"time":1791962666176,"kind":"title","name":"Initial Offline Goal","sessionId":"01a1394c-53d6-735a-b160-3178503557ad"}
+{"time":1791962666223,"kind":"terminal-input","data":"\u001b[20~"}
+{"time":1791962666223,"kind":"observe","text":"","sessionId":"01a1394c-53d6-735a-b160-3178503557ad","title":"Initial Offline Goal","state":{"type":"custom","customType":"preset.session-name.v1","data":{"progress":{"version":1,"count":1,"evaluated":1,"retryAt":0,"observedIds":["266e0269"]},"ownership":{"version":1,"titleEntryId":"584252a5","title":"Initial Offline Goal","owned":true}},"id":"7f519733","parentId":"584252a5","timestamp":"2026-10-14T07:24:26.176Z"},"names":1,"mains":1}
+{"time":1791962666261,"kind":"terminal-input","data":"/"}
+{"time":1791962666262,"kind":"terminal-input","data":"s"}
+{"time":1791962666262,"kind":"terminal-input","data":"e"}
+{"time":1791962666263,"kind":"terminal-input","data":"s"}
+{"time":1791962666263,"kind":"terminal-input","data":"s"}
+{"time":1791962666263,"kind":"terminal-input","data":"i"}
+{"time":1791962666263,"kind":"terminal-input","data":"o"}
+{"time":1791962666263,"kind":"terminal-input","data":"n"}
+{"time":1791962666263,"kind":"terminal-input","data":"-"}
+{"time":1791962666263,"kind":"terminal-input","data":"n"}
+{"time":1791962666263,"kind":"terminal-input","data":"a"}
+{"time":1791962666263,"kind":"terminal-input","data":"m"}
+{"time":1791962666264,"kind":"terminal-input","data":"e"}
+{"time":1791962666266,"kind":"terminal-input","data":"\r"}
+{"time":1791962666267,"kind":"request","naming":true,"id":2,"model":"name-offline/scripted","reasoning":null,"sessionId":"01a1394c-53d6-735a-b160-3178503557ad","mode":"ok","title":"Manual Offline Refresh"}
+{"time":1791962666267,"kind":"title","name":"Manual Offline Refresh","sessionId":"01a1394c-53d6-735a-b160-3178503557ad"}
+{"time":1791962666305,"kind":"terminal-input","data":"\u001b[20~"}
+{"time":1791962666305,"kind":"observe","text":"","sessionId":"01a1394c-53d6-735a-b160-3178503557ad","title":"Manual Offline Refresh","state":{"type":"custom","customType":"preset.session-name.v1","data":{"progress":{"version":1,"count":1,"evaluated":1,"retryAt":0,"observedIds":["266e0269"]},"ownership":{"version":1,"titleEntryId":"9c53b14b","title":"Manual Offline Refresh","owned":true}},"id":"7596087c","parentId":"9c53b14b","timestamp":"2026-10-14T07:24:26.267Z"},"names":2,"mains":1}
+{"time":1791962666315,"kind":"terminal-input","data":"/"}
+{"time":1791962666316,"kind":"terminal-input","data":"s"}
+{"time":1791962666316,"kind":"terminal-input","data":"e"}
+{"time":1791962666316,"kind":"terminal-input","data":"s"}
+{"time":1791962666316,"kind":"terminal-input","data":"s"}
+{"time":1791962666316,"kind":"terminal-input","data":"i"}
+{"time":1791962666316,"kind":"terminal-input","data":"o"}
+{"time":1791962666316,"kind":"terminal-input","data":"n"}
+{"time":1791962666316,"kind":"terminal-input","data":"-"}
+{"time":1791962666316,"kind":"terminal-input","data":"n"}
+{"time":1791962666317,"kind":"terminal-input","data":"a"}
+{"time":1791962666317,"kind":"terminal-input","data":"m"}
+{"time":1791962666317,"kind":"terminal-input","data":"e"}
+{"time":1791962666317,"kind":"terminal-input","data":" "}
+{"time":1791962666317,"kind":"terminal-input","data":"c"}
+{"time":1791962666317,"kind":"terminal-input","data":"o"}
+{"time":1791962666317,"kind":"terminal-input","data":"n"}
+{"time":1791962666317,"kind":"terminal-input","data":"f"}
+{"time":1791962666317,"kind":"terminal-input","data":"i"}
+{"time":1791962666317,"kind":"terminal-input","data":"g"}
+{"time":1791962666319,"kind":"terminal-input","data":"\r"}
+{"time":1791962672341,"kind":"terminal-input","data":"\u001b\u0015"}
+{"time":1791962672345,"kind":"terminal-input","data":"/"}
+{"time":1791962672346,"kind":"terminal-input","data":"q"}
+{"time":1791962672346,"kind":"terminal-input","data":"u"}
+{"time":1791962672346,"kind":"terminal-input","data":"i"}
+{"time":1791962672346,"kind":"terminal-input","data":"t"}
+{"time":1791962672350,"kind":"terminal-input","data":"\r"}
+{"time":1791962680351,"kind":"shutdown"}

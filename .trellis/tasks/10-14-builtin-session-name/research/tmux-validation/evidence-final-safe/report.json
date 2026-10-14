@@ -1,0 +1,520 @@
+{
+  "status": "PASS",
+  "error": null,
+  "cases": [
+    {
+      "case": "01 isolated installed CLI startup",
+      "status": "PASS",
+      "pid": 19043
+    },
+    {
+      "case": "02 first actual user input creates auto title",
+      "status": "PASS",
+      "observation": {
+        "time": 1791963264477,
+        "kind": "observe",
+        "text": "",
+        "sessionId": "01a13955-74b0-7198-ac22-8d64f9b92922",
+        "title": "Initial Offline Goal",
+        "state": {
+          "type": "custom",
+          "customType": "preset.session-name.v1",
+          "data": {
+            "progress": {
+              "version": 1,
+              "count": 1,
+              "evaluated": 1,
+              "retryAt": 0,
+              "observedIds": [
+                "5782f3d9"
+              ]
+            },
+            "ownership": {
+              "version": 1,
+              "titleEntryId": "c76fa52c",
+              "title": "Initial Offline Goal",
+              "owned": true
+            }
+          },
+          "id": "a9c83688",
+          "parentId": "c76fa52c",
+          "timestamp": "2026-10-14T07:34:24.451Z"
+        },
+        "names": 1,
+        "mains": 1
+      }
+    },
+    {
+      "case": "03 manual refresh visible success",
+      "status": "PASS",
+      "observation": {
+        "time": 1791963264610,
+        "kind": "observe",
+        "text": "",
+        "sessionId": "01a13955-74b0-7198-ac22-8d64f9b92922",
+        "title": "Manual Offline Refresh",
+        "state": {
+          "type": "custom",
+          "customType": "preset.session-name.v1",
+          "data": {
+            "progress": {
+              "version": 1,
+              "count": 1,
+              "evaluated": 1,
+              "retryAt": 0,
+              "observedIds": [
+                "5782f3d9"
+              ]
+            },
+            "ownership": {
+              "version": 1,
+              "titleEntryId": "213e6e38",
+              "title": "Manual Offline Refresh",
+              "owned": true
+            }
+          },
+          "id": "28e7595f",
+          "parentId": "213e6e38",
+          "timestamp": "2026-10-14T07:34:24.576Z"
+        },
+        "names": 2,
+        "mains": 1
+      }
+    },
+    {
+      "case": "04 config defaults and cancel leaves disk unchanged",
+      "status": "PASS",
+      "disk": null
+    },
+    {
+      "case": "05 disable persisted",
+      "status": "PASS",
+      "disk": {
+        "automatic": false,
+        "interval": 8
+      }
+    },
+    {
+      "case": "06 disabled actual input does not name",
+      "status": "PASS",
+      "observation": {
+        "time": 1791963265240,
+        "kind": "observe",
+        "text": "",
+        "sessionId": "01a13955-74b0-7198-ac22-8d64f9b92922",
+        "title": "Manual Offline Refresh",
+        "state": {
+          "type": "custom",
+          "customType": "preset.session-name.v1",
+          "data": {
+            "progress": {
+              "version": 1,
+              "count": 2,
+              "evaluated": 1,
+              "retryAt": 0,
+              "observedIds": [
+                "5782f3d9",
+                "798b01b1"
+              ]
+            },
+            "ownership": {
+              "version": 1,
+              "titleEntryId": "213e6e38",
+              "title": "Manual Offline Refresh",
+              "owned": true
+            }
+          },
+          "id": "f4b3df82",
+          "parentId": "922af461",
+          "timestamp": "2026-10-14T07:34:24.950Z"
+        },
+        "names": 2,
+        "mains": 2
+      }
+    },
+    {
+      "case": "07 set N through real dialog and persist",
+      "status": "PASS",
+      "disk": {
+        "automatic": false,
+        "interval": 2
+      }
+    },
+    {
+      "case": "08 enable persisted",
+      "status": "PASS",
+      "disk": {
+        "automatic": true,
+        "interval": 2
+      }
+    },
+    {
+      "case": "09 N first input no early call",
+      "status": "PASS",
+      "observation": {
+        "time": 1791963266163,
+        "kind": "observe",
+        "text": "",
+        "sessionId": "01a13955-74b0-7198-ac22-8d64f9b92922",
+        "title": "N Round Baseline",
+        "state": {
+          "type": "custom",
+          "customType": "preset.session-name.v1",
+          "data": {
+            "progress": {
+              "version": 1,
+              "count": 3,
+              "evaluated": 2,
+              "retryAt": 0,
+              "observedIds": [
+                "5782f3d9",
+                "798b01b1",
+                "122b1817"
+              ]
+            },
+            "ownership": {
+              "version": 1,
+              "titleEntryId": "3d7936d6",
+              "title": "N Round Baseline",
+              "owned": true
+            }
+          },
+          "id": "c82387d0",
+          "parentId": "ee2e36ac",
+          "timestamp": "2026-10-14T07:34:25.870Z"
+        },
+        "names": 3,
+        "mains": 3
+      }
+    },
+    {
+      "case": "10 N threshold evaluates once",
+      "status": "PASS",
+      "observation": {
+        "time": 1791963266266,
+        "kind": "observe",
+        "text": "",
+        "sessionId": "01a13955-74b0-7198-ac22-8d64f9b92922",
+        "title": "N Round Updated",
+        "state": {
+          "type": "custom",
+          "customType": "preset.session-name.v1",
+          "data": {
+            "progress": {
+              "version": 1,
+              "count": 4,
+              "evaluated": 4,
+              "retryAt": 0,
+              "observedIds": [
+                "5782f3d9",
+                "798b01b1",
+                "122b1817",
+                "b59e8ec9"
+              ]
+            },
+            "ownership": {
+              "version": 1,
+              "titleEntryId": "abf58e28",
+              "title": "N Round Updated",
+              "owned": true
+            }
+          },
+          "id": "21c299f5",
+          "parentId": "abf58e28",
+          "timestamp": "2026-10-14T07:34:26.231Z"
+        },
+        "names": 4,
+        "mains": 4
+      }
+    },
+    {
+      "case": "11 native name protects against automatic evaluation",
+      "status": "PASS",
+      "observation": {
+        "time": 1791963266799,
+        "kind": "observe",
+        "text": "",
+        "sessionId": "01a13955-74b0-7198-ac22-8d64f9b92922",
+        "title": "Native Protected",
+        "state": {
+          "type": "custom",
+          "customType": "preset.session-name.v1",
+          "data": {
+            "progress": {
+              "version": 1,
+              "count": 6,
+              "evaluated": 4,
+              "retryAt": 0,
+              "observedIds": [
+                "5782f3d9",
+                "798b01b1",
+                "122b1817",
+                "b59e8ec9",
+                "c514f918",
+                "b53624ac"
+              ]
+            },
+            "ownership": {
+              "version": 1,
+              "titleEntryId": "fe74f851",
+              "title": "Native Protected",
+              "owned": false
+            }
+          },
+          "id": "e8b97abe",
+          "parentId": "acaea0c2",
+          "timestamp": "2026-10-14T07:34:26.530Z"
+        },
+        "names": 4,
+        "mains": 6
+      }
+    },
+    {
+      "case": "12 manual resumes auto; failure visible and preserves title",
+      "status": "PASS",
+      "observation": {
+        "time": 1791963267111,
+        "kind": "observe",
+        "text": "",
+        "sessionId": "01a13955-74b0-7198-ac22-8d64f9b92922",
+        "title": "Ownership Resumed",
+        "state": {
+          "type": "custom",
+          "customType": "preset.session-name.v1",
+          "data": {
+            "progress": {
+              "version": 1,
+              "count": 8,
+              "evaluated": 6,
+              "retryAt": 10,
+              "observedIds": [
+                "5782f3d9",
+                "798b01b1",
+                "122b1817",
+                "b59e8ec9",
+                "c514f918",
+                "b53624ac",
+                "ce6b4eaa",
+                "5d41cca9"
+              ]
+            },
+            "ownership": {
+              "version": 1,
+              "titleEntryId": "dd48acbd",
+              "title": "Ownership Resumed",
+              "owned": true
+            }
+          },
+          "id": "bf260151",
+          "parentId": "0c0e734e",
+          "timestamp": "2026-10-14T07:34:27.076Z"
+        },
+        "names": 6,
+        "mains": 8
+      }
+    },
+    {
+      "case": "13 failure retries only after N new inputs",
+      "status": "PASS",
+      "observation": {
+        "time": 1791963267796,
+        "kind": "observe",
+        "text": "",
+        "sessionId": "01a13955-74b0-7198-ac22-8d64f9b92922",
+        "title": "Retry After Two Inputs",
+        "state": {
+          "type": "custom",
+          "customType": "preset.session-name.v1",
+          "data": {
+            "progress": {
+              "version": 1,
+              "count": 10,
+              "evaluated": 10,
+              "retryAt": 0,
+              "observedIds": [
+                "5782f3d9",
+                "798b01b1",
+                "122b1817",
+                "b59e8ec9",
+                "c514f918",
+                "b53624ac",
+                "ce6b4eaa",
+                "5d41cca9",
+                "600b0e2c",
+                "d3a1401c"
+              ]
+            },
+            "ownership": {
+              "version": 1,
+              "titleEntryId": "091f8d6f",
+              "title": "Retry After Two Inputs",
+              "owned": true
+            }
+          },
+          "id": "ec1efbf4",
+          "parentId": "091f8d6f",
+          "timestamp": "2026-10-14T07:34:27.763Z"
+        },
+        "names": 7,
+        "mains": 10
+      }
+    },
+    {
+      "case": "14 new actual input cancels late response",
+      "status": "PASS",
+      "observation": {
+        "time": 1791963268317,
+        "kind": "observe",
+        "text": "",
+        "sessionId": "01a13955-74b0-7198-ac22-8d64f9b92922",
+        "title": "Fresh After Cancellation",
+        "state": {
+          "type": "custom",
+          "customType": "preset.session-name.v1",
+          "data": {
+            "progress": {
+              "version": 1,
+              "count": 13,
+              "evaluated": 13,
+              "retryAt": 0,
+              "observedIds": [
+                "5782f3d9",
+                "798b01b1",
+                "122b1817",
+                "b59e8ec9",
+                "c514f918",
+                "b53624ac",
+                "ce6b4eaa",
+                "5d41cca9",
+                "600b0e2c",
+                "d3a1401c",
+                "fe5af4be",
+                "05e9e116",
+                "9e8ce78b"
+              ]
+            },
+            "ownership": {
+              "version": 1,
+              "titleEntryId": "91d5f4d2",
+              "title": "Fresh After Cancellation",
+              "owned": true
+            }
+          },
+          "id": "4637e103",
+          "parentId": "91d5f4d2",
+          "timestamp": "2026-10-14T07:34:28.008Z"
+        },
+        "names": 9,
+        "mains": 13
+      }
+    },
+    {
+      "case": "15 actual session replacement cancels old response",
+      "status": "PASS",
+      "observation": {
+        "time": 1791963268614,
+        "kind": "observe",
+        "text": "",
+        "sessionId": "01a13955-85c9-7198-ac22-8d6694561d1a",
+        "title": null,
+        "names": 0,
+        "mains": 0
+      }
+    },
+    {
+      "case": "16 persisted global config works in new session",
+      "status": "PASS",
+      "observation": {
+        "time": 1791963268720,
+        "kind": "observe",
+        "text": "",
+        "sessionId": "01a13955-85c9-7198-ac22-8d6694561d1a",
+        "title": "New Session First Title",
+        "state": {
+          "type": "custom",
+          "customType": "preset.session-name.v1",
+          "data": {
+            "progress": {
+              "version": 1,
+              "count": 1,
+              "evaluated": 1,
+              "retryAt": 0,
+              "observedIds": [
+                "8a26f1fd"
+              ]
+            },
+            "ownership": {
+              "version": 1,
+              "titleEntryId": "06105d8c",
+              "title": "New Session First Title",
+              "owned": true
+            }
+          },
+          "id": "6c6e1e43",
+          "parentId": "06105d8c",
+          "timestamp": "2026-10-14T07:34:28.683Z"
+        },
+        "names": 1,
+        "mains": 1
+      }
+    }
+  ],
+  "cleanup": {
+    "natural_cli_exit": true,
+    "pane_dead_status": "0",
+    "actual_pid_gone": true,
+    "cli_pid": 19043,
+    "unique_server_stopped": true,
+    "server_probe": {
+      "returncode": 1,
+      "stderr": "no server running on /private/tmp/tmux-501/name-name-tmux-byk4v62o"
+    },
+    "isolated_config_removed": true
+  },
+  "root": "/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-byk4v62o",
+  "server": "name-name-tmux-byk4v62o",
+  "width": 140,
+  "height": 40,
+  "theme": "dark",
+  "mode": "fullscreen",
+  "product_hashes_before": {
+    "extensions/session-name.ts": "e9bb3d55e4e4d4a65c38a01b077d98987c74f9b7bf21a27b8b9bb8e2a4dbb574",
+    "extensions/status-bar.ts": "aba28df29e69793c7e21ce8cb07ee2bd03a45d7024bcdbe35dffb1c42f931df0",
+    "extensions/session-name/config.ts": "c6e029b0d3aaa3c8df03906041f23a23999f4f27de0239a89dc6a4c984763905",
+    "extensions/session-name/index.ts": "8240d85405b52e014dfe0e76cb7b73217031a9079d7e339b4a3c7d957da7742a",
+    "extensions/session-name/title.ts": "ac8654c0880f44f6ed408f5b85681a1a60a736eb0e85b79444afb565e3871117",
+    "extensions/session-assist/context.ts": "93800d5914cf7a2baabe15126fa29d399059349b64c3345a077a999003f9759f",
+    "extensions/session-assist/request.ts": "4d693d9147dbf00458394f14ac65fd42a7ab423779c73e17dc3a8dd5f836099f"
+  },
+  "command": "exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-byk4v62o/home USERPROFILE=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-byk4v62o/home XDG_CONFIG_HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-byk4v62o/home/.config PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-byk4v62o/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-byk4v62o/sessions NAME_TMUX_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-byk4v62o PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-byk4v62o/terminal.raw PATH=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-byk4v62o GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-byk4v62o/sessions --use-theme dark --tui-mode fullscreen --tools read --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-14-builtin-session-name/research/tmux-validation/probe.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/session-name.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/status-bar.ts --model name-offline/scripted --thinking off",
+  "tmux_command": "/opt/homebrew/bin/tmux -L name-name-tmux-byk4v62o -f /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-byk4v62o/tmux.conf new-session -d -s check -x 140 -y 40 -c /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-byk4v62o/cwd 'exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-byk4v62o/home USERPROFILE=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-byk4v62o/home XDG_CONFIG_HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-byk4v62o/home/.config PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-byk4v62o/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-byk4v62o/sessions NAME_TMUX_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-byk4v62o PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-byk4v62o/terminal.raw PATH=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-byk4v62o GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-byk4v62o/sessions --use-theme dark --tui-mode fullscreen --tools read --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-14-builtin-session-name/research/tmux-validation/probe.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/session-name.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/status-bar.ts --model name-offline/scripted --thinking off'",
+  "versions": {
+    "pi": "1.2.0",
+    "node": "v24.14.1",
+    "tmux": "tmux 3.6a"
+  },
+  "isolated_config_final": {
+    "automatic": true,
+    "interval": 2
+  },
+  "elapsed_seconds": 5.24,
+  "product_hashes_after": {
+    "extensions/session-name.ts": "e9bb3d55e4e4d4a65c38a01b077d98987c74f9b7bf21a27b8b9bb8e2a4dbb574",
+    "extensions/status-bar.ts": "aba28df29e69793c7e21ce8cb07ee2bd03a45d7024bcdbe35dffb1c42f931df0",
+    "extensions/session-name/config.ts": "c6e029b0d3aaa3c8df03906041f23a23999f4f27de0239a89dc6a4c984763905",
+    "extensions/session-name/index.ts": "8240d85405b52e014dfe0e76cb7b73217031a9079d7e339b4a3c7d957da7742a",
+    "extensions/session-name/title.ts": "ac8654c0880f44f6ed408f5b85681a1a60a736eb0e85b79444afb565e3871117",
+    "extensions/session-assist/context.ts": "93800d5914cf7a2baabe15126fa29d399059349b64c3345a077a999003f9759f",
+    "extensions/session-assist/request.ts": "4d693d9147dbf00458394f14ac65fd42a7ab423779c73e17dc3a8dd5f836099f"
+  },
+  "product_code_unchanged": true,
+  "exit_status": 0,
+  "not_run": [
+    "online model quality",
+    "physical keyboard/IME",
+    "other themes/modes/widths",
+    "120-second deadline",
+    "branch navigation",
+    "concurrent commands/third-party extensions"
+  ]
+}

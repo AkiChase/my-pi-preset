@@ -1,0 +1,40 @@
+
+ Warning: fd not found. Offline mode enabled, skipping download.
+
+ NAME_TMUX_READY
+
+
+ Build a local offline session naming validator
+
+
+ OFFLINE_MAIN_OK 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-pzdu5ack/cwd  • Initial Offline Goal
+▰▱▱▱▱▱▱▱▱▱▱▱▱▱  1% 1.4k/128k                                                                                                        scripted
+↑697 ↓5 W697 H0%

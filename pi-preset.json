@@ -1,7 +1,6 @@
 {
   "packages": {
     "git:github.com/AkiChase/my-pi-preset": "latest",
-    "npm:pi-session-name": "latest",
     "npm:pi-cache-optimizer": "latest",
     "npm:pi-input-history": "latest",
     "npm:pi-web-access": "latest",
@@ -12,7 +11,8 @@
   "conflicts": [
     "npm:pi-patty-bg-tasks",
     "npm:@heyhuynhgiabuu/pi-pretty",
-    "npm:@tintinweb/pi-subagents"
+    "npm:@tintinweb/pi-subagents",
+    "npm:pi-session-name"
   ],
   "settings": {
     "retry": {

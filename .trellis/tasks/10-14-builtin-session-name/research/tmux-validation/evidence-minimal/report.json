@@ -1,0 +1,145 @@
+{
+  "status": "FAIL",
+  "error": "Timeout: actual select menu",
+  "cases": [
+    {
+      "case": "01 isolated installed CLI startup",
+      "status": "PASS",
+      "pid": 961
+    },
+    {
+      "case": "02 first actual user input creates auto title",
+      "status": "PASS",
+      "observation": {
+        "time": 1791962666223,
+        "kind": "observe",
+        "text": "",
+        "sessionId": "01a1394c-53d6-735a-b160-3178503557ad",
+        "title": "Initial Offline Goal",
+        "state": {
+          "type": "custom",
+          "customType": "preset.session-name.v1",
+          "data": {
+            "progress": {
+              "version": 1,
+              "count": 1,
+              "evaluated": 1,
+              "retryAt": 0,
+              "observedIds": [
+                "266e0269"
+              ]
+            },
+            "ownership": {
+              "version": 1,
+              "titleEntryId": "584252a5",
+              "title": "Initial Offline Goal",
+              "owned": true
+            }
+          },
+          "id": "7f519733",
+          "parentId": "584252a5",
+          "timestamp": "2026-10-14T07:24:26.176Z"
+        },
+        "names": 1,
+        "mains": 1
+      }
+    },
+    {
+      "case": "03 manual refresh visible success",
+      "status": "PASS",
+      "observation": {
+        "time": 1791962666305,
+        "kind": "observe",
+        "text": "",
+        "sessionId": "01a1394c-53d6-735a-b160-3178503557ad",
+        "title": "Manual Offline Refresh",
+        "state": {
+          "type": "custom",
+          "customType": "preset.session-name.v1",
+          "data": {
+            "progress": {
+              "version": 1,
+              "count": 1,
+              "evaluated": 1,
+              "retryAt": 0,
+              "observedIds": [
+                "266e0269"
+              ]
+            },
+            "ownership": {
+              "version": 1,
+              "titleEntryId": "9c53b14b",
+              "title": "Manual Offline Refresh",
+              "owned": true
+            }
+          },
+          "id": "7596087c",
+          "parentId": "9c53b14b",
+          "timestamp": "2026-10-14T07:24:26.267Z"
+        },
+        "names": 2,
+        "mains": 1
+      }
+    },
+    {
+      "case": "interruption (fixture/product classification requires review)",
+      "status": "FAIL",
+      "error": "Timeout: actual select menu"
+    }
+  ],
+  "cleanup": {
+    "natural_cli_exit": false,
+    "quit_error": "Timeout: own CLI quit",
+    "actual_pid_gone": true,
+    "cli_pid": 961,
+    "unique_server_stopped": true,
+    "server_probe": {
+      "returncode": 1,
+      "stderr": "no server running on /private/tmp/tmux-501/name-name-tmux-uot1ekxl"
+    },
+    "isolated_config_removed": true
+  },
+  "root": "/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-uot1ekxl",
+  "server": "name-name-tmux-uot1ekxl",
+  "width": 140,
+  "height": 40,
+  "theme": "dark",
+  "mode": "fullscreen",
+  "product_hashes_before": {
+    "extensions/session-name.ts": "e9bb3d55e4e4d4a65c38a01b077d98987c74f9b7bf21a27b8b9bb8e2a4dbb574",
+    "extensions/status-bar.ts": "aba28df29e69793c7e21ce8cb07ee2bd03a45d7024bcdbe35dffb1c42f931df0",
+    "extensions/session-name/config.ts": "c6e029b0d3aaa3c8df03906041f23a23999f4f27de0239a89dc6a4c984763905",
+    "extensions/session-name/index.ts": "8240d85405b52e014dfe0e76cb7b73217031a9079d7e339b4a3c7d957da7742a",
+    "extensions/session-name/title.ts": "ac8654c0880f44f6ed408f5b85681a1a60a736eb0e85b79444afb565e3871117",
+    "extensions/session-assist/context.ts": "93800d5914cf7a2baabe15126fa29d399059349b64c3345a077a999003f9759f",
+    "extensions/session-assist/request.ts": "4d693d9147dbf00458394f14ac65fd42a7ab423779c73e17dc3a8dd5f836099f"
+  },
+  "command": "exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-uot1ekxl/home USERPROFILE=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-uot1ekxl/home XDG_CONFIG_HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-uot1ekxl/home/.config PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-uot1ekxl/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-uot1ekxl/sessions NAME_TMUX_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-uot1ekxl PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-uot1ekxl/terminal.raw PATH=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-uot1ekxl GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-uot1ekxl/sessions --use-theme dark --tui-mode fullscreen --tools read --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-14-builtin-session-name/research/tmux-validation/probe.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/session-name.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/status-bar.ts --model name-offline/scripted --thinking off",
+  "tmux_command": "/opt/homebrew/bin/tmux -L name-name-tmux-uot1ekxl -f /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-uot1ekxl/tmux.conf new-session -d -s check -x 140 -y 40 -c /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-uot1ekxl/cwd 'exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-uot1ekxl/home USERPROFILE=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-uot1ekxl/home XDG_CONFIG_HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-uot1ekxl/home/.config PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-uot1ekxl/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-uot1ekxl/sessions NAME_TMUX_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-uot1ekxl PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-uot1ekxl/terminal.raw PATH=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-uot1ekxl GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/name-tmux-uot1ekxl/sessions --use-theme dark --tui-mode fullscreen --tools read --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-14-builtin-session-name/research/tmux-validation/probe.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/session-name.ts --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/status-bar.ts --model name-offline/scripted --thinking off'",
+  "versions": {
+    "pi": "1.2.0",
+    "node": "v24.14.1",
+    "tmux": "tmux 3.6a"
+  },
+  "traceback": "Traceback (most recent call last):\n  File \"/Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-14-builtin-session-name/research/tmux-validation/driver.py\", line 88, in <module>\n    open_config();txt=capture('config-defaults');key('Escape');wait(lambda:'Session naming (automatic' not in screen(),'select canceled')\n    ~~~~~~~~~~~^^\n  File \"/Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-14-builtin-session-name/research/tmux-validation/driver.py\", line 69, in open_config\n    send('/session-name config');wait(lambda:'Session naming (automatic' in screen(),'actual select menu')\n                                 ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-14-builtin-session-name/research/tmux-validation/driver.py\", line 37, in wait\n    raise RuntimeError('Timeout: '+label)\nRuntimeError: Timeout: actual select menu\n",
+  "elapsed_seconds": 14.93,
+  "product_hashes_after": {
+    "extensions/session-name.ts": "e9bb3d55e4e4d4a65c38a01b077d98987c74f9b7bf21a27b8b9bb8e2a4dbb574",
+    "extensions/status-bar.ts": "aba28df29e69793c7e21ce8cb07ee2bd03a45d7024bcdbe35dffb1c42f931df0",
+    "extensions/session-name/config.ts": "c6e029b0d3aaa3c8df03906041f23a23999f4f27de0239a89dc6a4c984763905",
+    "extensions/session-name/index.ts": "8240d85405b52e014dfe0e76cb7b73217031a9079d7e339b4a3c7d957da7742a",
+    "extensions/session-name/title.ts": "ac8654c0880f44f6ed408f5b85681a1a60a736eb0e85b79444afb565e3871117",
+    "extensions/session-assist/context.ts": "93800d5914cf7a2baabe15126fa29d399059349b64c3345a077a999003f9759f",
+    "extensions/session-assist/request.ts": "4d693d9147dbf00458394f14ac65fd42a7ab423779c73e17dc3a8dd5f836099f"
+  },
+  "product_code_unchanged": true,
+  "exit_status": 1,
+  "not_run": [
+    "online model quality",
+    "physical keyboard/IME",
+    "other themes/modes/widths",
+    "120-second deadline",
+    "branch navigation",
+    "concurrent commands/third-party extensions"
+  ]
+}

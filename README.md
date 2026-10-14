@@ -6,7 +6,7 @@
 
 - 清单：[`pi-preset.json`](pi-preset.json)，记录要装哪些包、装什么版本、哪些包不能装，以及哪些 pi 设置和键位由本仓库说了算
 - 同步：[`install.sh`](install.sh) 和 [`scripts/sync.mjs`](scripts/sync.mjs)，负责把本机状态对齐到清单
-- 扩展：[`extensions/`](extensions)，本仓库自带的五个扩展，pi 安装本仓库时会自动发现
+- 扩展：[`extensions/`](extensions)，本仓库自带的扩展，pi 安装本仓库时会按显式声明加载
 
 本仓库自己也是清单里的一条（`git:github.com/AkiChase/my-pi-preset`），默认和其他包一样从远程安装、被 pi 管理和更新。本地开发可用 `./install.sh --dev` 只把本仓库切换为当前检出，第三方包仍按清单使用远程来源。
 
@@ -95,7 +95,7 @@ pi update --extensions   # 更新本仓库的扩展，以及已装的包
 ./install.sh --sync settings  # 只把设置对齐过去
 ./install.sh --prune     # 顺手清掉清单外的包、设置键和键位
 ```
-pi 里只有一个本仓库自带的命令：`/statusbar`，在自定义状态栏和 pi 内置 footer 之间切换。其余扩展各自的命令、快捷键和配置文件，都在下面两节里。
+pi 里的本仓库命令包括 `/statusbar`（切换 footer）、`/session-name`（刷新标题）、`/session-name config`（配置自动命名），以及任务管理入口；各扩展的命令、快捷键和配置文件见下文。
 
 ## 这里有什么
 
@@ -103,7 +103,7 @@ pi 里只有一个本仓库自带的命令：`/statusbar`，在自定义状态�
 
 | 包 | 作用 | 配置文件 | 快捷键 |
 | --- | --- | --- | --- |
-| [`pi-session-name`](#npmpi-session-name) | 自动生成会话标题，同步到终端标题栏 | 无 | 无 |
+| [`session-name`](#extensionssession-namets--会话命名) | 手动刷新与 N 轮自动评估会话标题 | `~/.pi/agent/session-name.json` | 无 |
 | [`pi-cache-optimizer`](#npmpi-cache-optimizer) | 提高缓存命中率，显示命中统计 | `~/.pi/agent/pi-cache-optimizer-config.json` | 无 |
 | [`pi-input-history`](#npmpi-input-history) | 跨会话的输入历史，模糊反向搜索 | `~/.pi/agent/pi-input-history.json`，由清单声明 | `alt+r`，可改 |
 | [`pi-web-access`](#npmpi-web-access) | 联网：搜索、抓取、PDF、GitHub、视频 | `~/.pi/agent/web-search.json` | `ctrl+shift+s` 等，可改 |
@@ -116,7 +116,7 @@ pi 里只有一个本仓库自带的命令：`/statusbar`，在自定义状态�
 | [`at-path-completion`](#extensionsat-path-completionts--路径连续补全) | `@` 目录连续原生提示，只展示不自动接受下一层 | 无 | 沿用原生 Tab／Enter／Escape |
 | [`beautify`](#extensionsbeautifyts--工具与输入框美化) | 六类工具单行展示与输入框外观 | 无 | 沿用 pi 工具展开键 |
 
-表中的 session-name、cache-optimizer、input-history、web-access、memory、ask-user-question、recap 是普通第三方包，由 pi 从 npm 安装，来源写在 [`pi-preset.json`](pi-preset.json) 的 `packages` 里，本仓库不动它们的代码。
+表中的 cache-optimizer、input-history、web-access、memory、ask-user-question、recap 是普通第三方包，由 pi 从 npm 安装，来源写在 [`pi-preset.json`](pi-preset.json) 的 `packages` 里，本仓库不动它们的代码。
 
 process-tasks 和 agent-tasks 是一次性拷贝后由本仓库维护的代码，分别来自 patty 和 `pi-subagents@0.20.0`，由 `extensions/task-composition.ts` 组合加载；beautify 独立负责展示。原后端 upstream 包仍在清单 `conflicts` 中，不能独立安装；standalone Pretty 也保留在 conflicts 中，因为它会与 beautify 争用四类 renderer 和输入框，但本仓库不再加载或依赖 Pretty。
 
@@ -127,16 +127,6 @@ process-tasks 和 agent-tasks 是一次性拷贝后由本仓库维护的代码�
 ### 第三方包
 
 下面这些「配置」小节写的都是扩展自己的配置入口，包括文件路径、键名、默认值和环境变量。pi 本体的键位怎么改、冲突怎么判，统一放在 [配置扩展](#配置扩展) 里。
-
-#### `npm:pi-session-name`
-
-> 来源：[npm](https://www.npmjs.com/package/pi-session-name) · [GitHub](https://github.com/ttttmr/pi-session-name)
-
-拿会话的第一条用户输入，让当前模型生成一句短标题写进会话名，同时把 agent 的忙闲状态同步到终端标题栏（运行中 `· <会话名>`，空闲 `✳ <会话名>`）。生成失败会重试三次，之后就安静放弃，不报错。
-
-**提供**：没有工具、命令、快捷键，只挂 `input`、`agent_start`、`agent_end` 三个事件。
-
-**配置**：无任何配置项，标题来源和符号都写死在源码里。
 
 #### `npm:pi-cache-optimizer`
 
@@ -248,9 +238,23 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 
 ### 由本仓库代为加载的包
 
-`pi-patty-bg-tasks` 和 `@tintinweb/pi-subagents` 的代码已分别成为 [process-tasks](#extensionsprocess-tasks--进程与-monitor-后端) 和 [agent-tasks](#extensionsagent-taskssrcindexts--子-agent-和-workflow-后端)，不再作为 npm 依赖安装。清单仍以原来源声明 conflicts，防止 standalone 工具重复注册。
+`pi-patty-bg-tasks` 和 `@tintinweb/pi-subagents` 的代码已分别成为 [process-tasks](#extensionsprocess-tasks--进程与-monitor-后端) 和 [agent-tasks](#extensionsagent-taskssrcindexts--子-agent-和-workflow-后端)，不再作为 npm 依赖安装。清单仍以原来源声明 conflicts，防止 standalone 工具重复注册。会话命名已改为本仓库的独立实现，`npm:pi-session-name` 也在 conflicts 中，不再加载旧包；已有标题不清空，终端标题交由 Pi 原生维护，不保留旧包的忙闲特殊符号。
 
 ### 本仓库自带的扩展
+
+#### `extensions/session-name.ts` —— 会话命名
+
+独立入口，嵌套 `session-name/` 与 `session-assist/` 只作为库导入，不重复加载。参考旧包的功能目的后重新实现；来源说明见 [PROVENANCE.md](extensions/session-name/PROVENANCE.md)。
+
+- `/session-name`：等待当前工作空闲后，用当前对话重新评估标题。成功后恢复自动管理；失败显示英文消息并保留旧标题。
+- `/session-name config`：启用／关闭自动命名、设置 N。配置全局持久化到 `~/.pi/agent/session-name.json`（随 `PI_CODING_AGENT_DIR`），默认 `{ "automatic": true, "interval": 8 }`，N 接受 1–10000 的整数。菜单取消不保存；坏 JSON 不覆盖。没有会话覆盖层或环境变量，清单不强制发放默认值，避免同步重置个人选择。
+- 无标题时，在第一批可确认用户输入处理 settled 后生成；之后每 N 次有效输入评估一次。原标题仍准确可不改，但成功评估会推进计数。失败提示一条可见消息，再累计 N 次有效输入后自动重试，不在同边界循环；手动刷新随时可试。
+- 普通 interactive/RPC steering、follow-up 输入可计数；斜杠命令（含 skill/template）、插件注入、工具循环和未交付队列不计。SDK 不持久化可靠输入来源，采用启用后的输入候选与实际交付消息保守匹配；旧历史、被其他扩展变换的输入和歧义重复输入可能少计，不声称任意插件组合下精确计数。已交付且 settled 的输入计数，即使主请求失败；用户 abort 的边界不自动发起命名。
+- `/name` 或外部改名会暂停自动覆盖，已有未知来源标题也保守保护；仅本命令刷新成功重新交给自动管理。标题与保护是整个会话的，不随分支独立命名。迟到响应不能覆盖新输入、换分支、用户改名或关闭后的会话；不承诺监听其他进程直接编辑会话文件。
+
+请求使用 Pi 公共模型接口，跟随当前模型与当前思考等级，不改主对话设置、不自行认证／HTTP／payload 改写，不强制 off/low 或小输出上限。当前 off 按公共 API 以未指定 reasoning 表示；provider 不支持时正常报失败，不自动降级。读取当前分支的有效投影，保留既有压缩／分支摘要与用户／助手可见文字，排除 thinking、工具调用／结果、插件状态和 shell 日志；只使用文字，不上传图片。不会主动 compact、另调模型总结、截取近期窗口或按插件输入阈值跳过。长上下文及高思考等级成本不固定，可调大 N 或关闭自动更新。
+
+旁路请求默认 120 秒总截止时间，正常失效取消不报错；释放自有 timer/listener，但不能强制终止不响应 signal 的第三方 provider 内部 promise。标题保存由 Pi 原生 API 完成，现有 status-bar 沿用会话名，无新增 footer 或忙闲标题动画。
 
 #### `extensions/agent-tasks/src/index.ts` —— 子 agent 和 workflow 后端
 
@@ -462,7 +466,7 @@ pi 自己其实把信号发出来了 —— `ui_prompt_start` / `ui_prompt_end` 
 | `~/.pi/agent/memory/` | `pi-memory` 的数据目录（不是配置），可用 `PI_MEMORY_DIR` 改写；配置只有 `PI_MEMORY_*` 环境变量 |
 | `~/.pi/agent/process-tasks.json` | 本仓库 process-tasks，超时、并发、日志目录及 monitor 执行参数；所有键也能用 `PROCESS_TASKS_*` 覆盖，不包含公共快捷键 |
 | `~/.pi/agent/task-ui.json` | 本仓库共享任务 UI，面板／转后台快捷键及 `downOpener`（默认 true）；不读取进程配置或环境变量中的旧快捷键 |
-| 无 | `pi-session-name` 全部硬编码，没有任何配置入口 |
+| `~/.pi/agent/session-name.json` | 本仓库 session-name，全局自动开关与 N；由 `/session-name config` 保存，不由清单强制覆盖 |
 
 `~/.pi/agent` 这个 agent 目录可以用 `PI_CODING_AGENT_DIR` 改写，上面带这个前缀的路径都会跟着走。改完文件之后在 pi 里 `/reload`；少数影响工具 schema 的键（见 agent-tasks 那节）要重启 pi。
 
@@ -511,10 +515,10 @@ pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDING
 {
   "packages": {
     "git:github.com/AkiChase/my-pi-preset": "latest",
-    "npm:pi-session-name": "latest",
+    "npm:pi-cache-optimizer": "latest",
     "npm:some-tool": "^2.1.0"
   },
-  "conflicts": ["npm:pi-patty-bg-tasks", "npm:@heyhuynhgiabuu/pi-pretty", "npm:@tintinweb/pi-subagents"],
+  "conflicts": ["npm:pi-patty-bg-tasks", "npm:@heyhuynhgiabuu/pi-pretty", "npm:@tintinweb/pi-subagents", "npm:pi-session-name"],
   "settings": { "retry": { "maxRetries": 5 } },
   "keybindings": { "tui.editor.jumpForward": [] },
   "files": {
@@ -640,7 +644,7 @@ pnpm test               # 只跑 node --test
 ./install.sh --dry-run  # 看看这台机器缺什么
 ```
 
-测试用 `node --test`，没有第三方框架。全部测试都不联网、不碰 `~/.pi`：`scripts/sync.test.mjs` 会使用假的 `pi`，并把 `PI_CODING_AGENT_DIR` 指到临时目录，所以配置读写都发生在那里。它还用带空格路径的临时 git 检出验证 `install.sh --dev`：远程/本地双向切换、不同 git 写法和 ref、重复执行、两份同时注册、移除失败中止、dry-run、域选择、非法检出及管道安装拒绝；第三方包和 prune 保持原来的行为。`scripts/pi-manifest.test.mjs` 只读本仓库清单，校验所有顶层扩展被声明、nested 后端未作为入口、standalone upstream 只在 conflicts，以及运行依赖与 host SDK 边界。
+测试用 `node --test`，没有第三方框架。会话命名可定向运行 `node --test extensions/session-name/__tests__/*.test.ts extensions/session-assist/__tests__/*.test.ts`，使用临时 agent 目录且不带 force-exit；覆盖实际 SDK 投影、保守计数、手动保护、失败退避和取消，不把离线 fake provider 当作在线标题质量验收。全部测试都不联网、不碰 `~/.pi`：`scripts/sync.test.mjs` 会使用假的 `pi`，并把 `PI_CODING_AGENT_DIR` 指到临时目录，所以配置读写都发生在那里。它还用带空格路径的临时 git 检出验证 `install.sh --dev`：远程/本地双向切换、不同 git 写法和 ref、重复执行、两份同时注册、移除失败中止、dry-run、域选择、非法检出及管道安装拒绝；第三方包和 prune 保持原来的行为。`scripts/pi-manifest.test.mjs` 只读本仓库清单，校验所有顶层扩展被声明、nested 后端未作为入口、standalone upstream 只在 conflicts，以及运行依赖与 host SDK 边界。
 
 轮次接口回归位于 `tool-waits.test.ts`、`backend-waits.test.ts` 与 `runner-cancellation.test.ts`，执行实际工具／manager／runner／临时 ScheduleStore／RPC，覆盖旧参数忽略、用户及 frontmatter 限额、无限制、resume 显示与通知一致、可信程序入口上限保留，以及异步 bind 期间默认值变化不改变本次上限。
 

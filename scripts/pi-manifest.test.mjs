@@ -71,6 +71,14 @@ describe("package.json pi.extensions", () => {
     assert.equal(existsSync(join(root, "extensions/agent-tasks/LICENSE.upstream")), true);
   });
 
+  it("loads session naming once and removes its external counterpart", () => {
+    assert.equal(declaredExtensions().filter(path => path === "extensions/session-name.ts").length, 1);
+    assert.equal(declaredExtensions().some(path => path.startsWith("extensions/session-assist/")), false);
+    assert.ok(preset.conflicts.includes("npm:pi-session-name"));
+    assert.equal(Object.hasOwn(preset.packages, "npm:pi-session-name"), false);
+    assert.equal(Object.hasOwn(preset.files, "session-name.json"), false);
+  });
+
   it("covers the resource types this repo ships", () => {
     // A pi manifest switches off convention discovery for the types it does not list, so a
     // new skills/ or prompts/ directory is silently ignored until it is declared here.
