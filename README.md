@@ -1,668 +1,116 @@
 # my-pi-preset
 
-个人 [pi](https://pi.dev) 配置预设。
+个人 [Pi](https://pi.dev) 配置预设：一份包清单、一个同步脚本和一组自带扩展，让不同机器使用同一套插件、配置与快捷键。
 
-内容很简单：一份清单，一个同步脚本，几个自己写的扩展。在新机器上跑一条命令，pi 就装成我平时用的样子：第三方扩展备齐，自定义状态栏就位，几个扩展之间的冲突也已经处理掉，pi 本体的几个偏好和键位也一并对齐。
-
-- 清单：[`pi-preset.json`](pi-preset.json)，记录要装哪些包、装什么版本、哪些包不能装，以及哪些 pi 设置和键位由本仓库说了算
-- 同步：[`install.sh`](install.sh) 和 [`scripts/sync.mjs`](scripts/sync.mjs)，负责把本机状态对齐到清单
-- 扩展：[`extensions/`](extensions)，本仓库自带的扩展，pi 安装本仓库时会按显式声明加载
-
-本仓库自己也是清单里的一条（`git:github.com/AkiChase/my-pi-preset`），默认和其他包一样从远程安装、被 pi 管理和更新。本地开发可用 `./install.sh --dev` 只把本仓库切换为当前检出，第三方包仍按清单使用远程来源。
+- [pi-preset.json](pi-preset.json)：包来源、版本、冲突和受管理配置。
+- [插件文档](docs/index.md)：全部预设插件的用法、命令、配置和限制。
 
 ## 安装
 
-在新机器上，跑一条命令就行：
+机器上需已有 `pi`、`node` 和 `curl`：
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/AkiChase/my-pi-preset/main/install.sh | sh
 ```
 
-本地已经有检出的话，直接执行脚本，效果一样：
+已有本地检出时：
 
 ```sh
+./install.sh --dry-run  # 先看计划，不改本机
 ./install.sh
 ```
 
-想先看看会发生什么，不动手：
+完成后在 Pi 中 `/reload`，或重启 Pi。脚本只管理用户级包及 agent 目录配置，不修改项目 `.pi/`。
+
+### 使用本地检出
+
+普通安装仍使用清单中的远程来源。要加载当前检出：
 
 ```sh
-./install.sh --dry-run
-```
-
-前提是机器上有 `pi`、`node`、`curl`。装完后在 pi 里 `/reload`，或者重启 pi。
-
-### 测试本地修改
-
-普通 `./install.sh` 即使用了本地清单，装的仍是远程版；未提交、未推送的扩展修改不会被加载。想直接测试当前检出：
-
-```sh
-pnpm install               # 先装本地运行时和开发依赖；pi 不会替本地包装依赖
+pnpm install
 ./install.sh --dev --dry-run
 ./install.sh --dev
 ```
 
-然后在 pi 里执行 `/reload`，用 `/process-tasks-version` 确认路径指向当前检出的 `extensions/process-tasks`，而不是 `~/.pi/agent/git/`。没有构建或复制步骤，改本地文件后再 `/reload` 即可。
+随后 `/reload`，可用 `/process-tasks-version` 查看加载路径。`--dev` 只切换本仓库，第三方包仍按清单安装；不修改清单。切回远程版，在同一个检出运行普通 `./install.sh` 后再 `/reload`。
 
-`--dev` 的路径取自执行的 `scripts/sync.mjs` 所在的 git 检出，不取当前工作目录；带空格的路径也支持。它只在内存中替换本仓库的来源，**不改 `pi-preset.json`**。第三方包、配置、域选择和 prune 的语义都不变。切换时会先移除用户级远程注册（包括不同 URL 写法和 ref），再注册本地绝对路径；两份已同时存在时只移除相反来源。本地已经注册则保留，不调 `pi update`。
+必须在本仓库完整独立检出中使用 `--dev`，不能在 Pi 管理的克隆、下载的单文件或 `curl | sh` 中使用。来源切换的移除失败会中止后续安装和配置写入，避免重复注册。只选择配置域或使用 dry-run 时不会切换来源。
 
-测试完，在同一个检出执行普通 `./install.sh`，会先移除这个检出的本地注册，再安装或更新清单里的远程版；随后 `/reload`。任一来源切换的移除失败都会中止，避免继续安装造成重复工具注册。切换只在 `packages` 域被选中时发生；`--sync settings` / `--sync none` 不会切换来源，`--dry-run` 不执行安装、更新、移除或配置写入。
-
-`--dev` 必须从本仓库完整的独立 git 检出执行；不要在 pi 管理的 `~/.pi/agent/git/` 克隆中使用，否则移除远程来源会删掉当前检出，脚本会拒绝这种切换。下载的单文件或 `curl | sh` 也不支持，脚本会报错而不是把临时目录装进去。脚本仍只管用户级包，不修改项目 `.pi/`，也不会移除另一条本地检出路径；如手动安装过这些来源，需自行检查重复注册。
-
-清单文件从 `pi-packages.json` 改名成了 `pi-preset.json`。本地还是老检出、或者手里存了老 `install.sh` 的机器上，它会去下一个已经不存在的文件并报 `could not download pi-packages.json`；`git pull` 或者重跑上面那条 curl 命令即可。
-
-### 命令行选项
-
-同步分四个域：`packages`（走 `pi install` / `pi update` / `pi remove`）、`settings`（写 `~/.pi/agent/settings.json`）、`keybindings`（写 `~/.pi/agent/keybindings.json`）、`files`（写 agent 目录下各扩展自己的配置文件，比如 `pi-input-history.json`）。每个域可以单独选，选中的域各自跑在两种模式之一。
-
-| 选项 | 作用 |
-| --- | --- |
-| `--sync <域>` | 要对齐哪些域，逗号分隔，可写 `all` / `none`，默认 `all` |
-| `--prune [<域>]` | 哪些域完全以清单为准，默认 `none`；裸写 `--prune` 或 `--prune all` 等于「`--sync` 选中的全部域」 |
-| `--dev` | 只把本仓库替换为执行脚本所在 git 检出的绝对路径，第三方包仍用远程；只在同步 `packages` 时切换 |
-| `--dry-run` | 只打印计划，不做任何改动 |
-
-```sh
-./install.sh                             # 四个域全同步，全 merge；本仓库用远程
-./install.sh --dev                       # 本仓库用当前检出，第三方包仍用远程
-./install.sh --sync settings             # 只对齐设置，不碰包
-./install.sh --prune packages            # 包以清单为准，配置仍是 merge
-./install.sh --prune                     # 四个域都以清单为准
-./install.sh --sync packages,settings --dry-run
-```
-
-两种模式：
-
-- **merge**（默认）：只对齐清单声明的那些条目，清单没提的一律不动（`conflicts` 和本仓库 dev/远程来源切换除外，避免重复注册）。某台机器上临时 `pi install` 的包会保留，手改的其它设置键也会保留。
-- **prune**：那个域里清单就是全集 —— 没声明的包卸掉、没声明的设置键和键位删掉；`files` 域下则把声明过的文件当全集，没声明的键删掉（没声明过的文件仍然一个字也不碰）。例外是 `preserve` 白名单和 pi 自己维护的 `packages` / `lastChangelogVersion`，细节见 [声明设置和键位](#声明设置和键位)。
-
-`--prune` 里写了 `--sync` 没选的域会直接报错，不会静默忽略。脚本只管用户级的包和 agent 目录下的配置，项目 `.pi/` 里的东西不受影响。
-
-### 用哪个 pi
-
-有些终端应用会在 `PATH` 前面放一个同名的 `pi` 启动器，撞上它的话 `pi install` 会去打开那个应用，而不是装包。所以脚本优先使用受管理的可执行文件 `$PI_CODING_AGENT_DIR/bin/pi`（默认是 `~/.pi/agent/bin/pi`），并且会把它实际用的是哪个打印出来。要指定别的路径：
+脚本优先使用 agent 目录中的 `bin/pi`，并打印实际路径；需要指定时：
 
 ```sh
 PI_BIN=/path/to/pi ./install.sh
 ```
 
-## 日常使用
+## 插件
+
+详细说明只维护在对应文档中，README 不重复配置表和快捷键。
+
+### 本仓库自带
+
+| 插件 | 一句话介绍 |
+| --- | --- |
+| [Session Name](docs/extensions/session-name.md) | 自动评估会话标题，也可手动刷新并保护手动命名。 |
+| [Task Composition](docs/extensions/task-composition.md) | 在共享面板中管理命令、子 Agent 和 workflow 的执行与等待。 |
+| [Monitor](docs/extensions/monitor.md) | 持续监听命令或 WebSocket，分批通知并提醒静默与恢复。 |
+| [Beautify](docs/extensions/beautify.md) | 精简工具结果展示，并美化输入框。 |
+| [At Path Completion](docs/extensions/at-path-completion.md) | 接受 `@` 目录后继续显示原生补全候选。 |
+| [Status Bar](docs/extensions/status-bar.md) | 汇总路径、Git、上下文、用量和扩展状态。 |
+| [SSE Normalize](docs/extensions/sse-normalize.md) | 规整 SSE 响应换行，减少特定流解析错误。 |
+| [Blocked Signal](docs/extensions/blocked-signal.md) | 在受支持的终端宿主中提示正在等待用户回答。 |
+
+Monitor 属于 Task Composition，不是额外顶层入口；Agent、进程和共享面板的说明统一收在 Task composition 文档中。
+
+### 第三方插件
+
+| 插件 | 一句话介绍 |
+| --- | --- |
+| [pi-cache-optimizer](docs/packages/cache-optimizer.md) | 优化提示缓存并显示命中统计。 |
+| [pi-input-history](docs/packages/input-history.md) | 跨会话浏览输入历史，并用 `Alt+R` 搜索。 |
+| [pi-web-access](docs/packages/web-access.md) | 提供网页搜索、内容抓取及结果分页读取。 |
+| [pi-memory](docs/packages/memory.md) | 保存跨会话记忆、日志和便签，并提供检索。 |
+| [rpiv-ask-user-question](docs/packages/ask-user-question.md) | 让模型通过选项问卷澄清需求。 |
+| [pi-recap](docs/packages/recap.md) | 回到会话时显示简短回顾。 |
+
+第三方包由 Pi 安装，本仓库不修改其代码。清单目前使用 `latest`，实际功能以安装版本为准。清单中的 `conflicts` 用于防止功能重复加载，同步时会移除这些冲突来源。
+
+## 同步与更新
 
 ```sh
-pi update --extensions   # 更新本仓库的扩展，以及已装的包
-./install.sh             # 清单改过之后，把这台机器对齐过去
-./install.sh --sync settings  # 只把设置对齐过去
-./install.sh --prune     # 顺手清掉清单外的包、设置键和键位
-```
-pi 里的本仓库命令包括 `/statusbar`（切换 footer）、`/session-name`（刷新标题）、`/session-name config`（配置自动命名），以及任务管理入口；各扩展的命令、快捷键和配置文件见下文。
-
-## 这里有什么
-
-先放一张总表，细节看后面各小节。
-
-| 包 | 作用 | 配置文件 | 快捷键 |
-| --- | --- | --- | --- |
-| [`session-name`](#extensionssession-namets--会话命名) | 手动刷新与 N 轮自动评估会话标题 | `~/.pi/agent/session-name.json` | 无 |
-| [`pi-cache-optimizer`](#npmpi-cache-optimizer) | 提高缓存命中率，显示命中统计 | `~/.pi/agent/pi-cache-optimizer-config.json` | 无 |
-| [`pi-input-history`](#npmpi-input-history) | 跨会话的输入历史，模糊反向搜索 | `~/.pi/agent/pi-input-history.json`，由清单声明 | `alt+r`，可改 |
-| [`pi-web-access`](#npmpi-web-access) | 联网：搜索、抓取、PDF、GitHub、视频 | `~/.pi/agent/web-search.json` | `ctrl+shift+s` 等，可改 |
-| [`pi-memory`](#npmpi-memory) | 跨会话记忆：长期记忆、日志、便签、检索 | 无（只有 `PI_MEMORY_*` 环境变量） | 无 |
-| [`agent-tasks`](#extensionsagent-taskssrcindexts--子-agent-和-workflow-后端) | 子 agent 和工作流编排，vendor `pi-subagents@0.20.0` | `~/.pi/agent/agent-tasks.json` | 共用下述 task-ui 入口 |
-| [`task-ui`](#extensionstask-ui--共享任务面板与等待) | 统一面板、分类底栏与等待协调 | `~/.pi/agent/task-ui.json` | `ctrl+shift+b` / `shift+down`，可改；条件 Down |
-| [`@juicesharp/rpiv-ask-user-question`](#npmjuicesharprpiv-ask-user-question) | 让模型给出选项，而不是自己猜 | `~/.config/rpiv-ask-user-question/config.json` | `ctrl+]`，可改 |
-| [`@tifan/pi-recap`](#npmtifanpi-recap) | 会话回到现场：一行 recap，离开后自动生成 | `~/.pi/agent/extensions/pi-recap.json` | 无 |
-| [`process-tasks`](#extensionsprocess-tasks--进程与-monitor-后端) | 前台／后台命令与 monitor | `~/.pi/agent/process-tasks.json` | `ctrl+shift+b` 等，可改 |
-| [`at-path-completion`](#extensionsat-path-completionts--路径连续补全) | `@` 目录连续原生提示，只展示不自动接受下一层 | 无 | 沿用原生 Tab／Enter／Escape |
-| [`beautify`](#extensionsbeautifyts--工具与输入框美化) | 六类工具单行展示与输入框外观 | 无 | 沿用 pi 工具展开键 |
-
-表中的 cache-optimizer、input-history、web-access、memory、ask-user-question、recap 是普通第三方包，由 pi 从 npm 安装，来源写在 [`pi-preset.json`](pi-preset.json) 的 `packages` 里，本仓库不动它们的代码。
-
-process-tasks 和 agent-tasks 是一次性拷贝后由本仓库维护的代码，分别来自 patty 和 `pi-subagents@0.20.0`，由 `extensions/task-composition.ts` 组合加载；beautify 独立负责展示。原后端 upstream 包仍在清单 `conflicts` 中，不能独立安装；standalone Pretty 也保留在 conflicts 中，因为它会与 beautify 争用四类 renderer 和输入框，但本仓库不再加载或依赖 Pretty。
-
-执行后端、共享等待和会话关闭已接入，旧 AgentWidget/FleetView 已删除，核心 Task Panel 和空编辑器 Down 入口已通过集中自动验证、独立审查及临时配置的真实 Pi PTY 核心交互冒烟。
-
-除了包，清单还声明了两类本机配置：pi 本体的几个偏好 —— 失败重试次数 `retry.maxRetries: 5`，以及把被扩展抢走的内置键 `tui.editor.jumpForward`（`ctrl+]`）禁掉；以及 `pi-input-history` 的搜索键 `searchShortcut: "alt+r"`。格式和语义见 [声明设置和键位](#声明设置和键位)，键位那条的来由见 [键位冲突](#键位冲突)。
-
-### 第三方包
-
-下面这些「配置」小节写的都是扩展自己的配置入口，包括文件路径、键名、默认值和环境变量。pi 本体的键位怎么改、冲突怎么判，统一放在 [配置扩展](#配置扩展) 里。
-
-#### `npm:pi-cache-optimizer`
-
-> 来源：[npm](https://www.npmjs.com/package/pi-cache-optimizer) · [GitHub](https://github.com/jiangge/pi-cache-optimizer)
-
-稳定化 system prompt、注入 OpenAI 兼容的 `prompt_cache_key`、按会话派生亲和性请求头，以此提高 prompt / KV 缓存命中率，并在底栏持续显示命中统计。发现模型的 compat 配置缺失时会提示并可自动修复。
-
-**提供**：斜杠命令 `/cache-optimizer`（子命令有 `enable` / `disable` / `doctor` / `stats` / `compat` / `fix` / `rollback` / `config …`，不带参数弹交互菜单），以及底栏状态（status key `pi-cache-stats`）。
-
-**配置**：
-
-- 配置文件 `~/.pi/agent/pi-cache-optimizer-config.json`，主要键是 `footerMode`、`features`、`promptCacheKey.omit`，建议用 `/cache-optimizer config` 子命令改。
-- 每个 feature 也有对应的 `PI_CACHE_OPTIMIZER_*` 环境变量。优先级：配置文件 > 环境变量 > 默认值。
-- 统计数据在 `~/.pi/agent/pi-cache-optimizer-stats.json` 和 `pi-cache-optimizer-stats.d/` 目录。
-- 底栏的 `⚠️ compat` 指 `~/.pi/agent/models.json` 里缺的 compat 键，跑 `/cache-optimizer doctor` 看缺哪个，`/cache-optimizer fix` 自动补。
-
-#### `npm:pi-input-history`
-
-> 来源：[npm](https://www.npmjs.com/package/pi-input-history) · [GitHub](https://github.com/ouzhenkun/pi-input-history)
-
-pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个扩展在会话启动时把当前目录下历史会话里的输入（去重后最近 100 条）灌进编辑器历史，↑/↓ 能直接翻到上个会话的 prompt。另外提供一个反向搜索浮层，模糊匹配，刚输入的内容也能立刻搜到。
-
-**提供**：全局快捷键 `alt+r` 打开反向搜索浮层。浮层内：`alt+r` / `↑` 更旧，`ctrl+s` / `↓` 更新，`ctrl+k` / `ctrl+j` 滚动预览，`Enter` 填入，`Esc` 或 `ctrl+g` 取消。没有工具和斜杠命令。
-
-**配置**：配置文件 `~/.pi/agent/pi-input-history.json`，四个键位都可以改，改完 `/reload`：
-
-```json
-{
-  "searchShortcut": "alt+r",
-  "newerShortcut": "ctrl+s",
-  "scrollUpShortcut": "ctrl+k",
-  "scrollDownShortcut": "ctrl+j"
-}
+pi update --extensions
+./install.sh
+./install.sh --sync settings
+./install.sh --sync packages,settings --dry-run
+./install.sh --prune
 ```
 
-历史条数（固定 100）和去重行为不可配置。`alt+r` 这条声明在清单里（`files` 域），同步到每台机器；其余三个键保持上游默认值，没有写进清单。扩展自己的默认值是 `ctrl+r`，会撞 pi 的 `app.session.rename`，所以才改到 `alt+r`，见 [键位冲突](#键位冲突)。
-
-#### `npm:pi-web-access`
-
-> 来源：[npm](https://www.npmjs.com/package/pi-web-access) · [GitHub](https://github.com/nicobailon/pi-web-access)
-
-给 pi 接上网络。搜索聚合了 30 多家 provider（OpenAI、Brave、Tavily、Exa、Gemini、Kagi、Firecrawl 等）；抓取侧支持 URL 转 Markdown、PDF、GitHub 仓库 / Issue / PR、YouTube 字幕和本地视频抽帧。检索结果完整落盘，模型只读分页摘要，上下文不会被整页内容冲爆。附带浏览器端的「结果策展器」，可以人工筛过来源再交给模型。
-
-**提供**：工具 `web_search`、`source_check`、`fetch_content`、`get_search_content`、`web_enable`（惰性加载器）；命令 `/websearch`、`/curator`、`/search`、`/google-account`；快捷键 `ctrl+shift+s`（策展器）、`ctrl+shift+w`（活动面板）。
-
-**配置**：配置文件 `~/.pi/agent/web-search.json`（旧路径 `~/.pi/web-search.json` 也认）。常用键：
-
-- `provider` / `searchProvider`：默认 `"auto"`，可写 `"all"` 或 provider 名数组。
-- `shortcuts.curate`、`shortcuts.activity`：改快捷键用这两个，值是 pi 的 KeyId 字符串。
-- `commands.<名字>.enabled`：禁命令在这里改，不是在 pi 全局配置里。
-- `tools.<名字>.enabled`、`toolNames.<名字>`：开关或重命名工具。
-- `workflow`、`toolActivation`、`maxInlineContentChars`、`fetch.defaultMode`、`proxy` 等。
-
-```json
-{
-  "provider": "auto",
-  "shortcuts": { "curate": "ctrl+alt+s", "activity": "ctrl+alt+w" },
-  "webSearch": { "allowedProviders": ["brave", "exa", "gemini"] }
-}
-```
-
-各家 API key 用环境变量提供（`BRAVE_API_KEY`、`TAVILY_API_KEY`、`EXA_API_KEY` 等），也可以写进配置文件，环境变量优先级更高。完整的 provider 和键名清单见上游 README。
-
-#### `npm:pi-memory`
-
-> 来源：[npm](https://www.npmjs.com/package/pi-memory) · [GitHub](https://github.com/jayzeng/pi-memory)（需要 Node ≥ 22.19）
-
-给 pi 一份跨会话的记忆，全部是 `~/.pi/agent/memory/` 下的纯 markdown：`MEMORY.md` 放长期的决定和偏好，`daily/<日期>.md` 是追加式工作日志，`SCRATCHPAD.md` 是待办清单，`recovery/` 存可恢复的删除记录。每轮 agent 开始前把「未完成便签 + 今天的日志 + `MEMORY.md` + 昨天的日志」按优先级注入 system prompt（合计上限 16K 字符）。上下文压缩前会把当前进度写一条 handoff 进当天日志；退出时默认还会调一次模型写退出摘要。
-
-默认是 `stable` 快照模式：只在会话开始、压缩前、写长期记忆、跨天这几个检查点刷新注入内容，中间每轮字节完全一致，这样本地前缀缓存（llama.cpp / vLLM / MLX）不会每轮失效。`PI_MEMORY_SNAPSHOT=per-turn` 换回每轮重建，并顺带开启「按当前 prompt 自动检索记忆」的注入。
-
-**提供**：工具 `memory_write`、`memory_read`、`memory_forget`、`memory_restore`、`scratchpad`、`memory_search`、`memory_status`。没有斜杠命令，不注册快捷键，也不写状态栏。
-
-**配置**：没有配置文件，全部走环境变量。常用的几个：
-
-| 变量 | 默认 | 作用 |
-| --- | --- | --- |
-| `PI_MEMORY_DIR` | `~/.pi/agent/memory` | 换存储目录 |
-| `PI_MEMORY_SNAPSHOT` | `stable` | 改成 `per-turn` 回到每轮重建 + 自动检索注入 |
-| `PI_MEMORY_EXIT_SUMMARY` | 开启 | 设 `0` / `off` 关掉退出摘要，退出就不再调模型，瞬间退出 |
-| `PI_MEMORY_EXIT_SUMMARY_MODEL` | 会话模型 | 用便宜的模型写退出摘要，格式 `provider/model-id` |
-| `PI_MEMORY_QMD_UPDATE` | `background` | 写入后自动重建索引和向量；`manual` / `off` 关掉 |
-
-另有 `PI_MEMORY_EXIT_SUMMARY_TIMEOUT_MS`（默认 10000）、`PI_MEMORY_QMD_SEARCH_TIMEOUT_MS`（默认 60000）、`PI_MEMORY_SUMMARIZE_TRANSITIONS`、`PI_MEMORY_NO_SEARCH`。
-
-`memory_search` 需要额外装 [qmd](https://github.com/tobi/qmd)（`npm install -g @tobilu/qmd`），装了之后扩展会自己建好 `pi-memory` collection 和 path context，并在后台跑 `qmd update` / `qmd embed`；没装则只有这一个工具不可用，其余照常，`memory_status` 会告诉你当前缺什么。**本仓库不管 qmd 的安装**，要语义检索就自己在那台机器上装。
-
-#### `npm:@juicesharp/rpiv-ask-user-question`
-
-> 来源：[npm](https://www.npmjs.com/package/@juicesharp/rpiv-ask-user-question) · [GitHub](https://github.com/juicesharp/rpiv-mono/tree/main/packages/rpiv-ask-user-question)（需要 Node ≥ 22）
-
-让模型在该问而不是该猜的地方停下来。它注册一个 `ask_user_question` 工具：模型一次最多抛 4 个问题，每题带 2 到 4 个写明含义的选项，终端底部弹出带页签的问卷，选择以结构化数据回传。选项可以带 markdown `preview`（ASCII 原型、代码片段、配置示例），渲染在选项列表右侧。每题末尾固定有一行自由作答入口。非交互运行时这个工具会自动从工具列表里消失，不会报错。
-
-**提供**：工具 `ask_user_question`。没有斜杠命令，不注册全局快捷键；问卷内的按键见问卷底部提示，其中 `ctrl+]` 用来折叠 / 展开浮层。
-
-**配置**：配置文件 `~/.config/rpiv-ask-user-question/config.json`（走 `XDG_CONFIG_HOME`，不在 agent 目录下），只读不写。能配四项：`collapseKey`（默认 `"ctrl+]"`，写 `"off"` 关掉）、`guidance.description`、`guidance.promptSnippet`、`guidance.promptGuidelines`（后三项调节模型提问的积极程度）。其余按键不可重映射。默认的 `ctrl+]` 会撞 pi 的 `tui.editor.jumpForward`，见 [键位冲突](#键位冲突)。
-
-#### `npm:@tifan/pi-recap`
-
-> 来源：[npm](https://www.npmjs.com/package/@tifan/pi-recap) · [GitHub](https://github.com/tifandotme/pi-extensions/tree/master/packages/pi-recap)（需要 pi 0.84.2 以上）
-
-回到一个会话时不用重读整条 transcript。它在编辑器上方显示一行 recap：先说你当初为什么开这个会话，再补当前状态、关键决定、相关文件或命令、以及下一步大概要做什么。recap 用的是 pi 的当前会话上下文（跟随当前分支、尊重压缩），不去扒完整的会话文件或终端历史；最新一条 recap 存在 LLM 上下文之外。
-
-触发时机：`/recap` 当场生成一条新的；agent 结束后等 5 分钟，如果你一直闲着就自动生成一条；resume 时若已存的 recap 仍对得上最新会话状态就直接显示，过期或缺失则重新生成；你发出任何非 `/recap` 消息时 recap 清掉。
-
-**提供**：命令 `/recap`（生成并显示）、`/recap status`（看所选模型、当前模型、新鲜度、是否可见）、`/recap config`（选 recap 模型）、`/recap help`。用 `setWidget` 画在编辑器上方；任务概览在共享底栏和面板中，不占这个位置。不注册全局快捷键。
-
-**配置**：配置文件 `~/.pi/agent/extensions/pi-recap.json`（在 agent 目录的 `extensions/` 子目录下，不是根目录），只有一个键 `model`，形如 `{ "model": "provider/model-id" }`。扩展自己读写它：`/recap config` 选模型时写入，选「Use default」时删掉。上游默认模型是 `openai-codex/gpt-5.6-luna`，**本机没有这个 provider**，所以首次用必须跑一次 `/recap config` 选一个本机已认证的文本模型（如 `mp-messages/deepseek-v4.1-flash`），否则 recap 会报没有可用模型。因为这个文件在 `extensions/` 子目录里、而清单的 `files` 域只认 agent 根目录下的文件名，所以它**不由清单声明**，每台机器各自 `/recap config` 一次。
-
-### 由本仓库代为加载的包
-
-`pi-patty-bg-tasks` 和 `@tintinweb/pi-subagents` 的代码已分别成为 [process-tasks](#extensionsprocess-tasks--进程与-monitor-后端) 和 [agent-tasks](#extensionsagent-taskssrcindexts--子-agent-和-workflow-后端)，不再作为 npm 依赖安装。清单仍以原来源声明 conflicts，防止 standalone 工具重复注册。会话命名已改为本仓库的独立实现，`npm:pi-session-name` 也在 conflicts 中，不再加载旧包；已有标题不清空，终端标题交由 Pi 原生维护，不保留旧包的忙闲特殊符号。
-
-### 本仓库自带的扩展
-
-#### `extensions/session-name.ts` —— 会话命名
-
-独立入口，嵌套 `session-name/` 与 `session-assist/` 只作为库导入，不重复加载。参考旧包的功能目的后重新实现；来源说明见 [PROVENANCE.md](extensions/session-name/PROVENANCE.md)。
-
-- `/session-name`：等待当前工作空闲后，用当前对话重新评估标题。成功后恢复自动管理；失败显示英文消息并保留旧标题。
-- `/session-name config`：启用／关闭自动命名、设置 N。配置全局持久化到 `~/.pi/agent/session-name.json`（随 `PI_CODING_AGENT_DIR`），默认 `{ "automatic": true, "interval": 8 }`，N 接受 1–10000 的整数。菜单取消不保存；坏 JSON 不覆盖。没有会话覆盖层或环境变量，清单不强制发放默认值，避免同步重置个人选择。
-- 无标题时，在第一批可确认用户输入处理 settled 后生成；之后每 N 次有效输入评估一次。原标题仍准确可不改，但成功评估会推进计数。失败提示一条可见消息，再累计 N 次有效输入后自动重试，不在同边界循环；手动刷新随时可试。
-- 普通 interactive/RPC steering、follow-up 输入可计数；斜杠命令（含 skill/template）、插件注入、工具循环和未交付队列不计。SDK 不持久化可靠输入来源，采用启用后的输入候选与实际交付消息保守匹配；旧历史、被其他扩展变换的输入和歧义重复输入可能少计，不声称任意插件组合下精确计数。已交付且 settled 的输入计数，即使主请求失败；用户 abort 的边界不自动发起命名。
-- `/name` 或外部改名会暂停自动覆盖，已有未知来源标题也保守保护；仅本命令刷新成功重新交给自动管理。标题与保护是整个会话的，不随分支独立命名。迟到响应不能覆盖新输入、换分支、用户改名或关闭后的会话；不承诺监听其他进程直接编辑会话文件。
-
-请求使用 Pi 公共模型接口，跟随当前模型与当前思考等级，不改主对话设置、不自行认证／HTTP／payload 改写，不强制 off/low 或小输出上限。当前 off 按公共 API 以未指定 reasoning 表示；provider 不支持时正常报失败，不自动降级。读取当前分支的有效投影，保留既有压缩／分支摘要与用户／助手可见文字，排除 thinking、工具调用／结果、插件状态和 shell 日志；只使用文字，不上传图片。不会主动 compact、另调模型总结、截取近期窗口或按插件输入阈值跳过。长上下文及高思考等级成本不固定，可调大 N 或关闭自动更新。
-
-旁路请求默认 120 秒总截止时间，正常失效取消不报错；释放自有 timer/listener，但不能强制终止不响应 signal 的第三方 provider 内部 promise。标题保存由 Pi 原生 API 完成，现有 status-bar 沿用会话名，无新增 footer 或忙闲标题动画。
-
-#### `extensions/agent-tasks/src/index.ts` —— 子 agent 和 workflow 后端
-
-> 基线：[`@tintinweb/pi-subagents@0.20.0`](https://github.com/tintinweb/pi-subagents) · 完整来源与 MIT 许可见 [PROVENANCE.md](extensions/agent-tasks/PROVENANCE.md)
-
-把任务派给独立 pi 会话里的子 agent，支持前台等待、后台启动、嵌套委派、定时触发、steering、resume、git worktree 和持久化记忆。多阶段任务可用 pipeline / parallel / 动态扇出的 workflow 描述。内置 `general-purpose`、`Explore`、`Plan` 三个类型。
-
-**提供**：工具 `Agent`、`SubagentWorkflow`、`get_subagent_result`、`steer_subagent`；命令 `/agents` 管理类型、定时任务、workflow 和设置；输入框里的 `@handle <消息>` 可定向给子 agent。前台新建与 resume 可用 `/bg` / `Ctrl+Shift+B` 解除等待，原 agent ID、会话和对话输出继续；排队或 worktree 启动阶段也可解除。`get_subagent_result(wait: true)` 使用同一个等待协调器，解除或 Esc 取消只结束这一次结果等待，不停止后台执行；`wait: false` 仅查看运行状态，不消费未完成结果。真正前台执行在解除之前遇主会话 Esc 会停止自己及所属嵌套子任务，解除之后不再受旧父信号影响。agent 不按时间自动转后台。
-
-运行中的前台 agent 转后台时即使后台池已满也继续原 run，并临时占用后台名额，后来的后台新任务按上限排队；原来尚未启动的前台排队项迁移到后台 admission，不重新创建会话。resume 复用会话与 transcript、产生新的执行 revision，上一 run 尚未清理完时拒绝重入。正常结果由 inline 返回或后台通知报告；取消结果等待不会永久吞掉通知，通知仍沿用 agent 的 smart/group 分组与用量所有权。
-
-启动中的真正前台 agent 收到 Esc／后端停止时，取消会贯穿环境探测、资源 reload、session 创建和 extension bind；尚未发送的 prompt 不会迟到启动，部分创建的 session 只清理一次。手动转后台则解除旧父信号，不妨碍原 run 正常开始。后台工具返回 ID 前若 transcript 初始化失败，会停止该次执行并抛出原错误，不遗留排队项或发出无主完成通知，已生成文件仍保留。完成通知保留本次新建／resume 的 tool-call 关联及回合数／有效回合上限；无 tool-call 的定向 resume 不沿用上一调用 ID。 启动失败时已关闭的部分 session 不再提供 resume；真正发送 prompt 后的失败仍保留原会话供显式 resume。resume 的回合限额状态与新建一致：软限额收尾记为 steered，硬限额中止记为 aborted，不会被工作流当作成功完成。
-
-
-原 AgentWidget/FleetView 及其导航监听、`fleetView`／`widgetMode`／`showModel` 设置已删除，不保留旧 UI 开关。agent 和 workflow 与进程共用下述 Task Panel；工具结果、完成通知及 `/agents` 的类型、调度、workflow 和设置管理仍保留。`@handle` 的临时 clone 私有调用强制后台，不受 agent 文件的前台 pin 覆盖；普通 `Agent` 调用仍遵循 frontmatter 优先级。明确拒绝或已尝试调用的异常会向原会话显示原因，不对可能已启动的调用自动重试。条件 Down 使用共享层的编辑器本地装饰，规则见下节；已做隔离真实终端核心冒烟，不代表任意插件组合或在线模型质量均已验证。
-
-停止 agent 会先结束当前等待、关闭输出订阅，并取消自己及所属嵌套执行；这不代表 provider 或异步启动已实际退出。manager 单独关闭最多等待 2 秒实际 runner／worktree／会话清理，关闭阶段也运行已完成及保留子会话的 shutdown hooks，释放只归子扩展所有的资源；迟到创建只允许清理，不再 prompt、steer 或发布完成消息；超时后保留私有清理所有者，不恢复任务。正常 prompt 失败仍可显式 resume。正常 worktree 完成仍保存分支；取消或保存失败保留 worktree 路径和文件，不强制删除未知／未保存的更改，也不在关闭后启动 git prune。非协作 provider 无法保证立即停止写入，因此超时不表示所有资源都已关闭。agent 已接入 composition 的统一关闭 participant；mention clone、计划定时器和 workflow worker／host gate 也按原 activation 取消与清理。关闭时旧工具／定向输入／RPC 拒绝或忽略新执行，迟到完成不发旧通知，scheduler 不删除用户计划定义。正常完成仍只报告一次；显式停止不额外发送完成通知，组内其他自然完成成员不受影响。对第三方进程内 provider／create／shutdown hook 采用协作式取消；不响应取消的代码可能继续内部执行或写文件，不保证单独强杀。自有进程、monitor、workflow worker、队列和计划定时器仍必须停止，并隔离旧会话接口与通知、保留文件。
-
-**轮次上限由用户配置，不由模型委派决定**：根／嵌套 `Agent` 工具不再提供 `max_turns`；旧模型参数即使带此字段，新建、resume、嵌套及模型创建的定时任务也会忽略。用户仍可通过 `agent-tasks.json` 的 `defaultMaxTurns` 或 agent Markdown frontmatter 的 `max_turns` 设置上限，`0`／未设置默认为无限制（frontmatter 的 `0` 可覆盖全局上限）。保留 runner 的软收尾及超过 `graceTurns` 后硬中止，以及可信内部 RPC 的 `maxTurns`、scheduler 的 `max_turns`。模型创建的 schedule 不持久化轮次预算，在触发时使用当时用户配置。resume 使用原 agent 类型的当前上限；每次运行在启动前冻结有效值，之后配置变化不影响该次执行，面板、工具结果和通知显示同一有效值。
-
-**配置**：全局 `~/.pi/agent/agent-tasks.json`，项目 `<项目>/.pi/agent-tasks.json`，项目优先，`/agents → Settings` 写项目层；不读取旧 `subagents.json`。自定义 `.md` 类型仍在 agent 目录的 `agents/` 或项目 `.pi/agents/`，项目定义优先。常用键有 `maxConcurrent`（10）、`maxSubagentDepth`（2）、`backgroundByDefault`、`worktreeIsolation`。`schedulingEnabled`、`workflowsEnabled`、`toolDescriptionMode`、`disableDefaultAgents` 改动工具 schema，需重启 pi；其余按现有实现即时生效。
-
-#### `extensions/process-tasks/` —— 进程与 monitor 后端
-
-> 来源：[npm](https://www.npmjs.com/package/pi-patty-bg-tasks) · [GitHub](https://github.com/patty-io/pi-patty-bg-tasks)
-
-它同时负责前台命令和后台进程；不是只管后台。源码由 patty 一次性拷贝后独立维护（见 [`PROVENANCE.md`](extensions/process-tasks/PROVENANCE.md)），不是 npm 包依赖。它覆盖内置 `bash`，跑超过 120 秒的命令自动转入后台。注册表只属于当前会话，不持久化、不恢复进程；最终 shutdown 时停止旧 activation 的前台／后台／pending 进程和 monitor，释放结果等待与定时器；磁盘日志保留，终态元数据仅在原 activation 内保留。真实 Pi 1.1.0 在 new／resume／fork／reload 后加载全新 factory，旧工具关闭后拒绝新执行，不自动恢复旧任务。不读取旧 `bg-tasks.json` 或 `BG_TASKS_*` 环境变量。
-
-停止真实进程统一先发 TERM，仍未退出时在 250ms 后升级 KILL；升级定时器按实际 exit 注销，避免迟到停止误杀复用 PID。主会话 Esc 的前台取消也使用这条路径，因此忽略 TERM 的进程不会卡住 host 在 shutdown 前的 abort。monitor 的 silent stop 仍不新增尾批，不改变流／缓冲／时间语义。如果任务发布、启动接线或初始静默提醒的发送回调中同步触发 shutdown，monitor 返回启动取消而不是“已启动”：源尚未创建就不打开 socket／日志，已创建则只关闭一次并保留日志；已停止任务的元数据和统计不按启动异常重复撤销。可取消的 before-switch 或无效 cwd 不会永久关闭仍在使用的 activation。
-
-**提供**：
-
-- 工具：`bash`（覆盖内置，新增 `run_in_background`、`timeout`、`description` 参数）、`bash_bg`（直接后台启动）、`jobs`（list / output / kill / attach / search / stats；output 支持按字节 offset 翻页读大日志，search 支持限定单任务、忽略大小写、上下文行）、`monitor`（按事件流监听命令输出或 WebSocket）。日志默认落在 `/tmp/pi-bg/<jobId>.log`。
-- 后端诊断命令：`/process-tasks-version` 打印版本和路径、`/process-tasks-config` 显示生效的进程配置、来源文件和加载警告。公共 `/bg`、`/tasks` 和键位由下述 task-ui 统一注册，没有 `/bg-list` 别名。
-- `jobs attach(wait: true)` 可用 `/bg` 解除当前跟随而不停止原任务；取消结果等待也不停止任务。`wait: false` 只报告当前状态，不把运行中的任务标成完成或消费其结果。
-
-**Monitor 通知与唤醒**：同一会话的命令和 WS `monitor` 共用一个通知节奏：首批及静默／恢复／收尾最多等待 200ms 短窗口，普通进度按 `monitorFlushMs` 共享合并（默认 30 秒）。首批和及时窗口采用 `min(200ms, monitorFlushMs)`，`0` 按源回调批次直接发送。窗口截止固定，持续活动不会不断推迟发送；无新事件不追加被动消息或空通知。及时刷新会带走其他有资格发送的待发活动，并从成功提交重新计算普通间隔。所有进度、静默、恢复和收尾通知都可见并唤醒 Agent；Agent 忙碌时在当前整批工具完成后的安全边界接收，不取消正在执行的工具，也不保证每条通知都有独立回复。
-
-- 所有来源共用 `outputPreviewChars` 输出预览预算，按来源公平分配并重新分配未用份额；正文与结构化 details 使用同一裁剪载荷。另有内部 **64KiB** 硬上限：合计 UTF-8 JSON 序列化的正文＋details（含转义）至多 63KiB，预留 1KiB 小信封开销，不新增配置。超量时只内联有界来源前缀，一次通知显示省略来源数量及完整批次清单路径，不拆批或增加唤醒。清单位于配置的 `logDir/monitor-batch-<uuid>.jsonl`，独占创建、权限 0600；首行格式／数量信息，后续每行保存一个来源完整 ID、状态、原描述、日志路径、终态 summary 和本批转换（最多16个，超出保留计数）。不重复保存输出预览，完整输出在原日志。清单与日志一样不随停止、会话切换或十分钟 metadata sweep 删除，用户自行清理；可用文件读取／搜索工具按 ID 查询，再读其 `logPath`。面板仍查原任务／日志，不会自动导入清单。
-- 清单保存失败（包括路径过长）仍至多发一次有界通知，明确显示清单不可用，不展示被截断的假路径；被省略且未保存的终态不标已告知，`jobs list` 报 notification failed。内联终态仅在本地提交成功后消费。通知本地提交异常只记录安全错误字符串（包括无法字符串化或恶意诊断对象），诊断输出失败也隔离，不当成源失败、不停止正常监听，也不把结果标为已告知；已保存清单保留。进度预览不自动重放，未消费终态仍可查询或经既有 retrieval 取消重查；不安排自动重试，查询语义不等于自动再次通知。源已创建但启动接线失败时会清理监听资源并回滚注册，不发送启动失败收尾通知。
-- `command` 与 `ws` 二选一，`description` 必填。命令默认接收 stdout **和** stderr 到同一日志／通知，不标来源或严重度；stderr 内容不等于失败，自然结果看主 shell 的退出码／信号。两个流独立解析 UTF-8 和完整行，不保证跨流严格时间顺序，也不保证通知行序与合并日志的字节顺序一致。
-- 工具合流不改 shell 管道：`command | grep pattern` 只过滤 stdout，stderr 绕过 grep 仍被收到；`command 2>&1 | grep pattern` 才过滤两流。显式分别重定向仍生效。管道需要逐行刷新，例如 `grep --line-buffered`。
-- 可选 `wake_absent_ms` 是有限正数，表示从启动或最近完整行／WS 消息到达起静默多久提醒；不传关闭。每段静默只提醒一次，监听继续；首次恢复事件在短窗口内及时通知，并从成功提交重新计算共享普通间隔；其他来源的通知不重置本来源的静默计时。被通知省略的行和空 WS 消息仍算活动；命令未换行片段只在收尾并入，不单独唤醒。多行 WS 消息只算一次到达。
-- 可选 `timeout_ms` 是有限正数的总截止；不传没有隐式截止。到时停止源，把原因和待发输出合为一条收尾。自然成功、失败、外部信号和日志超限也只产生一条合并收尾，仍遵守结果已告知／`jobs attach` 等待时的共享抑制。`jobs kill`、面板 x 和会话退出不新增尾批或收尾通知，已提交的消息不撤回，日志保留。
-- 命令观察随**主 shell 的 exit** 立即结束，不等待孙进程的 stdout/stderr EOF，也没有排空宽限时间。同步保存 Node 已缓冲的两流 bytes、并入收尾后关闭管道；任一流尚未结束时会说明后续输出可能未记录，不虚构数量。日志完整性只覆盖已接收／最终读取的观察范围，不承诺保存之后的孙进程输出。
-- 待发正文按行数及字符数保留本批前缀，超长行只留有界预览；通知明确区分省略的整行、字符和截断行，更多输出可读同一日志。通知省略不丢弃观察范围内原始日志，不因持续高频输出本身停止监听。所有 monitor 都遵守共享 `maxLogBytes`；这是周期磁盘保护，日志可能在检查之间超阈值，不是硬写入上限或速率限制。
-
-已删除 `persistent`、`monitorDefaultTimeoutMs`、`monitorMaxTimeoutMs`、`monitorPollMs`、`monitorRateWindowMs`、`monitorMaxLinesPerWindow` 和 `monitorMaxOverflowWindows`，无兼容别名或迁移层，不改写用户配置；旧文件键仅按普通未知键处理。
-
-**交互**：任务概览与 agent/workflow 共用 [Task Panel](#extensionstask-ui--共享任务面板与等待)，底栏也包含真正的前台任务，不再由进程后端另写后台计数。前台命令超过 2 秒时的「转后台」提示仍保留。
-
-进程完成 4 秒后从面板隐藏，当前查看的有界最终快照保留到切换或关闭。进程注册表的终态元数据在完成 10 分钟后由每 60 秒一次的 sweep 回收；`jobs list` 在此期间可列出，回收后按 ID 检索会报未知任务，磁盘日志仍保留。扩展不主动删除日志，也没有 `jobs cleanup`；默认 `/tmp/pi-bg` 可能被系统清理，长期保留请配置 `logDir`。
-
-**配置**：配置文件 `~/.pi/agent/process-tasks.json`（目录跟 `PI_CODING_AGENT_DIR`），优先级是环境变量 > 配置文件 > 默认值。文件可以不存在。每个键都能用环境变量覆盖，名字是 `PROCESS_TASKS_` 加大写蛇形：`timeoutMs` → `PROCESS_TASKS_TIMEOUT_MS`。
-
-| 键 | 默认 | 说明 |
-| --- | --- | --- |
-| `timeoutMs` | `120000` | 前台命令跑多久后自动转后台 |
-| `logDir` | `"/tmp/pi-bg"` | 日志目录，支持开头的 `~` |
-| `maxConcurrentJobs` | `16` | 同时在跑的后台任务上限 |
-| `maxLogBytes` | `104857600` | 日志超过这个大小就杀掉任务 |
-| `outputPreviewChars` | `12000` | `jobs output` 和前台命令结束时显示多少尾部 |
-| `failureTailLines` | `20` | 失败通知内联几行日志 |
-| `failureTailChars` | `2000` | 这段尾部的字符上限 |
-| `failureTailLinesShown` | `5` | TUI 在摘要下显示其中几行，`0` 为不显示 |
-| `stallCheckIntervalMs` | `5000` | 卡死检测的轮询间隔 |
-| `stallThresholdMs` | `45000` | 日志多久没增长算可疑 |
-| `stallTailBytes` | `1024` | 判断交互提示符时读多少尾字节 |
-| `monitorFlushMs` | `30000` | 会话级普通 monitor 进度节奏；首批／及时事件最多等 `min(200ms,F)`，及时提交重计普通间隔；`0` 按源回调批次直接发送 |
-| `monitorMaxLinesPerEvent` | `50` | monitor 待发正文和单条通知的行数上限；字符上限复用 `outputPreviewChars` |
-配置文件写错不会让扩展加载失败：非法值一律回退默认值，未知键会被忽略，每条都记一句警告 —— 用 `/process-tasks-config` 看。旧 `shortcutKillLatest` 配置已移除，文件里保留它会显示未知键警告。渲染与生命周期细节（2 秒快速完成窗口、4 秒展示、10 分钟保留、60 秒回收间隔等）仍写死在 `extensions/process-tasks/types.ts`，没有开放。
-
-#### `extensions/task-ui/` —— 共享任务面板与等待
-
-`task-composition.ts` 每次加载创建一个 coordinator、lifecycle 和 UI owner，注入两个独立执行后端；task-ui 是嵌套库，不是另一份扩展。Task Panel 显示当前会话的 shell、monitor、独立 agent、workflow 及其真实子任务，包含前台、后台、启动中、排队和短暂保留的终态。底栏按独立工作分类显示 active／queued 数量，不将父任务和子任务重复计数。shell、monitor、agent、workflow 的摘要统一使用主题语义色：类型与快捷键为强调色，数量为明亮文字色，active 为成功色，queued 为警告色，分隔符为暗色；没有活动或排队任务时隐藏摘要。
-
-`/tasks` / `Shift+Down` 打开双栏面板：左侧选择任务，右侧立即显示有界日志、对话或 workflow 进度，无需 Enter 或再开弹窗。workflow 默认展开；普通 agent 的嵌套任务按实际父子关系显示，刷新不覆盖用户收起状态。活跃父组保留已完成子行；整体完成后才开始四秒展示窗口，期间即使早期子结果已消费并遇到元数据 sweep，新打开的面板仍能看到整组。当前选择的最终有界详情在过滤或元数据 sweep 后仍保留到换选项或关闭，不依赖保留后端控制器，也不消费结果。
-
-| 窗口内按键 | 行为 |
+| 选项 | 用途 |
 | --- | --- |
-| `↑↓` / `j` / `k` | 列表选择或详情滚动，详情立即跟随 |
-| `Tab` / `Shift+Tab` | 切换列表与详情焦点 |
-| `←` / `→` | 列表中收起／展开组，或返回父行 |
-| `PageUp` / `PageDown`、`Home` / `End` | 当前焦点跨页或到开头／末尾 |
-| `x` | 请求停止当前可停止任务；workflow 停整个 run，子 agent 只停自己及所属嵌套任务，不停独立兄弟 |
-| `c` | 复制所选日志／会话／worktree 路径，不提交内容给 Agent |
-| `Esc` | 只关闭面板，不停止执行，也不解除等待 |
-| `Ctrl+Shift+B`（可配置） | 解除所有当前等待，执行继续 |
+| `--sync <域>` | 选择 `packages`、`settings`、`keybindings`、`files`，逗号分隔；支持 `all` / `none`，默认全部。 |
+| `--prune [<域>]` | 在选定域删除未声明内容；默认不删除，裸写表示清理全部已选域。 |
+| `--dev` | 只把本仓库切为执行同步脚本所在的本地检出。 |
+| `--dry-run` | 读取并打印计划，不执行安装、更新、移除或配置写入。 |
 
-一次详情最多 16K，日志／transcript 默认读有界尾部；正文过滤外部终端控制符，显示列宽按 SDK 计算。面板注明读取范围与省略量，滚动只覆盖该预览，不假称能读完整文件；完整内容可复制路径或用后端结果工具查看。没有重跑、删除记录或清理文件的按键。
+默认 **merge**：对齐清单声明的内容，保留未声明值；**prune**：删除选定域中未声明且未受保护的内容。不能 prune 未被 sync 选中的域。`conflicts` 中的包即使在 merge 模式也会移除。
 
-- `/bg` / `Ctrl+Shift+B` 解除所有当前已接入的等待，前台命令或 agent 原实例转为后台，ID、PID/agent 会话和日志不变；进程启动不到 2 秒、agent 排队或 worktree 启动中也可解除。结果跟随只结束等待，不改变执行模式。动作不调用扩展自有的 `abort`。
-- 普通消息提交不触发进程转后台、abort 或重新提交，由 Pi 原生 queue/steering 处理；agent 的 `@handle` 定向消息仍由 agent 后端路由。
-- 主会话 Esc 真正取消前台 bash/agent 时停止对应执行；手动转后台后旧父信号不再杀它。取消后台结果等待不停止执行。bash 超时自动转后台保持，agent 只手动解除等待。
-- `/tasks` / `Shift+Down` 打开上述共享面板；打开和 Esc 关闭不解除等待。执行模式与 waits 分开显示，「等待后台结果」不标为前台执行。窗口内的转后台 chord 使用同一个 coordinator。
-- 裸 `Down` 只在编辑器文本严格为空、编辑器持有实际焦点、无补全／可见 overlay、有当前可查看任务且面板未打开时开面板，前台-only 也可用。release／repeat 不打开；非空、无任务或其他 UI 的 Down 继续原编辑器／组件处理。它不注册全局裸 Down 快捷键或 terminal-input 监听，也不解除等待。
-- 首次安装保留已有 live editor 的实例、原输入方法和内部编辑状态；先通过同步完成、不挂载的公开 UI factory 捕获 TUI，在编辑器仍挂载时做兼容性预检。不支持装饰时只禁用 Down，保留输入框和原 factory；已有 overlay 不关闭。只在 SDK 同步交接期间暂时屏蔽同一实例的重复接线，随后恢复属性。关闭只解除自己仍拥有的装饰，不调用 host setter 重建编辑器；后来插件保存的包装退役为无旧会话资源的透传。后续不委托原 factory 的全新编辑器不能自动继承 Down，`/tasks`／`Shift+Down` 仍可用。
-- 完成通过 inline 结果或后台通知报告；取消结果等待后仍可通知，即使完成和解除发生在同一 tick。统计包含前台执行，转后台不重复增加 started。
-- composition 已提供单一 `TaskLifecycle` 关闭协议：参与者同步冻结 admission／通知，关闭入口 hook，再释放等待、silent stop、最多等待 2 秒实际 cleanup，最后释放 source/coordinator。process 和 agent 共用这一个协议，agent 不再另注册先执行的 shutdown handler；beautify 独立清理输入框装饰与高亮缓存。真正换代由 host 关闭旧 factory 再创建新 factory，旧实例不复活；可取消的 before_switch 不永久停止计划或清空执行状态。worker 终止不代表 host gate 已退出，关闭同时取消 gate signal 并等待其实际 promise。两秒预算不能强制终止任意进程内 provider／第三方 hook，超时仍保留迟到清理所有者；这是明确的协作式取消边界，不代表第三方代码已实际停止或无法再写文件。
+### 受管理的配置
 
-**配置**：`~/.pi/agent/task-ui.json`（随 `PI_CODING_AGENT_DIR`），可不创建；不读取 process 配置中的旧键或旧环境变量，不做迁移。
+当前清单只声明三项配置：
 
-| 键 | 默认 | 当前行为 |
-| --- | --- | --- |
-| `shortcutBackground` | `["ctrl+shift+b"]` | 解除所有已接入的等待 |
-| `shortcutTaskPanel` | `["shift+down"]` | 打开共享 Task Panel |
-| `downOpener` | `true` | 启用上述空编辑器 Down 入口；`false` 不安装编辑器装饰 |
+- `settings.json` 的 `retry.maxRetries: 5`。
+- `keybindings.json` 的 `tui.editor.jumpForward: []`，禁用与问卷折叠键冲突的内置动作。
+- `pi-input-history.json` 的 `searchShortcut: "alt+r"`。
 
-快捷键接受单个键名、数组或 `"off"`。`registerShortcut` 不走 keybinding id，所以需在此文件改键；默认不注册 Pi 已占用的 `ctrl+b`。Down 与显式快捷键独立，由 `downOpener` 开关控制。配置和无效 chord 的警告写加载日志；进程诊断只显示进程配置。
+其余插件配置按对应文档自行维护。agent 目录默认 `~/.pi/agent`，可用 `PI_CODING_AGENT_DIR` 改写；问卷等采用其他配置目录的插件不跟随这个变量。
 
-#### `extensions/beautify.ts` —— 工具与输入框美化
+### 修改清单
 
-独立扩展，只通过 Pi 的公开 `registerToolRenderer` resolver 接管 `read`、`bash`、`find`、`grep` 展示，并为可选的 `get_subagent_result`、`jobs` 提供保守适配。不会重新注册工具、包装执行、修改模型可见的 content/details/structuredContent 或额外读取文件／完整任务日志；`edit`、`write`、`ls` 等保持原 renderer。没有 FFF、文件补全、工具连续分组、用户消息前缀或额外 Working/Thinking 动画。
+`packages` 是“来源 → 版本”：`latest` 跟随更新，精确版本固定，范围版本在范围内升级，Git 来源可指定 tag 或 commit。添加包后提交到自己的仓库，再在各机器运行同步；不要把同一来源同时声明为安装包和冲突包。
 
-- Read：标题以真实注册名 `read` 开头，折叠显示路径、返回代码行数与展开提示；展开显示完整路径、1-based 行号、竖线与语法色。offset 与路径尾保持原子，长路径省略中段，长代码行用 `›` 截断。折叠以 limited 标记续读／截断，展开保留完整说明，不计代码行；文件尾部空行保留，未知或嵌入代码的说明样式文本不剥离；图片与附件仍由宿主绘制。折叠工具标题中的换行显示为 `\n`，展开按完整原文分行。
-- Bash：标题为 `bash  command`，保留 timeout、返回输出行数和本次调用耗时（不是后台进程耗时）；展开正文，错误用 Pi error 色。只有完整后台返回信封才显示 background ID，log path 与完整文案在展开后显示，不标记为进程已完成；正文含后台关键词不会误判；原 timeout/background/任务协调行为不变。
-- Find/Grep：按返回顺序分组目录／文件，标题加粗着色。数量为已展示文件／matching lines，不把 context 和 limit notice 当命中。Grep 的 literal/ignoreCase 影响高亮；路径歧义、无效或不支持的 regex 保守回退原文／无高亮，不影响搜索执行。
-- `get_subagent_result`：可识别的头部保留真实注册名，description 在名称后，末尾保状态、可靠耗时／用量；展开显示已经返回的全文及 verbose 对话。waiting、running/queued 快照、not found、wait released/cancelled 分开，停止等待不表示停止 agent。不会额外获取或消费结果。
-- `jobs`：list 显示可靠任务数，output 显示实际字节范围及省略标记，search 显示可靠 matches/jobs，stats 显示 running/terminal，attach 的 partial 为 following/waiting、final 替换 partial（不拼接日志），kill 只报告工具返回的 stop，不推断 OS 已退出。展开只显示本次已返回文本。
-- 六类已知展示整块折叠为一行，错误／图片文字／限制说明也不展开铺正文；标题始终保留真实注册工具名及原始大小写（`read`、`bash`、`find`、`grep`、`get_subagent_result`、`jobs`），参数／描述在名称后，不重复工具名前缀。元数据位于标题末尾，窄屏优先保完整工具名，再缩略参数／描述及省略次要字段；连名称也放不下时安全截断。原四类和常规可选工具使用宿主 pending/success/error Box 背景、行尾填充及一次 outputPad；点击宿主结果区域或工具展开键可切换。可选工具缺席不注册假工具；动态出现／恢复历史均按参数及文本信封惰性判断。同名异形、未知 details 或格式漂移委托原 call/result/state/shell；没有原 renderer 则用公开组件的通用标题、有界参数预览、10 行结果预览和展开全文（字符串参数按原文分行）；原 renderer 回调抛错时也保留当前参数与返回文本并一次诊断，此兼容例外可能多行。原 self renderer 的未知格式仍保留 self 外壳；已知态仅正文区域点击展开，padding 不改变展开状态。
-- 未覆盖工具继续使用插件自身或 Pi 默认 renderer；例如 `ask_user_question` 的小写注册名不会转换成 `Ask User Question`，其问卷交互界面也不受本扩展接管。
-- 工具展开状态沿用 Pi；提示读取当前键位（默认 Ctrl+O，macOS 可显示 Control/Option 名称）。布局用宿主传入的实际内宽 `render(width)` 和 SDK 显示列宽，处理中文、ANSI 与窗口变化；外部终端控制字符先清理。
+`settings` 和 `files` 按嵌套叶子合并；数组和标量整体替换。`keybindings` 按完整动作 ID 对齐。`null` 表示删除声明项，`[]` 可用于禁用键位；仅从清单移除一个键不会在 merge 模式自动删除本机值。
 
-代码高亮直接依赖 `shiki` 与 `@shikijs/cli ^4.0.2`，固定 `one-dark-pro`，不读取个人配置、不改变 Pi 全局主题。未知语言／超过 80k 字符使用 plain；异常只输出一次不含路径或源代码的诊断。缓存最多 128 项、总字符约束 2Mi，关闭时清理；先 plain 后异步刷新，迟到结果不会覆盖新内容、折叠或已关闭 activation。
+`preserve` 为 prune 保留机器各自的偏好，当前包括主题、默认 provider、模型和思考等级。声明与保护路径不能重叠。Pi 自己维护的 `settings.packages` 和 `lastChangelogVersion` 不受同步管理。
 
-**输入框**：使用宿主上下横线，无左右竖边框，首行 `❯`，续行不重复；向上滚动后不补第一行提示，原 working status 和隐藏行提示保留。装饰实际活实例，不复制 history/undo/paste 等私有状态；同实例 handoff 只在同步 setter 接线期间屏蔽冗余写入。input-history 和 task-ui Down 在两个顺序下均可组合，关闭 Down 不影响外观。装饰或安装不安全时保留原可用 UI并输出诊断；后来的方法、padding、factory 所有权不被清理覆盖，reload-before-shutdown 不重装旧输入框。
+`files` 只接受 agent 根目录内声明的 `.json` 文件名；不支持子目录或其他配置根目录。未声明的文件不会被读取、写入或清理。认证、信任、模型等受保护文件不能加入此域。prune 会清理声明文件中的未保护叶子，使用前先看 dry-run。
 
-除宿主工具展开点击外，不新增鼠标／选区／剪贴板处理，不保证终端复制能消除软换行。SDK 1.2.0 的单列中文递归错误、Box 在不足两侧 padding 加一列正文时仍保留最小内宽、极窄聚焦光标越界仍是原生边界；本扩展保留原生行为，不宣称修复。当前自动证据为真实 host loader/resolver/component/editor/setter 与独立离线 history fixture；另已完成隔离 dark/fullscreen tmux 的原四工具单行与键盘往返、jobs list 和长标题连续背景/40列提示定向复验，不代表实际 input-history 包、全部 jobs action/get_result child 或任意第三方 editor 的端到端验收。
-
-不再发放、读取或删除 `pi-pretty.json`；个人旧文件可留在原处，同步及 prune 均不触碰。standalone Pretty 仍禁止共存，不再是代加载包。
-
-#### `extensions/at-path-completion.ts` —— @ 路径连续补全
-
-在 `@local/`、`@./`、`@../`、`@~/`、绝对路径或 `@"带空格目录/"` 中，手动输入 `/` 后自动展示原生候选；Tab、Enter 或原生列表点击接受目录后也会继续提示下一轮。新一轮即使只有一个子项也只展示，不自动接受。目录为空时保持原生关闭列表，接受文件仍补尾随空格，目录接受 Enter 不提交消息。Escape 关闭后不会仅因路径仍以 `/` 结尾反弹；正文 `/`、slash commands、email、agent handles、跳转和整段粘贴不触发额外浏览。
-
-该扩展可独立加载，不依赖 Beautify、Task UI、Pretty 或 fff，不增加配置、键位或搜索实现。provider 链、排序、ignore、递归搜索与最多 20 项的原生限制均保留，不将目录搜索改成严格单层列表。它装饰活编辑器，保留 history、undo、cursor、paste 和原回调／receiver；后续输入、鼠标、编辑器切换及 shutdown 会使待续请求失效。
-
-验证基线为 Pi 1.2.0。为复用原生候选 UI，唯一内部兼容依赖是 `tryTriggerAutocomplete(false)`；没有模拟 Tab、临时字符或 SDK 修改。不兼容时停止增强、输出一次英文诊断并保留原生 Tab。Pi 升级后须重跑回归，方法存在不代表内部语义未变。安装公开 provider 会按宿主规则重建链并取消当时的补全列表／请求；这不重建编辑器或复制草稿。自动验证覆盖实际 SDK/editor/setter、fd 临时目录和离线 history／agent provider 组合；另已通过真实 installed CLI 的隔离 tmux 验收：dark/fullscreen 固定 140、80、40 列，真实逐字符输入、Tab／Enter 目录续提示、唯一子项只展示、文件尾空格、Escape 与正常离线提交。物理 IME、实际 input-history、regular／其他主题和动态 resize 未验收，见 [`TESTING.md`](extensions/at-path-completion/TESTING.md)。
-
-#### `extensions/task-composition.ts` —— 组合执行后端与共享任务 UI
-
-原入口 `extensions/bash-unified.ts` 已删除，不保留兼容转发。通过 `package.json` 的 `extensions/*.ts` 加载无需调整设置；若自行显式引用旧路径，请改为 `extensions/task-composition.ts`。
-
-直接调用本仓库 process-tasks 注册唯一 Bash 定义，保留其参数、prompt/guidelines 与 execute；agent-tasks 在根会话注册工具，子会话 guard 保留。两个后端共用一个 coordinator/lifecycle/UI owner，但不合并执行引擎。该入口仅负责后端与任务协调，工具／输入框美化由独立 beautify 提供；不再有 Pretty Proxy、Bash 注入器或 snippet 补丁。
-
-#### `extensions/status-bar.ts` —— 统一状态栏
-
-**要解决的问题**：pi 把所有扩展 `setStatus()` 的内容塞在 footer 下面共用的一行里，各写各的，装得越多越乱。自定义 footer 是唯一能统一排版的入口，代价是必须自己把那些状态画出来，否则它们会直接消失。
-
-**做了什么更改**：接管 `ctx.ui.setFooter()`，把路径、git、context、token 和各扩展状态排成固定三行：
-
-```text
-~/tools/pi-trellis  main ●2 +1 ↑2  • session name
-▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 39% 157k/400k (auto)        mp-messages·claude-opus-5·medium
-↑112 ↓30k R5.3M W260k H83% $0.42  │  ⛁ 96% 1.2M/1.3M  │  ⚙ 2 jobs
-```
-
-- 第一行是「我在哪」：路径、git 分支与状态（`●` 改动、`+` 暂存、`?` 未跟踪、`✖` 冲突、`↑↓` 与上游的差异）、会话名。git 信息一次 `git status --porcelain=v2 --branch` 拿全，render 时按 3 秒节流异步刷新，并订阅 pi 的分支变化事件立即更新。
-- 第二行是「还剩多少」：context 进度条加百分比和绝对值，按 70% / 85% 变黄变红。压缩后 token 数未知时只画空条和 `?`，不编造数字。右侧是 provider · 模型 · thinking，thinking 用 pi 自己的色标。
-- 第三行是「花了多少」：累计 token（`↑` 输入、`↓` 输出、`R` cache 读、`W` cache 写）、`H` 最近一次请求的命中率、费用，后面接各扩展的状态 chip，组间用 `│` 分隔。第一次响应之前什么都不显示成错误，画一排暗色占位符等着填值。
-
-扩展状态的收纳规则：`pi-cache-optimizer` 的长状态压成一个 `⛁ 96% 1.2M/1.3M` 的 chip，百分比旁边带的是它计算所依据的 token 对（`⛁ off` 表示禁用，`⚠` 表示 compat 不全）；不认识的状态键原样透出来，以后新装的扩展不会被吞掉。`@tintinweb/pi-subagents` 用的是 `setWidget`，画在编辑器上方，互不影响。唯一真正的冲突是另一个扩展也调 `setFooter()`，后调用的覆盖先调用的，目前清单里没有。
-
-配色规则是「符号退后、数字读色」：箭头和字母标签统一 `dim`，颜色落在数值上。所有颜色调用都走一个 `paint()` 包装，`theme.fg()` 遇到主题未定义的 token 会抛异常，而 render 里抛异常会弄挂 TUI，所以降级成无色文本。
-
-`/statusbar` 在自定义 footer 和 pi 内置 footer 之间切换。
-
-#### `extensions/sse-normalize.ts` —— SSE 响应规整
-
-**要解决的问题**：pi 1.1.0 的 Anthropic SSE 解析器在 CRLF 跨 chunk 时会报不可重试的 `Could not parse Anthropic SSE event`，一次长回答就此作废。
-
-**做了什么更改**：包住 `fetch`，把 `text/event-stream` 响应体统一成 LF 换行（末尾的 `\r` 会留到下一个字节再判定），并丢掉没有 `data:` 行的空帧。用 `Symbol.for` 记住原始 `fetch`，重复加载不会套娃。这样处理之后，被截断的流会表现为 pi 可以自动重试的 `stream ended before message_stop`，而不是一条作废的回答。
-
-#### `extensions/blocked-signal.ts` —— 告诉终端复用器「在等你」
-
-在需要回答、选择或确认时，让 Herdr 显示 Blocked；Pi 直接运行在 cmux 中时，补充问卷和文本编辑的等待通知。没有对应宿主环境时不启用。
-
-标准选择、确认、输入和文本编辑保留等待提示；`ask_user_question` 按问卷明确的等待信号显示，标签优先使用第一题的 header。回答、取消或退出会清除本扩展的等待提示，重叠交互不会重复通知。
-
-**浏览面板不是问答**：Viewer、Task Panel 等自定义面板不再自动标为 Blocked。其他第三方 custom 问答如果没有声明等待信号，也不会自动通知，需要单独适配。
-
-Herdr 与 cmux 不叠加通知；`CMUX_PI_HOOKS_DISABLED=1` 可关闭直接 cmux 的补充通知。本扩展不修改 Pi 的 OSC 状态，也不暂停模型或后台任务。浏览面板仍接管键盘，未显示 Blocked 不代表可以安全地向它投递聊天 prompt。
-
-## 配置扩展
-
-每个扩展自己的配置细节已经写在上面各小节里了，这里只汇总文件位置，再讲两条通用规则。
-
-### 配置文件在哪
-
-| 文件 | 归属 |
-| --- | --- |
-| `~/.pi/agent/settings.json` | pi 本体。主题、默认 provider 和模型、已装包清单。`packages` 由 pi 维护，别手改；被清单声明的键由本仓库维护，见 [声明设置和键位](#声明设置和键位) |
-| `~/.pi/agent/keybindings.json` | pi 本体的键位，格式见下；被清单声明的动作 id 由本仓库维护 |
-| `~/.pi/agent/<名字>.json` | 各扩展自己的配置文件，见上表；其中被清单 `files` 域声明的由本仓库维护，见 [声明扩展的配置文件](#声明扩展的配置文件) |
-| `~/.pi/agent/models.json` | provider 和模型定义，以及 compat 键。`pi-cache-optimizer` 的 `⚠️ compat` 指这里 |
-| `~/.pi/agent/pi-cache-optimizer-config.json` | `pi-cache-optimizer` |
-| `~/.pi/agent/pi-input-history.json` | `pi-input-history`，只存快捷键；其中 `searchShortcut` 由清单声明 |
-| `~/.pi/agent/web-search.json` | `pi-web-access`，provider、key、命令开关、快捷键都在这 |
-| `~/.pi/agent/agent-tasks.json`、`<项目>/.pi/agent-tasks.json` | 本仓库 agent-tasks，项目覆盖全局；不读取旧配置名 |
-| `~/.config/rpiv-ask-user-question/config.json` | `@juicesharp/rpiv-ask-user-question`，走 `XDG_CONFIG_HOME`，不在 agent 目录下 |
-| `~/.pi/agent/extensions/pi-recap.json` | `@tifan/pi-recap`，只有 `model` 一键；在 `extensions/` 子目录下，不由清单声明 |
-| `~/.pi/agent/memory/` | `pi-memory` 的数据目录（不是配置），可用 `PI_MEMORY_DIR` 改写；配置只有 `PI_MEMORY_*` 环境变量 |
-| `~/.pi/agent/process-tasks.json` | 本仓库 process-tasks，超时、并发、日志目录及 monitor 执行参数；所有键也能用 `PROCESS_TASKS_*` 覆盖，不包含公共快捷键 |
-| `~/.pi/agent/task-ui.json` | 本仓库共享任务 UI，面板／转后台快捷键及 `downOpener`（默认 true）；不读取进程配置或环境变量中的旧快捷键 |
-| `~/.pi/agent/session-name.json` | 本仓库 session-name，全局自动开关与 N；由 `/session-name config` 保存，不由清单强制覆盖 |
-
-`~/.pi/agent` 这个 agent 目录可以用 `PI_CODING_AGENT_DIR` 改写，上面带这个前缀的路径都会跟着走。改完文件之后在 pi 里 `/reload`；少数影响工具 schema 的键（见 agent-tasks 那节）要重启 pi。
-
-### pi 本体的键位
-
-`~/.pi/agent/keybindings.json` 把动作 id 映射到一个键或一组键。配置值会替换掉该动作的默认绑定，写空数组就是禁用：
-
-```json
-{
-  "tui.editor.cursorLeft": ["left"],
-  "app.session.rename": "ctrl+shift+r",
-  "tui.editor.jumpForward": []
-}
-```
-在 pi 里跑 `/hotkeys` 能看到当前生效的键位，完整的动作列表在 pi 文档的 `docs/keybindings.md`。
-
-### 键位冲突
-
-扩展用 `pi.registerShortcut("ctrl+shift+b", …)` 注册快捷键，收的是原始键组合，不是动作 id。所以 `keybindings.json` 改不了扩展的键，要换只能看那个扩展自己有没有开放配置项。
-
-pi 的仲裁规则（见 `core/extensions/runner.js` 里的 `RESERVED_KEYBINDINGS_FOR_EXTENSION_CONFLICTS`）分三种情况：
-
-- 撞上保留动作（`app.interrupt`、`app.clear`、`app.exit`、`app.suspend`、`app.thinking.cycle`、`app.model.*`、`app.tools.expand`、`app.thinking.toggle`、`app.editor.external`、`app.message.copy`、`app.message.followUp`、`tui.input.submit`、`tui.select.confirm`、`tui.select.cancel`、`tui.input.copy`、`tui.editor.deleteToLineEnd`）：扩展的键被直接丢弃，只留一条 warning。想救回来，就在 `keybindings.json` 里把那个保留动作从这个键上挪走。
-- 撞上非保留的内置动作：扩展赢，内置动作在编辑器里按不出来，启动时报一条非致命 warning。
-- 两个扩展抢同一个键：后加载的赢，同样只有 warning。
-
-当前这套组合里，已知的冲突有一处。仲裁规则在上面，表格里「结果」一列就是按它推出来的：
-
-| 扩展键 | 撞上 | 结果 | 怎么处理 |
-| --- | --- | --- | --- |
-| `ctrl+]`（ask-user-question 折叠浮层） | `tui.editor.jumpForward`（`ctrl+]`） | 扩展赢 | 已处理：清单把 `tui.editor.jumpForward` 设成 `[]` 禁掉 |
-
-「已处理」指的是 [`pi-preset.json`](pi-preset.json) 的 `keybindings` 里那条空数组。扩展的键本来就会赢，把被抢走的内置动作显式禁掉，图的是启动时不再报那条冲突 warning、以后也不会以为这个内置键还能用。不想这样就把清单里那条改成别的键，或者改成 `null` 让它从所有机器上消失。
-
-曾经还有第二处：input-history 的反向搜索默认是 `ctrl+r`，正好是 `app.session.rename`（重命名会话）。当时的做法也是把重命名禁掉。现在清单直接把 `searchShortcut` 改成了 `alt+r`（`files` 域，见 [配置文件在哪](#配置文件在哪)），`ctrl+r` 没人抢了，重命名也就回到了 pi 的默认行为。
-
-`pi-web-access` 的 `ctrl+shift+s` / `ctrl+shift+w`，以及 task-ui 的 `ctrl+shift+b` / `shift+down`，对着 pi 的动作表逐个核过，都没撞上内置动作 —— `shift+down` 尤其容易让人起疑，但内置用的是 `down`（`cursorDown` / `select.down`）、`ctrl+shift+down`（`altScreen.nextPrompt`）和 `alt+down`（`models.reorderDown`），没人要 `shift+down`。task-ui 没注册 `ctrl+b`：那是内置 `tui.editor.cursorLeft` 的别名，抢过来会在启动时报冲突诊断。task-ui 这两个键都能在 `task-ui.json` 里改或设 `"off"`。旧 subagents 全局列表导航已删除；共享层的裸 Down 只在严格空文本、真实编辑器焦点、无补全／overlay且有可查看任务时处理，其余交给原输入方法。Left/Right 只在面板中导航。
-
-可管理范围就是清单里声明了的那几项：`settings.json` 的 `retry.maxRetries`、`keybindings.json` 的 `tui.editor.jumpForward`、`pi-input-history.json` 的 `searchShortcut`。其余配置文件、其余键都不在本仓库的管理范围内，各自的机器上自己维护。
-
-## 工作方式
-
-清单 [`pi-preset.json`](pi-preset.json) 分六段：
-
-```json
-{
-  "packages": {
-    "git:github.com/AkiChase/my-pi-preset": "latest",
-    "npm:pi-cache-optimizer": "latest",
-    "npm:some-tool": "^2.1.0"
-  },
-  "conflicts": ["npm:pi-patty-bg-tasks", "npm:@heyhuynhgiabuu/pi-pretty", "npm:@tintinweb/pi-subagents", "npm:pi-session-name"],
-  "settings": { "retry": { "maxRetries": 5 } },
-  "keybindings": { "tui.editor.jumpForward": [] },
-  "files": {
-    "pi-input-history.json": { "searchShortcut": "alt+r" }
-  },
-  "preserve": { "settings": ["theme", "defaultModel"], "keybindings": [] }
-}
-```
-
-### 包
-
-`packages` 的格式是「包来源 → 版本」：
-
-- `"latest"`（也可以写 `"*"` 或 `""`）跟随最新版本。
-- 像 `"0.1.7"` 这样的精确版本会被钉住，更新时不动它。
-- 像 `"^2.1.0"` 这样的范围会在该范围内安装和升级。
-- git 来源的版本写 tag 或 commit，例如 `"v1.2.0"`。
-- `conflicts` 是绝对不能作为 pi 包安装的来源，同步时无论有没有 `--prune` 都会卸掉。同一个来源同时写进 `packages` 和 `conflicts` 会直接报错。
-
-### 声明设置和键位
-
-`settings` 跟 `settings.json` 长得一样，但**声明的单位是叶子**：对象递归合并到叶子，数组和标量整体替换。所以下面这段只管 `retry.maxRetries`，本机自己调过的 `retry.baseDelayMs` 不会被动：
-
-```json
-"settings": { "retry": { "maxRetries": 5 } }
-```
-
-几条规则：
-
-- **删除也是声明的一部分**。要把一个键从所有机器上摘掉，不是把它从清单里删掉，而是把值写成 `null`（`"markdown": { "mermaid": null }`）。这条墓碑留在清单里，所有机器同步过一轮后再清掉 —— 也正因为有它，本仓库不需要任何记录「上次改过什么」的状态文件。
-- **设置用嵌套，不用点号路径**。顶层键里带点会报错：`"markdown.mermaid"` 会变成一个 pi 根本不认的键。更深的键允许带点，因为真有（`modelThinkingLevels` 是用 `provider/model-4.1` 这种做键的）。
-- **`keybindings` 是平的**，一个动作 id 就是一个条目，整体替换。`"ctrl+r"` 和 `["ctrl+r"]` 算同一个值，不会因为写法不同而重写文件；`[]` 是「禁用这个动作」这个合法值，`null` 才是墓碑。
-- **`preserve` 只在 prune 模式下有意义**：列进去的路径和它底下的一切即使没声明也不会被删。这是「真·偏好、但每台机器不一样」的键的逃生口，现在里面是 `theme`、`defaultProvider`、`defaultModel`、`defaultThinkingLevel`。`preserve.settings` 的条目是**路径**，所以 `"retry.baseDelayMs"` 的点按层级解析；要保护本身带点的键，写成段数组 `["modelThinkingLevels", "openai/gpt-4.1"]`。`preserve.keybindings` 的条目则是动作 id 原文，不切点号。
-- **`packages` 和 `lastChangelogVersion` 硬保护**：这两个键是 pi 自己在写，无论哪种模式都不碰，写进清单还会报错。
-- 声明和 `preserve` 撞上同一个路径会报错，因为那是两个矛盾的意图。
-
-### 声明扩展的配置文件
-
-`files` 域管的是 agent 目录下那些扩展自己的 JSON（`pi-input-history.json`、`process-tasks.json`、`task-ui.json`、`web-search.json` …）。键就是文件名，值就是那个文件的内容，语义与 `settings` 完全一致：叶子级合并、`null` 是墓碑、顶层键不能带点。
-
-```json
-"files": {
-  "pi-input-history.json": { "searchShortcut": "alt+r" }
-}
-```
-
-几条规则：
-
-- **只能是 agent 目录下的文件名**，不带路径。`~/.config/rpiv-ask-user-question/config.json` 这种不在 agent 目录里的配置暂不支持 —— 多一个根目录就得多一套 XDG 解析。带 `/`、`..` 或不是 `.json` 的名字会报错。
-- **几个文件硬保护**：`settings.json` / `keybindings.json` 有自己的域；`auth.json` 放凭证；`trust.json` / `models-store.json` 是 pi 本机的状态；`models.json` 会被 `pi-cache-optimizer` 在它自己的事务锁下重写，从这边打叶子补丁会撞上。写进 `files` 会直接报错。
-- **`--prune` 只作用在 `files` 声明过的文件上**。清单没提的文件永远不被读、不被写、不被删；而被声明过的文件在 prune 下就是「全文以清单为准」，所以只把清单当「改其中几个键」用。（声明了但本机不存在的文件，同步时会直接建出来，不存在「不碰」这个选项。）
-- **`preserve.files` 按文件名分组**：`"preserve": { "files": { "pi-input-history.json": ["scrollUpShortcut"] } }`。保护一个没人声明的文件里的键等于什么都没保护，所以那种写法会报错。
-- 自动写入只关心键与值：两空格缩进，保留现有键的顺序（新键追加到末尾），跟 pi 自己写文件的习惯一致。
-
-### 怎么落到本机
-
-`install.sh` 只做引导：检查 `pi` / `node` / `curl`，拿到清单和同步脚本，然后交给 [`scripts/sync.mjs`](scripts/sync.mjs)。包部分通过 pi 自己的命令（`pi install` / `pi update` / `pi remove`）落地，配置部分由同步脚本直接写 agent 目录下的 JSON。
-
-| 情况 | 动作 |
-| --- | --- |
-| 清单里有，本机没装 | 安装 |
-| 声明的版本和已装的不一致 | 安装声明的版本 |
-| 清单里有，但磁盘上已经不见 | 重新安装 |
-| 未固定版本，且已安装 | 更新到最新版 |
-| 固定了精确版本 | 不动 |
-| 本机有包，清单里没有 | 保留，除非该域在 `--prune` 里 |
-| 本机有包，且在 `conflicts` 里 | 卸载（merge 模式下也会卸） |
-| `--dev`，本仓库远程来源已注册 | 先卸载该仓库的远程注册，再注册当前检出的绝对路径（merge 也切换） |
-| `--dev`，当前检出已注册 | 保留本地来源，不更新；第三方包照常对齐 |
-| 同一检出执行普通安装，本仓库本地来源已注册 | 先移除这个本地注册，再安装或更新清单的远程版 |
-| 来源切换的移除失败 | 中止，不再执行安装或配置写入 |
-| `packages` 未选中或 `--dry-run` | 不切换来源；dry-run 仅显示计划 |
-| 声明了设置键，本机值不同或缺失 | 写成声明的值 |
-| 声明了设置键，本机值已一致 | 不动，也不重写文件 |
-| 声明成 `null` | 从本机删掉（本来就没有就什么都不做） |
-| 本机有设置键或键位，清单没声明 | 保留，除非该域在 `--prune` 里且没被 `preserve` 盖住 |
-| 扩展配置文件被 `files` 声明，本机没这个文件 | 建出来，只写声明的键 |
-| 扩展配置文件未被 `files` 声明 | 永远不碰 |
-
-写配置文件时的几个细节：
-
-- 先跑包，再写配置，并且**写之前重新读一遍文件**。`pi install` 会把 `packages` 写进 `settings.json`，按路径打补丁而不是整文件覆盖，才不会把它刚写的东西抹掉。
-- 保留现有键的顺序，新键追加到末尾；格式跟 pi 自己写的一致（两空格缩进、末尾不加换行）；内容没变就不动文件。先写临时文件再 `rename`，不会留下写到一半的 JSON。
-- 写 `settings.json` 前会拿 pi 用的那把锁（`settings.json.lock` 目录，pi 1.1.0 用 proper-lockfile 做的就是这个），所以跟正在跑的 pi 互斥。超过 10 秒的锁当残留处理。
-- 目标文件存在但 JSON 坏了就报错退出，绝不覆盖 —— 那更像是一个改到一半的手改，不是该扔掉的东西。
-- 改完在 pi 里 `/reload`。pi 正在跑的时候同步也不会丢：它存盘时也是重读文件、只合并自己改过的字段（`persistScopedSettings`）。真正会输的情况是同一个字段两边都在改。
-
-两个脚本都按步骤把日志打到 stderr，网络慢或被拦截时能看出卡在哪，不会像假死一样没有输出；`--dry-run` 的结果仍可直接管道给别的命令。每次调用 pi 最多等 10 分钟，超时只针对那个包报错。
-
-## 添加扩展
-
-放一个 `.ts` 文件进 `extensions/` 即可，不需要构建步骤。改完跑一遍 `pnpm check`，同时更新 README 里对应的小节，提交推送后，在其它机器上跑 `pi update --extensions`。
-
-加载的范围由 [`package.json`](package.json) 的 `pi.extensions` 声明，而不是自动发现：
-
-```json
-"pi": { "extensions": ["extensions/*.ts"] }
-```
-
-这条 glob 不跨目录，所以顶层每个 `.ts` 都会自动加载，而 `extensions/` 下的子目录一律不会。必须这么写：pi 的自动发现会把任何 `extensions/<name>/index.ts` 也当成独立扩展，`extensions/process-tasks/`（vendor 进来、由 `task-composition.ts` 当库 import 的那份）会因此被加载两遍、工具和快捷键全部冲突。`scripts/pi-manifest.test.mjs` 盯着这件事。
-
-两个后果：真想加一个目录式扩展（`extensions/foo/index.ts`），得把它单独列进 `pi.extensions`；有了这段声明，pi 对 `skills/` / `prompts/` / `themes/` 的自动发现也一并关掉，将来真要放这些资源，同样得在 `pi` 里声明（测试会提醒）。
-
-扩展要用第三方 npm 包时，把它写进本仓库 `package.json` 的 `dependencies`：pi 安装 git 来源的包时会在检出目录里装一遍运行时依赖。要是这个包本身也是个 pi 扩展（例如代加载的后端），记得同时把它加进 `pi-preset.json` 的 `conflicts`，否则两边会各注册一遍。
-
-## 添加第三方包
-
-1. 把来源和想要的版本写进 `pi-preset.json` 的 `packages`。
-2. 提交并推送。
-3. 在每台机器上跑 `./install.sh`；或者在需要的地方先 `pi install`，下次同步时会保留下来。
-
-## 开发
-
-开发用 pnpm（版本钉在 `package.json` 的 `packageManager` 里）：
-
-```sh
-pnpm install            # 装开发依赖
-pnpm check              # 类型检查 + 全部测试，提交前跑这个
-pnpm typecheck          # 只跑 tsc --noEmit
-pnpm test               # 只跑 node --test
-./install.sh --dev      # 本仓库切到当前检出；之前需 pnpm install
-./install.sh --dev --dry-run  # 看本地测试模式的切换和同步计划
-./install.sh --dry-run  # 看看这台机器缺什么
-```
-
-测试用 `node --test`，没有第三方框架。会话命名可定向运行 `node --test extensions/session-name/__tests__/*.test.ts extensions/session-assist/__tests__/*.test.ts`，使用临时 agent 目录且不带 force-exit；覆盖实际 SDK 投影、保守计数、手动保护、失败退避和取消，不把离线 fake provider 当作在线标题质量验收。全部测试都不联网、不碰 `~/.pi`：`scripts/sync.test.mjs` 会使用假的 `pi`，并把 `PI_CODING_AGENT_DIR` 指到临时目录，所以配置读写都发生在那里。它还用带空格路径的临时 git 检出验证 `install.sh --dev`：远程/本地双向切换、不同 git 写法和 ref、重复执行、两份同时注册、移除失败中止、dry-run、域选择、非法检出及管道安装拒绝；第三方包和 prune 保持原来的行为。`scripts/pi-manifest.test.mjs` 只读本仓库清单，校验所有顶层扩展被声明、nested 后端未作为入口、standalone upstream 只在 conflicts，以及运行依赖与 host SDK 边界。
-
-轮次接口回归位于 `tool-waits.test.ts`、`backend-waits.test.ts` 与 `runner-cancellation.test.ts`，执行实际工具／manager／runner／临时 ScheduleStore／RPC，覆盖旧参数忽略、用户及 frontmatter 限额、无限制、resume 显示与通知一致、可信程序入口上限保留，以及异步 bind 期间默认值变化不改变本次上限。
-
-`extensions/agent-tasks/__tests__/loading.test.ts` 在临时 cwd／agent-dir 中通过真实 Pi host loader 验证单一注册、同 cwd／不同 cwd 的根／子会话 guard、重叠根加载和 shutdown；`workflow.test.ts` 使用真实 worker 跑无模型脚本及 stub RPC，验证 abort 后自然退出。vendor 源中的 TypeScript 参数属性需要本地测试的 [`source-loader.mjs`](extensions/agent-tasks/__tests__/source-loader.mjs) 在内存中变换；hook 只覆盖 agent-tasks/src，测试先注册再动态 import，生产仍由 Pi jiti 加载，不生成 dist。可单独运行 `node --test extensions/agent-tasks/__tests__/*.test.ts`，不用 force-exit 掩盖线程或 timer 泄漏。
-
-共享租约和进程接入另跑 `node --test extensions/task-ui/__tests__/*.test.ts extensions/process-tasks/__tests__/*.test.ts`，同样不带 force-exit，覆盖早期 detach、父信号解除、多次结果等待、完成竞态与前台日志保留；检查仍须使用下述真实 SDK 路径和临时 agent-dir。[`mixed-waits.test.ts`](extensions/task-ui/__tests__/mixed-waits.test.ts) 同时运行真实 shell 与假模型 agent，通过实际面板验证打开／关闭不改变四个启动与结果等待，面板转后台键一次解除两后端等待，PID、agent 会话与日志不被替换。
-
-[`panel.test.ts`](extensions/task-ui/__tests__/panel.test.ts) 使用真实 TaskPanel/coordinator 和有界 source fixture，覆盖即时详情、模式与等待、默认展开／用户收起、整个父组四秒窗口、sweep 后选中快照、queued／starting／paused 停止、路径复制、宽字符与外部控制符、共享 UI owner 重入清理和单 overlay。可定向运行 `node --test extensions/task-ui/__tests__/panel.test.ts extensions/agent-tasks/__tests__/tool-waits.test.ts`；后者还执行真实 registered Agent＋临时自定义 frontmatter＋typed clone transport，验证私有后台强制、普通调用前台 pin、明确拒绝反馈和部分 admission 异常不重复执行。旧进程底栏的测试改为 source 发布／接线故障，不恢复已删除的 footer 来满足旧断言。
-
-[`activation.test.ts`](extensions/process-tasks/__tests__/activation.test.ts) 执行真实 bash／monitor／jobs／source，覆盖前台／后台／pending／attach、有界 TERM→KILL、忽略 TERM 的孙进程、WS 迟到事件、停止 hook 抛错和日志保留。其 [`process-harness.ts`](extensions/process-tasks/__tests__/process-harness.ts) 只提供 scoped typed 测试边界，不进入生产。共享 [`lifecycle.test.ts`](extensions/task-ui/__tests__/lifecycle.test.ts) 检验所有参与者先冻结、后释放等待、drain 有界且异常不挡其他清理；[`sdk-runtime.test.ts`](extensions/task-ui/__tests__/sdk-runtime.test.ts) 用真实 SDK `AgentSessionRuntime` 的 new／resume／fork／import／quit，以及 `AgentSession.reload` 方法驱动旧 shutdown→新 factory，昂贵 session/services 用最小 typed seam，不复制 host 生命周期、不启动模型或真实 Pi。可单跑 `node --test extensions/task-ui/__tests__/{lifecycle,sdk-runtime}.test.ts extensions/process-tasks/__tests__/activation.test.ts`，仍须隔离 agent-dir，且不用 force-exit。monitor 启动重入回归另可运行 `node --test extensions/process-tasks/__tests__/{activation,monitor-session,monitor-setup-result,lifecycle,monitor}.test.ts`：仅替换 WS transport，实际工具／源／session 覆盖发布、source factory、UI 接线中的同步 shutdown、已 abort 接线、停止 hook 抛错、统计保留及关闭后日志不再增长；`monitor-setup-result.test.ts` 保留 F=0 的末次静默提醒同步 shutdown 取消启动与正常即时 deadline 收尾，并覆盖默认短窗口后 shutdown。新增 [`monitor-notifications.test.ts`](extensions/process-tasks/__tests__/monitor-notifications.test.ts) 验证实际共享调度、及时抢先、发送重入、总预览预算、终态抑制和 epoch 清理；session 多源与 factory command/WS 合并／renderer 回归也运行实际接入。可单跑 `node --test extensions/process-tasks/__tests__/{monitor-notifications,monitor-session,monitor-buffer,monitor,config,index,activation,waits,monitor-setup-result}.test.ts`，隔离 agent-dir 且不用 force-exit。
-
-Agent backend 实际清理可定向运行 `node --test extensions/agent-tasks/__tests__/{runner-cancellation,worktree-lifecycle}.test.ts`（临时 agent-dir、无 force-exit）。前者执行真实 manager／runner 的 typed env／loader／create seam，后者以 fake `pi.exec` 和临时文件执行真实 worktree 路径，不调用真实 git；覆盖 terminal 先结束但 drain 仍等待、new／resume、partial session、非协作晚结束、同步关闭重入、抛错清理 hook 和保留 artifact；另以 child shutdown hook 所有的真实 interval 验证已完成／workflow 保留子会话、运行中子会话与单独 dispose 的资源释放，超时后不启动迟到 host hook。
-
-开发回归补充：`node --test extensions/agent-tasks/__tests__/{auxiliary-lifecycle,tool-waits,workflow}.test.ts extensions/task-ui/__tests__/sdk-runtime.test.ts`（同样使用临时 `PI_CODING_AGENT_DIR`、实际 SDK、无 force-exit）。实际 clone 只替换 loader/create 输入，执行 reload/create/prompt/abort/local dispose；scheduler 用 typed timer seam 和真实临时 ScheduleStore，检查旧 interval/once/cron 与 startup/finalize 不串新 binding。SDK runtime 与 reload 同时绑定真实 process/agent 及同一 coordinator/protocol；busy/paused worker、迟到 host gate、CLI workflow、保留 child extension interval、旧 RPC/tool/input 均走实际路径，无模型／网络／真实 git／安装／SDK 写入。非协作第三方 provider／create／shutdown hook 按上述协作式取消边界处理，测试不能声称已强制终止其内部执行；核心共享 UI 和 Down 已通过实际 SDK 编辑器离线测试及隔离真实 Pi PTY 核心冒烟。
-
-另以临时 HOME／agent-dir／cwd／sessions 直接加载当前检出的真实 Pi CLI，运行 140×40 PTY 核心冒烟：无任务／非空 Down、前台-only 开面板、查看／Esc 不解除等待、转后台保持 PID、x 停实际进程、子 agent 排队／即时详情、workflow 默认展开／子详情／整组停止、monitor 输出、`/new` 清理和正常 `/quit`。子 agent 使用 SDK 原生 faux 离线脚本响应，实际创建会话并执行本地 bash；workflow 使用真实 worker。没有在线模型请求，也没有改个人配置或安装。此烟测不覆盖模型自主质量、任意第三方插件／终端尺寸或全部 provider／worktree 场景。
-
-路径连续补全可定向运行 `node --test extensions/at-path-completion/__tests__/*.test.ts`，不带 force-exit，并使用下述临时 agent-dir 与既有 SDK。回归包含原生对照、目录 Tab／Enter／唯一候选、异步取消、实际 host setter 与多顺序组合、安全降级和 GC；native fd 在临时目录验证 ignored scoped、相对／绝对／引号、递归与 20 项上限，`~/` 在临时 HOME 子进程验证，不扫描个人 home。fd 不可用时不安装替代工具，相关集成限制须单独报告。
-
-beautify 回归使用实际 SDK loader/resolver/ToolExecutionComponent、setter/reset、CustomEditor 与 TUI，history 使用独立离线 fixture，不读取本机 `pi-input-history`。范围见 [`extensions/beautify/TESTING.md`](extensions/beautify/TESTING.md)。运行 `node --test extensions/beautify/__tests__/*.test.ts extensions/task-ui/__tests__/editor.test.ts`（不加 `--test-force-exit`）检查自然退出。全量 `pnpm check` 前请把 `PI_CODING_AGENT_DIR` 指到 `mktemp -d` 的临时目录，同时用 `PI_SDK_DIR` 指向实际 SDK 的 `node_modules`，结束后删除临时目录；部分既有测试调用默认配置 loader，不能仅依赖测试自身隔离。
-
-扩展 import 的 `@earendil-works/*`（pi 自己的 SDK）是 peer 依赖，运行时由 pi 提供，所以不装。类型检查和测试前会先跑 [`scripts/link-pi-sdk.mjs`](scripts/link-pi-sdk.mjs)，它在本机 pi 安装里找到这套 SDK 并软链进 `node_modules/`——类型因此永远对着真正加载这些代码的那个 pi 版本。`pnpm install` 之后链接可能被清掉，跑 `pnpm link-sdk` 重建即可；pi 装在别处时用 `PI_SDK_DIR` 或 `PI_BIN` 指过去。
-
-本仓库的 [`.npmrc`](.npmrc) 设置 `auto-install-peers=false`，避免本地 pnpm 额外装一套 host SDK；TypeBox 在开发依赖中供原生测试／类型检查解析，运行时同样由 pi 提供。`croner`、`nanoid` 是 agent 后端的普通运行依赖。
-
-另外注意：别人机器上的运行时依赖由 pi 安装，用的是 pi 自己配置的包管理器（默认 npm），它不读 `pnpm-lock.yaml`。所以 `dependencies` 保持宽松范围；`devDependencies` 不会被装到那些机器上。
-
-改动扩展、清单、同步行为或检查命令时，必须同步更新 README 对应的小节。
+配置内容不变时不会重写；遇到坏 JSON 会报错，不覆盖。日志写入 stderr，便于看出同步进行到哪一步。更新配置后 `/reload`；个别影响工具开关的插件设置需要重启，见各插件文档。

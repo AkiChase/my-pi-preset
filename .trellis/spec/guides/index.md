@@ -1,16 +1,8 @@
-# Thinking Guides
+# Shared Thinking Guides
 
-## Use the Actual Preset Boundaries
+Compatible entry point for package skills. Read [development](../development/index.md) and [testing](../testing/index.md), then the applicable short checklist:
 
-These guides support the [preset guidelines](../preset/index.md); they do not introduce application layers or upstream template-maintenance duties.
+- [Code reuse](code-reuse-thinking-guide.md): actual ownership and matching semantics.
+- [Cross-layer boundaries](cross-layer-thinking-guide.md): identity, side effects, failure and preservation.
 
-| Guide | Trigger |
-| --- | --- |
-| [Cross-Layer Thinking](./cross-layer-thinking-guide.md) | A manifest/config/registration change crosses sync, runtime, tests or README; a lifecycle change crosses execution and notification/rendering |
-| [Code Reuse Thinking](./code-reuse-thinking-guide.md) | Adding a helper, changing a shared default, copying parsing/rendering/state logic, or editing several consumers |
-
-Before non-trivial work, identify the behavior gap, the actual owner, required files and exclusions. Search related symbols and values in `extensions/`, `scripts/`, `pi-preset.json`, `package.json` and README; expand the search only when evidence points elsewhere.
-
-For review findings, trace the real source and caller. The bundled manifest is repository-controlled, but current machine JSON and external host payloads are separate inputs; neither blanket distrust nor blanket trust is useful. Verify a comment's claimed behavior against code and assertions. Confirm a regression would fail if the feature were removed, and prioritize demonstrated failures rather than unsupported severity labels.
-
-After a fix, put a reusable convention in the owning preset spec and a task-specific finding in task research. Keep generated development integrations outside product changes.
+Read complete relevant source/tests and approved task artifacts. Role JSONL explicitly selects material; this index neither loads every spec nor authorizes implementation. Keep historical results in task research.
