@@ -1,6 +1,6 @@
 import json, os, pathlib, shlex, subprocess, tempfile, time
 
-REPO = pathlib.Path(__file__).resolve().parents[5]
+REPO = next(parent for parent in pathlib.Path(__file__).resolve().parents if (parent / 'pi-preset.json').is_file())
 CLI = pathlib.Path('/Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js')
 root = pathlib.Path(tempfile.mkdtemp(prefix='completion-tmux-'))
 server = 'completion-' + root.name
@@ -33,7 +33,7 @@ try:
     cmd = ['/usr/bin/env', '-i', *[f'{k}={v}' for k,v in env.items()], '/opt/homebrew/bin/node', str(CLI),
            '--offline', '--no-approve', '--no-extensions', '--no-skills', '--no-prompt-templates', '--no-themes', '--no-context-files', '--no-mcp',
            '--session-dir', str(root/'sessions'), '--use-theme', 'dark', '--tui-mode', 'fullscreen',
-           '-e', str(REPO/'.trellis/tasks/10-14-subagent-completion-notification/research/tmux/provider.ts'),
+           '-e', str(pathlib.Path(__file__).with_name('provider.ts')),
            '-e', str(REPO/'extensions/task-composition.ts'), '--model', 'completion-offline/scripted', '--thinking', 'off']
     launch = ' '.join(shlex.quote(v) for v in cmd)
     (root/'launch.sh').write_text(launch + '; result=$?; printf "%s" "$result" > '+shlex.quote(str(root/'exit-code'))+'\n')
