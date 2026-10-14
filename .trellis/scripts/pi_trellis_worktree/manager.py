@@ -5,7 +5,7 @@ from pathlib import Path
 import uuid
 
 from .records import (
-    active_execution, assert_destination, atomic_json, binding_file, binding_problems,
+    active_execution, active_source_execution, assert_destination, atomic_json, binding_file, binding_problems,
     canonical, contains, execution_file, git, marker_file, now, owner_alive,
     read_binding, read_execution, read_marker, repository, require_ignored,
     resolve_base, runtime, same_identity, source_for, source_lock, task_slug,
@@ -291,6 +291,8 @@ def manage(action, cwd, task, confirm=False, path=None, branch=None, base=None, 
             return dict(binding=b, note="Ready: task materials and independent target context validated. No agent dispatched.")
     if action not in ("create", "adopt"):
         raise ValueError("Unsupported worktree action")
+    if active_source_execution(source, task):
+        raise ValueError("Task has running/unknown source execution; stop and verify it before create/adopt")
     if b:
         require_identity(b, source)
         if path is not None and str(canonical(Path(source["root"]) / path)) != b["worktreePath"]:
@@ -345,6 +347,8 @@ def manage(action, cwd, task, confirm=False, path=None, branch=None, base=None, 
     if not confirm:
         return dict(plan=plan, preview=True, note="Creation preview. Repeat with --confirm only after user authorization.")
     with source_lock(root):
+        if active_source_execution(source, task):
+            raise ValueError("Task has running/unknown source execution; cannot create/adopt")
         if read_binding(root, task):
             raise ValueError("Task was bound by another operation; query status and retry")
         task_record(root, task)

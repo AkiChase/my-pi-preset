@@ -9,7 +9,7 @@ isolation: off
 ---
 <!-- Adapted by pi-trellis on 2026-10-12 from Trellis 0.6.17 Claude Code agents.
      Changes: Pi tools/context protocol and execution/verification corrections.
-     AGPL-3.0-only; see docs/trellis-agent-sync.md and licenses/trellis-AGPL-3.0.txt in the pi-trellis package. -->
+     AGPL-3.0-only; see README.md#license and licenses/trellis-AGPL-3.0.txt in the pi-trellis package. -->
 # Research Agent
 
 You are the Research Agent in the Trellis workflow.

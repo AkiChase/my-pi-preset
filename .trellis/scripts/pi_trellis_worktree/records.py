@@ -264,6 +264,35 @@ def active_execution(b):
     return r is not None and r["state"] in ("starting", "running", "unknown")
 
 
+def active_source_execution(source, task):
+    def utf16_length(value):
+        return len(value.encode("utf-16-le", errors="surrogatepass")) // 2
+    task_slug(task)
+    directory = runtime(source["root"]) / "source-executions"
+    file = directory / (hashlib.sha256(task.encode()).hexdigest() + ".json")
+    # Source leases must remain local, including all existing ancestors.
+    for path in (Path(source["root"]) / ".trellis", Path(source["root"]) / ".trellis" / ".runtime", runtime(source["root"]), directory, file):
+        if path.is_symlink() or not contains(Path(source["root"]), canonical(path)):
+            raise ValueError("Source execution path is symlinked or external")
+    r = read_json(file, 65536)
+    if r is None:
+        return False
+    if not isinstance(r, dict) or type(r.get("version")) is not int or r.get("version") != 1 or r.get("mode") != "source" or r.get("role") not in ("trellis-implement", "trellis-check", "trellis-research") or r.get("state") not in ("starting", "running", "completed", "failed", "unknown") or type(r.get("ownerPid")) is not int or not 0 < r["ownerPid"] <= 9007199254740991:
+        raise ValueError("Invalid source execution state/owner")
+    for key, value in (("sourceRoot", source["root"]), ("repositoryIdentity", source["commonDir"]), ("taskDir", task)):
+        if r.get(key) != value:
+            raise ValueError("Source execution identity mismatch")
+    for key in ("requestId", "ownerToken", "createdAt"):
+        v = r.get(key)
+        if not isinstance(v, str) or not v or utf16_length(v) > 256 or re.search(r"[\x00\r\n]", v):
+            raise ValueError("Invalid source execution identifier")
+    if "agentId" in r and (not isinstance(r["agentId"], str) or not r["agentId"] or utf16_length(r["agentId"]) > 1024 or re.search(r"[\x00\r\n]", r["agentId"])):
+        raise ValueError("Invalid source agent id")
+    if "error" in r and (not isinstance(r["error"], str) or utf16_length(r["error"]) > 4096):
+        raise ValueError("Invalid source execution error")
+    return r["state"] in ("starting", "running", "unknown")
+
+
 def owner_alive(record):
     pid = record.get("ownerPid")
     if type(pid) is not int or pid <= 0:
