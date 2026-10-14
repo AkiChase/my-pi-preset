@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Derived from @mindfoldhq/trellis 0.6.16 (Mindfold LLC).
+# Maintained/adapted for Pi by pi-trellis; see resources/runtime-baseline.json.
 """
 File I/O utilities.
 
@@ -47,6 +50,13 @@ def read_json_checked(path: Path) -> tuple[dict | None, str | None]:
     a state file that parses to ``{}`` carries none of the fields callers read,
     and treating it as success would silently rebuild it from defaults.
     """
+    # All supported task mutations share the same record authorization as reads.
+    # The dedicated reader does not call this function (no recursive I/O).
+    if path.name == "task.json":
+        from .paths import get_repo_root
+        from .task_records import read_task_record
+        return read_task_record(path.parent, get_repo_root())
+
     try:
         text = path.read_text(encoding="utf-8")
     except FileNotFoundError:

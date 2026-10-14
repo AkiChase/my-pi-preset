@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Derived from @mindfoldhq/trellis 0.6.16 (Mindfold LLC).
+# Maintained/adapted for Pi by pi-trellis; see resources/runtime-baseline.json.
 """
 Safe git-add helpers for Trellis-owned paths.
 
@@ -14,7 +17,7 @@ agent driving the workflow "fixed" it by retrying with
 Design
 ------
 - Scripts only stage SPECIFIC product paths (journal files, index.md, the
-  current task dir, the archive dir). Never the whole `.trellis/` tree.
+  current task dir, the exact archive destination). Never the whole `.trellis/` tree.
 - If plain `git add <specific>` fails with "ignored by", DO NOT retry with
   ``-f``. The presence of `.trellis/` in `.gitignore` is treated as user
   intent ("keep .trellis/ local-only"). The script warns and skips the
@@ -58,146 +61,38 @@ TRELLIS_IGNORED_SUBPATHS = (
 )
 
 
-def safe_trellis_paths_to_add(
-    repo_root: Path,
-    task_name: str | None = None,
-) -> list[str]:
-    """Return the list of repo-relative paths the auto-commit should stage.
-
-    Only includes paths that exist on disk so callers don't pass non-existent
-    arguments to git. The caller is responsible for `git diff --cached`
-    checking afterwards.
-
-    Included:
-      - .trellis/workspace/<developer>/journal-*.md
-      - .trellis/workspace/<developer>/index.md
-      - .trellis/tasks/<task_name>/   (ONLY the current task dir when
-        ``task_name`` is passed; plus its archive location if the task
-        already lives under archive/)
-
-    Excluded (intentionally — these must not be staged):
-      - .trellis/.backup-*, .trellis/worktrees/,
-        .trellis/.template-hashes.json, .trellis/.runtime/, .trellis/.cache/
-
-    Scope contract (see #303 / break-loop analysis): when ``task_name`` is
-    passed, the task segment stages ONLY that task directory — it never walks
-    ``tasks_dir.iterdir()`` over all active tasks. This mirrors
-    :func:`safe_archive_paths_to_add` and prevents dirty changes in OTHER
-    parallel-window task dirs from being bundled into the session auto-commit.
-
-    Backwards-compat: with no ``task_name``, the function walks every active
-    task directory (+ the archive subtree) the old wide way. New callers
-    should always pass ``task_name``.
-    """
-    paths: list[str] = []
-
-    # Workspace journal files + index.md
-    developer = get_developer(repo_root)
-    if developer:
-        ws = repo_root / DIR_WORKFLOW / DIR_WORKSPACE / developer
-        if ws.is_dir():
-            for f in sorted(ws.glob(f"{FILE_JOURNAL_PREFIX}*.md")):
-                if f.is_file():
-                    paths.append(
-                        f"{DIR_WORKFLOW}/{DIR_WORKSPACE}/{developer}/{f.name}"
-                    )
-            index_md = ws / "index.md"
-            if index_md.is_file():
-                paths.append(
-                    f"{DIR_WORKFLOW}/{DIR_WORKSPACE}/{developer}/index.md"
-                )
-
-    tasks_dir = repo_root / DIR_WORKFLOW / DIR_TASKS
-    if not tasks_dir.is_dir():
-        return paths
-
-    if task_name is not None:
-        # Narrow scope — ONLY the current task directory (active or archived).
-        # Never iterdir() all tasks: parallel-window dirty task dirs must not
-        # leak into the session auto-commit.
-        active_task = tasks_dir / task_name
-        if active_task.is_dir():
-            paths.append(f"{DIR_WORKFLOW}/{DIR_TASKS}/{task_name}")
-        archived_task = tasks_dir / DIR_ARCHIVE / task_name
-        if archived_task.is_dir():
-            paths.append(
-                f"{DIR_WORKFLOW}/{DIR_TASKS}/{DIR_ARCHIVE}/{task_name}"
-            )
-        return paths
-
-    # Legacy wide scope (no task_name): each direct child of tasks/ that is a
-    # directory and not the archive root, plus the whole archive subtree.
-    for child in sorted(tasks_dir.iterdir()):
-        if not child.is_dir():
-            continue
-        if child.name == DIR_ARCHIVE:
-            continue
-        paths.append(f"{DIR_WORKFLOW}/{DIR_TASKS}/{child.name}")
-
-    archive_dir = tasks_dir / DIR_ARCHIVE
-    if archive_dir.is_dir():
-        paths.append(f"{DIR_WORKFLOW}/{DIR_TASKS}/{DIR_ARCHIVE}")
-
+def safe_trellis_paths_to_add(repo_root: Path, task_path: str | None = None) -> list[str]:
+    """Workspace products plus exact validated task ref. No task means none."""
+    from .paths import get_workspace_dir
+    from .task_records import read_task_record, resolve_task_ref
+    paths = []
+    ws = get_workspace_dir(repo_root)
+    if ws and ws.is_dir():
+        for file in [*sorted(ws.glob(f"{FILE_JOURNAL_PREFIX}*.md")), ws / "index.md"]:
+            if file.is_file():
+                paths.append(file.relative_to(repo_root).as_posix())
+    if task_path:
+        task = resolve_task_ref(task_path, repo_root)
+        if task and read_task_record(task, repo_root)[0] is not None:
+            # Git cannot stage external stores; do not guess a local basename.
+            if task.resolve().is_relative_to(repo_root.resolve()):
+                paths.append(task.relative_to(repo_root.resolve()).as_posix())
     return paths
 
-
-def safe_archive_paths_to_add(
-    repo_root: Path,
-    task_name: str | None = None,
-    modified_children: list[str] | None = None,
-) -> list[str]:
-    """Return paths to stage after `task.py archive`.
-
-    Scoped to ONLY the paths the archive operation actually touched:
-
-      - the archive subtree (where the freshly-moved task lives)
-      - the source task directory (for source-side deletes; caller pairs
-        this with `git rm --cached` since `git add` won't stage deletes
-        for a path that no longer exists in the working tree)
-      - any child task directories whose `task.json` was edited to drop
-        the archived parent (parent-children relationship update)
-
-    This narrow scope avoids "scope creep" — dirty changes in OTHER
-    active task dirs (parallel-window edits) are NOT bundled into the
-    archive commit. Callers handle each kind of change in its own
-    commit boundary.
-
-    Backwards-compat: with no arguments, the function walks the whole
-    `.trellis/tasks/` subtree the old way (active tasks + archive). New
-    callers should always pass `task_name`.
-    """
-    paths: list[str] = []
-    tasks_dir = repo_root / DIR_WORKFLOW / DIR_TASKS
-    if not tasks_dir.is_dir():
-        return paths
-
-    archive_dir = tasks_dir / DIR_ARCHIVE
-
-    if task_name is not None:
-        # Narrow scope — only paths that still exist on disk (so
-        # `git add` doesn't choke on the moved-away source). The caller
-        # handles the source-side deletes via `git rm --cached`
-        # explicitly.
-        if archive_dir.is_dir():
-            paths.append(
-                f"{DIR_WORKFLOW}/{DIR_TASKS}/{DIR_ARCHIVE}"
-            )
-        for child_name in modified_children or []:
-            paths.append(f"{DIR_WORKFLOW}/{DIR_TASKS}/{child_name}")
-        return paths
-
-    # Legacy wide scope (no task_name): preserve old behavior so callers
-    # that have not been updated keep working.
-    if archive_dir.is_dir():
-        paths.append(f"{DIR_WORKFLOW}/{DIR_TASKS}/{DIR_ARCHIVE}")
-    for child in sorted(tasks_dir.iterdir()):
-        if not child.is_dir():
-            continue
-        if child.name == DIR_ARCHIVE:
-            continue
-        paths.append(f"{DIR_WORKFLOW}/{DIR_TASKS}/{child.name}")
+def safe_archive_paths_to_add(repo_root: Path, archive_dest: Path,
+                              modified_children: list[str] | None = None) -> list[str]:
+    """Exact actual move destination and explicitly edited child records."""
+    from .task_records import read_task_record, resolve_task_ref
+    paths = []
+    dest = resolve_task_ref(str(archive_dest), repo_root)
+    if dest and dest.is_dir() and dest.resolve().is_relative_to(repo_root.resolve()):
+        paths.append(dest.relative_to(repo_root.resolve()).as_posix())
+    for ref in modified_children or []:
+        child = resolve_task_ref(ref, repo_root)
+        if child and read_task_record(child, repo_root)[0] is not None:
+            if child.resolve().is_relative_to(repo_root.resolve()):
+                paths.append((child / "task.json").relative_to(repo_root.resolve()).as_posix())
     return paths
-
 
 def _stderr_indicates_ignored(stderr: str) -> bool:
     """git add error indicates the path is excluded by .gitignore."""

@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Derived from @mindfoldhq/trellis 0.6.16 (Mindfold LLC).
+# Maintained/adapted for Pi by pi-trellis; see resources/runtime-baseline.json.
 """
 Git command execution utility.
 
@@ -7,6 +10,7 @@ Single source of truth for running git commands across all Trellis scripts.
 from __future__ import annotations
 
 import subprocess
+import os
 import time
 from pathlib import Path
 
@@ -48,6 +52,8 @@ def run_git(
             encoding="utf-8",
             errors="replace",
             timeout=timeout,
+            env={**{k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
+                 "GIT_OPTIONAL_LOCKS": "0"},
         )
         return result.returncode, result.stdout, result.stderr
     except Exception as e:

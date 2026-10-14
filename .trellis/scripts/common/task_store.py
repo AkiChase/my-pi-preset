@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Derived from @mindfoldhq/trellis 0.6.16 (Mindfold LLC).
+# Maintained/adapted for Pi by pi-trellis; see resources/runtime-baseline.json.
 """
 Task CRUD operations.
 
@@ -292,6 +295,37 @@ def _default_prd_content(title: str, description: str | None = None) -> str:
 # Command: create
 # =============================================================================
 
+def task_skeleton(slug: str, title: str, description: str, creator: str, assignee: str,
+                  today: str, priority: str = "P2", package=None, base_branch=None, meta=None) -> dict:
+    """Pure canonical defaults, shared by CLI creation and explicit Pi init."""
+    return {
+        "id": slug,
+        "name": slug,
+        "title": title,
+        "description": description,
+        "status": "planning",
+        "dev_type": None,
+        "scope": None,
+        "package": package,
+        "priority": priority,
+        "creator": creator,
+        "assignee": assignee,
+        "createdAt": today,
+        "completedAt": None,
+        "branch": None,
+        "base_branch": base_branch,
+        "worktree_path": None,
+        "commit": None,
+        "pr_url": None,
+        "subtasks": [],
+        "children": [],
+        "parent": None,
+        "relatedFiles": [],
+        "notes": "",
+        "meta": meta or {},
+    }
+
+
 def cmd_create(args: argparse.Namespace) -> int:
     """Create a new task."""
     repo_root = get_repo_root()
@@ -491,32 +525,8 @@ def cmd_create(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
 
-    task_data = {
-        "id": slug,
-        "name": slug,
-        "title": args.title,
-        "description": description,
-        "status": "planning",
-        "dev_type": None,
-        "scope": None,
-        "package": package,
-        "priority": args.priority,
-        "creator": creator,
-        "assignee": assignee,
-        "createdAt": today,
-        "completedAt": None,
-        "branch": None,
-        "base_branch": base_branch,
-        "worktree_path": None,
-        "commit": None,
-        "pr_url": None,
-        "subtasks": [],
-        "children": [],
-        "parent": None,
-        "relatedFiles": [],
-        "notes": "",
-        "meta": meta,
-    }
+    task_data = task_skeleton(slug, args.title, description, creator, assignee,
+                              today, args.priority, package, base_branch, meta)
 
     # A directory without task.json is not a task: `list` hides it and every
     # lifecycle command refuses it. Fail here rather than printing "Created
@@ -1266,7 +1276,11 @@ def cmd_archive(args: argparse.Namespace) -> int:
     # mover refuses a collision too, but by then this command has already
     # marked the task completed, re-parented its children and cleared the
     # sessions pointing at it — all of which would have to be undone by hand.
-    archive_dest_check = archive_destination_for(task_dir)
+    try:
+        archive_dest_check = archive_destination_for(task_dir)
+    except (OSError, RuntimeError, ValueError) as error:
+        print(f"Error: Refusing archive destination: {error}", file=sys.stderr)
+        return 1
     if archive_dest_check.exists():
         print(colored(
             f"Error: refusing to archive '{task_name}': "
@@ -1275,6 +1289,19 @@ def cmd_archive(args: argparse.Namespace) -> int:
             Colors.RED), file=sys.stderr)
         print(f"Task remains at: {_repo_relative_path(task_dir, repo_root)}", file=sys.stderr)
         print("Move or rename the existing archived task, then retry.", file=sys.stderr)
+        return 1
+
+    from .active_task import _runtime_sessions_dir
+    try:
+        _runtime_sessions_dir(repo_root)
+    except (OSError, RuntimeError, ValueError) as error:
+        print(f"Error: Refusing archive with unsafe session runtime: {error}", file=sys.stderr)
+        return 1
+
+    from .task_records import read_task_record
+    _record, error = read_task_record(task_dir, repo_root)
+    if error:
+        print(f"Error: Refusing archive of invalid task: {error}", file=sys.stderr)
         return 1
 
     dir_name = task_dir.name
@@ -1330,13 +1357,17 @@ def cmd_archive(args: argparse.Namespace) -> int:
             # Keep this task in its parent's children list so progress
             # counters (children_progress) stay consistent — children
             # missing from the active set are treated as completed.
-            task_children = data.get("children", [])
+            from .task_records import children_field
+            task_children = children_field(data)
 
             # If this is a parent, clear parent field in all children
             if task_children:
                 for child_name in task_children:
                     child_dir_path = find_task_by_name(child_name, tasks_dir)
                     if child_dir_path:
+                        from .task_records import read_task_record
+                        if read_task_record(child_dir_path, repo_root)[0] is None:
+                            continue
                         child_json = child_dir_path / FILE_TASK_JSON
                         if child_json.is_file():
                             child_data, child_reason = read_json_checked(child_json)
@@ -1367,7 +1398,7 @@ def cmd_archive(args: argparse.Namespace) -> int:
                                     file=sys.stderr,
                                 )
                                 return 1
-                            modified_children.append(child_dir_path.name)
+                            modified_children.append(child_dir_path.relative_to(repo_root).as_posix())
 
     # Clear any session that still points at this task before the path moves.
     from .active_task import clear_task_from_sessions
@@ -1382,7 +1413,7 @@ def cmd_archive(args: argparse.Namespace) -> int:
 
         # Auto-commit unless --no-commit
         if not getattr(args, "no_commit", False):
-            if not _auto_commit_archive(dir_name, repo_root, modified_children):
+            if not _auto_commit_archive(dir_name, repo_root, archive_dest, modified_children):
                 print(
                     colored(
                         "Archive moved on disk, but git auto-commit did not complete. "
@@ -1407,6 +1438,7 @@ def cmd_archive(args: argparse.Namespace) -> int:
 def _auto_commit_archive(
     task_name: str,
     repo_root: Path,
+    archive_dest: Path,
     modified_children: list[str] | None = None,
 ) -> bool:
     """Stage Trellis-owned task paths and commit after archive.
@@ -1440,7 +1472,7 @@ def _auto_commit_archive(
     source_was_tracked = rc == 0 and bool(tracked_out.strip())
 
     paths = safe_archive_paths_to_add(
-        repo_root, task_name=task_name, modified_children=modified_children
+        repo_root, archive_dest=archive_dest, modified_children=modified_children
     )
     if not paths:
         print("[OK] No task changes to commit.", file=sys.stderr)

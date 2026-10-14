@@ -1,3 +1,7 @@
 node_modules/
 *.tsbuildinfo
 local/
+# pi-trellis:ignore:start
+/.worktree/
+/.trellis/.runtime/
+# pi-trellis:ignore:end

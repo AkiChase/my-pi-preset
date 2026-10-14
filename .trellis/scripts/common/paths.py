@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Derived from @mindfoldhq/trellis 0.6.16 (Mindfold LLC).
+# Maintained/adapted for Pi by pi-trellis; see resources/runtime-baseline.json.
 """
 Common path utilities for Trellis workflow.
 
@@ -18,6 +21,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .git import main_worktree_root
+from .task_records import safe_segment
 
 
 # =============================================================================
@@ -82,6 +86,8 @@ def get_repo_root(start_path: Path | None = None) -> Path:
 
 def _read_developer_file(dev_file: Path) -> str | None:
     """Read the `name=` field out of a .developer file, or None."""
+    if dev_file.is_symlink() or (dev_file.exists() and not dev_file.is_file()):
+        raise ValueError("Developer identity must be a regular file, not symlinked")
     if not dev_file.is_file():
         return None
 
@@ -92,7 +98,10 @@ def _read_developer_file(dev_file: Path) -> str | None:
 
     for line in content.splitlines():
         if line.startswith("name="):
-            return line.split("=", 1)[1].strip() or None
+            name = line.split("=", 1)[1]
+            if not safe_segment(name):
+                raise ValueError("Invalid developer identity; expected a safe single directory segment")
+            return name.strip()
 
     return None
 
@@ -121,9 +130,11 @@ def get_developer(repo_root: Path | None = None) -> str | None:
     Returns:
         Developer name or None if not initialized.
     """
-    env_name = os.environ.get(ENV_DEVELOPER, "").strip()
+    env_name = os.environ.get(ENV_DEVELOPER, "")
     if env_name:
-        return env_name
+        if not safe_segment(env_name):
+            raise ValueError("Invalid TRELLIS_DEVELOPER; expected a safe single directory segment")
+        return env_name.strip()
 
     if repo_root is None:
         repo_root = get_repo_root()
@@ -187,7 +198,11 @@ def get_workspace_dir(repo_root: Path | None = None) -> Path | None:
 
     developer = get_developer(repo_root)
     if developer:
-        return repo_root / DIR_WORKFLOW / DIR_WORKSPACE / developer
+        workspace = repo_root / DIR_WORKFLOW / DIR_WORKSPACE / developer
+        base = repo_root.resolve() / DIR_WORKFLOW / DIR_WORKSPACE
+        if workspace.is_symlink() or not workspace.resolve().is_relative_to(base):
+            raise ValueError("Developer workspace must be local, not symlinked")
+        return workspace
     return None
 
 
@@ -278,74 +293,9 @@ def normalize_task_ref(task_ref: str) -> str:
 
 
 def resolve_task_ref(task_ref: str, repo_root: Path | None = None) -> Path | None:
-    """Resolve a task ref to an absolute task directory path inside the repo.
-
-    Returns None when the ref resolves outside `repo_root`. Every reader of the
-    active task — `task.py`, the shared hooks, the platform extensions — comes
-    through here, so containment is enforced at this one point rather than at
-    each call site.
-
-    It matters because a ref is not always something the user typed. It round
-    trips through the session pointer under `.trellis/.runtime/sessions/`, and
-    `..` segments used to survive that trip intact: `_canonical_task_ref`
-    compares lexically, and a lexical `relative_to` accepts
-    `<root>/.trellis/tasks/../../../elsewhere` because the string does start
-    with the root. The ref was then stored verbatim and replayed on every later
-    turn, so `task.py start .trellis/tasks/../../../elsewhere` both rewrote that
-    directory's `task.json` and fed its files to the model.
-
-    Resolving here also normalises the path, so callers get a ref without `..`
-    to store.
-    """
-    if repo_root is None:
-        repo_root = get_repo_root()
-
-    normalized = normalize_task_ref(task_ref)
-    if not normalized:
-        return None
-
-    try:
-        root = repo_root.resolve()
-    except OSError:
-        return None
-
-    path_obj = Path(normalized)
-    if path_obj.is_absolute():
-        candidate = path_obj
-    elif normalized.startswith(f"{DIR_WORKFLOW}/"):
-        candidate = root / path_obj
-    else:
-        candidate = root / DIR_WORKFLOW / DIR_TASKS / path_obj
-
-    # resolve() collapses `..` and follows symlinks, so a task directory that
-    # links outside the repo is refused too. Both sides are resolved because
-    # repo_root itself may sit behind a symlink (/tmp on macOS does).
-    try:
-        resolved = candidate.resolve()
-        workflow_real = (root / DIR_WORKFLOW).resolve()
-    except OSError:
-        return None
-
-    try:
-        resolved.relative_to(root)
-        return resolved
-    except ValueError:
-        pass
-
-    # `.trellis` may itself be a symlink into a store outside the repo (#567).
-    # The workflow dir's own real location is then a second legitimate
-    # containment base: a ref through that link never left the workflow tree.
-    # A ref that escapes BOTH bases (traversal, absolute path elsewhere, a
-    # task dir symlinked out of the tree) is still refused.
-    try:
-        rel = resolved.relative_to(workflow_real)
-    except ValueError:
-        return None
-
-    # Map back to the in-repo (lexical) form so callers store the same
-    # repo-relative ref as in the non-symlinked layout.
-    return root / DIR_WORKFLOW / rel
-
+    """Resolve through the shared lexical/resolved task-store boundary."""
+    from .task_records import resolve_task_ref as resolve
+    return resolve(task_ref, repo_root or get_repo_root())
 
 def get_current_task(
     repo_root: Path | None = None,
@@ -365,7 +315,8 @@ def get_current_task(
 
     from .active_task import resolve_active_task
 
-    return resolve_active_task(repo_root, platform_input, platform).task_path
+    active = resolve_active_task(repo_root, platform_input, platform)
+    return active.task_path if active.valid else None
 
 
 def get_current_task_abs(

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Derived from @mindfoldhq/trellis 0.6.16 (Mindfold LLC).
+# Maintained/adapted for Pi by pi-trellis; see resources/runtime-baseline.json.
 """
 Package discovery and context output.
 
@@ -46,7 +49,7 @@ def _get_active_task_package(repo_root: Path) -> str | None:
     current = get_current_task(repo_root)
     if not current:
         return None
-    ct = load_task(repo_root / current)
+    ct = load_task(repo_root / current, repo_root)
     return ct.package if ct and ct.package else None
 
 
@@ -159,6 +162,11 @@ def get_context_packages_text(repo_root: Path | None = None) -> str:
     if repo_root is None:
         repo_root = get_repo_root()
 
+    from .active_task import resolve_active_task
+    active = resolve_active_task(repo_root)
+    if active.error:
+        return f"Task error ({active.state}): {active.error}"
+
     pkg_info = get_packages_info(repo_root)
     lines: list[str] = []
 
@@ -214,6 +222,11 @@ def get_context_packages_json(repo_root: Path | None = None) -> dict:
     """Get packages context as a dictionary (for --mode packages --json)."""
     if repo_root is None:
         repo_root = get_repo_root()
+
+    from .active_task import resolve_active_task
+    active = resolve_active_task(repo_root)
+    if active.error:
+        return {"task_error": {"state": active.state, "message": active.error}}
 
     pkg_info = get_packages_info(repo_root)
 

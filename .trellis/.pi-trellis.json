@@ -1,0 +1,284 @@
+{
+  "schemaVersion": 2,
+  "runtimeReleaseId": "pi-trellis-runtime-v1-e461666507e07f59b5edf6a719ce30dd620d2d26e2d6cddbec80d6e0197fc45e",
+  "files": {
+    ".trellis/scripts/add_session.py": {
+      "sha256": "432c29b3adcd3510f86b63803f6ecefc3901f3ee623ffda3e0b693ad83ca730c",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/add_session.py"
+    },
+    ".trellis/scripts/common/__init__.py": {
+      "sha256": "9f5fa711f818cbbfa9bf4c2419b28f64d44a8a6937a88f856afe04dcb870b6e4",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/common/__init__.py"
+    },
+    ".trellis/scripts/common/active_task.py": {
+      "sha256": "64fa2acc4ba18716f7e718f228a6b60a0bd3fa069582352a2a64934c1206bac5",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/common/active_task.py"
+    },
+    ".trellis/scripts/common/config.py": {
+      "sha256": "ae8a5004f8d51beb7a82a57def07eb2db49331be45a50d47d88304b1e9d27283",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/common/config.py"
+    },
+    ".trellis/scripts/common/developer.py": {
+      "sha256": "1f0b22891166da83b1e213dcc1ce91d51182b7d475751bf91bc4d487c30fc836",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/common/developer.py"
+    },
+    ".trellis/scripts/common/git.py": {
+      "sha256": "6d93ac9085c6811ed75c92c75929741f92b1774365df508bfbc54dae9ce4f5d8",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/common/git.py"
+    },
+    ".trellis/scripts/common/git_context.py": {
+      "sha256": "4d171a2e77f0cbc5c9970ba37e1f159089ace90e21914cf1468e237cf96b33b4",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/common/git_context.py"
+    },
+    ".trellis/scripts/common/io.py": {
+      "sha256": "02cb0e5cd00711b9c66484bbde30cda11abe034fa7415140cd5c3006b481dde0",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/common/io.py"
+    },
+    ".trellis/scripts/common/log.py": {
+      "sha256": "9349ed14fc3cd61c7a6fdef2a8a26ed29c40d9967315af68a38fcfbdb1f469f7",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/common/log.py"
+    },
+    ".trellis/scripts/common/packages_context.py": {
+      "sha256": "cd5897bbf3f4cab6f1c1495ea876bb644de35b468fae8f10e0cd9e97d5601d6e",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/common/packages_context.py"
+    },
+    ".trellis/scripts/common/paths.py": {
+      "sha256": "ac684efc1a1febfa60c0fa4b49d24d6b08218d25a18febd3a67255e75a9fcacc",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/common/paths.py"
+    },
+    ".trellis/scripts/common/safe_commit.py": {
+      "sha256": "edf0d18627fe561e5b475706c84cebd8270e2ab6914438205adeac987a89fea3",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/common/safe_commit.py"
+    },
+    ".trellis/scripts/common/session_context.py": {
+      "sha256": "1095bbd8e3e9fce6e8eca56e50ecd24e511282d26ec696ff305d3d82f29ba752",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/common/session_context.py"
+    },
+    ".trellis/scripts/common/task_context.py": {
+      "sha256": "d7d2c096cd8a909d5f0c6b7c2c5a76e9bcf3b3f26afa5834ab1c0befa737e9bc",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/common/task_context.py"
+    },
+    ".trellis/scripts/common/task_store.py": {
+      "sha256": "121b0e27fd00cc5de87d918e1255c6be7eea32555d970f40e4aa526710e5b3a3",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/common/task_store.py"
+    },
+    ".trellis/scripts/common/task_utils.py": {
+      "sha256": "89f9aa4709848d5ea69b31f1f079ca0743c8425fb98bab15edba3c376e81462b",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/common/task_utils.py"
+    },
+    ".trellis/scripts/common/tasks.py": {
+      "sha256": "88159cb42455e07af03aa716d1596ad76ed6647b82075dc01c492ec44809f87b",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/common/tasks.py"
+    },
+    ".trellis/scripts/common/trellis_config.py": {
+      "sha256": "750da9420105d3bbeaceb26c41f183556b1df7769f58768e9f1fbc704fef95f4",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/common/trellis_config.py"
+    },
+    ".trellis/scripts/common/types.py": {
+      "sha256": "17f464519a109881871d29d8e9b6ff4dafefd89cc711a63301313d43046064d4",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/common/types.py"
+    },
+    ".trellis/scripts/common/workflow_phase.py": {
+      "sha256": "2474a4da63eb26ecd82483b55519f2555b340de4d46de0b8a9940ef283a35175",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/common/workflow_phase.py"
+    },
+    ".trellis/scripts/get_context.py": {
+      "sha256": "5f0de91be014e6d59b697fb17d9c840b80605a6cbc29a0609b5d4cb4464acf9a",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/get_context.py"
+    },
+    ".trellis/scripts/get_developer.py": {
+      "sha256": "db36b4a8d25d2cee5c9f1c0c08941cff1642db3fc99ab396cab8185f2ad46c6f",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/get_developer.py"
+    },
+    ".trellis/scripts/init_developer.py": {
+      "sha256": "3e044c5788dbb583c86c0963847d756b8a66483d1440aee17473fd1577dee6ad",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/init_developer.py"
+    },
+    ".trellis/scripts/task.py": {
+      "sha256": "cf1a1f198070cac7de44904a0d9636b88a0ebfde69f99fd4b7f76809ea3d7962",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/task.py"
+    },
+    ".trellis/scripts/query-worktree.py": {
+      "sha256": "d3e99b08f03a182f3f984c35141af300998c4e3fad82dd50ee6e9547bc974139",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/query-worktree.py"
+    },
+    ".trellis/scripts/worktree.py": {
+      "sha256": "ab50d841d912c717abb54becad9bfdb3f0a160823bd956d74ca77de8a5d8b0e0",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/worktree.py"
+    },
+    ".trellis/scripts/pi_trellis_worktree/records.py": {
+      "sha256": "ab1d129e5d598315737f639c0942dc75332b7905595cb5fdb483010d04e0f02a",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/pi_trellis_worktree/records.py"
+    },
+    ".trellis/scripts/pi_trellis_worktree/materials.py": {
+      "sha256": "1e51edfbed879dd5334c01f891bac1a7ffb61ad04df647f8afb2d2a1bc86f428",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/pi_trellis_worktree/materials.py"
+    },
+    ".trellis/scripts/pi_trellis_worktree/__init__.py": {
+      "sha256": "1d4d0902645668497861fb14b1021af44fe3af3140a24b45ee31fd64a749c1ab",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/pi_trellis_worktree/__init__.py"
+    },
+    ".trellis/scripts/pi_trellis_worktree/cli.py": {
+      "sha256": "452d39cb0cac9974dc5fc6179001936932a4f0754f78ea2cb266b1e00e1e1aef",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/pi_trellis_worktree/cli.py"
+    },
+    ".trellis/scripts/pi_trellis_worktree/manager.py": {
+      "sha256": "a846d18428fa5519864607e240a103b9b20185d015f461330b71983b785b4fa2",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/pi_trellis_worktree/manager.py"
+    },
+    ".trellis/scripts/common/task_records.py": {
+      "sha256": "036a46fd0b558a67f4e25f38d9741fab8a90cd7879e8419893ac65eb8a58c880",
+      "mode": 420,
+      "kind": "runtime",
+      "source": "runtime/common/task_records.py"
+    },
+    ".pi/agents/trellis-implement.md": {
+      "sha256": "4f7192a3118eccc92699efe1fed9cf8368e2d9b50028682ba30652e855b04d8a",
+      "mode": 420,
+      "kind": "agent",
+      "source": "agents/trellis-implement.md"
+    },
+    ".pi/agents/trellis-check.md": {
+      "sha256": "afe276bcb225cb3e718e9b498d7b201c3666f1c3868fffe8dd6fe1c77f5553a2",
+      "mode": 420,
+      "kind": "agent",
+      "source": "agents/trellis-check.md"
+    },
+    ".pi/agents/trellis-research.md": {
+      "sha256": "fe9ba44ec6b216a7c697a13af054f8bc42beeb3821b4332e17ee34fd4acfcb18",
+      "mode": 420,
+      "kind": "agent",
+      "source": "agents/trellis-research.md"
+    }
+  },
+  "templates": {
+    ".trellis/workflow.md": {
+      "origin": "package-default",
+      "sha256": "58079f85c2fb64c42996888ec523f9e9e5e5acc0e990f2bbf21b551f03cd0ad4",
+      "mode": 420,
+      "source": "resources/templates/workflow.md"
+    },
+    ".trellis/config.yaml": {
+      "sha256": "a966e6d374e9e6ff283cf761ccd99631323ee1754856cef51ad154ca0afb9dfa",
+      "mode": 420,
+      "origin": "preserved-project",
+      "source": {
+        "kind": "project-snapshot",
+        "revision": "7d49ec4f72946577fd8e9b015902ccda8def5699"
+      }
+    },
+    ".trellis/.gitignore": {
+      "sha256": "3bc42434cbe61c937a1c26ea3c880b496bfad4e7d683750169e27ade509aa798",
+      "mode": 420,
+      "origin": "preserved-project",
+      "source": {
+        "kind": "project-snapshot",
+        "revision": "7d49ec4f72946577fd8e9b015902ccda8def5699"
+      }
+    },
+    ".trellis/workspace/index.md": {
+      "sha256": "9f9d685df377e8272d2341b89cd097431b284bb378b3e12b33985a4e6b9c544c",
+      "mode": 420,
+      "origin": "preserved-project",
+      "source": {
+        "kind": "project-snapshot",
+        "revision": "7d49ec4f72946577fd8e9b015902ccda8def5699"
+      }
+    },
+    ".trellis/spec/index.md": {
+      "origin": "package-default",
+      "sha256": "a37d28a4f1055a1f72487cb3c2fbd24e5d10726ad98aa8796be5b3435055f7c6",
+      "mode": 420,
+      "source": "resources/templates/spec/index.md"
+    },
+    ".trellis/spec/guides/index.md": {
+      "sha256": "8fccd8d02c736f13469c4dbbdf077b79f6b6f79c03fed2b438d2c9c07e3adfbc",
+      "mode": 420,
+      "origin": "preserved-project",
+      "source": {
+        "kind": "project-snapshot",
+        "revision": "7d49ec4f72946577fd8e9b015902ccda8def5699"
+      }
+    },
+    ".trellis/spec/guides/code-reuse-thinking-guide.md": {
+      "sha256": "2e34df3f0ade1a227e639e1413bb56b83cfb6aba0f24dfb6083bdd3a5d510e60",
+      "mode": 420,
+      "origin": "preserved-project",
+      "source": {
+        "kind": "project-snapshot",
+        "revision": "7d49ec4f72946577fd8e9b015902ccda8def5699"
+      }
+    },
+    ".trellis/spec/guides/cross-layer-thinking-guide.md": {
+      "sha256": "b10e16ca6eda69a9fcb3b8eedd8e239995865a6fe5e901f3e602af331df42a07",
+      "mode": 420,
+      "origin": "preserved-project",
+      "source": {
+        "kind": "project-snapshot",
+        "revision": "7d49ec4f72946577fd8e9b015902ccda8def5699"
+      }
+    }
+  }
+}

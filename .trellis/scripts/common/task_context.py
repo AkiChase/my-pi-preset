@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Derived from @mindfoldhq/trellis 0.6.16 (Mindfold LLC).
+# Maintained/adapted for Pi by pi-trellis; see resources/runtime-baseline.json.
 """
 Task JSONL context management.
 
@@ -27,7 +30,6 @@ from pathlib import Path
 
 from .config import get_context_injection_limits
 from .git import branch_exists_locally
-from .io import read_json
 from .log import Colors, colored
 from .paths import DIR_ARCHIVE, DIR_TASKS, DIR_WORKFLOW, FILE_TASK_JSON, get_repo_root
 from .task_utils import resolve_task_dir
@@ -169,19 +171,21 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
     # Warn (don't fail validation) when the recorded branch is stale — it
     # was likely already merged and deleted (#399 item 2).
-    task_json_path = target_dir / FILE_TASK_JSON
-    if task_json_path.is_file():
-        task_data = read_json(task_json_path)
-        stored_branch = task_data.get("branch") if task_data else None
-        if stored_branch and not branch_exists_locally(stored_branch, repo_root):
-            print(
-                colored(
-                    f"Warning: recorded branch '{stored_branch}' no longer exists locally "
-                    "(likely merged and deleted).",
-                    Colors.YELLOW,
-                )
+    from .task_records import read_task_record, string_field
+    task_data, error = read_task_record(target_dir, repo_root)
+    if error:
+        print(f"Error: Refusing context validation for invalid task: {error}")
+        return 1
+    stored_branch = string_field(task_data, "branch")
+    if stored_branch and not branch_exists_locally(stored_branch, repo_root):
+        print(
+            colored(
+                f"Warning: recorded branch '{stored_branch}' no longer exists locally "
+                "(likely merged and deleted).",
+                Colors.YELLOW,
             )
-            print()
+        )
+        print()
 
     total_errors = 0
     for jsonl_name in ["implement.jsonl", "check.jsonl"]:

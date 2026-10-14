@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# SPDX-License-Identifier: AGPL-3.0-only
+# Derived from @mindfoldhq/trellis 0.6.16 (Mindfold LLC).
+# Maintained/adapted for Pi by pi-trellis; see resources/runtime-baseline.json.
 """
 Git and Session Context utilities.
 
@@ -71,6 +74,18 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+    from .active_task import resolve_active_task
+    from .paths import get_repo_root
+    active = resolve_active_task(get_repo_root())
+    if active.error:
+        import sys
+        diagnostic = {"task_error": {"state": active.state, "message": active.error,
+                                     "raw_ref": active.raw_ref, "source": active.source}}
+        if args.json:
+            print(json.dumps(diagnostic, ensure_ascii=False))
+        else:
+            print(f"Task error: {active.error}", file=sys.stderr)
+        sys.exit(1)
 
     if args.mode == "record":
         if args.json:

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Derived from @mindfoldhq/trellis 0.6.16 (Mindfold LLC).
+# Maintained/adapted for Pi by pi-trellis; see resources/runtime-baseline.json.
 """
 Initialize developer for workflow.
 
@@ -13,6 +16,8 @@ This creates:
 from __future__ import annotations
 
 import sys
+sys.dont_write_bytecode = True
+
 
 from common.paths import (
     DIR_WORKFLOW,
@@ -24,7 +29,7 @@ from common.developer import init_developer
 
 def main() -> None:
     """CLI entry point."""
-    if len(sys.argv) < 2:
+    if len(sys.argv) != 2:
         print(f"Usage: {sys.argv[0]} <developer-name>")
         print()
         print("Example:")
@@ -32,14 +37,6 @@ def main() -> None:
         sys.exit(1)
 
     name = sys.argv[1]
-
-    # Check if already initialized
-    existing = get_developer()
-    if existing:
-        print(f"Developer already initialized: {existing}")
-        print()
-        print(f"To reinitialize, remove {DIR_WORKFLOW}/{FILE_DEVELOPER} first")
-        sys.exit(0)
 
     if init_developer(name):
         sys.exit(0)

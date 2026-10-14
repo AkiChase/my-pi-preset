@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Derived from @mindfoldhq/trellis 0.6.16 (Mindfold LLC).
+# Maintained/adapted for Pi by pi-trellis; see resources/runtime-baseline.json.
 """
 Task utility functions.
 
@@ -108,10 +111,17 @@ def find_task_by_name(task_name: str, tasks_dir: Path) -> Path | None:
 # =============================================================================
 
 def archive_destination_for(task_dir_abs: Path) -> Path:
-    """Path a task would be archived to: <tasks>/archive/<YYYY-MM>/<name>."""
+    """Validate the exact move route before task status/children/pointers change."""
     tasks_dir = task_dir_abs.parent
     year_month = datetime.now().strftime("%Y-%m")
-    return tasks_dir / "archive" / year_month / task_dir_abs.name
+    dest = tasks_dir / "archive" / year_month / task_dir_abs.name
+    store = tasks_dir.resolve(strict=True)
+    for directory in (dest.parent.parent, dest.parent):
+        if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
+            raise ValueError("Archive directories must be regular local directories")
+    if dest.is_symlink() or not dest.resolve().is_relative_to(store):
+        raise ValueError("Archive destination leaves its task store or is symlinked")
+    return dest
 
 
 def archive_task_dir(task_dir_abs: Path, repo_root: Path | None = None) -> Path | None:
@@ -128,7 +138,11 @@ def archive_task_dir(task_dir_abs: Path, repo_root: Path | None = None) -> Path 
         print(f"Error: task directory not found: {task_dir_abs}", file=sys.stderr)
         return None
 
-    dest = archive_destination_for(task_dir_abs)
+    try:
+        dest = archive_destination_for(task_dir_abs)
+    except (OSError, RuntimeError, ValueError) as error:
+        print(f"Error: Refusing archive destination: {error}", file=sys.stderr)
+        return None
     month_dir = dest.parent
 
     # Create archive directory
@@ -246,6 +260,10 @@ def resolve_task_dir(target_dir: str, repo_root: Path) -> Path | None:
             )
             return None
 
+    from .task_records import resolve_task_ref as validate_ref
+    if validate_ref(str(candidate), repo_root) is None:
+        print(f"Error: Task path leaves lexical/resolved task store: {target_dir}", file=sys.stderr)
+        return None
     try:
         resolved = candidate.resolve()
         tasks_lexical = get_tasks_dir(repo_root.resolve())
@@ -407,6 +425,10 @@ def run_task_hooks(event: str, task_json_path: Path, repo_root: Path) -> None:
     from .config import get_hooks
     from .log import Colors, colored
 
+    from .task_records import read_task_record
+    if read_task_record(task_json_path.parent, repo_root)[0] is None:
+        print(f"[WARN] Refusing {event} hooks for invalid task", file=sys.stderr)
+        return
     commands = get_hooks(event, repo_root)
     if not commands:
         return

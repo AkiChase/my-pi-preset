@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Derived from @mindfoldhq/trellis 0.6.16 (Mindfold LLC).
+# Maintained/adapted for Pi by pi-trellis; see resources/runtime-baseline.json.
 """
 Task data access layer.
 
@@ -19,9 +22,11 @@ from pathlib import Path
 from .io import describe_json_read_failure, read_json_checked
 from .paths import FILE_TASK_JSON
 from .types import TaskInfo
+from .task_records import read_task_record, task_projection
+from .paths import get_repo_root
 
 
-def load_task(task_dir: Path) -> TaskInfo | None:
+def load_task(task_dir: Path, repo_root: Path | None = None) -> TaskInfo | None:
     """Load task from a directory containing task.json.
 
     Args:
@@ -40,23 +45,24 @@ def load_task(task_dir: Path) -> TaskInfo | None:
     if not task_json.is_file():
         return None
 
-    data, reason = read_json_checked(task_json)
+    data, reason = read_task_record(task_dir, repo_root or get_repo_root())
     if data is None:
         problem, hint = describe_json_read_failure(task_json, reason)
         print(f"[WARN] Skipping task '{task_dir.name}': {problem}", file=sys.stderr)
         print(f"       {hint}", file=sys.stderr)
         return None
 
+    view = task_projection(data)
     return TaskInfo(
         dir_name=task_dir.name,
         directory=task_dir,
-        title=data.get("title") or data.get("name") or "unknown",
-        status=data.get("status", "unknown"),
-        assignee=data.get("assignee", ""),
-        priority=data.get("priority", "P2"),
-        children=tuple(data.get("children", [])),
-        parent=data.get("parent"),
-        package=data.get("package"),
+        title=view.get("title") or view.get("name") or "unknown",
+        status=view.get("status") or "unknown",
+        assignee=view.get("assignee") or "",
+        priority=view.get("priority") or "P2",
+        children=tuple(view["children"]),
+        parent=view["parent"],
+        package=view["package"],
         raw=data,
     )
 
@@ -78,7 +84,7 @@ def iter_active_tasks(tasks_dir: Path) -> Iterator[TaskInfo]:
     for d in sorted(tasks_dir.iterdir()):
         if not d.is_dir() or d.name == "archive":
             continue
-        info = load_task(d)
+        info = load_task(d, tasks_dir.parent.parent)
         if info is not None:
             yield info
 

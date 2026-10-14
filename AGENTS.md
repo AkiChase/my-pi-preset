@@ -1,21 +1,11 @@
 <!-- TRELLIS:START -->
-# Trellis Instructions
+# Pi Trellis
 
-These instructions are for AI assistants working in this project.
-
-This project is managed by Trellis. The working knowledge you need lives under `.trellis/`:
-
-- `.trellis/workflow.md` — development phases, when to create tasks, skill routing
-- `.trellis/spec/` — package- and layer-scoped coding guidelines (read before writing code in a given layer)
-- `.trellis/workspace/` — per-developer journals and session traces
-- `.trellis/tasks/` — active and archived tasks (PRDs, research, jsonl context)
-
-If a Trellis command is available on your platform (e.g. `/trellis:finish-work`, `/trellis:continue`), prefer it over manual steps. Not every platform exposes every command.
-
-If you're using Codex or another agent-capable tool, additional project-scoped helpers may live in:
-- `.agents/skills/` — reusable Trellis skills
-- `.codex/agents/` — optional custom subagents
-
-Managed by Trellis. Edits outside this block are preserved; edits inside may be overwritten by a future `trellis update`.
-
+Use `/trellis-init --check` to inspect the project and `/skill:trellis-start` to orient.
+Read `.trellis/workflow.md` and relevant `.trellis/spec/` indexes before approved changes.
+Skills load from the pi-trellis package; project roles live in `.pi/agents/`.
+Use project `.trellis/scripts/` Python commands, with the session context supplied by Pi.
+Read-only exploration needs no task. Task creation, implementation, Git commits and
+archival require user approval; initialization grants none of these approvals.
+Managed task worktrees use the package's on-demand execution protocol, never temporary isolation.
 <!-- TRELLIS:END -->

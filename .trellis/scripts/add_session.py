@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# SPDX-License-Identifier: AGPL-3.0-only
+# Derived from @mindfoldhq/trellis 0.6.16 (Mindfold LLC).
+# Maintained/adapted for Pi by pi-trellis; see resources/runtime-baseline.json.
 """
 Add a new session to journal file and update index.md.
 
@@ -45,11 +48,13 @@ Branch resolution order:
 
 from __future__ import annotations
 
+import sys
+sys.dont_write_bytecode = True
+
 import argparse
 import hashlib
 import json
 import re
-import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -1106,23 +1111,8 @@ def _auto_commit_workspace(repo_root: Path) -> str:
         return COMMIT_BLOCKED
 
     commit_msg = get_session_commit_message(repo_root)
-    # Resolve the current task so staging is scoped to its dir only. The ref
-    # is ``.trellis/tasks/<name>`` (or under archive/) — pass the bare name.
     current = get_current_task(repo_root)
-    if current:
-        task_name = Path(current).name
-        paths = safe_trellis_paths_to_add(repo_root, task_name=task_name)
-    else:
-        # Current task unknown (0 or >=2 parallel sessions — exactly the
-        # parallel-window case #303 is about). Do NOT fall back to the wide
-        # `tasks_dir.iterdir()` scan; that would re-leak other tasks' dirty
-        # dirs into the session commit. Stage only the developer's journal/
-        # index and skip every task dir.
-        paths = [
-            p
-            for p in safe_trellis_paths_to_add(repo_root, task_name=None)
-            if not p.startswith(f"{DIR_WORKFLOW}/{DIR_TASKS}/")
-        ]
+    paths = safe_trellis_paths_to_add(repo_root, task_path=current)
     if not paths:
         print("[OK] No workspace changes to commit.", file=sys.stderr)
         return COMMIT_SKIPPED
@@ -1200,6 +1190,11 @@ def add_session(
 ) -> int:
     """Add a new session, resuming an interrupted one instead of duplicating it."""
     repo_root = get_repo_root()
+    from common.active_task import resolve_active_task
+    active = resolve_active_task(repo_root)
+    if active.error:
+        print(f"Error: Invalid active task: {active.error}", file=sys.stderr)
+        return 1
     warn_if_parallel_worktree(repo_root)
     ensure_developer(repo_root)
 
@@ -1508,8 +1503,13 @@ def main() -> int:
 
     # Load active task once — shared by package and branch resolution
     repo_root = get_repo_root()
+    from common.active_task import resolve_active_task
+    active = resolve_active_task(repo_root)
+    if active.error:
+        print(f"Error: Invalid active task: {active.error}", file=sys.stderr)
+        return 1
     current = get_current_task(repo_root)
-    task_data = load_task(repo_root / current) if current else None
+    task_data = load_task(repo_root / current, repo_root) if current else None
 
     package = args.package
     if package:

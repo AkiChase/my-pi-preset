@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Derived from @mindfoldhq/trellis 0.6.16 (Mindfold LLC).
+# Maintained/adapted for Pi by pi-trellis; see resources/runtime-baseline.json.
 """
 Core type definitions for Trellis task data.
 
@@ -82,7 +85,8 @@ class TaskInfo:
 
     @property
     def description(self) -> str:
-        return self.raw.get("description", "")
+        from .task_records import string_field
+        return string_field(self.raw, "description", "")
 
     @property
     def branch(self) -> str | None:
@@ -90,7 +94,8 @@ class TaskInfo:
 
     @property
     def meta(self) -> dict:
-        return self.raw.get("meta", {})
+        meta = self.raw.get("meta")
+        return meta if isinstance(meta, dict) else {}
 
 
 # =============================================================================
