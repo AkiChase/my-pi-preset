@@ -369,12 +369,13 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 
 独立扩展，只通过 Pi 的公开 `registerToolRenderer` resolver 接管 `read`、`bash`、`find`、`grep` 展示，并为可选的 `get_subagent_result`、`jobs` 提供保守适配。不会重新注册工具、包装执行、修改模型可见的 content/details/structuredContent 或额外读取文件／完整任务日志；`edit`、`write`、`ls` 等保持原 renderer。没有 FFF、文件补全、工具连续分组、用户消息前缀或额外 Working/Thinking 动画。
 
-- Read：折叠显示路径、返回代码行数与展开提示；展开显示完整路径、1-based 行号、竖线与语法色。offset 与路径尾保持原子，长路径省略中段，长代码行用 `›` 截断。折叠以 limited 标记续读／截断，展开保留完整说明，不计代码行；文件尾部空行保留，未知或嵌入代码的说明样式文本不剥离；图片与附件仍由宿主绘制。折叠工具标题中的换行显示为 `\n`，展开按完整原文分行。
-- Bash：保留 `$ command`、timeout、返回输出行数和本次调用耗时（不是后台进程耗时）；展开正文，错误用 Pi error 色。只有完整后台返回信封才显示 background ID，log path 与完整文案在展开后显示，不标记为进程已完成；正文含后台关键词不会误判；原 timeout/background/任务协调行为不变。
+- Read：标题以真实注册名 `read` 开头，折叠显示路径、返回代码行数与展开提示；展开显示完整路径、1-based 行号、竖线与语法色。offset 与路径尾保持原子，长路径省略中段，长代码行用 `›` 截断。折叠以 limited 标记续读／截断，展开保留完整说明，不计代码行；文件尾部空行保留，未知或嵌入代码的说明样式文本不剥离；图片与附件仍由宿主绘制。折叠工具标题中的换行显示为 `\n`，展开按完整原文分行。
+- Bash：标题为 `bash  command`，保留 timeout、返回输出行数和本次调用耗时（不是后台进程耗时）；展开正文，错误用 Pi error 色。只有完整后台返回信封才显示 background ID，log path 与完整文案在展开后显示，不标记为进程已完成；正文含后台关键词不会误判；原 timeout/background/任务协调行为不变。
 - Find/Grep：按返回顺序分组目录／文件，标题加粗着色。数量为已展示文件／matching lines，不把 context 和 limit notice 当命中。Grep 的 literal/ignoreCase 影响高亮；路径歧义、无效或不支持的 regex 保守回退原文／无高亮，不影响搜索执行。
-- `get_subagent_result`：可识别的头部以 description 为标题，末尾保状态、可靠耗时／用量；展开显示已经返回的全文及 verbose 对话。waiting、running/queued 快照、not found、wait released/cancelled 分开，停止等待不表示停止 agent。不会额外获取或消费结果。
+- `get_subagent_result`：可识别的头部保留真实注册名，description 在名称后，末尾保状态、可靠耗时／用量；展开显示已经返回的全文及 verbose 对话。waiting、running/queued 快照、not found、wait released/cancelled 分开，停止等待不表示停止 agent。不会额外获取或消费结果。
 - `jobs`：list 显示可靠任务数，output 显示实际字节范围及省略标记，search 显示可靠 matches/jobs，stats 显示 running/terminal，attach 的 partial 为 following/waiting、final 替换 partial（不拼接日志），kill 只报告工具返回的 stop，不推断 OS 已退出。展开只显示本次已返回文本。
-- 六类已知展示整块折叠为一行，错误／图片文字／限制说明也不展开铺正文；元数据位于标题末尾，窄屏先缩略标题再省略次要字段。原四类和常规可选工具使用宿主 pending/success/error Box 背景、行尾填充及一次 outputPad；点击宿主结果区域或工具展开键可切换。可选工具缺席不注册假工具；动态出现／恢复历史均按参数及文本信封惰性判断。同名异形、未知 details 或格式漂移委托原 call/result/state/shell；没有原 renderer 则用公开组件的通用标题、有界参数预览、10 行结果预览和展开全文（字符串参数按原文分行）；原 renderer 回调抛错时也保留当前参数与返回文本并一次诊断，此兼容例外可能多行。原 self renderer 的未知格式仍保留 self 外壳；已知态仅正文区域点击展开，padding 不改变展开状态。
+- 六类已知展示整块折叠为一行，错误／图片文字／限制说明也不展开铺正文；标题始终保留真实注册工具名及原始大小写（`read`、`bash`、`find`、`grep`、`get_subagent_result`、`jobs`），参数／描述在名称后，不重复工具名前缀。元数据位于标题末尾，窄屏优先保完整工具名，再缩略参数／描述及省略次要字段；连名称也放不下时安全截断。原四类和常规可选工具使用宿主 pending/success/error Box 背景、行尾填充及一次 outputPad；点击宿主结果区域或工具展开键可切换。可选工具缺席不注册假工具；动态出现／恢复历史均按参数及文本信封惰性判断。同名异形、未知 details 或格式漂移委托原 call/result/state/shell；没有原 renderer 则用公开组件的通用标题、有界参数预览、10 行结果预览和展开全文（字符串参数按原文分行）；原 renderer 回调抛错时也保留当前参数与返回文本并一次诊断，此兼容例外可能多行。原 self renderer 的未知格式仍保留 self 外壳；已知态仅正文区域点击展开，padding 不改变展开状态。
+- 未覆盖工具继续使用插件自身或 Pi 默认 renderer；例如 `ask_user_question` 的小写注册名不会转换成 `Ask User Question`，其问卷交互界面也不受本扩展接管。
 - 工具展开状态沿用 Pi；提示读取当前键位（默认 Ctrl+O，macOS 可显示 Control/Option 名称）。布局用宿主传入的实际内宽 `render(width)` 和 SDK 显示列宽，处理中文、ANSI 与窗口变化；外部终端控制字符先清理。
 
 代码高亮直接依赖 `shiki` 与 `@shikijs/cli ^4.0.2`，固定 `one-dark-pro`，不读取个人配置、不改变 Pi 全局主题。未知语言／超过 80k 字符使用 plain；异常只输出一次不含路径或源代码的诊断。缓存最多 128 项、总字符约束 2Mi，关闭时清理；先 plain 后异步刷新，迟到结果不会覆盖新内容、折叠或已关闭 activation。

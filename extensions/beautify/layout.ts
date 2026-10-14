@@ -44,14 +44,24 @@ export function summary(path: string, suffix: string, stats: string, width: numb
   const minimumTitle = Math.min(visibleWidth(path + suffix), Math.max(visibleWidth(suffix), Math.min(12, Math.floor(width / 3))));
   const fields = secondary ? secondary.split(" · ") : [];
   let metadata = [stats, ...fields, hint].filter(Boolean).join(" · ");
-  if (visibleWidth(metadata) + minimumTitle + 2 > width) metadata = [stats, ...fields].filter(Boolean).join(" · ");
   while (fields.length && visibleWidth(metadata) + minimumTitle + 2 > width) {
-    fields.pop(); metadata = [stats, ...fields].filter(Boolean).join(" · ");
+    fields.pop(); metadata = [stats, ...fields, hint].filter(Boolean).join(" · ");
   }
+  if (visibleWidth(metadata) + minimumTitle + 2 > width) metadata = stats;
   if (visibleWidth(metadata) + minimumTitle + 2 > width) metadata = clipPlain(stats, Math.max(0, width - minimumTitle - 2));
   const room = width - (metadata ? visibleWidth(metadata) + 2 : 0);
   const label = middlePath(path, room, suffix);
   return [theme.fg("accent", label) + (metadata ? "  " + theme.fg("muted", metadata) : "")];
+}
+export function toolHeading(name: string, detail: string, suffix: string, stats: string, width: number, theme: Theme, expanded: boolean, secondary = ""): string[] {
+  if (width < 1) return [];
+  if (expanded) return wrap(name + (detail || suffix ? "  " + detail + suffix : ""), width).map(line => theme.fg("accent", line));
+  // Identity is a separate field: middle-path clipping may only shorten details.
+  const identity = clipPlain(name, width);
+  const room = width - visibleWidth(identity) - 2;
+  if (room < 1) return [theme.fg("accent", identity)];
+  const rest = summary(detail, suffix, stats, room, theme, secondary)[0]!;
+  return [theme.fg("accent", identity) + (visibleWidth(rest) ? "  " + rest : "")];
 }
 export function splitView(raw: string, noticePattern: RegExp): View {
   const text = clean(raw);

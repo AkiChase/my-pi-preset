@@ -1,6 +1,6 @@
 import { keyHint, type Theme, type ToolRenderers } from "@earendil-works/pi-coding-agent";
 import { Box, Container, Text, type Component } from "@earendil-works/pi-tui";
-import { clean, summary, wrap } from "../layout.ts";
+import { clean, toolHeading, wrap } from "../layout.ts";
 import { text, type Args, type RenderContext } from "../types.ts";
 import { component, type Metadata } from "./shared.ts";
 import type { RetrievalContract } from "./retrieval-contracts.ts";
@@ -50,7 +50,7 @@ export function optionalRenderers(name: string, original: ToolRenderers | undefi
     const children: Component[] = [];
     if (cell.meta) {
       const meta = cell.meta;
-      children.push(component(width => ctx.expanded ? wrap(meta.title ?? name, width).map(line => theme.fg("accent", line)) : summary(meta.title ?? name, "", meta.stats, width, theme, meta.secondary)));
+      children.push(component(width => toolHeading(name, meta.title ?? "", "", meta.stats, width, theme, ctx.expanded, meta.secondary)));
       if (result && ctx.expanded) children.push(component(width => wrap(text(result), width).map(line => theme.fg(ctx.isError ? "error" : "toolOutput", line))));
     } else {
       if (phase === "call" || !cell.callDelegated) {

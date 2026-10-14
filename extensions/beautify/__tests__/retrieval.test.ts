@@ -110,6 +110,33 @@ test("actual host optional call/result sync, mouse/key expansion, pending/partia
   component.setExpanded(false); assert.match(rows(component).join("\n"), /following released/); assert.doesNotMatch(rows(component).join("\n"), /killed/);
 });
 
+test("optional identities stay complete before long details in pending, terminal and expanded titles", () => {
+  for (const [name, contract, args, output] of [
+    ["get_subagent_result", agentContract, { agent_id: "a1", wait: true }, agentHeader("completed", "answer", "非常长描述/".repeat(60))],
+    ["jobs", jobsContract, { action: "search", pattern: "very-long-pattern/".repeat(60) }, undefined],
+    ["jobs", jobsContract, { action: "list" }, "No background jobs"],
+    ["jobs", jobsContract, { action: "output", jobId: "a1" }, "No task found with ID: a1"],
+  ] as const) {
+    const c = new ToolExecutionComponent(name, "identity", args, { outputPad: 2 }, optionalRenderers(name, undefined, contract), screen, "/fixture");
+    for (const stage of ["pending", "result"]) {
+      if (stage === "result" && output !== undefined) c.updateResult({ ...raw(output), isError: output.startsWith("No task") });
+      for (const expanded of [false, true]) {
+        c.setExpanded(expanded);
+        for (const width of [8, 20, name.length + 4, 40, 80, 120]) {
+          const rendered = c.render(width);
+          assert.ok(rendered.every((line: string) => visibleWidth(line) <= width));
+          const heading = rows(c, width)[0]!.trim();
+          if (width >= name.length + 4) assert.ok(heading.startsWith(name), `${name}/${stage}/${expanded}/${width}: ${heading}`);
+          assert.doesNotMatch(heading, /^jobs\s+jobs\b/);
+        }
+      }
+    }
+  }
+  const c = new ToolExecutionComponent("get_subagent_result", "detail", { agent_id: "a1" }, {}, optionalRenderers("get_subagent_result", undefined, agentContract), screen, "/fixture");
+  c.updateResult({ ...raw(agentHeader()), isError: false });
+  assert.match(rows(c).join("\n"), /get_subagent_result  Review source/);
+});
+
 test("unknown formats delegate original slots/state/shell, known→unknown switches synchronously and missing original has generic preview", () => {
   let previousCall: unknown, previousResult: unknown, originalState: unknown;
   const original: ToolRenderers = {
@@ -155,7 +182,7 @@ test("actual loader optional absence/dynamic next, no tools registered, unrelate
   try {
     assert.deepEqual(loaded.errors, []); assert.equal(loaded.extensions[0].tools.size, 0);
     const runner = resolver(loaded, dir);
-    for (const name of ["write", "Agent", "bash_bg", "monitor", "ls"]) { const original = { renderShell: "self" }; assert.equal(runner.resolveToolRenderers(name, () => original), original); }
+    for (const name of ["write", "Agent", "bash_bg", "monitor", "ls", "ask_user_question"]) { const original = { renderShell: "self" }; assert.equal(runner.resolveToolRenderers(name, () => original), original); }
     for (const original of [undefined, { renderShell: "self", renderCall: () => new Text("DYNAMIC", 0, 0), renderResult: () => new Text("RESULT", 0, 0) }]) {
       const renderer = runner.resolveToolRenderers("jobs", () => original);
       const component = new ToolExecutionComponent("jobs", "history", { foreign: true }, {}, renderer, screen, dir);

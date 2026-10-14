@@ -1,14 +1,14 @@
 import type { Theme, ToolRenderers } from "@earendil-works/pi-coding-agent";
 import { visibleWidth, type Component } from "@earendil-works/pi-tui";
-import { clean, clip, summary, wrap } from "../layout.ts";
+import { clean, clip, summary, toolHeading, wrap } from "../layout.ts";
 import { text, type Args, type RenderContext, type Result } from "../types.ts";
 export type Draw = (result: Result, theme: Theme, context: RenderContext, width: number) => string[];
 export interface Metadata { title?: string; suffix?: string; stats: string; secondary?: string }
 export type Describe = (result: Result | undefined, context: RenderContext) => Metadata;
 export function title(name: string, args: Args): string {
-  if (name === "bash") return "$ " + clean(String(args.command ?? "")) + (args.timeout === undefined ? "" : `  timeout ${args.timeout}s`);
-  if (name === "read") return clean(String(args.path ?? "read"));
-  return `${name} ${clean(String(args.pattern ?? ""))}${args.path ? ` in ${clean(String(args.path))}` : ""}`;
+  if (name === "bash") return clean(String(args.command ?? "")) + (args.timeout === undefined ? "" : `  timeout ${args.timeout}s`);
+  if (name === "read") return clean(String(args.path ?? ""));
+  return `${clean(String(args.pattern ?? ""))}${args.path ? ` in ${clean(String(args.path))}` : ""}`;
 }
 interface Cell { result?: Result; ctx: RenderContext; theme: Theme }
 export function renderers(name: string, draw: Draw, describe: Describe = genericMetadata): ToolRenderers {
@@ -27,7 +27,7 @@ export function renderers(name: string, draw: Draw, describe: Describe = generic
         const meta = describe(result, ctx);
         const label = meta.title ?? title(name, ctx.args);
         const suffix = meta.suffix ?? (name === "read" && typeof ctx.args.offset === "number" ? `:${Math.max(1, ctx.args.offset)}` : "");
-        return ctx.expanded ? wrap(label + suffix, width).map(line => theme.fg("accent", line)) : summary(label, suffix, meta.stats, width, theme, meta.secondary);
+        return toolHeading(name, label, suffix, meta.stats, width, theme, ctx.expanded, meta.secondary);
       } };
     },
     renderResult: (result, _options, theme, context) => {

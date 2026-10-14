@@ -40,7 +40,7 @@ test("actual loader/resolver owns six display adapters, original tool execution/
     assert.equal(extension.handlers.has("tool_result"), false);
     const runner = resolver(loaded, dir);
     const base = { renderShell: "default" };
-    for (const name of ["edit", "write", "ls", "codemode", "Agent"]) assert.equal(runner.resolveToolRenderers(name, () => base), base);
+    for (const name of ["edit", "write", "ls", "codemode", "Agent", "ask_user_question"]) assert.equal(runner.resolveToolRenderers(name, () => base), base);
     for (const name of ["read", "bash", "find", "grep"]) assert.equal(runner.resolveToolRenderers(name, () => base).renderShell, "default");
     let reads = 0;
     const definition = createReadToolDefinition(dir, { operations: { async access() {}, async readFile() { reads++; return Buffer.from("const x = 1;\nlast"); }, async detectImageMimeType() { return undefined; } } });
@@ -88,7 +88,7 @@ test("four actual host components obey widths/padding/expansion and native metad
           const rows = component.render(width);
           // Pi Box reserves at least one content cell plus two-sided padding, even below five columns.
           assert.ok(rows.every((line: string) => visibleWidth(line) <= Math.max(width, 5)), `${fixture.name}/${expanded}/${width}`);
-          if (fixture.name === "read" && !expanded && width >= 8) assert.ok(rows.some((line: string) => plain(line).includes(":65")));
+          if (fixture.name === "read" && !expanded && width >= 13) assert.ok(rows.some((line: string) => plain(line).includes(":65")));
         }
       }
       component.setExpanded(false); const compact = plain(component.render(120).join("\n"));
@@ -108,6 +108,37 @@ test("four actual host components obey widths/padding/expansion and native metad
     assert.match(plain(result(bash, "", {}, { expanded: false, durationMs: undefined }).render(80).join("\n")), /no output/);
     for (const [name, output] of [["find", "No files found matching pattern"], ["grep", "No matches found"]]) assert.match(plain(result(runner.resolveToolRenderers(name, () => undefined), output).render(80).join("\n")), /No /);
   } finally { for (const handler of loaded.extensions[0].handlers.get("session_shutdown") ?? []) await handler({}, {}); screen.stop(); rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("built-in tool identity precedes details across pending/results, expansion and long-title budgets", () => {
+  const highlighter = new Highlighter();
+  const long = "源目录/" + "long-middle/".repeat(30) + "filename.ts";
+  const fixtures = [
+    { name: "read", renderer: readRenderers(highlighter), args: { path: long, offset: 65 } },
+    { name: "bash", renderer: bashRenderers, args: { command: long, timeout: 5 } },
+    { name: "find", renderer: findRenderers, args: { pattern: long, path: "目录" } },
+    { name: "grep", renderer: grepRenderers, args: { pattern: long, path: "目录" } },
+  ];
+  try {
+    for (const { name, renderer, args } of fixtures) {
+      for (const expanded of [false, true]) {
+        for (const status of ["pending", "success", "error"]) {
+          const ctx = context(args, { expanded, isPartial: status === "pending", isError: status === "error" });
+          const call = renderer.renderCall!(args, theme, ctx);
+          if (status !== "pending") renderer.renderResult!({ content: [{ type: "text", text: "failure" }], details: undefined }, { expanded, isPartial: false }, theme, ctx);
+          for (const width of [1, 2, name.length, name.length + 1, 13, 40, 80, 120]) {
+            const lines = call.render(width).map(plain);
+            assert.ok(lines.every(line => visibleWidth(line) <= width), `${name}/${status}/${expanded}/${width}`);
+            if (width >= name.length) assert.ok(lines[0]!.startsWith(name), `${name}/${status}/${expanded}/${width}: ${lines[0]}`);
+            assert.doesNotMatch(lines[0]!, new RegExp(`^${name}\\s+${name}\\b`));
+          }
+        }
+      }
+    }
+    assert.match(plain(result(readRenderers(highlighter), "body", { path: "sample.ts", offset: 65 }, { expanded: false }).render(120).join("\n")), /^read  sample\.ts:65/);
+    assert.match(plain(result(bashRenderers, "body", { command: "npm test", timeout: 5 }, { expanded: false }).render(120).join("\n")), /^bash  npm test  timeout 5s/);
+    assert.match(plain(result(findRenderers, "a.ts", { pattern: "*.ts", path: "src" }, { expanded: false }).render(120).join("\n")), /^find  \*\.ts in src/);
+  } finally { highlighter.dispose(); }
 });
 
 test("notice parsing is exact, unknown text/control data is retained safely and path offset stays atomic", () => {

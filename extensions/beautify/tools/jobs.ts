@@ -6,7 +6,7 @@ export const jobsContract: RetrievalContract = (args, result, ctx) => {
   if (!["list", "output", "search", "stats", "attach", "kill"].includes(String(action))) return undefined;
   if (["output", "attach", "kill"].includes(String(action)) && !args.jobId) return undefined;
   if (action === "search" && !args.pattern) return undefined;
-  const title = `jobs ${action}${action === "search" ? ` /${args.pattern}/${args.ignoreCase ? "i" : ""}` : ""}${args.jobId ? ` ${args.jobId}` : ""}`;
+  const title = `${action}${action === "search" ? ` /${args.pattern}/${args.ignoreCase ? "i" : ""}` : ""}${args.jobId ? ` ${args.jobId}` : ""}`;
   if (!result) return { title, stats: action === "attach" && args.wait !== false ? "following · waiting" : "" };
   const raw = envelope(result);
   if (raw === undefined) return undefined;
