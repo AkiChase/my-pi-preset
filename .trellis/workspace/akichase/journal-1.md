@@ -416,3 +416,27 @@ custom 浏览不再误报 blocked，问卷使用明确 attention 事件，聚合
 ### Next Steps
 
 - 八份其他活动任务JSONL规范路径已在工作树更新，但未收录其尚未提交的完整规划；保留给对应任务提交。托管worktree保留，未清理。
+
+
+## Session 14: 修复子代理完成通知可靠性
+<!-- trellis-session: v=2 fp=282e302fbb820b45 -->
+
+**Date**: 2026-10-15
+**Task**: 修复子代理完成通知可靠性
+**Branch**: `main`
+
+### Summary
+
+主main实施描述契约、精简失败warning/log、发送后run身份保护与stopped组结算；普通Agent独立检查无阻塞。strict通过，全仓720/720，后端128/128自然退出，离线真实CLI tmux五项通过；保留首次夹具格式误判失败记录。已授权归档收尾，无install/sync/reload/push，其他任务保持不变。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c4a5678` | fix: normalize programmatic agent spawn descriptions |
+| `69bd5ba` | fix: report notification failures and fence delivered runs |
+| `b7dd7e3` | fix: settle stopped agent group members without waiting for drain |
+
+### Status
+
+[OK] **Completed**

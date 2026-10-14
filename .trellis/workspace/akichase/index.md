@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 13
+- **Total Sessions**: 14
 - **Last Active**: 2026-10-15
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~418 | Active |
+| `journal-1.md` | ~442 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 14 | 2026-10-15 | 修复子代理完成通知可靠性 | `c4a5678`, `69bd5ba`, `b7dd7e3` | `main` |
 | 13 | 2026-10-15 | 规范与全部插件用户文档整理收尾 | `9e36e9f` | `main` |
 | 12 | 2026-10-14 | 修复终端交互分类并收尾 | `d86b38b` | `main` |
 | 11 | 2026-10-14 | 内置会话命名实施与终端验收 | `ae13d8a` | `main` |
