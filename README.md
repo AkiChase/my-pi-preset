@@ -430,21 +430,13 @@ pi 自带的 ↑/↓ 历史只在当前会话有效，重载就没了。这个�
 
 #### `extensions/blocked-signal.ts` —— 告诉终端复用器「在等你」
 
-**要解决的问题**：扩展弹对话框时 pi 的这一轮还没结束，`agent_settled` 不会触发，于是所有盯着它的集成都以为 pi 还在干活。最难受的是 `ask_user_question`：问卷能在那儿挂几分钟，herdr 面板一直是 Working，cmux 也不弹通知，人在别的窗口根本不知道该回来了。
+在需要回答、选择或确认时，让 Herdr 显示 Blocked；Pi 直接运行在 cmux 中时，补充问卷和文本编辑的等待通知。没有对应宿主环境时不启用。
 
-pi 自己其实把信号发出来了 —— `ui_prompt_start` / `ui_prompt_end` 包住每一次阻塞式 `ctx.ui.*`（select / confirm / input / editor / custom），而且只对最外层那一次发，一进一出严格配对。问题在两边的集成都没订阅它：
+标准选择、确认、输入和文本编辑保留等待提示；`ask_user_question` 按问卷明确的等待信号显示，标签优先使用第一题的 header。回答、取消或退出会清除本扩展的等待提示，重叠交互不会重复通知。
 
-- herdr（0.9.1，装在 `~/.pi/agent/extensions/herdr-agent-state.ts` 的集成是第 9 版）只在**别的**扩展往 pi 事件总线上发 `herdr:blocked` 时才报 blocked，而没有任何扩展会发。它给另一个 agent 写的同类集成（`HERDR_INTEGRATION_ID=omp`，第 10 版）是直接订阅那个 agent 的 approval / ask 事件的，所以这更像是 pi 这份集成没跟上。
-- cmux（0.65.0）在它生成的 `~/.pi/agent/extensions/cmux-session.ts` 里给 `ui.confirm`、`ui.select`、`ui.input` 打了猴补丁来发 `questionAsked` 钩子，偏偏漏了 `ui.custom` 和 `ui.editor` —— 问卷正是用 `ui.custom` 画的。
+**浏览面板不是问答**：Viewer、Task Panel 等自定义面板不再自动标为 Blocked。其他第三方 custom 问答如果没有声明等待信号，也不会自动通知，需要单独适配。
 
-**做了什么更改**：订阅那对事件，转发给两个 sink，各自只在自己宿主的环境变量齐备时才启用（都不在就直接返回，不留任何监听）：
-
-- **herdr**：发 `herdr:blocked`，`{ active: true, label }` 进、`{ active: false }` 出。herdr 那边自己计数，所以每个 `true` 必须配一个 `false`，中途 `/reload`、`session_shutdown` 都做了兜底。面板因此变成 Blocked，`herdr agent wait --until blocked` 也能停住了。
-- **cmux**：只在**没有** herdr 的时候才挂上 —— herdr 自己会把 `pi needs attention: <cwd>` 这种 toast 转发给它所在的终端（实测：面板变 blocked 时 cmux 真的弹了通知，而光打一个 BEL 什么都不弹），叠上去就是一次提问响两声。pi 直接跑在 cmux 面板里时才用这个 sink：走文档里的 `cmux notify`（横幅+侧栏徽标+面板高亮），答完按 id `cmux dismiss-notification` 撤掉，不用 `notify --clear`，免得连带清掉别人的通知。只对 cmux 自己没补的 `custom` 和 `editor` 发；`CMUX_PI_HOOKS_DISABLED=1` 这个它自己的开关也认。面板状态仍然属于 cmux 自己那份集成（装法 `cmux hooks pi install`，注意 `PATH` 里要让 cmux 的 `pi` shim 排在前面才会自动注入）。
-
-标签尽量给得有意义：有 `title` 就用 `title`；问卷没有 `title`，所以额外听一条 `rpiv:ask-user:prompt`（只认频道名，不 import 那个包），拿第一题的 header 当标签，比如 `Auth method`；都没有就退回按种类写死的一句话。
-
-**没做的事**：pi 自己的 OSC 7501 program status 没有补。pi 对 select / confirm / input / editor 会报 `blocked`，对 `ctx.ui.custom()` 不报（1.1.0 的 `showExtensionCustom` 没调 `programStatus.setBlocked`），这是上游的坑；而 herdr 0.9.1 和 cmux 0.65.0 都不读这个协议，绕它没有收益。
+Herdr 与 cmux 不叠加通知；`CMUX_PI_HOOKS_DISABLED=1` 可关闭直接 cmux 的补充通知。本扩展不修改 Pi 的 OSC 状态，也不暂停模型或后台任务。浏览面板仍接管键盘，未显示 Blocked 不代表可以安全地向它投递聊天 prompt。
 
 ## 配置扩展
 

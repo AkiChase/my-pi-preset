@@ -1,30 +1,11 @@
 import { execFile } from "node:child_process";
 import type { ExtensionAPI, UIPromptKind, UIPromptStartEvent } from "@earendil-works/pi-coding-agent";
 
-// Tells the surrounding multiplexer that pi is waiting for the user, not working.
-//
-// The hole: pi blocks the whole turn while an extension dialog is open, so `agent_settled` never
-// fires and every integration that keys off it keeps the pane in Working. The worst case is
-// @juicesharp/rpiv-ask-user-question, whose questionnaire can sit there for minutes with nobody
-// notified. pi itself does publish the right thing -- `ui_prompt_start` / `ui_prompt_end` bracket
-// every blocking `ctx.ui.*` prompt (select, confirm, input, editor, custom), only for the outermost
-// one, so starts and ends pair 1:1 -- but neither integration below subscribes to it:
-//
-//   - herdr (0.9.1, integration version 9 in ~/.pi/agent/extensions/herdr-agent-state.ts) reports
-//     working/idle over its control socket and reports `blocked` only when some *other* extension
-//     emits `herdr:blocked` on pi's event bus. Nothing emits it. Its sibling integration for
-//     another agent (HERDR_INTEGRATION_ID=omp, version 10) does wire up that agent's approval and
-//     ask events, so the pi integration is behind rather than deliberately passive.
-//   - cmux (0.65.0) monkey-patches `ui.confirm`, `ui.select` and `ui.input` in its generated
-//     ~/.pi/agent/extensions/cmux-session.ts to send its `questionAsked` hook. `ui.custom` and
-//     `ui.editor` are not patched, which is exactly how the questionnaire renders.
-//
-// So: one listener, two sinks, each inert unless its host's environment is present.
-//
-// Not covered: pi's own OSC 7501 program status. pi reports `blocked` there for
-// select/confirm/input/editor but not for `ctx.ui.custom()` (showExtensionCustom never calls
-// programStatus.setBlocked, pi 1.1.0). That is an upstream gap, and neither herdr 0.9.1 nor cmux
-// 0.65.0 reads the protocol, so there is nothing to gain by working around it here.
+// Reports explicit human-attention waits to optional terminal hosts. A custom screen owns input,
+// but is not necessarily a question: browsers and settings panels must stay notification-free.
+// Standard Pi dialogs use ui_prompt_start/end; the optional questionnaire peer declares its own
+// attention lifetime, including nested/overlapping mounts, through rpiv:ask-user:blocked.
+// This adapter does not alter execution or make a focused browser safe for terminal prompt input.
 
 /** herdr's channel. Payload: `{ active: true, label?: string }` to block, `{ active: false }` to release. */
 const HERDR_BLOCKED_EVENT = "herdr:blocked";
@@ -35,6 +16,7 @@ const HERDR_BLOCKED_EVENT = "herdr:blocked";
  * pane would read as a bare "waiting". Channel name only -- the package stays an optional peer.
  */
 const ASK_USER_PROMPT_EVENT = "rpiv:ask-user:prompt";
+const ASK_USER_BLOCKED_EVENT = "rpiv:ask-user:blocked";
 
 /** The kinds cmux's own hooks already cover; notifying for them would double up. */
 const CMUX_PATCHED_KINDS: ReadonlySet<UIPromptKind> = new Set<UIPromptKind>(["confirm", "select", "input"]);
@@ -51,6 +33,7 @@ const CLI_TIMEOUT_MS = 2000;
 
 /** What a host integration needs from a prompt. `release()` must tolerate never having blocked. */
 export interface PromptSink {
+  accepts?(kind: UIPromptKind): boolean;
   block(label: string, kind: UIPromptKind): void;
   release(): void;
 }
@@ -127,28 +110,25 @@ type RunCli = (args: string[], onDone?: (stdout: string) => void) => void;
  * state belongs to cmux's own hook integration, which this only fills the gaps of.
  */
 export function createCmuxSink(run: RunCli): PromptSink {
-  let notificationId: string | undefined;
-  let outstanding = false;
+  let current: { id?: string } | undefined;
   return {
+    accepts: (kind) => !CMUX_PATCHED_KINDS.has(kind),
     block(label, kind) {
       if (CMUX_PATCHED_KINDS.has(kind)) return;
-      outstanding = true;
+      const notification: { id?: string } = {};
+      current = notification;
       run(["notify", "--title", "pi is waiting", "--body", label, "--json"], (stdout) => {
         const id = (JSON.parse(stdout) as { id?: unknown }).id;
-        // The dialog may already be answered by the time the id arrives.
         if (typeof id !== "string") return;
-        if (!outstanding) run(["dismiss-notification", "--id", id]);
-        else notificationId = id;
+        // Bind late replies to their own attention segment, not the next questionnaire.
+        if (current !== notification) run(["dismiss-notification", "--id", id]);
+        else notification.id = id;
       });
     },
     release() {
-      if (!outstanding) return;
-      outstanding = false;
-      const id = notificationId;
-      notificationId = undefined;
-      // Answering the prompt means the user is right here, so the banner is stale. Dismiss by id
-      // rather than `notify --clear`, which would also drop other tools' notifications.
-      if (id) run(["dismiss-notification", "--id", id]);
+      const notification = current;
+      current = undefined;
+      if (notification?.id) run(["dismiss-notification", "--id", notification.id]);
     },
   };
 }
@@ -166,42 +146,70 @@ function cliRunner(cliPath: string): RunCli {
   };
 }
 
-/** Wires `ui_prompt_start` / `ui_prompt_end` to the sinks. Exported for tests. */
+/** Aggregate standard dialogs and explicitly declared questionnaire waits per host. */
 export function watchPrompts(pi: ExtensionAPI, sinks: PromptSink[]): void {
-  let pending = 0;
+  let closed = false;
+  let prompt: UIPromptStartEvent | undefined;
+  let askPending = 0;
   let askLabel: string | undefined;
+  let activeAskLabel: string | undefined;
+  const blocked = new Set<PromptSink>();
 
-  const forEachSink = (visit: (sink: PromptSink) => void) => {
+  const reconcile = () => {
     for (const sink of sinks) {
       try {
-        visit(sink);
+        const standard = !closed && prompt && prompt.kind !== "custom" &&
+          (sink.accepts?.(prompt.kind) ?? true) ? prompt : undefined;
+        const questionnaire = !closed && askPending > 0 && (sink.accepts?.("custom") ?? true);
+        if (standard || questionnaire) {
+          if (blocked.has(sink)) continue;
+          blocked.add(sink);
+          sink.block(standard ? promptLabel(standard, undefined) : activeAskLabel ?? KIND_LABELS.custom,
+            standard?.kind ?? "custom");
+        } else if (blocked.delete(sink)) {
+          sink.release();
+        }
       } catch {
-        // One failing host must not starve the others.
+        // A broken sink must not starve other hosts or prevent lifecycle cleanup.
       }
     }
   };
 
   pi.events.on(ASK_USER_PROMPT_EVENT, (payload) => {
-    askLabel = askUserLabel(payload);
+    if (!closed) askLabel = askUserLabel(payload);
   });
-
+  pi.events.on(ASK_USER_BLOCKED_EVENT, (payload) => {
+    if (closed) return;
+    const active = (payload as { active?: unknown } | null)?.active;
+    if (active === true) {
+      if (askPending++ === 0) activeAskLabel = askLabel;
+      askLabel = undefined;
+    } else if (active === false) {
+      askPending = Math.max(0, askPending - 1);
+      if (askPending === 0) {
+        activeAskLabel = undefined;
+        askLabel = undefined;
+      }
+    } else return;
+    reconcile();
+  });
   pi.on("ui_prompt_start", (event) => {
-    pending++;
-    const label = promptLabel(event, askLabel);
-    forEachSink((sink) => sink.block(label, event.kind));
+    if (closed) return;
+    prompt = event;
+    reconcile();
   });
-
   pi.on("ui_prompt_end", () => {
+    if (closed) return;
+    prompt = undefined;
     askLabel = undefined;
-    if (pending === 0) return;
-    pending--;
-    forEachSink((sink) => sink.release());
+    reconcile();
   });
-
   pi.on("session_shutdown", () => {
-    if (pending === 0) return;
-    pending = 0;
-    forEachSink((sink) => sink.release());
+    closed = true;
+    prompt = undefined;
+    askPending = 0;
+    askLabel = activeAskLabel = undefined;
+    reconcile();
   });
 }
 

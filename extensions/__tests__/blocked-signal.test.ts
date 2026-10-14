@@ -93,6 +93,7 @@ describe("watchPrompts", () => {
     fake.fireBus("rpiv:ask-user:prompt", {
       questions: [{ header: "Auth method" }, { header: "Library" }],
     });
+    fake.fireBus("rpiv:ask-user:blocked", { active: true });
     fake.fire("ui_prompt_start", start("custom"));
 
     assert.deepEqual(sink.calls, ["block:custom:Auth method"]);
@@ -104,9 +105,12 @@ describe("watchPrompts", () => {
     watchPrompts(fake.pi, [sink]);
 
     fake.fireBus("rpiv:ask-user:prompt", { questions: [{ header: "Auth method" }] });
+    fake.fireBus("rpiv:ask-user:blocked", { active: true });
     fake.fire("ui_prompt_start", start("custom"));
     fake.fire("ui_prompt_end", end("custom"));
+    fake.fireBus("rpiv:ask-user:blocked", { active: false });
     fake.fire("ui_prompt_start", start("custom"));
+    fake.fireBus("rpiv:ask-user:blocked", { active: true });
 
     assert.equal(sink.calls.at(-1), "block:custom:Waiting for input");
   });
@@ -131,6 +135,58 @@ describe("watchPrompts", () => {
     assert.deepEqual(sink.calls, ["block:input:Token", "release"]);
   });
 
+  it("keeps browsers quiet even after a prompt payload without a mounted question", () => {
+    const fake = createFakePi();
+    const sink = recordingSink();
+    watchPrompts(fake.pi, [sink]);
+    fake.fireBus("rpiv:ask-user:prompt", { questions: [{ header: "Failed mount" }] });
+    fake.fire("ui_prompt_start", start("custom", "Viewer"));
+    fake.fire("ui_prompt_end", end("custom"));
+    assert.deepEqual(sink.calls, []);
+  });
+
+  it("counts overlapping questionnaire lifetimes without double-blocking", () => {
+    const fake = createFakePi();
+    const sink = recordingSink();
+    watchPrompts(fake.pi, [sink]);
+    fake.fireBus("rpiv:ask-user:blocked", { active: true });
+    fake.fireBus("rpiv:ask-user:blocked", { active: true });
+    fake.fire("ui_prompt_start", start("custom"));
+    fake.fire("ui_prompt_end", end("custom"));
+    fake.fireBus("rpiv:ask-user:blocked", { active: false });
+    assert.deepEqual(sink.calls, ["block:custom:Waiting for input"]);
+    fake.fireBus("rpiv:ask-user:blocked", { active: false });
+    fake.fireBus("rpiv:ask-user:blocked", { active: false });
+    assert.deepEqual(sink.calls, ["block:custom:Waiting for input", "release"]);
+  });
+
+  it("coalesces a questionnaire and standard input, including a question opened over a browser", () => {
+    const fake = createFakePi();
+    const sink = recordingSink();
+    watchPrompts(fake.pi, [sink]);
+    fake.fire("ui_prompt_start", start("custom"));
+    fake.fireBus("rpiv:ask-user:blocked", { active: true });
+    fake.fire("ui_prompt_end", end("custom"));
+    fake.fire("ui_prompt_start", start("input", "Answer"));
+    fake.fireBus("rpiv:ask-user:blocked", { active: false });
+    assert.deepEqual(sink.calls, ["block:custom:Waiting for input"]);
+    fake.fire("ui_prompt_end", end("input"));
+    assert.deepEqual(sink.calls, ["block:custom:Waiting for input", "release"]);
+  });
+
+  it("fences late events after shutdown and tolerates malformed attention payloads", () => {
+    const fake = createFakePi();
+    const sink = recordingSink();
+    watchPrompts(fake.pi, [sink]);
+    for (const payload of [null, {}, { active: "true" }]) fake.fireBus("rpiv:ask-user:blocked", payload);
+    fake.fireBus("rpiv:ask-user:blocked", { active: true });
+    fake.fire("session_shutdown", {});
+    fake.fire("session_shutdown", {});
+    fake.fireBus("rpiv:ask-user:blocked", { active: true });
+    fake.fire("ui_prompt_start", start("input"));
+    assert.deepEqual(sink.calls, ["block:custom:Waiting for input", "release"]);
+  });
+
   it("keeps going when one sink throws", () => {
     const fake = createFakePi();
     const healthy = recordingSink();
@@ -144,10 +200,10 @@ describe("watchPrompts", () => {
     };
     watchPrompts(fake.pi, [broken, healthy]);
 
-    fake.fire("ui_prompt_start", start("custom"));
-    fake.fire("ui_prompt_end", end("custom"));
+    fake.fire("ui_prompt_start", start("editor"));
+    fake.fire("ui_prompt_end", end("editor"));
 
-    assert.deepEqual(healthy.calls, ["block:custom:Waiting for input", "release"]);
+    assert.deepEqual(healthy.calls, ["block:editor:Waiting for text", "release"]);
   });
 });
 
@@ -210,6 +266,36 @@ describe("cmux sink", () => {
     cli.settle("n1");
 
     assert.deepEqual(cli.calls.at(-1), ["dismiss-notification", "--id", "n1"]);
+  });
+
+  it("does not assign an old notification reply to a new attention segment", () => {
+    const cli = fakeCli();
+    const sink = createCmuxSink(cli.run);
+    sink.block("First", "custom");
+    sink.release();
+    sink.block("Second", "custom");
+    cli.settle("old");
+    cli.settle("new");
+    sink.release();
+    assert.deepEqual(cli.calls.slice(2), [
+      ["dismiss-notification", "--id", "old"],
+      ["dismiss-notification", "--id", "new"],
+    ]);
+  });
+
+  it("still notifies for a questionnaire that overlaps a cmux-patched dialog", () => {
+    const fake = createFakePi();
+    const cli = fakeCli();
+    watchPrompts(fake.pi, [createCmuxSink(cli.run)]);
+    fake.fire("ui_prompt_start", start("input", "Token"));
+    fake.fireBus("rpiv:ask-user:blocked", { active: true });
+    fake.fireBus("rpiv:ask-user:blocked", { active: false });
+    fake.fire("ui_prompt_end", end("input"));
+    cli.settle("n1");
+    assert.deepEqual(cli.calls, [
+      ["notify", "--title", "pi is waiting", "--body", "Waiting for input", "--json"],
+      ["dismiss-notification", "--id", "n1"],
+    ]);
   });
 
   it("stays quiet when no notification was posted", () => {
