@@ -13,6 +13,10 @@ export default function (pi: ExtensionAPI) {
     return fauxAssistantMessage(notification ? "PARENT_RECEIVED_COMPLETION" : "CHILD_COMPLETED_OK");
   };
   faux.setResponses([response]); pi.registerProvider(faux.provider);
+  let mode = "normal";
+  // Test-only formatter fault through the existing registry; production code
+  // and sendMessage remain unchanged in this real-host warning case.
+  pi.registerCommand("completion-mode", { description: "Select offline fault fixture", handler: async value => { mode = value; } });
   pi.registerCommand("completion-spawn", { description: "Offline actual RPC completion test", handler: async (description, ctx) => {
     const requestId = `smoke-${Date.now()}`;
     const off = pi.events.on(`subagents:rpc:spawn:reply:${requestId}`, value => { event("rpc-reply", { value }); off(); });
@@ -22,7 +26,14 @@ export default function (pi: ExtensionAPI) {
     } });
     ctx.ui.notify("RPC_SENT", "info");
   } });
-  pi.events.on("subagents:completed", value => event("child-completed", { value }));
+  pi.events.on("subagents:completed", value => {
+    event("child-completed", { value });
+    if (mode !== "format-error") return;
+    const id = (value as { id: string }).id;
+    const registry = Reflect.get(globalThis, Symbol.for("pi-subagents:manager")) as { getRecord(id: string): object | undefined };
+    const record = registry.getRecord(id);
+    if (record) Object.defineProperty(record, "description", { configurable: true, get() { throw new Error("offline formatter fault"); } });
+  });
   pi.on("message_end", e => { if (e.message.role === "custom") event("custom-notification", { content: e.message.content }); });
   pi.on("session_start", () => event("ready"));
   pi.on("session_shutdown", () => event("shutdown"));

@@ -22,7 +22,7 @@ function deferred<T>() {
 const tick = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
 const pause = (ms: number) => new Promise<void>(done => setTimeout(done, ms));
 
-async function factory(settings: Record<string, unknown> = {}, extra: AgentManagerDependencies = {}, mentionDependencies?: import("../src/mention-clone.ts").MentionCloneDependencies, host: { exec?: ExtensionAPI["exec"]; flag?: string; localLifecycle?: boolean; onEvent?: (name: string) => void; customAgent?: boolean; ui?: ExtensionToolContext["ui"]; beforeStart?: (coordinator: TaskCoordinator, lifecycle: TaskLifecycle) => void; onSource?: (source: import("../../task-ui/types.ts").TaskSource, lifecycle: TaskLifecycle) => void } = {}) {
+async function factory(settings: Record<string, unknown> = {}, extra: AgentManagerDependencies = {}, mentionDependencies?: import("../src/mention-clone.ts").MentionCloneDependencies, host: { send?: (message: { customType: string; content: unknown; details?: NotificationDetails }) => void; exec?: ExtensionAPI["exec"]; flag?: string; localLifecycle?: boolean; onEvent?: (name: string) => void; customAgent?: boolean; ui?: ExtensionToolContext["ui"]; beforeStart?: (coordinator: TaskCoordinator, lifecycle: TaskLifecycle) => void; onSource?: (source: import("../../task-ui/types.ts").TaskSource, lifecycle: TaskLifecycle) => void } = {}) {
   const root = mkdtempSync(join(tmpdir(), "agent-tool-waits-")), cwd = join(root, "cwd"), config = join(root, "agent");
   mkdirSync(cwd); mkdirSync(config);
   writeFileSync(join(config, "agent-tasks.json"), JSON.stringify({ schedulingEnabled: false, outputTranscript: true, rememberAgents: false, defaultJoinMode: "async", ...settings }));
@@ -34,6 +34,7 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
   process.env.PI_CODING_AGENT_DIR = config;
   const tools = new Map<string, Parameters<ExtensionAPI["registerTool"]>[0]>();
   const handlers = new Map<string, ((...args: unknown[]) => unknown)[]>();
+  const entries: string[] = [];
   const rpcHandlers = new Map<string, (value: unknown) => void>();
   const rpcReplies: { name: string; value: unknown }[] = [];
   const notices: { content: unknown; customType: string; details?: NotificationDetails }[] = [];
@@ -63,7 +64,7 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
   const pi = { registerTool(tool: Parameters<ExtensionAPI["registerTool"]>[0]) { tools.set(tool.name, tool); },
     registerMessageRenderer() {}, registerEntryRenderer() {}, registerFlag() {}, registerCommand() {},
     on(name: string, handler: (...args: unknown[]) => unknown) { const list = handlers.get(name) ?? []; list.push(handler); handlers.set(name, list); },
-    events: { emit(name: string, value: unknown) { rpcReplies.push({ name, value }); host.onEvent?.(name); }, on(name: string, handler: (value: unknown) => void) { rpcHandlers.set(name, handler); return () => rpcHandlers.delete(name); } }, appendEntry() {}, sendMessage(message: typeof notices[number]) { notices.push(message); },
+    events: { emit(name: string, value: unknown) { rpcReplies.push({ name, value }); host.onEvent?.(name); }, on(name: string, handler: (value: unknown) => void) { rpcHandlers.set(name, handler); return () => rpcHandlers.delete(name); } }, appendEntry(type: string) { entries.push(type); }, sendMessage(message: typeof notices[number]) { host.send?.(message); notices.push(message); },
     exec: host.exec, getFlag: () => host.flag, getAllTools: () => [], getActiveTools: () => [],
   } as unknown as ExtensionAPI;
   const coordinator = new TaskCoordinator(), lifecycle = new TaskLifecycle(coordinator);
@@ -83,7 +84,7 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
     hasRunning(): boolean; getRecord(id: string): AgentRecord | undefined;
   };
   const execute = (name: string, params: Record<string, unknown>, signal?: AbortSignal, call: { id: string | undefined } = { id: "offline-call" }) => tools.get(name)!.execute(call.id!, params, signal, () => { throw new Error("inline renderer failed"); }, ctx);
-  return { coordinator, lifecycle, source, calls, rpcReplies,
+  return { coordinator, lifecycle, source, calls, rpcReplies, entries,
     rpc: (value: unknown) => rpcHandlers.get("subagents:rpc:spawn")!(value),
     shutdownHandlers: () => handlers.get("session_shutdown")!.length, tools, resumes, notices, execute, ctx, registry, root,
     input: (text: string) => handlers.get("input")![0]!({ text, source: "interactive" }, ctx),
@@ -814,5 +815,112 @@ void it("actual malformed RPC rejects before record or runner admission and neve
     assert.ok(!f.rpcReplies.some(reply => /reply:undefined$/.test(reply.name)));
     assert.equal(f.calls.length, 0);
     await f.start(true); assert.equal(f.calls.length, 1, "rejections leave admission available");
+  } finally { await f.close(); }
+});
+
+
+for (const ui of [false, true]) void it(`notification failure gives only ${ui ? "UI warning" : "safe log"}, preserves result and isolates sinks`, async t => {
+  const warnings: unknown[][] = [], toasts: string[] = []; let attempts = 0;
+  t.mock.method(console, "warn", (...args: unknown[]) => { warnings.push(args); throw new Error("log sink failed"); });
+  const f = await factory({}, {}, undefined, { send() { if (++attempts === 1) throw new Error("secret payload"); } });
+  f.ctx.hasUI = ui;
+  f.ctx.ui.notify = message => { toasts.push(message); throw new Error("UI sink failed"); };
+  try {
+    await f.start(true); const id = f.calls[0]!.options.agentId!;
+    f.calls[0]!.finish("available result"); await tick(); await pause(260);
+    assert.equal(attempts, 1); assert.equal(f.registry.getRecord(id)?.notificationDelivered, false);
+    assert.equal(f.registry.getRecord(id)?.resultConsumed, false);
+    assert.equal(f.notices.length, 0);
+    assert.equal(ui ? toasts.length : warnings.length, 1);
+    assert.equal(ui ? warnings.length : toasts.length, 0);
+    assert.doesNotMatch(JSON.stringify([warnings, toasts]), /secret payload/);
+    assert.deepEqual(f.entries, ["subagents:record"], "no persistent diagnostic entry");
+    await pause(250); assert.equal(attempts, 1, "no automatic retry");
+    assert.match(text(await f.execute("get_subagent_result", { agent_id: id })), /available result/);
+    await f.start(true); f.calls[1]!.finish("sibling"); await tick(); await pause(260);
+    assert.equal(f.notices.length, 1); assert.match(String(f.notices[0]?.content), /sibling/);
+  } finally { await f.close(); }
+});
+
+void it("notification formatter failure is visible without consuming or marking delivery", async t => {
+  const warnings: unknown[][] = [];
+  t.mock.method(console, "warn", (...args: unknown[]) => { warnings.push(args); });
+  const f = await factory();
+  try {
+    await f.start(true); const id = f.calls[0]!.options.agentId!;
+    f.calls[0]!.finish("answer"); await tick();
+    const record = f.registry.getRecord(id)!;
+    Object.defineProperty(record, "result", { configurable: true, get() { throw new Error("formatter injected"); } });
+    await pause(260);
+    assert.equal(warnings.length, 1); assert.equal(record.notificationDelivered, false); assert.equal(record.resultConsumed, false);
+    Object.defineProperty(record, "result", { configurable: true, writable: true, value: "answer" });
+    assert.match(text(await f.execute("get_subagent_result", { agent_id: id })), /answer/);
+  } finally { await f.close(); }
+});
+
+void it("individual notification synchronous resume cannot mark the new run delivered", async () => {
+  let resumed: Promise<unknown> | undefined;
+  const f = await factory({}, {}, undefined, { send(message) {
+    if (!resumed) resumed = f.start(true, { resume: message.details!.id });
+  } });
+  try {
+    await f.start(true); const id = f.calls[0]!.options.agentId!, old = f.registry.getRecord(id)!.runId;
+    f.calls[0]!.finish("old answer"); await tick(); await pause(260); await resumed;
+    const record = f.registry.getRecord(id)!;
+    assert.notEqual(record.runId, old); assert.equal(record.notificationDelivered, false);
+    f.resumes[0]!.finish("new answer"); await tick(); await pause(260);
+    assert.equal(f.notices.length, 2); assert.match(String(f.notices[1]?.content), /new answer/);
+    assert.equal(record.notificationDelivered, true);
+  } finally { await f.close(); }
+});
+
+void it("shutdown reentered during notification send cannot mark or report an old run", async t => {
+  let closing: Promise<void> | undefined;
+  const warnings: unknown[][] = [];
+  t.mock.method(console, "warn", (...args: unknown[]) => { warnings.push(args); });
+  const f = await factory({}, {}, undefined, { send() { closing = f.lifecycle.shutdown(); throw new Error("send failed after shutdown"); } });
+  try {
+    await f.start(true); const record = f.registry.getRecord(f.calls[0]!.options.agentId!)!;
+    f.calls[0]!.finish(); await tick(); await pause(260); await closing;
+    assert.equal(record.notificationDelivered, false); assert.equal(warnings.length, 0);
+    assert.equal(f.notices.length, 0);
+  } finally { await f.close(); }
+});
+
+
+void it("group notification send failure leaves every result available without retry", async t => {
+  const warnings: unknown[][] = [];
+  t.mock.method(console, "warn", (...args: unknown[]) => { warnings.push(args); });
+  let attempts = 0;
+  const f = await factory({ defaultJoinMode: "group" }, {}, undefined, { send() { attempts++; throw new Error("group sink fault"); } });
+  try {
+    await f.start(true); await f.start(true); await pause(130);
+    for (const call of f.calls) call.finish("group result");
+    await tick(); await pause(260);
+    assert.equal(attempts, 1); assert.equal(warnings.length, 1); assert.equal(f.notices.length, 0);
+    for (const call of f.calls) {
+      const record = f.registry.getRecord(call.options.agentId!)!;
+      assert.equal(record.notificationDelivered, false); assert.equal(record.resultConsumed, false);
+    }
+    await pause(250); assert.equal(attempts, 1);
+    for (const call of f.calls) assert.match(text(await f.execute("get_subagent_result", { agent_id: call.options.agentId })), /group result/);
+  } finally { await f.close(); }
+});
+
+
+void it("group send synchronous resume marks only the original submitted runs", async () => {
+  let resumed: Promise<unknown> | undefined, resumedId = "";
+  const f = await factory({ defaultJoinMode: "group" }, {}, undefined, { send(message) {
+    if (!resumed) { resumedId = message.details!.id; resumed = f.start(true, { resume: resumedId }); }
+  } });
+  try {
+    await f.start(true); await f.start(true); await pause(130);
+    for (const call of f.calls) call.finish("old group answer");
+    await tick(); await pause(260); await resumed;
+    assert.equal(f.registry.getRecord(resumedId)?.notificationDelivered, false);
+    const sibling = f.calls.find(call => call.options.agentId !== resumedId)!;
+    assert.equal(f.registry.getRecord(sibling.options.agentId!)?.notificationDelivered, true);
+    f.resumes[0]!.finish("new group member answer"); await tick(); await pause(260);
+    assert.equal(f.notices.length, 2); assert.match(String(f.notices[1]?.content), /new group member answer/);
   } finally { await f.close(); }
 });

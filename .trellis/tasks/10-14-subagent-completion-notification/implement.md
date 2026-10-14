@@ -15,11 +15,11 @@
 
 ## 阶段 2：通知失败与运行身份
 
-- [ ] 替换无差别吞异常，有 UI 时简短英文 warning，无 UI 时简短安全日志；提示 sink 失败隔离，不新增持久诊断。
-- [ ] 构造/同步提交失败不标 delivered、不 consume、不自动重试；stale/closing 不写新 session。
-- [ ] 单条通知发送后核对 record/runId/activation，不污染同步 resume 新 run。
-- [ ] 补 throwing send/formatter/sinks、同步 resume、消费/等待/shutdown 回归。
-- [ ] 定向测试、strict、独立 review 与主 diff 复核，立即 scoped commit，记录证据。
+- [x] 替换无差别吞异常，有 UI 时简短英文 warning，无 UI 时简短安全日志；提示 sink 失败隔离，不新增持久诊断。
+- [x] 构造/同步提交失败不标 delivered、不 consume、不自动重试；stale/closing 不写新 session。
+- [x] 单条通知发送后核对 record/runId/activation，不污染同步 resume 新 run。
+- [x] 补 throwing send/formatter/sinks、同步 resume、消费/等待/shutdown 回归。
+- [x] 定向测试、strict、独立 review 与主 diff 复核，阶段提交记录见 research/stage2.md。
 
 ## 阶段 3：stopped group 结算及整体集成
 

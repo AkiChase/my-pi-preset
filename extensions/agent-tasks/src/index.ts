@@ -511,8 +511,17 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     pendingNudges.set(key, setTimeout(() => {
       pendingNudges.delete(key);
       if (!active()) return;
-      try { send(); } catch { /* ignore stale completion side-effect errors */ }
+      try { send(); } catch { reportNoticeFailure(); }
     }, delay));
+  }
+
+  function reportNoticeFailure(): void {
+    if (!active()) return;
+    const message = "Subagent completion notification failed; results are still available.";
+    // A fixed message cannot leak provider payloads, prompts or result text.
+    // Optional feedback must never prevent another notice or execution cleanup.
+    if (currentCtx?.hasUI) safely(() => { if (active()) currentCtx?.ui.notify(message, "warning"); });
+    else safely(() => { if (active()) console.warn(`[pi-subagents] ${message}`); });
   }
 
   function cancelNudge(key: string) {
@@ -536,6 +545,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       display: true,
       details: buildNotificationDetails(record, 500, agentActivity.get(record.id)),
     }, { deliverAs: "followUp", triggerTurn: true });
+    if (!active() || manager.getRecord(record.id) !== record || record.runId !== runId) return;
     record.notificationDelivered = true;
     manager.notifyChanged();
   }
@@ -587,9 +597,9 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
           display: true,
           details,
         }, { deliverAs: "followUp", triggerTurn: true });
-        for (const record of unconsumed) {
+        for (const { record, runId } of runs) {
           const live = manager.getRecord(record.id);
-          if (live && live.runId === record.runId) live.notificationDelivered = true;
+          if (active() && live && live.runId === runId && unconsumed.some(member => member.id === record.id)) live.notificationDelivered = true;
         }
         manager.notifyChanged();
       });

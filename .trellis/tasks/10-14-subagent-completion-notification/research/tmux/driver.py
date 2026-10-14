@@ -54,6 +54,11 @@ try:
     capture('invalid')
     assert len([e for e in events() if e['kind']=='child-completed'])==2
     report['cases'].append({'case':'invalid description refused', 'result':'PASS'})
+    send('/completion-mode format-error')
+    send('/completion-spawn')
+    wait(lambda: 'Subagent completion notification failed' in tmux('capture-pane', '-p', '-t', pane).stdout)
+    capture('warning')
+    report['cases'].append({'case':'actual UI warning on injected formatter failure', 'result':'PASS'})
     tmux('send-keys', '-t', pane, 'C-d')
     wait(lambda: (root/'exit-code').exists())
     assert (root/'exit-code').read_text()=='0'
