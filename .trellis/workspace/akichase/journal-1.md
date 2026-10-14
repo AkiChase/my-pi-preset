@@ -297,3 +297,34 @@ Implemented registry-scoped command/WS monitor batching with fixed short windows
 ### Status
 
 [OK] **Completed**
+
+
+## Session 10: 完成 @ 路径连续补全与 tmux 验收
+<!-- trellis-session: v=2 fp=e05a7c669afc5d08 -->
+
+**Date**: 2026-10-14
+**Task**: 完成 @ 路径连续补全与 tmux 验收
+**Branch**: `main`
+
+### Summary
+
+独立补全插件完成实施及独立检查；真实 tmux dark/fullscreen 140/80/40列验收通过，完整671测试通过，只提交本任务并归档，不push/个人安装。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ef149d2` | feat: add continuous at-path completion |
+
+### Testing
+
+- [OK] actual SDK 60/60自然退出，related47/47，manifest6/6，strict/full671/671
+- [OK] 真实tmux三宽核心矩阵PASS，六轮CLI/PID/server/config清理通过；保留两次夹具失败与NOT_RUN边界
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 若Pi升级，重跑内部补全接口兼容回归；物理IME/实际input-history/regular/动态resize仍未验
