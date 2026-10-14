@@ -76,6 +76,7 @@ import { resolveWorkflowScript } from "./workflow/saved.ts";
 import { completeWorkflowTask, createWorkflowTask, failWorkflowTask, formatWorkflowNotification, resolveResumeTarget, updateWorkflowProgressBatch, type WorkflowTask, workflowResultText, workflowRunId } from "./workflow/task.ts";
 import { fullWorkflowToolDescription } from "./workflow/tool-description.ts";
 import { isWorktreeIsolationEnabled, setWorktreeIsolationEnabled } from "./worktree.ts";
+import { assertSpawnInput, normalizeAgentDescription, parseSpawnOptions } from "./spawn-input.ts";
 import { escapeXml } from "./xml.ts";
 
 // ---- Shared helpers ----
@@ -744,14 +745,16 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     const { state, callbacks } = createActivityTracker(resolveEffectiveMaxTurns(dispatch.type, options?.maxTurns));
     // Repaints are left to the manager's `onStart` callback, which already starts
     // the widget/fleet timers for agents that enter this way.
-    const id = manager.spawn(piRef, ctxRef, dispatch.type, prompt, { ...options, ...callbacks });
+    const normalized = { ...options, description: normalizeAgentDescription(options?.description, dispatch.type) };
+    const id = manager.spawn(piRef, ctxRef, dispatch.type, prompt, { ...normalized, ...callbacks });
     assertActive();
     agentActivity.set(id, state);
     return id;
   };
 
   const spawnTopLevel = (piRef: any, ctxRef: any, type: string, prompt: string, options: any) => {
-    const safeOptions = { ...(options ?? {}) };
+    assertSpawnInput(type, prompt);
+    const safeOptions = parseSpawnOptions(options);
     delete safeOptions.parentAgentId;
     // Internal too: a forged value would hide an RPC-spawned agent inside
     // someone else's workflow, and take it out of the concurrency pool with it.

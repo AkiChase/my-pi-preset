@@ -13,6 +13,7 @@
  * completion-notification race, and what protocol version 2 does not promise.
  */
 
+import { assertSpawnInput, normalizeAgentDescription, parseSpawnOptions } from "./spawn-input.ts";
 import { isTopLevelAgent } from "./agent-manager.ts";
 import { type ModelRegistry, resolveModel } from "./model-resolver.ts";
 import { checkModelScope } from "./model-scope.ts";
@@ -79,16 +80,22 @@ function handleRpc<P extends { requestId: string }>(
 ): () => void {
   return events.on(channel, async (raw: unknown) => {
     if (!isActive()) return;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw) ||
+      !("requestId" in raw) || typeof raw.requestId !== "string" || !raw.requestId.trim()) {
+      try { console.warn("[pi-subagents] Ignoring RPC request without a valid requestId"); } catch { /* optional log sink */ }
+      return;
+    }
+    const requestId = raw.requestId;
     const params = raw as P;
     try {
       const data = await fn(params);
       if (!isActive()) return;
       const reply: { success: true; data?: unknown } = { success: true };
       if (data !== undefined) reply.data = data;
-      events.emit(`${channel}:reply:${params.requestId}`, reply);
+      events.emit(`${channel}:reply:${requestId}`, reply);
     } catch (err: any) {
       if (!isActive()) return;
-      events.emit(`${channel}:reply:${params.requestId}`, {
+      events.emit(`${channel}:reply:${requestId}`, {
         success: false, error: err?.message ?? String(err),
       });
     }
@@ -109,6 +116,11 @@ export function registerRpcHandlers(deps: RpcDeps): RpcHandle {
 
   const unsubSpawn = handleRpc<{ requestId: string; type: string; prompt: string; options?: any }>(
     events, "subagents:rpc:spawn", async ({ type, prompt, options }) => {
+      assertSpawnInput(type, prompt);
+      const parsedOptions = parseSpawnOptions(options);
+      // Validate the description here, but resolve its fallback in the factory
+      // after agent type resolution (including configured fallback agents).
+      normalizeAgentDescription(parsedOptions.description, type);
       const ctx = getCtx();
       if (!ctx) throw new Error("No active session");
 
@@ -118,7 +130,7 @@ export function registerRpcHandlers(deps: RpcDeps): RpcHandle {
       // — same pattern the scheduler path already uses — so the spawned
       // agent's auth lookup doesn't crash with "No API key found for
       // undefined".
-      let normalizedOptions = options ?? {};
+      let normalizedOptions = parsedOptions;
       // `!= null` on purpose: a JSON-forwarding caller can serialize an unset
       // field as null, and the runner reads `options.model ?? default`, so null
       // means "inherit" — not an override to resolve or scope-check.
@@ -127,11 +139,16 @@ export function registerRpcHandlers(deps: RpcDeps): RpcHandle {
         const { modelRegistry, cwd } = ctx as { modelRegistry?: ModelRegistry; cwd?: string };
         // Names the override the same way in both messages below; an object
         // override would otherwise interpolate as "[object Object]".
+        if (typeof override !== "string" && (typeof override !== "object" ||
+          !("provider" in override) || typeof override.provider !== "string" ||
+          !("id" in override) || typeof override.id !== "string")) {
+          throw new Error("Agent model override must be a model string or object");
+        }
         const label = typeof override === "string" ? override : `${override.provider}/${override.id}`;
         if (!modelRegistry) {
           throw new Error(`Model override "${label}" provided but ctx.modelRegistry is unavailable`);
         }
-        let model = override;
+        let model = override as Parameters<typeof checkModelScope>[0]["model"];
         if (typeof override === "string") {
           const resolved = resolveModel(override, modelRegistry);
           if (typeof resolved === "string") {

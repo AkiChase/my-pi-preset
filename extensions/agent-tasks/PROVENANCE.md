@@ -141,6 +141,12 @@ actualSDKhost/editor/Pretty/TUI分发回归与GC4/4资源回收通过（parentta
 
 前文各基础/3A/3B段为对应阶段的历史记录，旧UI保留/participant未接入的描述不是当前状态；以后续条目为准。
 
+## 完成通知入口契约
+
+- 程序化 spawn 的缺省/null/空白 description 回退到已解析的 agent 类型名；非空字符串保留，非法类型在 manager admission 前拒绝。RPC 与全局 registry 保留原模型/cwd/内部 capability 限制，不要求外部调用方补描述。
+- RPC 对派发必需的 type/prompt/options 做最小结构校验；有效 requestId 在等待启动前捕获，成功/失败回复不会因调用方修改请求对象而换地址。无有效地址的请求不派发、不生成 undefined reply channel。协议版本仍为 v2。
+- runner 不新增描述参数；record 与 worktree cleanup 使用同一规范化描述。实际 factory/RPC/manager 和离线真实宿主回归记录在本任务材料。
+
 ## 2026-10-13：beautify 替换 Pretty
 
 移除 Pretty runtime 与输入框专属代理，保留本后端、root/child ALS guard 与统一生命周期。Down 与 beautify 共享局部 editor-handoff 小工具，两个 session_start 顺序均在实际活实例上安装，Down 禁用仍有外观。原 Pretty editor/host fixture 迁移为真实 SDK + beautify + 离线历史 fixture；hard loader 将 shutdown 断言更新为 composition、appearance、highlighter 三项，原始工具／manager 归属不变。

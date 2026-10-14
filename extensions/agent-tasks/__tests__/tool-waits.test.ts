@@ -34,6 +34,8 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
   process.env.PI_CODING_AGENT_DIR = config;
   const tools = new Map<string, Parameters<ExtensionAPI["registerTool"]>[0]>();
   const handlers = new Map<string, ((...args: unknown[]) => unknown)[]>();
+  const rpcHandlers = new Map<string, (value: unknown) => void>();
+  const rpcReplies: { name: string; value: unknown }[] = [];
   const notices: { content: unknown; customType: string; details?: NotificationDetails }[] = [];
   const calls: { options: Parameters<NonNullable<AgentManagerDependencies["runAgent"]>>[3]; session: AgentSession; finish: (text?: string, failure?: string) => void }[] = [];
   const resumes: { session: AgentSession; options: Parameters<NonNullable<AgentManagerDependencies["resumeAgent"]>>[2]; finish: (text?: string) => void }[] = [];
@@ -61,7 +63,7 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
   const pi = { registerTool(tool: Parameters<ExtensionAPI["registerTool"]>[0]) { tools.set(tool.name, tool); },
     registerMessageRenderer() {}, registerEntryRenderer() {}, registerFlag() {}, registerCommand() {},
     on(name: string, handler: (...args: unknown[]) => unknown) { const list = handlers.get(name) ?? []; list.push(handler); handlers.set(name, list); },
-    events: { emit(name: string) { host.onEvent?.(name); }, on() { return () => {}; } }, appendEntry() {}, sendMessage(message: typeof notices[number]) { notices.push(message); },
+    events: { emit(name: string, value: unknown) { rpcReplies.push({ name, value }); host.onEvent?.(name); }, on(name: string, handler: (value: unknown) => void) { rpcHandlers.set(name, handler); return () => rpcHandlers.delete(name); } }, appendEntry() {}, sendMessage(message: typeof notices[number]) { notices.push(message); },
     exec: host.exec, getFlag: () => host.flag, getAllTools: () => [], getActiveTools: () => [],
   } as unknown as ExtensionAPI;
   const coordinator = new TaskCoordinator(), lifecycle = new TaskLifecycle(coordinator);
@@ -81,7 +83,8 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
     hasRunning(): boolean; getRecord(id: string): AgentRecord | undefined;
   };
   const execute = (name: string, params: Record<string, unknown>, signal?: AbortSignal, call: { id: string | undefined } = { id: "offline-call" }) => tools.get(name)!.execute(call.id!, params, signal, () => { throw new Error("inline renderer failed"); }, ctx);
-  return { coordinator, lifecycle, source, calls,
+  return { coordinator, lifecycle, source, calls, rpcReplies,
+    rpc: (value: unknown) => rpcHandlers.get("subagents:rpc:spawn")!(value),
     shutdownHandlers: () => handlers.get("session_shutdown")!.length, tools, resumes, notices, execute, ctx, registry, root,
     input: (text: string) => handlers.get("input")![0]!({ text, source: "interactive" }, ctx),
     repeatStart: () => handlers.get("session_start")![0]!(undefined, ctx),
@@ -756,5 +759,60 @@ void it("clone throwing after admission gives failure feedback but never retries
     assert.equal(f.calls.length, 1); assert.equal(f.coordinator.list().length, 1);
     assert.deepEqual(errors, ["Could not start @general-purpose: partial admission observer failure"]);
     f.calls[0]!.finish("partial run answer"); await tick(); await pause(260); assert.equal(f.notices.length, 1);
+  } finally { await f.close(); }
+});
+
+
+void it("actual RPC description defaults and strings complete with exactly one notice", async () => {
+  const f = await factory();
+  try {
+    for (const [index, description] of [undefined, null, "  ", " exact description "].entries()) {
+      f.rpc({ requestId: `description-${index}`, type: "general-purpose", prompt: "offline", options: { description } });
+      await tick();
+      const call = f.calls[index]!, expected = typeof description === "string" && description.trim() ? description : "general-purpose";
+      assert.equal(f.registry.getRecord(call.options.agentId!)?.description, expected);
+      call.finish(); await tick(); await pause(260);
+      assert.equal(f.notices.length, index + 1);
+      assert.equal(f.notices[index]?.details?.description, expected);
+    }
+    f.rpc({ requestId: "omitted-options", type: "general-purpose", prompt: "offline" }); await tick();
+    f.calls[4]!.finish(); await tick(); await pause(260);
+    assert.equal(f.notices.length, 5);
+    for (const payload of [
+      { options: { description: "" }, expected: "general-purpose" },
+      { options: {}, expected: "general-purpose" },
+      { options: { description: " " }, expected: "general-purpose" },
+    ]) {
+      f.rpc({ requestId: `fallback-${f.calls.length}`, type: "missing-agent", prompt: "offline", ...payload }); await tick();
+      const call = f.calls.at(-1)!;
+      assert.equal(f.registry.getRecord(call.options.agentId!)?.description, payload.expected);
+      call.finish(); await tick(); await pause(260);
+    }
+    assert.equal(f.notices.length, 8);
+  } finally { await f.close(); }
+});
+
+void it("actual malformed RPC rejects before record or runner admission and never uses undefined reply channels", async t => {
+  const f = await factory();
+  const warnings: unknown[][] = [];
+  t.mock.method(console, "warn", (...args: unknown[]) => { warnings.push(args); });
+  try {
+    const malformed = [
+      ...[42, {}, []].map(description => ({ type: "general-purpose", prompt: "test", options: { description } })),
+      ...[null, [], 42, "bad"].map(options => ({ type: "general-purpose", prompt: "test", options })),
+      { type: 42, prompt: "test" }, { type: " ", prompt: "test" }, { type: "general-purpose", prompt: null },
+    ];
+    for (const [index, payload] of malformed.entries()) {
+      const requestId = `invalid-${index}`;
+      f.rpc({ requestId, ...payload }); await tick();
+      const reply = f.rpcReplies.find(reply => reply.name === `subagents:rpc:spawn:reply:${requestId}`);
+      assert.equal((reply?.value as { success: boolean }).success, false);
+      assert.equal(f.calls.length, 0); assert.equal(f.coordinator.list().length, 0);
+    }
+    for (const payload of [undefined, null, [], {}, { requestId: 42 }, { requestId: " " }]) { f.rpc(payload); await tick(); }
+    assert.equal(warnings.length, 6);
+    assert.ok(!f.rpcReplies.some(reply => /reply:undefined$/.test(reply.name)));
+    assert.equal(f.calls.length, 0);
+    await f.start(true); assert.equal(f.calls.length, 1, "rejections leave admission available");
   } finally { await f.close(); }
 });

@@ -14,6 +14,7 @@
  * either — see `occupiesPoolSlot` / `occupiesForegroundSlot`.
  */
 
+import { normalizeAgentDescription } from "./spawn-input.ts";
 import type { TaskIdentity } from "../../task-ui/types.ts";
 import { randomUUID } from "node:crypto";
 import { statSync } from "node:fs";
@@ -193,7 +194,7 @@ interface SpawnArgs {
 }
 
 interface SpawnOptions {
-  description: string;
+  description?: string | null;
   /**
    * Optional memorable name for this instance, becoming a second handle
    * (`@auth-audit`) alongside the type-derived one. Slugged, not validated —
@@ -630,6 +631,8 @@ export class AgentManager {
     // call, not minutes later at drain. Throw (not warn): programmatic callers
     // can fix and retry; the RPC layer converts throws into error envelopes.
     if (this.admissionClosed) throw new Error("Agent admission is closed");
+    const description = normalizeAgentDescription(options.description, type);
+    options = { ...options, description };
     assertValidSpawnCwd(options.cwd);
 
     const id = randomUUID().slice(0, 17);
@@ -646,7 +649,7 @@ export class AgentManager {
         // A reclaimed handle is used as-is: it belongs to the conversation this
         // spawn is reopening, and re-deriving it would lose the numbering.
         : options.reclaim?.handle ?? assignHandle(handleBase(type), this.takenHandles()),
-      description: options.description,
+      description,
       // Reclaimed here, or filled in below from `name` — in which case it must
       // see the handle this record just took, since both come out of the same
       // namespace.
@@ -973,7 +976,7 @@ export class AgentManager {
           }
           const wtResult = this.admissionClosed
             ? { hasChanges: true, path: record.worktree.path, preserved: true }
-            : await (this.dependencies.cleanupWorktree ?? cleanupWorktree)(pi, baseCwd, record.worktree, options.description, { signal: this.cleanupController.signal });
+            : await (this.dependencies.cleanupWorktree ?? cleanupWorktree)(pi, baseCwd, record.worktree, record.description, { signal: this.cleanupController.signal });
           record.worktreeResult = wtResult;
           if (wtResult.hasChanges && wtResult.branch) {
             // With a caller-supplied cwd the branch lives in THAT repo, not the
@@ -1021,7 +1024,7 @@ export class AgentManager {
           try {
             const wtResult = this.admissionClosed
             ? { hasChanges: true, path: record.worktree.path, preserved: true }
-            : await (this.dependencies.cleanupWorktree ?? cleanupWorktree)(pi, baseCwd, record.worktree, options.description, { signal: this.cleanupController.signal });
+            : await (this.dependencies.cleanupWorktree ?? cleanupWorktree)(pi, baseCwd, record.worktree, record.description, { signal: this.cleanupController.signal });
             record.worktreeResult = wtResult;
           } catch { /* ignore cleanup errors */ }
         }

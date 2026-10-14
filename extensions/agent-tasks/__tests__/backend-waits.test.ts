@@ -454,3 +454,30 @@ void it("3B1 stop releases the transferred pool once without waiting for noncoop
     await f.manager.waitForAll();
   } finally { pending.resolve({ session, responseText: "late", aborted: false, steered: false }); await f.close(); }
 });
+
+
+void it("direct manager admission normalizes descriptions before records and worktree cleanup", async () => {
+  const descriptions: string[] = [];
+  const f = fixture({ worktreeEnabled: () => true,
+    createWorktree: async () => ({ path: tmpdir(), workPath: tmpdir(), branch: "offline", baseSha: "offline" }),
+    cleanupWorktree: async (_pi, _cwd, _worktree, description) => { descriptions.push(description); return { hasChanges: false }; },
+  });
+  try {
+    for (const description of [undefined, null, " ", " exact "]) {
+      const id = f.manager.spawn(pi, ctx, "general-purpose", "offline", { description, isolation: "worktree" });
+      await f.manager.awaitStartup(id);
+      const expected = description?.trim() ? description : "general-purpose";
+      assert.equal(f.manager.getRecord(id)?.description, expected);
+      f.calls.at(-1)!.finish(); await f.manager.waitForAll();
+      assert.equal(descriptions.at(-1), expected);
+    }
+    const count = f.manager.listAgents().length;
+    for (const description of [42, {}, []]) {
+      assert.throws(() => f.manager.spawn(pi, ctx, "general-purpose", "offline", {
+        description: description as unknown as string,
+      }), /description must be/);
+      assert.equal(f.manager.listAgents().length, count);
+      assert.equal(f.calls.length, 4);
+    }
+  } finally { await f.close(); }
+});

@@ -137,3 +137,22 @@ void it("actual clone reports only successful admission, preserves origin and fo
   await tick(); await f.tool().execute("clone", { run_in_background: false }, undefined, undefined, f.ctx as never);
   f.prompt.resolve(); assert.equal((await work).spawned, true); assert.equal(f.counts.spawn, 1); assert.equal(f.counts.dispose, 1);
 });
+
+
+void it("RPC captures validated reply identity across delayed startup and request mutation", async () => {
+  const { registerRpcHandlers } = await import("../src/cross-extension-rpc.ts");
+  for (const fail of [false, true]) {
+    const callbacks = new Map<string, (value: unknown) => void>(), replies: string[] = [];
+    const startup = deferred<void>();
+    const handle = registerRpcHandlers({ events: { on(name, callback) { callbacks.set(name, callback); return () => callbacks.delete(name); }, emit(name) { replies.push(name); } },
+      pi: {}, getCtx: () => ({}), manager: { spawn: () => "agent", awaitStartup: async () => { await startup.promise; if (fail) throw new Error("startup failed"); },
+        abort: () => true, getRecord: () => ({}), consumeResult: () => true },
+    });
+    try {
+      const request: { requestId?: string; type: string; prompt: string } = { requestId: "original", type: "general-purpose", prompt: "offline" };
+      callbacks.get("subagents:rpc:spawn")!(request); delete request.requestId;
+      startup.resolve(); await tick();
+      assert.deepEqual(replies, ["subagents:rpc:spawn:reply:original"]);
+    } finally { Object.values(handle).forEach(off => off()); }
+  }
+});
