@@ -12,10 +12,10 @@
 
 验证：临时 PI_CODING_AGENT_DIR + 已安装 SDK；node --test extensions/__tests__/blocked-signal.test.ts 自然退出；pnpm check；实际 diff 自检。验证后主会话立即创建 scoped local commit，保留 README 并行 hunk。
 
-## S2：压缩宿主状态（技术归属仍在确认）
+## S2：压缩宿主状态（用户取消）
 
-只读调研 Herdr bundled v9/public API；不通过第二 socket publisher 抢占状态，不直接编辑 ~/.pi managed 文件。确定可靠落地方式后补设计并核对批准边界；若需替换管理集成/跨仓库源码/安装，先报告并请求对应授权，不把实施 S1 当作 S2 完成。
+用户明确无需修复压缩状态。本阶段取消，不修改 Herdr 源码或个人集成，不安装升级、不增加第二 publisher。research/herdr-integration.md 和 research/s2-boundary.md 留作历史调研证据，不属于剩余工作。
 
-## 最终验证
+## 最终验证与收尾
 
-按最终范围复核 PRD。真实 Herdr 颜色/prompt 门禁、真实压缩流程若未运行须标 NOT_RUN；浏览输入保护不宣称已修复。不 push/archive/journal。
+S1 verified commit d86b38b；相关产品代码没有后续改变，复用 focused22/22 自然退出与 strict/full705/705。用户接受现有交付和未运行真实宿主的限制，授权更新任务、归档和 journal。本任务从未 PR-backed，main/base_branch 自指，archive 使用显式 --skip-branch-validation。保留并行所有更改；不 push/install/sync/reload。
