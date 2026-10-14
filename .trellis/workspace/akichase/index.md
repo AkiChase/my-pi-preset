@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 12
-- **Last Active**: 2026-10-14
+- **Total Sessions**: 13
+- **Last Active**: 2026-10-15
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~383 | Active |
+| `journal-1.md` | ~418 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 13 | 2026-10-15 | 规范与全部插件用户文档整理收尾 | `9e36e9f` | `main` |
 | 12 | 2026-10-14 | 修复终端交互分类并收尾 | `d86b38b` | `main` |
 | 11 | 2026-10-14 | 内置会话命名实施与终端验收 | `ae13d8a` | `main` |
 | 10 | 2026-10-14 | 完成 @ 路径连续补全与 tmux 验收 | `ef149d2` | `main` |

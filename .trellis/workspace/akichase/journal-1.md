@@ -381,3 +381,38 @@ custom 浏览不再误报 blocked，问卷使用明确 attention 事件，聚合
 ### Status
 
 [OK] **Completed**
+
+
+## Session 13: 规范与全部插件用户文档整理收尾
+<!-- trellis-session: v=2 fp=d3b274bea27eacb3 -->
+
+**Date**: 2026-10-15
+**Task**: 规范与全部插件用户文档整理收尾
+**Branch**: `main`
+
+### Summary
+
+完成development/testing规范分层与tmux归spec；14份插件用户文档覆盖全部preset，README116行且一句话链接；独立源码审查后修正文案，清除历史迁移叙述并统一标题。用户接受后提交并归档，保并行任务和配置。
+
+### Main Changes
+
+- docs供用户、spec供开发者；全部插件详细说明唯一正文，README轻量入口
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9e36e9f` | docs: separate user plugin guides from development specs |
+
+### Testing
+
+- [OK] 23份文档、60本地链接/锚点、归档后66活动context引用与插件覆盖检查通过；两次独立静态审查及主源码核对，空白检查通过
+- [OK] 未运行产品测试、真实终端或在线provider；无安装/个人sync/reload/push
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 八份其他活动任务JSONL规范路径已在工作树更新，但未收录其尚未提交的完整规划；保留给对应任务提交。托管worktree保留，未清理。
