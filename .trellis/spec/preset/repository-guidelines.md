@@ -1,43 +1,47 @@
 # Repository Guidelines
 
-## Repository Map
+## Layout and Ownership
 
-Paths below are relative to the repository root.
-
-| Path | Responsibility |
+| Location | Responsibility |
 | --- | --- |
-| [pi-preset.json](../../../pi-preset.json) | Desired packages, conflicting standalone packages, settings, keybindings, extension config files and prune preservation |
-| [install.sh](../../../install.sh), [scripts/sync.mjs](../../../scripts/sync.mjs) | Bootstrap and reconcile four machine-state domains; `--dev` overrides only this preset's source |
-| [extensions/](../../../extensions/) | Directly loaded top-level TypeScript extensions; nested modules/tests are not standalone entries |
-| [package.json](../../../package.json), [pnpm-lock.yaml](../../../pnpm-lock.yaml) | pi resource declaration and development/runtime dependency declarations |
-| `local/` | Gitignored notes and disposable scripts, not maintained project code; PRDs/plans belong in `.trellis/tasks/` |
-| [README.md](../../../README.md) | All user-facing documentation, in Chinese |
-| [`.trellis/`](../../) | Workflow, real specs, tasks with PRDs/JSONL context, developer journals and task scripts |
-| `.pi/` | Project-level development pi config; settings currently load only `git:github.com/AkiChase/pi-trellis` (integration and `trellis-*` subagents); `.pi/git/` clones are ignored |
-| `.gitattributes` | Union merge for append-only developer journals; not regenerated workspace indexes |
+| `extensions/<name>.ts` | Independently loaded extension entry |
+| `extensions/<name>/` | Helper modules, tests, and preserved upstream provenance |
+| `pi-preset.json` | Desired packages, conflicts, settings, keybindings, and managed config leaves |
+| `install.sh`, `scripts/sync.mjs` | Bootstrap and machine-state reconciliation |
+| `package.json`, `pnpm-lock.yaml` | Resource declarations and dependencies |
+| `README.md`, `docs/` | User overview and detailed plugin/development documentation |
+| `.trellis/spec/` | Coding, testing, architecture, and maintenance constraints |
+| `.trellis/tasks/` | Scoped plans and task-specific verification evidence |
+| `.pi/`, other `.trellis/` files | Development infrastructure, not shipped preset resources |
+| `local/` | Ignored disposable notes, not maintained product or task plans |
 
-**Project policy:** `.trellis/` and `.pi/` are development infrastructure, not preset resources. Never add them to `pi-preset.json` or the `package.json` `pi` declaration, and do not document those internals in README. Cursor integration is not used: do not restore `.cursor/` unless explicitly requested. AGENTS.md is only the managed Trellis entry point; keep project conventions in this spec layer.
+Do not add development infrastructure to the preset/resource manifest. Do not hand-edit generated runtime, role definitions, or the managed AGENTS block to change project conventions. Preserve unrelated staged and working-tree changes.
 
-## Runtime and Dependency Boundary
+## Language Policy
 
-- There is no build step: pi loads extension `.ts` files directly. [tsconfig.json](../../../tsconfig.json) is strict, `noEmit`, and rooted at `extensions/**/*.ts`; scripts are plain `.mjs`.
-- Use pnpm (version in `packageManager`); maintain `pnpm-lock.yaml`, never introduce `package-lock.json`.
-- **Project policy:** keep runtime `dependencies` on permissive ranges. On other machines pi installs git-package runtime dependencies with its own package manager (default npm), not this checkout's pnpm lockfile; `devDependencies` are for checkout development, not distributed runtime requirements.
-- pi supplies `@earendil-works/*` SDK imports at runtime. Keep the SDK peer-based rather than installing another runtime copy. [link-pi-sdk.mjs](../../../scripts/link-pi-sdk.mjs) links the locally installed SDK for checks; see [Testing Guidelines](./testing-guidelines.md).
-- Put a required third-party runtime import in `dependencies`, not only `devDependencies` or preset `packages`. If this preset invokes another pi extension itself, declare its standalone package in `conflicts` to prevent duplicate registrations (example: [task-composition.ts](../../../extensions/task-composition.ts)). Local packages need `pnpm install` before `--dev`; pi does not install/update their dependencies in place.
+- All documents under `.trellis/spec/preset/` must be written in English.
+- All documents under root `docs/` must be written in Chinese.
+- README, task plans/research, and deliberate project journals remain Chinese.
+- Code, code comments, and commit messages remain English. Identifiers, paths, commands, JSON keys, and quoted upstream material retain their original spelling.
+- Preserve third-party/license originals and generated materials; this policy does not authorize translating them.
 
-## Vendored Ownership
+This replaces the former rule requiring preset specifications to be Chinese. See [documentation maintenance](documentation.md) for content placement.
 
-[process-tasks/PROVENANCE.md](../../../extensions/process-tasks/PROVENANCE.md) records the upstream repository, exact commit, copy layout and license ([LICENSE.upstream](../../../extensions/process-tasks/LICENSE.upstream)). Preserve provenance for new copies and record intentional deviations as they land. This fork is repository-owned code: edit it in place, without an upstream merge/sync obligation. Do not reinstall `pi-patty-bg-tasks` as a separate dependency or pi package.
+## Runtime and Dependencies
 
-A vendor directory with `index.ts` must stay behind the top-level wrapper. Explicit discovery and [pi-manifest.test.mjs](../../../scripts/pi-manifest.test.mjs) prevent it loading again independently; never remove that guard. See [Extension Guidelines](./extension-guidelines.md).
+- There is no build step. Pi loads TypeScript through its host loader; checks use strict, no-emit TypeScript. Do not hide type errors with `any` or blanket suppressions.
+- Use the pnpm version declared in `packageManager`; maintain `pnpm-lock.yaml`, not npm lockfiles.
+- Keep host SDK packages peer-based. Use the existing `scripts/link-pi-sdk.mjs` to resolve an installed SDK for checks; do not fetch another SDK to silence validation failures.
+- Required runtime imports belong in `dependencies`, not only dev dependencies or preset packages. Other machines install git-package runtime dependencies through Pi's package manager and do not use this checkout's pnpm lockfile.
+- Keep runtime dependency ranges permissive unless a specific justified compatibility requirement says otherwise. Dependency fetching and personal installation require authorization; they are not validation steps.
+- Keep installer/sync code dependency-free. Do not import extension/SDK code into it for incidental reuse.
 
-## 文档语言
+## Vendor Code
 
-本项目文档使用中文，包括 `.trellis/spec/` 规范、`.trellis/tasks/` 中的 PRD、设计、实施计划、研究记录，以及开发者日志和自行维护的来源说明。新建或修改文档时遵守此规则；不要求批量翻译历史文档，也不手改 Trellis 自动生成的工作流、集成文件或第三方原文。文件名、路径、标识符、命令、JSON/JSONL 结构键和原文引用保持原样。
+Preserve upstream source, exact baseline, license, and intentional local deviations in the owning provenance file. Repository-owned forks may be edited in place; do not invent an upstream synchronization obligation or duplicate their standalone tool registration. Add conflicting standalone sources to the manifest when this preset owns their registration.
 
-## Language and Comments
+## Change Checklist
 
-代码、代码注释和提交信息仍使用英文；文档语言遵循上面的中文规则。项目约定统一维护在本规范层，不另建一份规则文件。
+Before non-trivial edits, identify the smallest behavior gap, actual owner, required files, and exclusions. Trace affected boundaries: manifest → sync → config → load, or execution → delivery → view. Search existing owners before adding helpers; do not merge semantically distinct settings or state just because their syntax resembles each other.
 
-Explain **why**, not just what: identify the pi/third-party behavior and version where relevant, and what breaks without the workaround. [task-composition.ts](../../../extensions/task-composition.ts) 说明共享后端协调所有权；[beautify.ts](../../../extensions/beautify.ts) 独立负责展示，不导入 Pretty； [blocked-signal.ts](../../../extensions/blocked-signal.ts) documents host notification gaps. Verify current code/assertions when historical comments or provenance describe an older model; do not turn those comments into new contracts.
+Read relevant topic guidelines, not every plugin's history. Verify current code and tests rather than copying stale comments. Keep public behavior, tests, and documentation consistent; record unrelated refactoring opportunities without implementing them.

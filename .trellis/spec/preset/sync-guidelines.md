@@ -2,7 +2,7 @@
 
 ## Ownership and Domain Selection
 
-[pi-preset.json](../../../pi-preset.json) declares desired state; [install.sh](../../../install.sh) only bootstraps and delegates to [scripts/sync.mjs](../../../scripts/sync.mjs). Keep the sync script runnable without project dependencies, including the downloaded installer path. User examples and the complete action table belong in README's 「工作方式」; apply [Documentation](./documentation.md) when behavior changes.
+[pi-preset.json](../../../pi-preset.json) declares desired state; [install.sh](../../../install.sh) only bootstraps and delegates to [scripts/sync.mjs](../../../scripts/sync.mjs). Keep the sync script runnable without project dependencies, including the downloaded installer path. User examples and the complete action table belong in README's synchronization section; apply [Documentation](./documentation.md) when behavior changes.
 
 | Domain | Existing implementation boundary |
 | --- | --- |

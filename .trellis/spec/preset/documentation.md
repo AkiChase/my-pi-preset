@@ -1,35 +1,34 @@
 # Documentation Maintenance
 
-## 文档语言
+## Language and Content Placement
 
-项目文档使用中文，Trellis task 的 `prd.md`、`design.md`、`implement.md`、研究记录及 JSONL 上下文的 `reason` 说明也一样。技术名称、路径、命令和结构键不翻译；代码、代码注释和提交信息仍用英文。完整适用范围见 [Repository Guidelines](./repository-guidelines.md#文档语言)。这项规则不要求批量翻译历史文档或修改自动生成文件。
+All files under `.trellis/spec/preset/` are English. All root `docs/` documents are Chinese. README and task plans/research remain Chinese; code/comments/commit messages remain English. Keep identifiers, commands, and quoted upstream originals unchanged. This supersedes the former Chinese-only preset-spec policy.
 
-## Project Policy: Code Changes Require README Changes
-
-[README.md](../../../README.md) is the complete user-facing reference, written in Chinese. Any changed preset behavior, command, keybinding, configuration, dependency or check command must update the relevant section in the same change. Do not hide a user-visible change in comments, provenance or task notes alone.
-
-| Change | README sections to update |
+| Location | Content |
 | --- | --- |
-| Add/remove an extension | 「这里有什么」 overview table + 「本仓库自带的扩展」 |
-| `package.json` `pi.extensions` | 「添加扩展」 |
-| Extension behavior/commands/shortcuts/config | Its extension subsection; for keys also audit 「键位冲突」 |
-| Manifest `packages` | 「这里有什么」 overview table + 「第三方包」 |
-| `conflicts` or loading a package through this preset instead | 「由本仓库代为加载的包」 |
-| `settings` / `keybindings` / `files` / `preserve` | 「这里有什么」 manifest declaration paragraph + 「声明设置和键位」 + 「声明扩展的配置文件」; for keys also 「键位冲突」 |
-| `sync.mjs` reconciliation semantics | 「工作方式」 situation → action table |
-| `install.sh` / `sync.mjs` options | 「安装」 + 「命令行选项」 |
-| New script or validation method | 「开发」 + the relevant preset spec (especially [Testing Guidelines](./testing-guidelines.md)); maintain this matrix in `.trellis/spec/preset/documentation.md` |
+| `README.md` | Overview, installation, concise plugin descriptions, and detailed-document links |
+| `docs/extensions/` | Plugin purpose, usage, commands, configuration, design explanations, and focused test entry points |
+| `docs/testing/` | Reusable testing procedures, including isolated tmux validation |
+| `.trellis/spec/preset/` | How to develop/test and constraints future changes must preserve |
+| `.trellis/tasks/` | Current plans, historical execution reports, logs, and acceptance evidence |
 
-Multiple rows can apply. Example: moving a shortcut through a manifest `files` entry requires both declaration documentation and the extension/key-conflict explanation, not just the new JSON value.
+A new plugin does not require a new specification chapter. Add a spec rule only when it captures a reusable development or architecture constraint backed by evidence. Concrete code/test links may illustrate a rule without turning it into a full implementation manual.
 
-## Verify Before Describing
+Do not move stale prose verbatim. Check actual sources, registrations, schemas, and tests; distinguish currently shipped behavior from planned or parallel changes. Do not migrate personal memory or credentials into documentation.
 
-Use [package.json](../../../package.json), [pi-preset.json](../../../pi-preset.json), actual extension registrations and source/test assertions to check descriptions. Historical comments can be stale: [shortcuts.test.ts](../../../extensions/task-ui/__tests__/shortcuts.test.ts) proves the shared controls own two defaults; the old backend-specific shortcut files no longer own these controls. [sync.test.mjs](../../../scripts/sync.test.mjs) proves source-switch removal precedes installation, while ordinary conflict removals retain their later order.
+## Synchronization Checklist
 
-Specs distinguish project policy from implementation descriptions and cite concrete evidence. Preserve vendor source/version/license and intentional deviations in [PROVENANCE.md](../../../extensions/process-tasks/PROVENANCE.md), but user behavior still belongs in README.
+- Adding/removing a plugin: update the README overview and its detailed documentation link.
+- Changing behavior, commands, keys, or config: update the owning Chinese plugin document and any affected README summary/config table.
+- Changing manifest packages/conflicts/resources: update loading/install explanations and discovery tests where relevant.
+- Changing sync semantics/options: update the relevant README action table/examples and [sync constraints](sync-guidelines.md).
+- Adding a validation method: document the procedure in `docs/testing/` or the owning plugin page; update generic testing requirements only if the requirement itself changed.
+- Changing document paths: update indexes and affected active references/JSONL. Preserve archived task evidence rather than rewriting historical results en masse.
 
-## Keep Developer Workflow Out of User Documentation
+README need not duplicate all plugin details. Small plugins may use a concise section instead of an artificial standalone page. Delegate substantial plugin-document research/writing per plugin when requested; the main agent must verify actual changes and integrate links, not treat subagent intent as acceptance.
 
-Do not add `.trellis/`, `.pi/`, `.cursor/`, task lifecycle instructions or spec-tree navigation to README or preset resource declarations. Keep AGENTS.md exactly its managed Trellis block; durable project rules live in the preset specs, not AGENTS custom sections. Migration snapshots are curated task research, not new long-term specs.
+## Verification and Boundaries
 
-For docs-only maintenance, update stale user-facing claims without inventing runtime changes. Check relative Markdown links, headings and whitespace, including new/untracked files; never regenerate managed infrastructure simply to repair an unrelated reference.
+Check local relative targets and affected anchors, language policy, whitespace (including new files), and consistency with actual behavior. Report historical test evidence as historical, never as a fresh run.
+
+Keep development integrations, task lifecycle instructions, and private spec navigation out of user-facing README and preset resources. Do not hand-edit generated infrastructure to repair a documentation reference. Preserve unrelated parallel edits and original vendor/license materials.

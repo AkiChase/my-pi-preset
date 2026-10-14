@@ -1,35 +1,26 @@
 # Preset Engineering Guidelines
 
-## Applicability
+This is a single Pi preset, not an application or monorepo. These specifications contain development constraints, not a catalogue of plugin behavior or past task results.
 
-This is one personal pi preset, not an application or a monorepo. This layer covers shipped extensions, the sync/installer scripts, their tests, dependencies and user documentation. Development-workflow files are separate from preset resources.
+## Read by Change Type
 
-## Guidelines Index
-
-| Guide | Read when changing |
+| Guide | Read when |
 | --- | --- |
-| [Repository Guidelines](./repository-guidelines.md) | File placement, dependencies, language or vendor code |
-| [Extension Guidelines](./extension-guidelines.md) | Extension entry points, tools, shortcuts, events or terminal rendering |
-| [Monitor 契约](./monitor-contract.md) | monitor 源事件、双流日志、通知时间、有界输出、停止，或统一任务 UI 接入 |
-| [Sync Guidelines](./sync-guidelines.md) | Manifest domains, installer options, config writes or local source switching |
-| [Testing Guidelines](./testing-guidelines.md) | Type checking, regression tests or validation commands |
-| [Documentation](./documentation.md) | Any user-visible behavior or maintenance/check commands |
-| [Thinking Guides](../guides/index.md) | Cross-boundary changes or reuse decisions |
+| [Repository](repository-guidelines.md) | Starting work; layout, dependencies, language, ownership |
+| [Extensions](extension-guidelines.md) | Tools, events, SDK integration, lifecycle, rendering, editor/UI changes |
+| [Testing](testing-guidelines.md) | Designing/running verification and reporting evidence |
+| [Sync](sync-guidelines.md) | Manifest, installer, package switching, config writes |
+| [Documentation](documentation.md) | User-visible changes or documentation organization |
 
-## Pre-Development Checklist
+All documents in this directory are English. Detailed plugin and testing documentation under root `docs/` is Chinese.
 
-- Read the active task's PRD, design and implementation plan before editing.
-- Read repository guidelines and documentation, then the extension/sync/testing topics relevant to the change.
-- For non-trivial work, follow [the workflow](../../workflow.md): use a task with a PRD and curated JSONL context; activation, finish and archive remain session-owner decisions.
-- State the smallest behavior gap, its actual owner, necessary files and exclusions. Search representative sources/tests, not just comments or earlier plans.
-- Read the shared thinking-guide index. Trace any manifest → sync → runtime → README boundary that changes.
-- 规范和任务文档使用中文，内容须具体、可执行；完整语言规则见 [Repository Guidelines](./repository-guidelines.md#文档语言)。规范发现只提供本索引，不会注入所有链接文件；implement/check 上下文清单须显式包含相关规范。迁移时将旧策略和发现机制的证据保留为任务研究，不要只从正在重写的文档推导约定。
+## Before Development
 
-## Quality Check
+1. Read the approved task PRD/design/implementation plan and relevant guides above.
+2. Identify the behavior gap, actual owner, required files, exclusions, and affected consumers.
+3. Verify current sources and tests; do not rely on stale descriptions or previous task status.
+4. Preserve unrelated changes. Curate actual context references before delegated execution.
 
-- Confirm explicit extension discovery and absence of duplicate registrations.
-- Cover behavior with offline, isolated tests; run `pnpm check` before proposing a commit.
-- Apply the complete [README synchronization matrix](./documentation.md).
-- Check local Markdown links and `git diff --check`; inspect new/untracked documents too.
-- Keep development integrations and task artifacts out of the shipped preset. Do not hand-edit generated integrations or the managed AGENTS block.
-- Report actual results and blockers. Update durable conventions here when evidence changes; do not leave scaffold prose or unrelated upstream instructions.
+## Before Delivery
+
+Verify actual diffs, focused and affected broader tests, discovery/registration ownership, lifecycle cleanup, and documentation consistency. Check links and new/untracked files. Report unavailable checks and remaining limitations. Record task-specific evidence in task research; add a general specification only when a reusable constraint warrants it.
