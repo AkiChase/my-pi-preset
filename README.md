@@ -71,6 +71,7 @@ Monitor 属于 Task Composition，不是额外顶层入口；Agent、进程和�
 | [pi-memory](docs/packages/memory.md) | 保存跨会话记忆、日志和便签，并提供检索。 |
 | [rpiv-ask-user-question](docs/packages/ask-user-question.md) | 让模型通过选项问卷澄清需求。 |
 | [pi-recap](docs/packages/recap.md) | 回到会话时显示简短回顾。 |
+| [pi-trellis](docs/packages/trellis.md) | 按项目维护任务、规范与角色派发的开发工作流。 |
 
 第三方包由 Pi 安装，本仓库不修改其代码。清单目前使用 `latest`，实际功能以安装版本为准。清单中的 `conflicts` 用于防止功能重复加载，同步时会移除这些冲突来源。
 

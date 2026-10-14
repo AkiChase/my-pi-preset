@@ -6,7 +6,8 @@
     "npm:pi-web-access": "latest",
     "npm:pi-memory": "latest",
     "npm:@juicesharp/rpiv-ask-user-question": "latest",
-    "npm:@tifan/pi-recap": "latest"
+    "npm:@tifan/pi-recap": "latest",
+    "git:github.com/AkiChase/pi-trellis": "latest"
   },
   "conflicts": [
     "npm:pi-patty-bg-tasks",

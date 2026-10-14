@@ -23,5 +23,6 @@ Monitor 是 Task Composition 的功能单页；内部 Agent、进程、Task UI �
 - [pi-memory](packages/memory.md)
 - [rpiv-ask-user-question](packages/ask-user-question.md)
 - [pi-recap](packages/recap.md)
+- [pi-trellis](packages/trellis.md)
 
 第三方来源由当前 [包清单](../pi-preset.json) 决定；清单使用 `latest`，不同机器的安装版本可能不同。各页面只介绍本预设相关用法，完整功能以安装版本及上游说明为准。
