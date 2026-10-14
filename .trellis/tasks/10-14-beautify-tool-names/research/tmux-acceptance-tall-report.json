@@ -1,0 +1,264 @@
+{
+  "versions": {
+    "pi": "1.2.0",
+    "tmux": "3.6a"
+  },
+  "command": "exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-names-5oyqn1vq/home PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-names-5oyqn1vq/agent BEAUTIFY_SMOKE_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-names-5oyqn1vq PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_IMAGE_PROTOCOL=none PI_HYPERLINKS=0 PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-names-5oyqn1vq/terminal.raw PATH=/Users/jyxc-dz-0101322/.pi/agent/bin:/opt/homebrew/bin:/usr/bin:/bin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-names-5oyqn1vq /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-names-5oyqn1vq/sessions --use-theme dark --tui-mode fullscreen --tools read,bash,find,grep,get_subagent_result,jobs,ask_user_question -e /Users/jyxc-dz-0101322/tools/my-pi-preset/.trellis/tasks/10-14-beautify-tool-names/research/tmux-harness/provider.ts -e /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/beautify.ts -e /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-composition.ts -e /Users/jyxc-dz-0101322/.pi/agent/npm/node_modules/@juicesharp/rpiv-ask-user-question/index.ts --model beautify-offline/scripted",
+  "server": "beautify-names-5oyqn1vq",
+  "root": "/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-names-5oyqn1vq",
+  "cases": [
+    {
+      "case": "read 140 exact identity",
+      "status": "PASS",
+      "line": "read  sample.ts:3  40 lines \u00b7 limited \u00b7 ctrl+o expand"
+    },
+    {
+      "case": "read 140 expanded identity",
+      "status": "PASS",
+      "expected": "MARK_42"
+    },
+    {
+      "case": "read 140 Ctrl+O roundtrip",
+      "status": "PASS"
+    },
+    {
+      "case": "read 80 exact identity",
+      "status": "PASS",
+      "line": "read  sample.ts:3  40 lines \u00b7 limited \u00b7 ctrl+o expand"
+    },
+    {
+      "case": "read 80 expanded identity",
+      "status": "PASS",
+      "expected": "MARK_42"
+    },
+    {
+      "case": "read 80 Ctrl+O roundtrip",
+      "status": "PASS"
+    },
+    {
+      "case": "read 40 exact identity",
+      "status": "PASS",
+      "line": "read  sample.ts:3  40 lines \u00b7 limited"
+    },
+    {
+      "case": "read 40 expanded identity",
+      "status": "PASS",
+      "expected": "MARK_42"
+    },
+    {
+      "case": "read 40 Ctrl+O roundtrip",
+      "status": "PASS"
+    },
+    {
+      "case": "read 140 exact identity",
+      "status": "PASS",
+      "line": "read  sample.ts:3  40 lines \u00b7 limited \u00b7 ctrl+o expand"
+    },
+    {
+      "case": "read 140 expanded identity",
+      "status": "PASS",
+      "expected": "MARK_42"
+    },
+    {
+      "case": "read 140 Ctrl+O roundtrip",
+      "status": "PASS"
+    },
+    {
+      "case": "find 140 exact identity",
+      "status": "PASS",
+      "line": "find  *.ts in files  32 files shown \u00b7 ctrl+o expand"
+    },
+    {
+      "case": "find 140 expanded identity",
+      "status": "PASS",
+      "expected": "match-31.ts"
+    },
+    {
+      "case": "find 140 Ctrl+O roundtrip",
+      "status": "PASS"
+    },
+    {
+      "case": "find 80 exact identity",
+      "status": "PASS",
+      "line": "find  *.ts in files  32 files shown \u00b7 ctrl+o expand"
+    },
+    {
+      "case": "find 80 expanded identity",
+      "status": "PASS",
+      "expected": "match-31.ts"
+    },
+    {
+      "case": "find 80 Ctrl+O roundtrip",
+      "status": "PASS"
+    },
+    {
+      "case": "find 40 exact identity",
+      "status": "PASS",
+      "line": "find  *.ts in files  32 files shown"
+    },
+    {
+      "case": "find 40 expanded identity",
+      "status": "PASS",
+      "expected": "match-31.ts"
+    },
+    {
+      "case": "find 40 Ctrl+O roundtrip",
+      "status": "PASS"
+    },
+    {
+      "case": "find 140 exact identity",
+      "status": "PASS",
+      "line": "find  *.ts in files  32 files shown \u00b7 ctrl+o expand"
+    },
+    {
+      "case": "find 140 expanded identity",
+      "status": "PASS",
+      "expected": "match-31.ts"
+    },
+    {
+      "case": "find 140 Ctrl+O roundtrip",
+      "status": "PASS"
+    },
+    {
+      "case": "grep 140 exact identity",
+      "status": "PASS",
+      "line": "grep  MARK in sample.ts  48 matching lines shown \u00b7 ctrl+o expand"
+    },
+    {
+      "case": "grep 140 expanded identity",
+      "status": "PASS",
+      "expected": "MARK_48"
+    },
+    {
+      "case": "grep 140 Ctrl+O roundtrip",
+      "status": "PASS"
+    },
+    {
+      "case": "grep 80 exact identity",
+      "status": "PASS",
+      "line": "grep  MARK in sample.ts  48 matching lines shown \u00b7 ctrl+o expand"
+    },
+    {
+      "case": "grep 80 expanded identity",
+      "status": "PASS",
+      "expected": "MARK_48"
+    },
+    {
+      "case": "grep 80 Ctrl+O roundtrip",
+      "status": "PASS"
+    },
+    {
+      "case": "grep 40 exact identity",
+      "status": "PASS",
+      "line": "grep  MA\u2026mple.ts  48 matching lines sh"
+    },
+    {
+      "case": "grep 40 expanded identity",
+      "status": "PASS",
+      "expected": "MARK_48"
+    },
+    {
+      "case": "grep 40 Ctrl+O roundtrip",
+      "status": "PASS"
+    },
+    {
+      "case": "grep 140 exact identity",
+      "status": "PASS",
+      "line": "grep  MARK in sample.ts  48 matching lines shown \u00b7 ctrl+o expand"
+    },
+    {
+      "case": "grep 140 expanded identity",
+      "status": "PASS",
+      "expected": "MARK_48"
+    },
+    {
+      "case": "grep 140 Ctrl+O roundtrip",
+      "status": "PASS"
+    },
+    {
+      "case": "bash 140 exact identity",
+      "status": "PASS",
+      "line": "bash  python3 -c \"print('\\\\n'.j\u2026(30)));print('Job ID background job /tmp/pi-bg/example.log')\"  32 output lines \u00b7 28ms call \u00b7 ctrl+o expand"
+    },
+    {
+      "case": "long bash clipped only details",
+      "status": "PASS",
+      "line": "bash  python3 -c \"print('\\\\n'.j\u2026(30)));print('Job ID background job /tmp/pi-bg/example.log')\"  32 output lines \u00b7 28ms call \u00b7 ctrl+o expand"
+    },
+    {
+      "case": "bash 140 expanded identity",
+      "status": "PASS",
+      "expected": "BASH_LINE_29"
+    },
+    {
+      "case": "bash 140 Ctrl+O roundtrip",
+      "status": "PASS"
+    },
+    {
+      "case": "bash 80 exact identity",
+      "status": "PASS",
+      "line": "bash  python3\u2026i-bg/example.log')\"  32 output lines \u00b7 28ms call \u00b7 ctrl+o expand"
+    },
+    {
+      "case": "bash 80 expanded identity",
+      "status": "PASS",
+      "expected": "BASH_LINE_29"
+    },
+    {
+      "case": "bash 80 Ctrl+O roundtrip",
+      "status": "PASS"
+    },
+    {
+      "case": "bash 40 exact identity",
+      "status": "PASS",
+      "line": "bash  pyth\u2026ple.log')\"  32 output lines"
+    },
+    {
+      "case": "bash 40 expanded identity",
+      "status": "PASS",
+      "expected": "BASH_LINE_29"
+    },
+    {
+      "case": "bash 40 Ctrl+O roundtrip",
+      "status": "PASS"
+    },
+    {
+      "case": "bash 140 exact identity",
+      "status": "PASS",
+      "line": "bash  python3 -c \"print('\\\\n'.j\u2026(30)));print('Job ID background job /tmp/pi-bg/example.log')\"  32 output lines \u00b7 28ms call \u00b7 ctrl+o expand"
+    },
+    {
+      "case": "long bash clipped only details",
+      "status": "PASS",
+      "line": "bash  python3 -c \"print('\\\\n'.j\u2026(30)));print('Job ID background job /tmp/pi-bg/example.log')\"  32 output lines \u00b7 28ms call \u00b7 ctrl+o expand"
+    },
+    {
+      "case": "bash 140 expanded identity",
+      "status": "PASS",
+      "expected": "BASH_LINE_29"
+    },
+    {
+      "case": "bash 140 Ctrl+O roundtrip",
+      "status": "PASS"
+    },
+    {
+      "case": "read-error 140 exact identity",
+      "status": "PASS",
+      "line": "read  mis\u2026-file.ts  error: ENOENT: no such file or directory, access '/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/beautify-na"
+    },
+    {
+      "case": "read-error 140 expanded identity",
+      "status": "PASS",
+      "expected": "ENOENT:"
+    }
+  ],
+  "error": "Timeout recollapsed read-error",
+  "cleanup": {
+    "natural_cli_exit": true,
+    "cli_pid_gone": true,
+    "own_server_stopped": true,
+    "isolated_config_removed": true
+  },
+  "cli_pid": 80861,
+  "elapsed_seconds": 20.45
+}
