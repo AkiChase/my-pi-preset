@@ -95,6 +95,13 @@ void it("name, revision and paging keep their declared bounds", t => {
     assert.equal(hostError(tools, "memory_read", { name: "index" }), undefined);
     assert.ok(hostError(tools, "memory_forget", { name: "item", expectedRevision: "short" }), "an exact SHA256 is required");
     assert.equal(hostError(tools, "memory_forget", { name: "item", expectedRevision: REVISION }), undefined);
+    for (const field of ["offset", "limit"] as const) {
+        for (const fraction of [1.5, "1.5"]) {
+            const err = hostError(tools, "memory_list", { [field]: fraction });
+            assert.ok(err, `${field} must reject fractions without integer coercion`);
+            assert.match(err.message, new RegExp(field));
+        }
+    }
     assert.equal(hostError(tools, "memory_list", { limit: 50 }), undefined);
     assert.ok(hostError(tools, "memory_list", { limit: 51 }), "the page size is capped at 50");
     assert.ok(hostError(tools, "memory_list", { offset: -1 }), "offset is non-negative");

@@ -10,7 +10,7 @@
  */
 import { describe, it, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, readFileSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { validateToolArguments } from "@earendil-works/pi-ai";
@@ -194,6 +194,12 @@ void describe("bash runtime checks — defense in depth behind the schema", () =
         assert.equal(h.reg.jobs.size, 0);
     });
 
+    it("rejects unknown parameters for direct execute callers before spawn", async () => {
+        const h = harness();
+        await assert.rejects(() => h.tool.execute("typo", { command: "true", timeuot: 1 }, undefined, undefined, h.ctx), /timeuot/);
+        assert.equal(h.reg.totalStarted, 0);
+    });
+
     it("rejects notify without run_in_background, explaining the dependency", async () => {
         const h = harness();
         await assert.rejects(
@@ -237,7 +243,7 @@ void describe("bash structuredContent — the inherited output schema", () => {
             assert.ok((sc.wall_time_seconds as number) >= 0);
             if (command.endsWith("exit 7")) {
                 assert.equal(result.isError, true, "a non-zero exit is an error result");
-                assert.equal(sc.exit_code, 7, "the script must be able to read the real code");
+                assert.match(result.content[0]!.text, /Command exited with code 7/);
             }
             if (command.startsWith("tail")) {
                 assert.notEqual(result.isError, true, "a cancel is not a command failure");
@@ -282,6 +288,40 @@ void describe("bash structuredContent — the inherited output schema", () => {
         assert.equal(sc.truncated, true, "output beyond the cap must be flagged");
         assert.equal(sc.full_output_path, job.logPath, "and the full log must be reachable");
         assert.ok((sc.output as string).length <= 1024 * 1024);
+    });
+
+    it("treats a spontaneous signal as failure, not explicit cancellation", async () => {
+        const h = harness();
+        const result = await h.tool.execute("signal", { command: "printf before; kill -TERM $$" }, undefined, undefined, h.ctx);
+        assert.equal(result.isError, true);
+        assert.match(result.content[0]!.text, /SIGTERM/);
+        assert.match(result.content[0]!.text, /143/);
+        assert.match(result.content[0]!.text, /before/);
+        assert.equal((result.structuredContent as Record<string, unknown>).exit_code, 143);
+    });
+
+    it("does not mistake multibyte output for truncation", async () => {
+        const h = harness();
+        const result = await h.tool.execute("utf8", { command: "printf '中文😀'" }, undefined, undefined, h.ctx);
+        const sc = result.structuredContent as Record<string, unknown>;
+        assert.equal(sc.output, "中文😀");
+        assert.equal(sc.truncated, false);
+        assert.equal(sc.full_output_path, undefined);
+    });
+
+    it("flags bounded output when a foreground run is detached", async () => {
+        const h = harness();
+        const pending = h.tool.execute("detach-big", { command: "tail -f /dev/null" }, undefined, undefined, h.ctx);
+        const job = [...h.reg.jobs.values()].at(-1) as Job;
+        spawnedPids.push(job.pid);
+        writeFileSync(job.logPath, "x".repeat(1050000));
+        h.reg.foreground.get("detach-big")!.requestPause("manual");
+        const result = await pending;
+        const sc = result.structuredContent as Record<string, unknown>;
+        assert.equal(sc.truncated, true);
+        assert.equal(sc.full_output_path, job.logPath);
+        terminateJobSilently(h.reg, job);
+        await job.donePromise;
     });
 
     it("does not claim truncation for a small run", async () => {

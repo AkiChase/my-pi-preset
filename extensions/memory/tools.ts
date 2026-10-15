@@ -33,7 +33,7 @@ export function registerMemoryTools(pi: ExtensionAPI, getOrigin: GetOrigin): voi
   });
   pi.registerTool({
     name: "memory_list", label: "memory_list", description: "List project memory metadata (no bodies). Default 20, maximum 50 per page and 8KiB. Continue using nextOffset; query filters name/description only.",
-    parameters: Type.Object({ query: Type.Optional(Query), offset: Type.Optional(Type.Integer({ minimum: 0 })), limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 50 })) }, { additionalProperties: false }),
+    parameters: Type.Object({ query: Type.Optional(Query), offset: Type.Optional(Type.Number({ minimum: 0, multipleOf: 1 })), limit: Type.Optional(Type.Number({ minimum: 1, maximum: 50, multipleOf: 1 })) }, { additionalProperties: false }),
     execute: async (_id, params, signal, _update, ctx) => boundary(async () => {
       const origin = getOrigin(ctx.cwd, signal); origin.assertActive();
       const page = origin.store.list(params.query, params.offset, params.limit);

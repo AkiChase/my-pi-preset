@@ -84,7 +84,7 @@ function structuredOutcome(args: {
     wallTimeSeconds: number;
 }): AgentToolResult<LaunchDetails | undefined>["structuredContent"] {
     const slice = readLogSlice(args.logPath, { limit: STRUCTURED_OUTPUT_MAX_BYTES });
-    const truncated = slice !== undefined && slice.size > slice.text.length;
+    const truncated = slice !== undefined && (slice.start > 0 || slice.end < slice.size);
     return {
         output: slice?.text ?? "",
         truncated,
@@ -129,6 +129,11 @@ export function registerBashTool(
             };
             const bashCtx = ctx as BashCtx;
 
+            for (const key of Object.keys(p)) {
+                if (!["command", "timeout", "run_in_background", "description", "notify"].includes(key)) {
+                    throw new Error(`Unknown bash parameter '${key}'. Accepted fields: command, timeout, run_in_background, description, notify.`);
+                }
+            }
             if (p.notify !== undefined && p.run_in_background !== true) throw new Error("notify requires run_in_background=true");
             // The host already rejects these against the schema above; repeating the
             // check keeps a direct `execute()` (tests, SDK callers that bypass
@@ -294,11 +299,8 @@ async function runForeground(args: {
                 exitCode,
                 wallTimeSeconds: (Date.now() - startedAt) / 1000,
             });
-            // A signal death (Esc-cancel, source stop) is a deliberate cancel, not
-            // a command failure: it carries no exit status the model can act on, so
-            // it stays a successful result and the text says the command was
-            // cancelled. `structuredContent.exit_code` still reports 128+signal — a
-            // script that cancelled the run can see how the process actually died.
+            // Only an interrupted launch wait is deliberate cancellation. A
+            // signal observed on normal completion is a command failure.
             if (cancelled) {
                 return {
                     content: [textBlock(`${launchText(details.runtimeLaunch)}\nCommand was cancelled${exit.signal ? ` (${exit.signal})` : ""} before it finished.\n${output}`)],
@@ -306,9 +308,12 @@ async function runForeground(args: {
                     structuredContent,
                 };
             }
-            if (exit.signal === null && exit.code !== 0) {
+            if (exitCode !== 0) {
+                const reason = exit.signal
+                    ? `Command terminated by ${exit.signal} (exit code ${exitCode}).`
+                    : `Command exited with code ${exitCode}.`;
                 return {
-                    content: [textBlock(`${launchText(details.runtimeLaunch)}\n${output || `Command exited with code ${exit.code ?? 1}`}`)],
+                    content: [textBlock(`${launchText(details.runtimeLaunch)}\n${reason}\n${output}`)],
                     details,
                     structuredContent,
                     isError: true,
@@ -346,12 +351,11 @@ async function runForeground(args: {
             return {
                 content: [textBlock(`${launchText(details.runtimeLaunch)}\n${text}`)],
                 details,
-                structuredContent: {
-                    output: readLogSlice(logPath, { limit: STRUCTURED_OUTPUT_MAX_BYTES })?.text ?? "",
-                    truncated: false,
-                    exit_code: 0,
-                    wall_time_seconds: (Date.now() - startedAt) / 1000,
-                } as AgentToolResult<LaunchDetails | undefined>["structuredContent"],
+                structuredContent: structuredOutcome({
+                    logPath,
+                    exitCode: 0,
+                    wallTimeSeconds: (Date.now() - startedAt) / 1000,
+                }),
             };
         }
         // Genuine cancellation kills the launch, then preserves its observed final log.

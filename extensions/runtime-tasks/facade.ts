@@ -107,12 +107,14 @@ export function runtimeTaskTool(facade: ReturnType<typeof createRuntimeTaskFacad
       task_id: Type.Optional(Type.String({ description: "Target task id, as returned by launch/list." })),
       run_id: Type.Optional(Type.String({ description: "Exact run id; omitting it binds the current run at call admission." })),
       task_type: Type.Optional(StringEnum(TASK_TYPES)),
-      offset: Type.Optional(Type.Integer({ minimum: 0, description: "Byte offset to start reading at (output/search)." })),
-      limit: Type.Optional(Type.Integer({ minimum: 1, description: "Maximum bytes or lines to return; must be at least 1." })),
+      // Integer schemas truncate fractions in host coercion; multipleOf keeps
+      // them intact until validation rejects them.
+      offset: Type.Optional(Type.Number({ minimum: 0, multipleOf: 1, description: "Integer byte offset to start reading at (output/search)." })),
+      limit: Type.Optional(Type.Number({ minimum: 1, multipleOf: 1, description: "Maximum bytes or lines to return; an integer of at least 1." })),
       verbose: Type.Optional(Type.Boolean({ description: "Include full subagent detail (subagent output/wait only)." })),
       pattern: Type.Optional(Type.String({ description: "Regular expression to search for (search only)." })),
       ignore_case: Type.Optional(Type.Boolean({ description: "Case-insensitive matching (search only)." })),
-      context: Type.Optional(Type.Integer({ minimum: 0, description: "Lines of context around each match (search only)." })),
+      context: Type.Optional(Type.Number({ minimum: 0, multipleOf: 1, description: "Integer lines of context around each match (search only)." })),
     }, { additionalProperties: false }),
     execute: async (id: string, params: RuntimeTaskParams, signal: AbortSignal | undefined, onUpdate: AgentToolUpdateCallback<RuntimeTaskDetails> | undefined, ctx: ExtensionContext) => report(id, await facade.execute(params, signal, onUpdate, ctx)),
   };

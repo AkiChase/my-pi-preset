@@ -25,8 +25,7 @@ test("an inapplicable field is reported by name, with the fields the action does
 });
 
 test("offset/limit/context must be integers when the host validator is bypassed", () => {
-  // The schema declares Type.Integer, so a fraction can only arrive from a
-  // direct caller. Paging a log from byte 1.5 would read from byte 1 silently.
+  // Direct callers still require a safe-integer check before reading a log.
   for (const key of ["offset", "limit", "context"] as const) {
     const message = validateRuntimeTaskParams({ action: "output", task_id: "x", [key]: 1.5 });
     assert.ok(message, `${key}=1.5 must be rejected`);
@@ -35,7 +34,7 @@ test("offset/limit/context must be integers when the host validator is bypassed"
   assert.equal(validateRuntimeTaskParams({ action: "output", task_id: "x", offset: 0, limit: 1 }), undefined);
 });
 
-test("the registered task_manage schema is closed and types offset/limit/context as integers", () => {
+test("the registered task_manage schema is closed and rejects fractional values", () => {
   const capability: RuntimeTaskCapability = {
     list: () => [],
     execute: async () => taskResult("x", { action: "output" }),
@@ -43,12 +42,15 @@ test("the registered task_manage schema is closed and types offset/limit/context
   const tool = runtimeTaskTool(createRuntimeTaskFacade([capability]));
   const schema = JSON.parse(JSON.stringify(tool.parameters)) as {
     additionalProperties?: unknown;
-    properties: Record<string, { type?: unknown; minimum?: unknown; description?: unknown }>;
+    properties: Record<string, { type?: unknown; minimum?: unknown; multipleOf?: unknown; description?: unknown }>;
   };
   // Closed so a typo like `limt` cannot reach the facade as a silently ignored key.
   assert.equal(schema.additionalProperties, false);
   for (const key of ["offset", "limit", "context"]) {
-    assert.equal(schema.properties[key]!.type, "integer", `${key} must be an integer`);
+    // Type.Integer triggers host truncation; number + multipleOf preserves the
+    // original fraction until validation rejects it.
+    assert.equal(schema.properties[key]!.type, "number");
+    assert.equal(schema.properties[key]!.multipleOf, 1);
     assert.equal(typeof schema.properties[key]!.description, "string");
   }
   assert.equal(schema.properties.limit!.minimum, 1, "limit 0 would return nothing to a caller that asked for output");
