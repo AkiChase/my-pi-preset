@@ -9,7 +9,7 @@ import type { Component, TUI } from "@earendil-works/pi-tui";
 import type { TestContext } from "node:test";
 import register, { STATE_TYPE } from "../index.ts";
 import { RECAP_PROMPT } from "../output.ts";
-import { buildMaterial } from "../material.ts";
+import { buildMaterial } from "../../shared/material.ts";
 import { deferred, FakeClock, flush, reply } from "./harness.ts";
 
 async function sdkHarness(t: TestContext, options: { initial?: boolean; automatic?: boolean; thinking?: string; extra?: (pi: ExtensionAPI) => void; rpc?: boolean; tui?: boolean; persisted?: boolean; retry?: boolean; config?: Record<string, unknown> } = {}) {

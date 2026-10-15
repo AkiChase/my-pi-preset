@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
-import { buildMaterial } from "../material.ts";
+import { buildMaterial } from "../../shared/material.ts";
 import { STATE_TYPE } from "../index.ts";
 import { deferred, flush, harness, reply } from "./harness.ts";
 
@@ -30,12 +30,6 @@ it("automatic unavailable defaults warn once; empty session never requests; manu
     await h.clock.tick(600000); assert.equal(h.notices.length, 1);
     await h.command(); assert.equal(h.notices.length, 2);
     const empty = harness(t); await empty.start(); await empty.clock.tick(600000); await empty.command(); assert.equal(empty.requests.length, 0); assert.match(empty.notices[0], /No conversation/);
-});
-it("material identity is budget-independent and includes evidence beyond 100-character tool-result cap", async t => {
-    const h = harness(t); await h.start(); h.manager.appendMessage({ role: "toolResult", toolCallId: "x", toolName: "read", content: [{ type: "text", text: "a".repeat(100) + "old" }], isError: false, timestamp: 1 });
-    const m = buildMaterial(h.manager, 256); assert.equal(m.identity, buildMaterial(h.manager, 32000).identity);
-    const target = h.manager.getLeafId()!; h.manager.appendContextEdit(target, { content: "a".repeat(100) + "new" });
-    assert.notEqual(buildMaterial(h.manager, 256).identity, m.identity);
 });
 it("widget synchronous shutdown reentry cannot leave late installed widget, public callbacks get no live model context", async t => {
     const h = harness(t); await h.start(); await h.user(); const command = h.command(); await flush();

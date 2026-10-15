@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { cleanText } from "./output.ts";
+import { cleanText } from "./text.ts";
 
 export const OMITTED = "[Earlier context omitted]";
 export const TOOL_RESULT_LIMIT = 100;

@@ -4,7 +4,7 @@ import { Text } from "@earendil-works/pi-tui";
 import { failureDetail } from "../shared/errors.ts";
 import { generateText, RequestCancelled } from "../shared/request.ts";
 import { DEFAULTS, loadConfig, resolveModel, saveConfig, THINKING_LEVELS, type ConfigState, type RecapConfig } from "./config.ts";
-import { buildMaterial, type Material } from "./material.ts";
+import { buildMaterial, type Material } from "../shared/material.ts";
 import { cleanText, OUTPUT_LIMIT, readRecap, RECAP_PROMPT } from "./output.ts";
 
 export const STATE_TYPE = "preset.recap.v1";

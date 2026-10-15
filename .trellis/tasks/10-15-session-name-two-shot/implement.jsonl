@@ -1,0 +1,4 @@
+{"file":".trellis/spec/development/index.md","reason":"插件状态、公共SDK、并发与配置约束"}
+{"file":".trellis/spec/testing/index.md","reason":"隔离测试、actual SDK、自然退出与完整验证"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"直接复用共享材料而非复制"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"全session额度与当前branch材料的边界"}

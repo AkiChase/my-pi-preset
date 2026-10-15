@@ -3,7 +3,7 @@ import { it, mock } from "node:test";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { STATE_TYPE } from "../index.ts";
-import { buildMaterial } from "../material.ts";
+import { buildMaterial } from "../../shared/material.ts";
 import { deferred, flush, harness, reply } from "./harness.ts";
 
 it("normal final settled starts full idle delay; agent_end/silence/tools/retry cannot open eligibility and tokens do not churn timers", async t => {

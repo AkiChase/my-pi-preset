@@ -1,0 +1,4 @@
+{"file":".trellis/spec/development/index.md","reason":"共享材料边界、持久化与异步副作用约束"}
+{"file":".trellis/spec/testing/index.md","reason":"隔离、自然退出及actual SDK验证"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Recap材料抽取等价与消费者回归"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"session级额度、标题保护和迟到结果"}
