@@ -267,7 +267,9 @@ void describe("bash structuredContent — the inherited output schema", () => {
         spawnedPids.push(job.pid);
         const sc = result.structuredContent as Record<string, unknown>;
         assert.ok(sc, "a started job still owes its callers the shape");
-        assert.equal(typeof sc.exit_code, "number");
+        // 0 is a placeholder, not an observed exit: the inherited schema has no
+        // "still running" sentinel. Pinned here so the field is not misread.
+        assert.equal(sc.exit_code, 0);
         assert.match(result.content[0]!.text!, new RegExp(job.logPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
         terminateJobSilently(h.reg, job);
         await job.donePromise;

@@ -345,9 +345,12 @@ async function runForeground(args: {
                 ? `Command was manually backgrounded by user with ID: ${id}. Output is being written to: ${logPath}`
                 : `Command running in background with ID: ${id}. Output is being written to: ${logPath}`;
             const details = { runtimeLaunch: launchMetadata("bash", id, id, "background") };
-            // The command is still running, so there is no exit code yet. A
-            // script gets the log path rather than a wall time it would misread
-            // as a completed run's duration.
+            // The command is still running, so there is no observed exit yet. The
+            // inherited outputSchema requires an integer `exit_code`, and it has no
+            // sentinel for "not finished" — so 0 is reported and a codemode script
+            // that needs to distinguish a running job must read `output`, the launch
+            // metadata, or wait on the job rather than trusting this field.
+            // `wall_time_seconds` is time-so-far, not a completed run's duration.
             return {
                 content: [textBlock(`${launchText(details.runtimeLaunch)}\n${text}`)],
                 details,

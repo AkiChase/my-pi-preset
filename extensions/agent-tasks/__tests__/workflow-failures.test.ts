@@ -65,6 +65,25 @@ void it("an invalid effort fails the run and names the accepted levels", { timeo
     assert.match(result.error ?? "", /minimal|low|medium|high/);
 });
 
+void it("effort accepts every level the host thinking parameter advertises, including off", { timeout: 10_000 }, async () => {
+    // The two lists live in different files — a worker template literal cannot
+    // import `invocation-config.ts` — so this is what keeps them from drifting.
+    const { host } = hosts();
+    for (const level of ["off", "minimal", "low", "medium", "high", "xhigh", "max"]) {
+        const result = await runWorkflow({
+            script: `${meta}\nreturn await agent("ok", { effort: ${JSON.stringify(level)} });`,
+            host,
+        });
+        assert.equal(result.status, "completed", `effort=${level} must be accepted: ${String(result.error)}`);
+    }
+    const rejected = await runWorkflow({
+        script: `${meta}\nreturn await agent("ok", { effort: "offf" });`,
+        host,
+    });
+    assert.equal(rejected.status, "failed");
+    assert.match(rejected.error ?? "", /off/);
+});
+
 void it("a resume/start-option conflict fails the run rather than silently replaying", { timeout: 10_000 }, async () => {
     const { host } = hosts();
     const result = await runWorkflow({
