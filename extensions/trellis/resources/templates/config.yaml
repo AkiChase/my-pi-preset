@@ -1,0 +1,8 @@
+# Pi Trellis defaults. No lifecycle hooks run by default.
+session_commit_message: "chore: record journal"
+max_journal_lines: 2000
+session_auto_commit: false
+context_injection:
+  max_file_bytes: 32768
+  max_artifact_bytes: 65536
+  max_total_bytes: 131072

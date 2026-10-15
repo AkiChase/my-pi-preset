@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "files": {
+    "agents-block.md": {
+      "sha256": "db46ec45c71ae528e5497a9cc688a4e8e3542ba0b7107e16b50f9525819b2bf3",
+      "license": "AGPL-3.0-only",
+      "origin": "Pi-only adaptation of project Trellis workflow conventions and upstream init behavior; no exact upstream template revision asserted"
+    },
+    "config.yaml": {
+      "sha256": "47a81490107fb215e58cb97fa25cb427340b12a2eeacca58c7a5fe86a37a498d",
+      "license": "AGPL-3.0-only",
+      "origin": "Pi-only adaptation of project Trellis workflow conventions and upstream init behavior; no exact upstream template revision asserted"
+    },
+    "journal.gitattributes": {
+      "sha256": "fbf06fcfa02307006a6676e2279507adba5a24a3606eee74be5343df49446d1d",
+      "license": "AGPL-3.0-only",
+      "origin": "Pi-only adaptation of project Trellis workflow conventions and upstream init behavior; no exact upstream template revision asserted"
+    },
+    "root.gitignore-block.txt": {
+      "sha256": "d42989a9eb63c7aeb1affac4638f23d967aebfdee2220f0b174c757b40a07622",
+      "license": "AGPL-3.0-only",
+      "origin": "Pi-only adaptation of project Trellis workflow conventions and upstream init behavior; no exact upstream template revision asserted"
+    },
+    "spec/guides/code-reuse-thinking-guide.md": {
+      "sha256": "0a10e79c7fe87f7d4da29500372fd44fa3778c6f6ed0ac8dae8c10d1dc1b92d6",
+      "license": "AGPL-3.0-only",
+      "origin": "Pi-only adaptation of project Trellis workflow conventions and upstream init behavior; no exact upstream template revision asserted"
+    },
+    "spec/guides/cross-layer-thinking-guide.md": {
+      "sha256": "3aff94cf5d8c4d0015f64e7b83d3a007c9f623657a9721cfea616341423530d8",
+      "license": "AGPL-3.0-only",
+      "origin": "Pi-only adaptation of project Trellis workflow conventions and upstream init behavior; no exact upstream template revision asserted"
+    },
+    "spec/guides/index.md": {
+      "sha256": "61399c91a23c16817653719abd7777a258681aa862dbd2056111514127bf5a8f",
+      "license": "AGPL-3.0-only",
+      "origin": "Pi-only adaptation of project Trellis workflow conventions and upstream init behavior; no exact upstream template revision asserted"
+    },
+    "spec/index.md": {
+      "sha256": "a37d28a4f1055a1f72487cb3c2fbd24e5d10726ad98aa8796be5b3435055f7c6",
+      "license": "AGPL-3.0-only",
+      "origin": "Pi-only adaptation of project Trellis workflow conventions and upstream init behavior; no exact upstream template revision asserted"
+    },
+    "tasks/bootstrap-prd.md": {
+      "sha256": "17c609fafb86bb0639a6e46454cc755062b6ceaa0cd5c1fb2216f6a0f3d77e03",
+      "license": "AGPL-3.0-only",
+      "origin": "Pi-only adaptation of project Trellis workflow conventions and upstream init behavior; no exact upstream template revision asserted"
+    },
+    "tasks/join-prd.md": {
+      "sha256": "a9cb8d940417e46eed6373a226bd0d547d75ff1442b7b9a3f24c7b3ab98db415",
+      "license": "AGPL-3.0-only",
+      "origin": "Pi-only adaptation of project Trellis workflow conventions and upstream init behavior; no exact upstream template revision asserted"
+    },
+    "trellis.gitignore": {
+      "sha256": "039c5f993947a09975af17b7946fe5558f11221385078509fd066e69efe2cbf3",
+      "license": "AGPL-3.0-only",
+      "origin": "Pi-only adaptation of project Trellis workflow conventions and upstream init behavior; no exact upstream template revision asserted"
+    },
+    "workflow.md": {
+      "sha256": "9ca10c78a738e2efa02b01269f2c74b2fc39a87729b021b163360d236d8359db",
+      "license": "AGPL-3.0-only",
+      "origin": "Pi-only adaptation of project Trellis workflow conventions and upstream init behavior; no exact upstream template revision asserted"
+    },
+    "workspace-index.md": {
+      "sha256": "00b569c959ab54052d931b9a56c6573f6b57b7be4af0b07907902f8665ba2771",
+      "license": "AGPL-3.0-only",
+      "origin": "Pi-only adaptation of project Trellis workflow conventions and upstream init behavior; no exact upstream template revision asserted"
+    }
+  }
+}

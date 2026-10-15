@@ -1,0 +1,5 @@
+.developer
+.runtime/
+**/__pycache__/
+**/*.pyc
+*.pi-trellis-tmp

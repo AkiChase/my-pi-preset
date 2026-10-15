@@ -53,6 +53,8 @@
 资源检查/更新纳入技能及其配套文件：初次部署不得静默覆盖同名用户资源；安全更新只替换已确认未修改的托管文件，定制冲突需明确提示/单独确认处理。不清理无关项目技能，不复制用户级技能。已有初始化项目升级需显式计划补齐技能，新库存不能直接触发未知资源清单拒绝，也不能放宽所有未知文件的信任边界。
 
 ## 验收标准
+
+测试方针（2026-10-16 用户决定）：不迁入UI/TUI测试和低效或无意义的测试（如真实SDK宿主、mounted overlay、菜单流程、渲染测试）；测试重点是纯函数和逻辑。本仓既有测试也有同样问题，不在本任务范围内清理。下方A3/A4等验收中的“实际mounted overlay/宿主”要求按此改为逻辑层验证。
 - A1：本仓维护一份Trellis产品，加载入口唯一；相对资源/模板/角色/技能均正确，旧独立包冲突可诊断/移除。
 - A2：初始化/上下文/任务/派发/工作树功能回归通过，无个人配置/数据/任务指针或未知绑定的隐式修改。
 - A3：共享内部接入仅一处、同宿主包实例与能力错误门禁有效，Viewer/Memory消费者不复制renderer或视口算法；Task Panel规划使用同一基础模块。
@@ -83,7 +85,7 @@
 ## 授权与状态
 2026-10-16 用户全权授权：“接下来我们可以开始进行 trellis 的迁移了，我就不一个一个授权了，全交由你来一步一步完成吧。”覆盖S1–S4实施、独立审查、阶段本地提交及验收后收尾。仍不push、不改历史、不安装依赖、不改个人配置/sync/reload、不删邻仓；本仓自身`.trellis/`部署副本不在本任务内重新init/update。
 
-迁移基线：邻仓 `24e3cefba998d4f7fb8ebc55860aae0e3ddb8bf7`（工作区干净；init-check-diagnostics、evidence-retention-policy、active-task-binding均已归档）。该基线已删除 `trellis-continue`（恢复逻辑并入 `trellis-start`），新增 `task.py active`；技能为9个。
+迁移基线：邻仓 `d0e07c94c8f586fdf6e6c98a3127133293faeb90`（在 `24e3cef` 之上修复旧manifest项目初始化菜单只剩Check/Help/Cancel，并统一菜单文案；2026-10-16用户要求重新同步）。工作区干净；init-check-diagnostics、evidence-retention-policy、active-task-binding均已归档）。该基线已删除 `trellis-continue`（恢复逻辑并入 `trellis-start`），新增 `task.py active`；技能为9个。
 
 2026-10-15用户批准提前编写迁入后文档（D0限定实施），无需等init check最终完成；只写用户文档并检查，不授权产品迁移/部署/安装/reload。D0可先执行，S1–S3仍待最终方案批准和pin；用户docs草稿清晰标记未上线迁入目标与待最终源码核对部分。
 

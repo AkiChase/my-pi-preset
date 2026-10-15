@@ -1,0 +1,4 @@
+# pi-trellis:ignore:start
+/.worktree/
+/.trellis/.runtime/
+# pi-trellis:ignore:end

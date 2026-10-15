@@ -123,6 +123,18 @@ function run({
   console.log("PASS Recap conflict replacement preserves user-owned configuration");
 }
 
+// The built-in Trellis replaces the standalone Git package, including ref variants, even in merge mode.
+{
+  const preset = JSON.parse(readFileSync(resolve(scriptDir, "..", "pi-preset.json"), "utf8"));
+  const result = run({ manifest: preset.packages, conflicts: preset.conflicts,
+    listOutput: "User packages:\n  git:github.com/AkiChase/pi-trellis@main\n    /p/pi-trellis", settingsFile: '{"untouched":true}', args: ["--sync", "packages"] });
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(result.calls.includes("remove git:github.com/AkiChase/pi-trellis@main"), result.calls.join("\n"));
+  assert.equal(result.calls.some(call => /^(install|update) git:github.com\/AkiChase\/pi-trellis/.test(call)), false);
+  assert.equal(result.settingsText, '{"untouched":true}');
+  console.log("PASS built-in Trellis removes the standalone pi-trellis package without reinstalling it");
+}
+
 // Composition replacement is a real offline dry-run plan, not a comment-only guard.
 {
   const preset = JSON.parse(readFileSync(resolve(scriptDir, "..", "pi-preset.json"), "utf8"));

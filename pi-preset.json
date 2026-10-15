@@ -5,15 +5,15 @@
     "npm:pi-input-history": "latest",
     "npm:pi-web-access": "latest",
     "npm:pi-memory": "latest",
-    "npm:@juicesharp/rpiv-ask-user-question": "latest",
-    "git:github.com/AkiChase/pi-trellis": "latest"
+    "npm:@juicesharp/rpiv-ask-user-question": "latest"
   },
   "conflicts": [
     "npm:pi-patty-bg-tasks",
     "npm:@heyhuynhgiabuu/pi-pretty",
     "npm:@tintinweb/pi-subagents",
     "npm:pi-session-name",
-    "npm:@tifan/pi-recap"
+    "npm:@tifan/pi-recap",
+    "git:github.com/AkiChase/pi-trellis"
   ],
   "settings": {
     "npmCommand": ["pnpm"],

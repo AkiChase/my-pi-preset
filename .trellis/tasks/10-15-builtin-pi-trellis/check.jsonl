@@ -1,5 +1,5 @@
-{"file":".trellis/tasks/10-15-builtin-pi-trellis/prd.md","reason":"Documentation acceptance scope"}
-{"file":".trellis/tasks/10-15-builtin-pi-trellis/design.md","reason":"Planned migration behavior vs stable current functionality"}
-{"file":".trellis/tasks/10-15-builtin-pi-trellis/implement.md","reason":"D0 authorization and final source audit gate"}
-{"file":".trellis/spec/development/index.md","reason":"Chinese user documentation conventions"}
-{"file":".trellis/spec/testing/index.md","reason":"Documentation link and command correctness checks"}
+{"file":".trellis/tasks/10-15-builtin-pi-trellis/prd.md","reason":"Acceptance criteria and authorization boundaries"}
+{"file":".trellis/tasks/10-15-builtin-pi-trellis/design.md","reason":"Intended layout and behavior to review against"}
+{"file":".trellis/tasks/10-15-builtin-pi-trellis/implement.md","reason":"Stage scope and S1 decisions"}
+{"file":".trellis/spec/development/index.md","reason":"Layout, provenance and preset conflict rules"}
+{"file":".trellis/spec/testing/index.md","reason":"Check selection, isolation and natural-exit evidence"}

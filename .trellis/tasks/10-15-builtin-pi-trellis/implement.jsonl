@@ -1,5 +1,7 @@
-{"file":".trellis/tasks/10-15-builtin-pi-trellis/prd.md","reason":"Migration scope and Chinese beginner user documentation requirements"}
-{"file":".trellis/tasks/10-15-builtin-pi-trellis/design.md","reason":"Target feature ownership and documentation topics"}
-{"file":".trellis/tasks/10-15-builtin-pi-trellis/implement.md","reason":"D0 documentation-only authorization and implementation boundaries"}
-{"file":".trellis/spec/development/index.md","reason":"User docs style, source correctness and preservation"}
-{"file":".trellis/spec/testing/index.md","reason":"Documentation verification and no terminal test authorization"}
+{"file":".trellis/tasks/10-15-builtin-pi-trellis/prd.md","reason":"Migration requirements, authorization and baseline"}
+{"file":".trellis/tasks/10-15-builtin-pi-trellis/design.md","reason":"Target layout, path wiring, skills deployment and test strategy"}
+{"file":".trellis/tasks/10-15-builtin-pi-trellis/implement.md","reason":"Stage plan and S1 concrete decisions"}
+{"file":".trellis/tasks/10-15-builtin-pi-trellis/research/migration-risk-analysis.md","reason":"Root/path/test wiring risks (dynamic-skill sections superseded by R7)"}
+{"file":".trellis/tasks/10-15-builtin-pi-trellis/research/project-skill-deployment.md","reason":"Skill deployment, manifest schema and reload findings for S2"}
+{"file":".trellis/spec/development/index.md","reason":"Repository layout, manifest, provenance and conflict rules"}
+{"file":".trellis/spec/testing/index.md","reason":"Test discovery, isolation and natural-exit requirements"}

@@ -88,6 +88,16 @@ describe("package.json pi.extensions", () => {
     assert.equal(Object.hasOwn(preset.files, "pi-recap.json"), false);
   });
 
+  it("loads Trellis once through its thin entry and replaces the standalone pi-trellis package", () => {
+    assert.equal(declaredExtensions().filter(path => path === "extensions/trellis.ts").length, 1);
+    assert.equal(declaredExtensions().some(path => path.startsWith("extensions/trellis/")), false);
+    assert.ok(existsSync(join(root, "extensions/trellis/index.ts")));
+    assert.ok(preset.conflicts.includes("git:github.com/AkiChase/pi-trellis"));
+    assert.equal(Object.keys(preset.packages).some(source => /pi-trellis/.test(source)), false);
+    // Trellis skills are conditional project resources, never static package skills.
+    assert.equal(Object.hasOwn(manifest, "skills"), false);
+  });
+
   it("covers the resource types this repo ships", () => {
     // A pi manifest switches off convention discovery for the types it does not list, so a
     // new skills/ or prompts/ directory is silently ignored until it is declared here.

@@ -22,6 +22,15 @@
 - [ ] 审阅最终PRD/design/implement，通过用户最终实施批准后再start，准备每个派发role的真实JSONL。
 
 ## S1 迁入产品闭包与唯一加载（A1/A2/A5/A6）
+
+S1 具体决定（基线d0e07c9；测试只保留逻辑/纯函数，不迁UI/宿主测试）：
+- `extensions/trellis/index.ts` 来自邻仓 `extensions/trellis.ts`；`lib/ runtime/ resources/ agents/ skills/ licenses/` 原样相对布局；邻仓 MIT `LICENSE` 保存为 `licenses/pi-trellis-MIT.txt`；顶层 `extensions/trellis.ts` 仅转发默认导出。
+- 不迁 `scripts/{install.sh,patch-trellis.py,deploy-worktree.py}`（产品无调用者）、`docs/`、`TESTING.md`、`AGENTS.md`、邻仓 package.json；依赖这些脚本或邻仓Git历史的测试重写或不迁。
+- 测试进 `extensions/trellis/__tests__/`，根 test/自然退出命令扩展 MJS glob；Python测试经现有 MJS wrapper 调用。
+- 技能在S1保持旧动态发现行为可用（指向新路径），S2再改为部署。包身份检测改认本包 `my-pi-preset`。
+- `pi-preset.json` 移除 `git:github.com/AkiChase/pi-trellis` 包并加入 conflicts。
+
+S1 检查点：基线d0e07c9产品资源字节一致，lib/index仅路径/文案/严格类型差异；独立审查首轮NOT ACCEPTED（剔除了fake-pi handler安全逻辑测试），已恢复；dispatch测试83s→13s。Trellis测试432/432自然退出约80s，Python 32，`pnpm check` 1470/1470。不再覆盖：真实宿主加载、viewer界面、菜单文案。
 - [ ] 从固定commit按清单迁入extensions/trellis/index.ts/lib/runtime/resources/agents/skills/licenses，不迁旧开发目录/历史/独立安装脚本/package。
 - [ ] 新薄extensions/trellis.ts；集中最小地址接线，正确resourceRoot/actualentry/presetidentity/userproject，更新执行协议与references路径。
 - [ ] 精选loader/context/task/dispatch/worktree/资源安全测试及fixtures到__tests__，明确MJS/Python发现/cwd，产品TS严格typecheck；不依赖neighbor或其Git历史。

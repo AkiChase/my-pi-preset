@@ -1,0 +1,333 @@
+{
+  "schemaVersion": 1,
+  "upstream": {
+    "package": "@mindfoldhq/trellis",
+    "version": "0.6.16",
+    "license": "AGPL-3.0-only",
+    "repository": "https://github.com/mindfold-ai/Trellis",
+    "revision": null,
+    "evidence": "All 28 project Python sources byte-match installed 0.6.16 npm templates; no verified git revision asserted.",
+    "sourceHashes": {
+      "task.py": "b415e0a2dbc9e8cba1ada0c7997999aaaaea0eec96d3419db640830e88e84cfe",
+      "get_developer.py": "84c27076323c3e0f2c9c8ed16e8aa865e225d902a187c37e20ee1a46e7142d8f",
+      "get_context.py": "ca5bf9e90bdb1d75d3de182b95f820f9d108ab28793d29097b24fd71315adcf5",
+      "__init__.py": "1242be5b972094c2e141aecbe81a4efd478f6534e3d5e28306374e6a18fcf46c",
+      "init_developer.py": "f9e6c0d882406e81c8cd6b1c5abb204b0befc0069ff89cf650cd536a80f8c60e",
+      "add_session.py": "f61a452ec5f7eece8d7e0f0dd56ce5851166cbc83ca4822e30acbb36eeb5896f",
+      "common/safe_commit.py": "262ad740552279fe6ec6a2a9865b2965ce2448577cf973a4d702dfe2f5f91f04",
+      "common/session_context.py": "3379ef1766e4e5ca77cbb7c040dbba3883fcca2548580299e3b38dbf22f4f7d5",
+      "common/active_task.py": "f52715bbcc0677607055903e799674d7d50d6fcbab413a8f453c4e4efc954726",
+      "common/git.py": "5605b71662e524b47632030d9db9245121a5cba85b5521eeb524ed464d840ff5",
+      "common/git_context.py": "fa30ced454f1a91ffc9f8b2abeb32225e3447cbdc90bad783797374eba07265d",
+      "common/task_queue.py": "0be61f713462b1fe4574927c82fc4704e678afe72dcb9813543aedf2f9e9e0c5",
+      "common/tasks.py": "87aca6b73ec4524450cfff8e2ae561b1f2e53bd62a185f036a7a2d484d90c8a2",
+      "common/config.py": "9a042d6f0e25a33a567510760e87c1e389af14a41faf1daeb1190a00f3df7f5e",
+      "common/task_store.py": "5712b0405e1fd0c2b7be5e5fbd420fa6eec2c49c8e4cf2b8fc69b7d2e4aeb016",
+      "common/packages_context.py": "efe158d7c99c2268851d0216fbb08de22836e418a8dbeb73575b8cc249eed7b7",
+      "common/paths.py": "d8586d4d3f9bb2dd46b7f11b0f038b5340d283f41b6fa2c76bb8235c13bbb0b7",
+      "common/log.py": "471df6895cfac80f995edebbf9974f6b7440634b7a688f28b8331c868bc0f3cf",
+      "common/io.py": "5dd8b9e297125ff58543a9bd4790c03ae1aca1d37b9e2ca60c4ffb47601c1cbb",
+      "common/workflow_phase.py": "146b69c1ec0e628aeb720d3e34d8333f16050225037fe4233da9bbc4d4ac99c1",
+      "common/__init__.py": "f258cd873681dc5a4d71db0dd71d10fd78656de55bec96418d6702503c16e87d",
+      "common/types.py": "9962081cc2608fb9d1deb32c6880e336f62cdca6b338e7ae813304701e155ee9",
+      "common/trellis_config.py": "f1fc705ec463b0b9c163672dc9e50f10d29da967775a1900429205f7c4fcb51c",
+      "common/task_utils.py": "35f544317a95e98d05fe089794071482175739e8c1f3b3b0228dae48602ffe90",
+      "common/cli_adapter.py": "5d6bd9d6f5c631e7e792db7dd343351317f9643bc87b73a9a98abd51cefb4307",
+      "common/task_context.py": "245e654713e6030f9e7b5cee474efc06343ecc0d7f66f6455098874239355ce3",
+      "common/developer.py": "a0f61bb58063e2f4cb357bcb2c22fd5a6f1241286398beaa7130b2a8994a4afa",
+      "hooks/linear_sync.py": "e09cc4ce4699aada908808718698f33f705a3edf55c4dcf8f777ad892f80ca79"
+    }
+  },
+  "entrypoints": [
+    "task.py",
+    "get_context.py",
+    "add_session.py",
+    "init_developer.py",
+    "get_developer.py",
+    "worktree.py"
+  ],
+  "pythonMinimum": "3.10",
+  "files": {
+    "add_session.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/add_session.py",
+      "sourceSha256": "f61a452ec5f7eece8d7e0f0dd56ce5851166cbc83ca4822e30acbb36eeb5896f",
+      "license": "AGPL-3.0-only",
+      "sha256": "432c29b3adcd3510f86b63803f6ecefc3901f3ee623ffda3e0b693ad83ca730c",
+      "modified": true
+    },
+    "common/__init__.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/common/__init__.py",
+      "sourceSha256": "f258cd873681dc5a4d71db0dd71d10fd78656de55bec96418d6702503c16e87d",
+      "license": "AGPL-3.0-only",
+      "sha256": "9f5fa711f818cbbfa9bf4c2419b28f64d44a8a6937a88f856afe04dcb870b6e4",
+      "modified": true
+    },
+    "common/active_task.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/common/active_task.py",
+      "sourceSha256": "f52715bbcc0677607055903e799674d7d50d6fcbab413a8f453c4e4efc954726",
+      "license": "AGPL-3.0-only",
+      "sha256": "64fa2acc4ba18716f7e718f228a6b60a0bd3fa069582352a2a64934c1206bac5",
+      "modified": true
+    },
+    "common/config.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/common/config.py",
+      "sourceSha256": "9a042d6f0e25a33a567510760e87c1e389af14a41faf1daeb1190a00f3df7f5e",
+      "license": "AGPL-3.0-only",
+      "sha256": "3c5da451d9d6def308305c4f7b803408344847264234d7ee8e55418408e5ac6b",
+      "modified": true
+    },
+    "common/developer.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/common/developer.py",
+      "sourceSha256": "a0f61bb58063e2f4cb357bcb2c22fd5a6f1241286398beaa7130b2a8994a4afa",
+      "license": "AGPL-3.0-only",
+      "sha256": "1f0b22891166da83b1e213dcc1ce91d51182b7d475751bf91bc4d487c30fc836",
+      "modified": true
+    },
+    "common/git.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/common/git.py",
+      "sourceSha256": "5605b71662e524b47632030d9db9245121a5cba85b5521eeb524ed464d840ff5",
+      "license": "AGPL-3.0-only",
+      "sha256": "6d93ac9085c6811ed75c92c75929741f92b1774365df508bfbc54dae9ce4f5d8",
+      "modified": true
+    },
+    "common/git_context.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/common/git_context.py",
+      "sourceSha256": "fa30ced454f1a91ffc9f8b2abeb32225e3447cbdc90bad783797374eba07265d",
+      "license": "AGPL-3.0-only",
+      "sha256": "4d171a2e77f0cbc5c9970ba37e1f159089ace90e21914cf1468e237cf96b33b4",
+      "modified": true
+    },
+    "common/io.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/common/io.py",
+      "sourceSha256": "5dd8b9e297125ff58543a9bd4790c03ae1aca1d37b9e2ca60c4ffb47601c1cbb",
+      "license": "AGPL-3.0-only",
+      "sha256": "02cb0e5cd00711b9c66484bbde30cda11abe034fa7415140cd5c3006b481dde0",
+      "modified": true
+    },
+    "common/log.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/common/log.py",
+      "sourceSha256": "471df6895cfac80f995edebbf9974f6b7440634b7a688f28b8331c868bc0f3cf",
+      "license": "AGPL-3.0-only",
+      "sha256": "9349ed14fc3cd61c7a6fdef2a8a26ed29c40d9967315af68a38fcfbdb1f469f7",
+      "modified": true
+    },
+    "common/packages_context.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/common/packages_context.py",
+      "sourceSha256": "efe158d7c99c2268851d0216fbb08de22836e418a8dbeb73575b8cc249eed7b7",
+      "license": "AGPL-3.0-only",
+      "sha256": "cd5897bbf3f4cab6f1c1495ea876bb644de35b468fae8f10e0cd9e97d5601d6e",
+      "modified": true
+    },
+    "common/paths.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/common/paths.py",
+      "sourceSha256": "d8586d4d3f9bb2dd46b7f11b0f038b5340d283f41b6fa2c76bb8235c13bbb0b7",
+      "license": "AGPL-3.0-only",
+      "sha256": "618b89cdc0a73811a453681c998195ef5dc20aa5345b10f913c81e70643814cc",
+      "modified": true
+    },
+    "common/safe_commit.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/common/safe_commit.py",
+      "sourceSha256": "262ad740552279fe6ec6a2a9865b2965ce2448577cf973a4d702dfe2f5f91f04",
+      "license": "AGPL-3.0-only",
+      "sha256": "edf0d18627fe561e5b475706c84cebd8270e2ab6914438205adeac987a89fea3",
+      "modified": true
+    },
+    "common/session_context.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/common/session_context.py",
+      "sourceSha256": "3379ef1766e4e5ca77cbb7c040dbba3883fcca2548580299e3b38dbf22f4f7d5",
+      "license": "AGPL-3.0-only",
+      "sha256": "1095bbd8e3e9fce6e8eca56e50ecd24e511282d26ec696ff305d3d82f29ba752",
+      "modified": true
+    },
+    "common/task_context.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/common/task_context.py",
+      "sourceSha256": "245e654713e6030f9e7b5cee474efc06343ecc0d7f66f6455098874239355ce3",
+      "license": "AGPL-3.0-only",
+      "sha256": "d7d2c096cd8a909d5f0c6b7c2c5a76e9bcf3b3f26afa5834ab1c0befa737e9bc",
+      "modified": true
+    },
+    "common/task_store.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/common/task_store.py",
+      "sourceSha256": "5712b0405e1fd0c2b7be5e5fbd420fa6eec2c49c8e4cf2b8fc69b7d2e4aeb016",
+      "license": "AGPL-3.0-only",
+      "sha256": "eeb7e7286215f1121d67e8cc1841af283d91f8b8a690ac5d7af9ceb9199cd85a",
+      "modified": true
+    },
+    "common/task_utils.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/common/task_utils.py",
+      "sourceSha256": "35f544317a95e98d05fe089794071482175739e8c1f3b3b0228dae48602ffe90",
+      "license": "AGPL-3.0-only",
+      "sha256": "89f9aa4709848d5ea69b31f1f079ca0743c8425fb98bab15edba3c376e81462b",
+      "modified": true
+    },
+    "common/tasks.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/common/tasks.py",
+      "sourceSha256": "87aca6b73ec4524450cfff8e2ae561b1f2e53bd62a185f036a7a2d484d90c8a2",
+      "license": "AGPL-3.0-only",
+      "sha256": "88159cb42455e07af03aa716d1596ad76ed6647b82075dc01c492ec44809f87b",
+      "modified": true
+    },
+    "common/trellis_config.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/common/trellis_config.py",
+      "sourceSha256": "f1fc705ec463b0b9c163672dc9e50f10d29da967775a1900429205f7c4fcb51c",
+      "license": "AGPL-3.0-only",
+      "sha256": "367ac380740ee1215c6435263f918dddf9e47e75eab967bfc5cfc83299c64b39",
+      "modified": true
+    },
+    "common/types.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/common/types.py",
+      "sourceSha256": "9962081cc2608fb9d1deb32c6880e336f62cdca6b338e7ae813304701e155ee9",
+      "license": "AGPL-3.0-only",
+      "sha256": "17f464519a109881871d29d8e9b6ff4dafefd89cc711a63301313d43046064d4",
+      "modified": true
+    },
+    "common/workflow_phase.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/common/workflow_phase.py",
+      "sourceSha256": "146b69c1ec0e628aeb720d3e34d8333f16050225037fe4233da9bbc4d4ac99c1",
+      "license": "AGPL-3.0-only",
+      "sha256": "c658994be566a401eb9fe8f483fda447c9e2dd89e8bdff8f88009df2ad0bc54f",
+      "modified": true
+    },
+    "get_context.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/get_context.py",
+      "sourceSha256": "ca5bf9e90bdb1d75d3de182b95f820f9d108ab28793d29097b24fd71315adcf5",
+      "license": "AGPL-3.0-only",
+      "sha256": "5f0de91be014e6d59b697fb17d9c840b80605a6cbc29a0609b5d4cb4464acf9a",
+      "modified": true
+    },
+    "get_developer.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/get_developer.py",
+      "sourceSha256": "84c27076323c3e0f2c9c8ed16e8aa865e225d902a187c37e20ee1a46e7142d8f",
+      "license": "AGPL-3.0-only",
+      "sha256": "db36b4a8d25d2cee5c9f1c0c08941cff1642db3fc99ab396cab8185f2ad46c6f",
+      "modified": true
+    },
+    "init_developer.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/init_developer.py",
+      "sourceSha256": "f9e6c0d882406e81c8cd6b1c5abb204b0befc0069ff89cf650cd536a80f8c60e",
+      "license": "AGPL-3.0-only",
+      "sha256": "3e044c5788dbb583c86c0963847d756b8a66483d1440aee17473fd1577dee6ad",
+      "modified": true
+    },
+    "task.py": {
+      "origin": "trellis-0.6.16",
+      "sourcePath": "dist/templates/trellis/scripts/task.py",
+      "sourceSha256": "b415e0a2dbc9e8cba1ada0c7997999aaaaea0eec96d3419db640830e88e84cfe",
+      "license": "AGPL-3.0-only",
+      "sha256": "b644b96eaa395d0fe935853c82ca3e0da6f049a1f0a6fa32019ad51e7c252b24",
+      "modified": true
+    },
+    "query-worktree.py": {
+      "origin": "pi-trellis",
+      "sourcePath": "python/query-worktree.py",
+      "sourceSha256": "d3e99b08f03a182f3f984c35141af300998c4e3fad82dd50ee6e9547bc974139",
+      "license": "MIT",
+      "sha256": "d3e99b08f03a182f3f984c35141af300998c4e3fad82dd50ee6e9547bc974139",
+      "modified": false,
+      "sourceRevision": "9af75d2f52f78ee932bb31563cc29fe7ce5a9b73"
+    },
+    "worktree.py": {
+      "origin": "pi-trellis",
+      "sourcePath": "python/worktree.py",
+      "sourceSha256": "ab50d841d912c717abb54becad9bfdb3f0a160823bd956d74ca77de8a5d8b0e0",
+      "license": "MIT",
+      "sha256": "ab50d841d912c717abb54becad9bfdb3f0a160823bd956d74ca77de8a5d8b0e0",
+      "modified": false,
+      "sourceRevision": "9af75d2f52f78ee932bb31563cc29fe7ce5a9b73"
+    },
+    "pi_trellis_worktree/records.py": {
+      "origin": "pi-trellis",
+      "sourcePath": "python/pi_trellis_worktree/records.py",
+      "sourceSha256": "ab1d129e5d598315737f639c0942dc75332b7905595cb5fdb483010d04e0f02a",
+      "license": "MIT",
+      "sha256": "03e73de91bf812a6da385148d901691065d946cfa9f778321b2a2a59f29ec8a4",
+      "modified": true,
+      "sourceRevision": "9af75d2f52f78ee932bb31563cc29fe7ce5a9b73"
+    },
+    "pi_trellis_worktree/materials.py": {
+      "origin": "pi-trellis",
+      "sourcePath": "python/pi_trellis_worktree/materials.py",
+      "sourceSha256": "1e51edfbed879dd5334c01f891bac1a7ffb61ad04df647f8afb2d2a1bc86f428",
+      "license": "MIT",
+      "sha256": "e1215b6e70672cd1bb12976376c1ce6a9efca3949288e5894521f5f0be440d88",
+      "modified": true,
+      "sourceRevision": "9af75d2f52f78ee932bb31563cc29fe7ce5a9b73"
+    },
+    "pi_trellis_worktree/__init__.py": {
+      "origin": "pi-trellis",
+      "sourcePath": "python/pi_trellis_worktree/__init__.py",
+      "sourceSha256": "1d4d0902645668497861fb14b1021af44fe3af3140a24b45ee31fd64a749c1ab",
+      "license": "MIT",
+      "sha256": "1d4d0902645668497861fb14b1021af44fe3af3140a24b45ee31fd64a749c1ab",
+      "modified": false,
+      "sourceRevision": "9af75d2f52f78ee932bb31563cc29fe7ce5a9b73"
+    },
+    "pi_trellis_worktree/cli.py": {
+      "origin": "pi-trellis",
+      "sourcePath": "python/pi_trellis_worktree/cli.py",
+      "sourceSha256": "452d39cb0cac9974dc5fc6179001936932a4f0754f78ea2cb266b1e00e1e1aef",
+      "license": "MIT",
+      "sha256": "f1bc7ab25e170f09813cec0ed4356806c0405ce194e7a18cd504b9b41f1b2c59",
+      "modified": true,
+      "sourceRevision": "9af75d2f52f78ee932bb31563cc29fe7ce5a9b73"
+    },
+    "pi_trellis_worktree/manager.py": {
+      "origin": "pi-trellis",
+      "sourcePath": "python/pi_trellis_worktree/manager.py",
+      "sourceSha256": "a846d18428fa5519864607e240a103b9b20185d015f461330b71983b785b4fa2",
+      "license": "MIT",
+      "sha256": "8d4b04e31a160a489945b782edfe4715411edfd18f733e97d1a5726ee132671e",
+      "modified": true,
+      "sourceRevision": "9af75d2f52f78ee932bb31563cc29fe7ce5a9b73"
+    },
+    "common/task_records.py": {
+      "origin": "pi-trellis-trellis-adaptation",
+      "sourcePath": null,
+      "sourceSha256": null,
+      "license": "AGPL-3.0-only",
+      "sha256": "036a46fd0b558a67f4e25f38d9741fab8a90cd7879e8419893ac65eb8a58c880",
+      "modified": true
+    },
+    "pi_trellis_worktree/diagnostics.py": {
+      "origin": "pi-trellis",
+      "sourcePath": null,
+      "sourceSha256": null,
+      "license": "MIT",
+      "sha256": "64ccac1d23a324fb61c49add575c29648700460144e52dc4f018d84fb9d7d42e",
+      "modified": false
+    },
+    "diagnostics.py": {
+      "origin": "pi-trellis-trellis-adaptation",
+      "sourcePath": null,
+      "sourceSha256": null,
+      "license": "AGPL-3.0-only",
+      "sha256": "90d2dc86b52a50cd3f6868659ee7799aa20ead95af6f4253ec6cdd220ccbbf2f",
+      "modified": true
+    }
+  },
+  "releaseId": "pi-trellis-runtime-v1-f585fde4c0f8f0b539815ca5daa78581581b5e9d7d5313d058cf4a052712c7e6",
+  "projectSourceRevision": "9af75d2f52f78ee932bb31563cc29fe7ce5a9b73"
+}

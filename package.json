@@ -16,7 +16,7 @@
   "scripts": {
     "link-sdk": "node scripts/link-pi-sdk.mjs",
     "typecheck": "node scripts/link-pi-sdk.mjs && tsc -p tsconfig.json",
-    "test": "node scripts/link-pi-sdk.mjs && node --test --test-force-exit \"extensions/**/__tests__/*.test.ts\" \"scripts/*.test.mjs\"",
+    "test": "node scripts/link-pi-sdk.mjs && node --test --test-force-exit \"extensions/**/__tests__/*.test.ts\" \"extensions/**/__tests__/*.test.mjs\" \"scripts/*.test.mjs\"",
     "check": "pnpm run typecheck && pnpm run test"
   },
   "peerDependencies": {
