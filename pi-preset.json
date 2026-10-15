@@ -16,6 +16,7 @@
     "npm:pi-session-name"
   ],
   "settings": {
+    "npmCommand": ["pnpm"],
     "retry": {
       "maxRetries": 5
     }
