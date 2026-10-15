@@ -6,14 +6,6 @@
 
 这不是重新做全产品审查，也不替代 N1 专项 reviewer `6d41` 的结论、main 正在进行的 fresh strict/full、整体验收或生命周期接受。产品仍为 **main HEAD `8158d31056b42e316039e64496903cf052ff4d46` 之上的未提交改动**，检查时 index 为空。本 reviewer 没有产品编辑、start、授权提问、commit、install/link/sync/reload、递归委派或归档；唯一仓库写入为此报告。后台检查只使用自己创建的临时 agent-dir，退出时按路径 guard 清理。
 
-## 检查输入与方法
-
-执行项目：`/Users/jyxc-dz-0101322/tools/my-pi-preset`。比较对象为 source HEAD、当前 source 与既有 `.worktree/10-14-runtime-task-tools` 的实际文件，不以摘要或旧 ready 文件代替当前产品。
-
-读取当前 workflow、development/testing 约束、PRD 核心边界、`integration-boundary.md`、`stage-2-implementation-report.md`、四项修复报告与独立 recheck、目标 N1 修复报告；读取 `integration-review/ready-plan.json`、冲突产物及完整 merged tool-waits 和当前 source 对应测试。旧 `.trellis/spec/preset/index.md` 不存在，实际使用 current development/testing，不恢复目标旧规范。
-
-巨大 `agent-tasks/src/index.ts` 仅对本次 HEAD/target diff 及所需 owner 方法作定向读取，**不声称重新全文审查整个入口或所有产品**。N1 owner/test 仅做 target→source byte-retention 核对，没有重复专项错误探针。
-
 ## 1. 已提交通知 owner：保留
 
 - `extensions/agent-tasks/src/spawn-input.ts:1–19` 与 source HEAD **byte-equal**：缺省/null/空白 description 回退类型，非空原值保留，非法类型拒绝；type/prompt/options 的最小 guards 未被旧 target 覆盖。
@@ -39,7 +31,7 @@
 
 `extensions/agent-tasks/__tests__/tool-waits.test.ts`：HEAD **49** 个测试名称块，target **42**，source **53**；集合精确为 **38 common + 11 source-only + 4 target-only**，没有缺失或另造替代名称。Template 循环展开后的实际执行计数与名称块计数不同。
 
-- Source 与 `research/integration-review/merged-tool-waits.test.ts` byte-equal；target 全部测试块在空白归一后与 source 一致。
+- 合并结果保留双方全部测试块；临时合并候选已删除，实际产品在提交 `273fad3` 中保存。
 - 11 个 source-only 通知测试完整保留；其中仅三个块改 `get_subagent_result(agent_id)` 为 `task_manage(action=output,task_id)`，原 warning/secret/nonconsume/delivery/no-retry/available-result 断言未弱化，其余 source-only 块不变。
 - 实际 RPC description/malformed admission、UI/headless safe sink、formatter、individual/group 同步 resume、shutdown reentry、before/after batch stopped noncooperative、running/mixed partial 均仍走实际 factory/manager/registered definition（runner/provider 是离线 seam）。
 - 四个 target-only 块保留 raw RPC ID/noalias、usage 单次上报、registered pause→wait/stop→worker/host drain、不影响 sibling，以及 full workflow answers/startup/concurrent wait。
@@ -74,16 +66,6 @@ git diff --check
 ```
 
 **PASS 82/82，0 fail/cancelled/skipped，22.190s，自然 exit0；`git diff --check` PASS。** Job `b0753oqtx`，实际日志 `/tmp/pi-bg/b0753oqtx.log`；已读执行结果及 totals，不只依完成通知。日志 intentional sibling cleanup fault 与 experimental TS warning不是 suite failure。没有重跑 full、strict、actual tmux 或 N1 专项；main 的 fresh checks/实际 tmux 由 main 单独报告，不称为本 reviewer 独立执行。
-
-## Preparatory artifact 限制
-
-`ready-plan.json` 的 source_head 正确；99 行的最终内容/删除预期除下列三项外匹配当前 source：
-
-1. PROVENANCE 后续修订 owned-only/resume 与独立通知成果说明；
-2. tool-waits 的预备行仍 `pending-test-merge/merged_sha256=null`，实际 merged 文件与 source 已一致；
-3. retrieval 后续完整迁移的 source-only detail 测试改变了预备 hash。
-
-因此 **ready-plan 是预备集成证据，不是最终文件 checksum manifest**。本轮以真实 diff、byte compare、测试及下列 final hashes 作为检查输入，不把这三个陈旧预备标记误称产品未合入或最终 manifest 已完全更新。本 reviewer 不改规划/产物/产品去消除这些说明性差异。
 
 ## 本轮 final SHA-256
 

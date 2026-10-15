@@ -1,18 +1,5 @@
 # 阶段 2 实施报告（2026-10-15）
 
-## 状态与执行边界
-
-已续接中断的阶段 2 产品代码和自动测试，当前可进入主会话独立检查及隔离 tmux。**不是最终任务验收；未勾 PRD AC／未改任务状态。** 所有执行命令均在现有 managed worktree：
-
-- target：`/Users/jyxc-dz-0101322/tools/my-pi-preset/.worktree/10-14-runtime-task-tools`
-- branch：`trellis/10-14-runtime-task-tools`
-- target context：`pi-wt-595db575-2e9e-42e0-aa6f-14ac2729703f`
-- 用户显式批准普通 Agent executor，未使用 trellis_dispatch／临时 worktree／递归委派。
-- source root 仅只读核当前提交和差异；没有 source 产品编辑、SDK 升级、依赖安装／link、commit/push/sync/reload/archive。
-- main 写中文用户 docs 与 README，tmux 准备 Agent 写 research/tmux-runtime；本 Agent 未改那些文件或运行 tmux。
-
-完整阅读 PRD/design/implement/implement.jsonl、43KB runtime-interface-map、stage-1-check-report、session-handoff 和实施引用研究／当前 development/testing/guides。读取安装 Pi 1.2.0 README、extensions/tui/sdk，以及相关 packages/configuration/settings/keybindings/themes 和 tools／extensions 示例。阶段 1 的 21／692 为历史证据，不作为本阶段 PASS。
-
 ## 首先分离通知越界改动
 
 只按 3bedbcc 原始行为分离两处 hunk：
@@ -99,9 +86,3 @@ final automated logs由后台job bd4cs3qgk产生，strict/focused/full均exit0�
 5. 协作式在线provider cancellation、任意host hook、外部包组合、物理mouse/IME、light/system/regular主题 **NOT_RUN**；终态不是强杀／全drain证明。
 6. 外部 pi-trellis 新工具门禁／provider probe未实施、未安装或更新当前 clone，组合发布仍待外部owner。RPC原协议/rawID保留仅证preset接口，不代替外部门禁验收。
 7. 缺 description通知可靠性／安全sink诊断归另task；此次专门分离，不能用full绿宣称该需求已修。
-
-## 变更范围与交付
-
-精确 owning产品 tracked＋untracked列表：`stage-2-product-file-list.log`（本轮记录94路径；其后源码注释收尾会新增少量tracked路径，最终以 actual git diff/status为准）。包括 runtime-tasks新合同/facade/handoff/launch/tests，agent/workflow management seams，process management/search/Bash迁移，Beautify新adapter与source布局hunks、测试及PROVENANCE/TESTING。早先大量preset spec差异是main对齐规范baseline，不是本Agent产品成果。main用户docs及research/tmux-runtime并行写入不归本报告owning代码。
-
-当前无已知自动测试阻塞，可进入main独立检查与tmux；以上尚未验证门保留开放。没有task start/acceptance/归档、产品commit/push/安装/同步/reload操作。

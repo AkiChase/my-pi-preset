@@ -1,9 +1,5 @@
 # 主目录整合验证（2026-10-15）
 
-## 当前状态
-
-产品已在 source main 工作区按三方差异整合，**未提交**。最终独立 N1／整合只读复查尚待结论；本报告不是 task completed。
-
 ## 范围与保存
 
 base `3bedbcc`、source已提交基线 `8158d31`、target existing `trellis/10-14-runtime-task-tools` dirty实现。99个extension路径仅应用本任务必要新接口/后端/展示/测试差异；source-only spawn-input和通知requestId/diagnostic/delivery/group改动保留；source其他插件不回退。四用户页按source当前文档组织更新，保通知专项用户说明并用task_manage读取结果。
@@ -42,9 +38,3 @@ python3 .worktree/10-14-runtime-task-tools/.trellis/tasks/10-14-runtime-task-too
 ```
 
 job `boz8snhmu` exit0，functional8/8＋实际SGR逐cell8/8 PASS；实际生产扩展-e路径在source，不是旧target。矩阵与此前tmux报告一致：dark/fullscreen三width/CtrlO、typederror、bashidentity/paging/searchstats/partial/bg/final/PID、actualchild完整563char显式/继承model、monitorEscwaitstopPIDfinite、workflowreturn。所有环境temp／env-i／unique-L／offline本地provider，无个人auth或网络。完整report/raw/screens在target研究 evidence-main-source-integrated；main最终归档前保存精确报告依赖。它不覆盖nested/provider所有组合，后者actualSDK注册回归提供独立证据。
-
-## 文档／规范／保存门
-
-source四用户页links/whitespace/newname检查 PASS，gitdiffcheck PASS，其他task指纹PASS。testing spec仅原Beautify入口改task_manage metadata/actionidentity/wait/noI/O合同，维持英文规范，不新建插件功能spec。外部pi-trellis旧Agent detector组合为发布前置，中文用户doc明确限制，未实施关联仓库。
-
-产品不自动提交限制保持；最终通过后source任务归档是独立生命周期动作，不能隐式提交99个产品路径。dirtytarget不删、不forceclean、不归档副本。

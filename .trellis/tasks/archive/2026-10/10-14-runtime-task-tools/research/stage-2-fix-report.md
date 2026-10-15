@@ -1,9 +1,5 @@
 # 阶段 2 四项检查修复报告（2026-10-15）
 
-## 范围与结论边界
-
-按主会话重复明确授权，直接在既有 `.worktree/10-14-runtime-task-tools` / `trellis/10-14-runtime-task-tools` 修改四项 R1–R4 及必要 owning 回归。没有 taskstart、worktree 创建、runtime 升级、commit、install/link/sync/reload、递归委派、source 产品修改或通知专任务移植。未修改 PRD AC、任务状态或归档；本报告是实施者自检，不是后续独立 recheck 或最终验收。
-
 ## 精确新增修改范围（不等于整个阶段 2 dirty diff）
 
 | 文件 | 本轮必要改动 |

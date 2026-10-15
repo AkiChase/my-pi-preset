@@ -6,14 +6,6 @@
 
 执行位置：既有 `/Users/jyxc-dz-0101322/tools/my-pi-preset/.worktree/10-14-runtime-task-tools`，branch `trellis/10-14-runtime-task-tools`。只读产品，唯一写入本报告；没有创建 worktree、start、升级运行时、产品编辑、commit、安装／link／sync／reload、递归委派或任务状态／AC 修改。
 
-## 真实 Git 与规范边界
-
-检查实际 tracked/untracked/deletes：删除旧 `process-tasks/tools/{bash-bg,jobs}.ts`、Beautify 旧 jobs/get-result/retrieval adapters 是本任务有意去旧接口；新增 runtime-tasks、两 backend management、workflow management 和 task-manage adapter 是实际产品，不因 untracked 忽略。`preset` 旧 specs 的大差异为主会话规范基线对齐，不判产品退化。source 自 `3bedbcc` 的 session naming、host-state、Beautify exact-name、docs 与 Trellis 基建提交为并行基线，未修改／回退。
-
-完整读 PRD/design/implement/check.jsonl、43023-byte runtime-interface-map、stage1/stage2报告与引用研究／handoff、当前 development/testing/guides（含 source 更新版本）。目标 development/guides/tmux 与 source 相同；testing 唯一相关差异是目标已迁新 task_manage 展示规范，source 尚留旧 jobs/get-result措辞，以目标新规范审本任务。
-
-完整审实际核心 contracts/facade/handoff/launch、agent management/manager/runner/nested/index/source/waits、workflow management/task/runtime/host、process management/search/log-search/output/bash/monitor/lifecycle、composition，以及 Beautify task-manage/optional/layout/shared/bash 与关键 actual-owner/host/registered tests。没有宣称整个仓库每份测试、Pi 全套文档或所有旧归档报告均已全文重读；产品不作修改，本轮 SDK host 行为由当前 actual-loader/SDK tests 和既有研究交叉核对。
-
 ## 已确认缺陷
 
 ### R1 — HIGH：resume 后 child composite 的 owned 管理永久失效

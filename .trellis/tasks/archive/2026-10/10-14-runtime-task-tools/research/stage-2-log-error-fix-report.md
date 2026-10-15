@@ -1,13 +1,5 @@
 # 阶段 2 N1 日志错误修复报告（2026-10-15）
 
-## 结论与边界
-
-**N1 实施与自检完成，等待 main 最终独立复查／整合／验收。** 修复前新 subprocess 回归实际复现 readline 未处理 ENOENT，子进程自然 exit1；修复后 strict、503/503 定向、725/725 全量自然退出通过。不是独立 review 结论，不自行标记任务 completed。
-
-所有写入仅在已存在 `/Users/jyxc-dz-0101322/tools/my-pi-preset/.worktree/10-14-runtime-task-tools`，branch `trellis/10-14-runtime-task-tools`。用户明确 NOW 批准当前任务修复，沿用已批准实现／检查边界，不再 taskstart／索批。没有 source/root 产品写入、commit、安装/link/sync/reload、runtime 升级、新建 worktree、递归 agent 或归档。未改 R1/R2/R4、通知逻辑、R3 身份围栏、spec/task 状态。
-
-完整读取 PRD/design/implement、N1 独立复查报告、development/testing/guides、preset extension 约束和 relevant skill；完整读取 owning `log-search.ts`、`search.ts`、`management.ts`、`registry.ts`、`output.ts`、facade/contracts，以及 runtime process、management fixture、jobs-read/output 和 source-loader。初试读取 `process-tasks/__tests__/log-search.test.ts` 返回 ENOENT；实际回归文件是 `jobs-read.test.ts`，已完整读取。没有把不存在的测试说成已运行。
-
 ## 最小实现
 
 修改 4 个产品 owner 文件：
@@ -107,11 +99,3 @@ ba7f91c2c4202242be839d9bd08a2fa591c089dfa4ac2f45f6e90decb8fec91c  extensions/pro
 2647a7d15de11743103dfbb98ec632d433bef15f56a86f342da83da1044b647c  extensions/runtime-tasks/__tests__/log-errors.test.ts
 03be44bcdbaca16e714a4b915c627440b20dc9c89c8f7b68b14ce752e8f87f04  extensions/runtime-tasks/__tests__/log-error-probe.mjs
 ```
-
-## 限制与后续 owner
-
-这是实施者自检；最终独立 N1 recheck/main 接受 **NOT_RUN by this agent**。没有本轮 tmux/CLI、在线模型、外部 pi-trellis、物理交互验收。EACCES 用 deterministic expensive-boundary seam，实际 missing path/directory 不是 seam；不声称跨权限/root/Windows 文件系统矩阵。subprocess timeout=10s 是测试失败界限，所有 PASS 都未触发 timeout 且自然退出，未强杀成功过程。
-
-既有 fallback 合同仍是有界尾部，显示 `(log tail)`／truncation，不声称 transient stream failure 下扫描了完整历史；本次只保证不可读不伪装成功、partial hits 不双计数、两个 emitter 与实际 fd cleanup 有 owner。一般 lifecycle/error要求已存在于 development/testing specs，本次未另造 spec 文档；任务专属证据仅此 research 报告。
-
-main 后续应读取实际4产品＋2测试 diff与本报告，进行最终独立复查、三方 source 整合及整合后的 fresh checks；本代理没有操作这些阶段。

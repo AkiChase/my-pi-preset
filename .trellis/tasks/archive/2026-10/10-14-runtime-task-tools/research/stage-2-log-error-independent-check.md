@@ -6,14 +6,6 @@
 
 这不是整个任务的最终验收、source 整合或独立全量结论。R1/R2/R4 沿用上一轮报告，本轮不重复研究；main 负责 integration/docs/tmux/最终验收。实施者 725/725 不作为本轮独立结论。
 
-## 边界与输入
-
-执行项目：`/Users/jyxc-dz-0101322/tools/my-pi-preset/.worktree/10-14-runtime-task-tools`，HEAD `3bedbcc3ebd83d23d9a98270c8e043da22bb17bb`。
-
-用户已明确批准既有任务的只读独立复查及本 research 报告。本轮无 taskstart、新建 worktree、递归 agent、产品修复、source/root 编辑、commit、install/link/sync/reload、runtime 升级、在线 provider 或任务状态修改。唯一仓库写入为本报告；额外 probe／baseline 均在本进程内或自身临时目录，结束即清理。
-
-完整读取 `stage-2-independent-recheck.md` 的 N1 及 `stage-2-log-error-fix-report.md`，PRD/design/implement、workflow、相关 extension/testing 约束；完整读取指定 4 个产品 owner、2 个新测试文件、runtime process tests。另读取 facade/contracts、jobs-read tests、package/tsconfig 以核真实错误透传、注册入口和执行命令。没有全仓重复研究。
-
 ## 实际 owner 检查
 
 | 合同 | 独立判断与证据 |

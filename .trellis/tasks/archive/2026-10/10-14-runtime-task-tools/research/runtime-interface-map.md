@@ -2,7 +2,7 @@
 
 ## 0. 范围、版本与证据边界
 
-本次仅做规划研究；唯一写入为本文件。不改产品、前置任务、PRD/生命周期、集成、个人配置；不安装、不运行会写临时配置/日志的测试，不提交。
+迁移前源码研究。旧工具名称、候选方案和行号仅描述当时基线，最终设计以 design.md 为准。
 
 - 本仓库基线：`81e47ddbe5bcd601a440a9f24c98c05d83d9c4a2`；读取时已有并行 `at-path-completion`、README、loader/manifest fixture 和 `.pi` 修改。本报告按当时实际文件，不以旧任务报告代替源码。
 - 前置 `10-13-beautify-tool-shell-collapse` **已 completed/归档**，位置为 `.trellis/tasks/archive/2026-10/10-13-beautify-tool-shell-collapse/`。本任务原 `beautify-migration.md` 中“未提交/未归档/无真实PTY”是较早快照，不是目前状态；不在本次改写那个文件。最终展示基线取实际源码及归档 `research/check-report.md`，真实终端后续材料见同目录 `tmux-validation.md`、`terminal-fix-report.md`。
@@ -275,38 +275,6 @@ Task UI 的显示状态是规范化视图：process `pending→queued`、`killed
 
 **发布协调点**：本task不修改外部。旧外部hook只认Agent而本preset只注册subagent_run，安全门禁会漏ordinary新入口。要么由外部owner先/同时支持新名并更新提示/测试（loadedclone需用户明确更新），要么明确暂不使用该旧adapter组合。不能为“兼容”在preset偷偷伪造tool_call为Agent、私改clone、自动install，或保重复旧执行工具而不让用户决定。
 
-## 9. 必须留给产品规划确认的决策
-
-以下是尚未解决的选择，不由研究替用户做：
-
-1. 旧执行工具alias是否完全移除；旧名历史Beautify展示是否单独保留，多久/哪些历史格式。
-2. task ID raw/opaque、stable agent ID与run ref、handle/alias接受范围、省略runId指当前还是必须精确；是否查询任意旧run（目前无backend支持）。
-3. 根task_manage默认是否含owned descendants，能否stop/output这些child；nested只ownerbranch与child-localprocess应保安全边界，不能推成全root。
-4. 统一output的subagent current text vs formatted conversation vs `.output`原始JSONL；默认全文/有界/分页单位；verbose原200char toolresult省略是否继续。workflow finalreturn vsprogress/journal怎样选通道。
-5. wait各type finalpayload：subagent必须finalanswer；bash/monitor保旧status-only还是附一页输出；是否支持progress partial、等待超时/释放结果的字段/词汇。monitor已明确等整个监听结束。
-6. `bash_bg.notify:false`迁到bash哪个适用mode；旧timeout边缘语义是否保留；不自动增加普适hardkill。
-7. search仅原bash/monitor日志还是扩到agent/workflow；stats分类型现有累计+snapshots还是新跨源累计账本；禁止重复计算owner/children。
-8. workflow pause/resume/skip/retry保持UI即可还是新增管理动作；pause-resume与replay-resume命名要分开；修paused replay旧边缘是否纳入。
-9. 新返回text固定信封还是版本details快照；错误、notfound/stale/unsupported、stop请求状态怎样表达。
-10. `subagent_message`严格running保旧合同，还是接受queued（backend已有menu行为），是否绑定精确run。
-11. 外部pi-trellis改名门禁/文案迁移的owner与交付顺序、真实clone升级何时由用户授权。
-12. schedule定义不属于四类运行对象，是否只保菜单/提示明确definition identity，还是以后另任务纳入管理；不能把定义取消与停止其某次执行混淆。
-
-## 10. 后续验证最小矩阵（计划建议；本次未执行）
-
-- registration：根集合恰为bash/monitor/subagent_run/subagent_workflow/subagent_message/task_manage；无旧启动/管理重名；workflowoff/disablednested/isolated/lateextension保持范围。
-- root/child：实际hostsame/differentcwd loader、overlappingALS、childshutdown不删root；无nestedchild仍可管理自己的bash/monitor；nested开只管ownbranch不看root/sibling；自定义task_manage不覆盖丢processfacet。
-- identities：fg/bg/detach同execution不变；新/resume/queue/startupfailed均有ID；旧runstop拒绝；wait完成与resume同tick返回旧answer；verbose snapshot语义验证；rawRPC ID与新taskref互通。
-- management：所有旧jobs search/context/count/page范围/stats、subagentverbose/errorpartial/handle、workflowreturn/log/replay/control均有明确映射；status/list不consume，terminaloutput/finalwait一次consume。
-- waits：四类multiplewait、alreadyaborted、`/bg`/trueEsc/complete同tick、waitpartial→final、cancel重查heldnotice、workflow启动失败/pausedstop都结束；不把waitrelease渲染stopped。
-- stops：processactualTERM→KILL/WSclose/fd/timer释放、monitor显式无尾批、agentownedchildren/pool/queued/startup、workflowworkerterminate＋hostgateabort/latecallback、协作式provider限制；不以metadata终态冒充实际drain。
-- notifications：保持processsteer、agent/workflowfollowUp、groupheld/usage、workflowwaitconsume禁重复nudge、manifest失败/overflowrecheck/log保留、不重播旧activation。
-- Beautify：新type/action合同、byte范围/safecounts、error{}未知、dynamic/history/absentoriginal/throwingoriginal、same-roundpartialfinal、self/default一次padding/mouse/连续背景、原四类regressions无新增I/O。
-- 外部：RPCping/spawncwd/missingdir/stop/consume/rawID、ordinarynewname材料门禁与Trelliscontext、unsupportedruntime拒绝；不修改SDK或生成集成来让测试过。
-- 完整检查按testing-spec只读已安装SDK＋隔离agentdir；自然退出定向/全量与strict分开报告。真实CLI/PTy须主会话明确授权、临时隔离、按前置最小matrix；不拿本研究或旧终端报告当新task_manage验收。
-
 ## 结论
 
-最小可实施统一是**composition一次注册＋三组有限backend管理capability**，复用既有tuple身份、coordinator retrieval lease、backend consumption/stop/retention，补workflowterminal/通知消费，不合并执行引擎。
-
-主要必做增量不是四个rename，而是：`bash_bg`有效选项迁移、fg身份返回一致化、workflow模型output/wait、childcomposite接线与scope、旧Beautify合同按新type/action迁移，以及外部ordinaryAgent门禁改名协调。ID/权限/输出默认/额外controls等产品选择以上均保留未决。
+选择和最终合同见 [design.md](../design.md)，实施／验证状态见 [implement.md](../implement.md)。本文只保留迁移前的源码研究，旧名称和行号是当时快照。

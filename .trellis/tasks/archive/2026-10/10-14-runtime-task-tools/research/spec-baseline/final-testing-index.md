@@ -2,7 +2,7 @@
 
 ## Before Development and Delivery
 
-Read [development constraints](../development/index.md), approved task artifacts and complete relevant tests/fixtures. Choose checks by behavior and side effects, not file count. Review final source, staged/unstaged/untracked and relevant committed changes. Rerun affected checks after edits; historical PASS counts do not establish current acceptance.
+Read development constraints（原路径 `../development/index.md`）, approved task artifacts and complete relevant tests/fixtures. Choose checks by behavior and side effects, not file count. Review final source, staged/unstaged/untracked and relevant committed changes. Rerun affected checks after edits; historical PASS counts do not establish current acceptance.
 
 ## Commands and Isolation
 
@@ -53,7 +53,7 @@ Lifecycle/resource changes require focused natural-exit tests, without `--test-f
 
 Inspect real filenames/coverage before selecting focused files; this matrix is not a claim that every behavior is covered. A history fixture does not establish installed third-party input-history compatibility. Component tests do not prove terminal appearance, physical IME or arbitrary plugin combinations. Scripted local providers do not establish online model quality.
 
-Reusable authorized CLI/TUI procedures are in [tmux testing](tmux.md). Documentation work does not authorize real terminal/provider execution, installers, personal sync/reload or dependency fetching.
+Reusable authorized CLI/TUI procedures are in tmux testing（原路径 `tmux.md`）. Documentation work does not authorize real terminal/provider execution, installers, personal sync/reload or dependency fetching.
 
 ## Focused Plugin Checks
 
