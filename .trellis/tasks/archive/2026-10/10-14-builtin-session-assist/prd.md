@@ -4,8 +4,8 @@
 将外部 `pi-session-name` 与 `@tifan/pi-recap` 按顺序迁入 preset，解决旁路模型请求固定关闭思考导致的兼容问题，并让会话标题随实际工作更新。
 
 ## 任务地图与顺序
-1. [内置 Session Name（已完成）](../archive/2026-10/10-14-builtin-session-name/prd.md)：手动刷新、可配置 N 轮自动评估（默认8）、手动标题保护、完整有效上下文；公共请求已建立并验收归档，不重复实施。
-2. [内置 Recap（剩余实施）](../archive/2026-10/10-14-builtin-recap/prd.md)：独立配置 model/thinking；按最终 settled 后完整空闲窗口生成摘要。按其 S1 纯目录收纳 → S2 公共错误详情及命名独立修复 → S3 Recap → S4 独立审查/整体检查推进。
+1. [内置 Session Name（已完成）](../10-14-builtin-session-name/prd.md)：手动刷新、可配置 N 轮自动评估（默认8）、手动标题保护、完整有效上下文；公共请求已建立并验收归档，不重复实施。
+2. [内置 Recap（剩余实施）](../10-14-builtin-recap/prd.md)：独立配置 model/thinking；按最终 settled 后完整空闲窗口生成摘要。按其 S1 纯目录收纳 → S2 公共错误详情及命名独立修复 → S3 Recap → S4 独立审查/整体检查推进。
 
 两个子任务分别规划、实施、验证；父任务不直接执行产品代码，只汇总已归档命名证据及 Recap 完成后的跨插件验收。已确认 Recap 产品设计和实施顺序；不能把命名旧验收当成移动/共享接口修改后无需回归的证据。
 
@@ -31,4 +31,4 @@
 2026-10-14 批准顺序任务；Session Name 已验收归档。2026-10-15 用户认可父任务完成路径并回复“可以”，批准同步父任务和开始 Recap 四阶段实施/验证。产品执行绑定 Recap 子任务，父任务保留汇总身份，不重复启动命名。保留不自动 commit/push/install/sync/reload/在线模型/真实终端/归档的边界；完成验收后另获收尾授权。
 
 ## 最终接受
-Session Name原子任务已归档；Recap产品b48e37b、主full892/892、独立85+11+3及真实tmux默认300004ms限定验收通过。两个入口/共享请求/命名回归/metadata中性/模型独立/清理均验证，详见 [Recap最终报告](../archive/2026-10/10-14-builtin-recap/evidence/report.md)。2026-10-15 用户直接收尾，父任务只汇总，未重复实施命名；neverPR main，明确skipbranch。保留报告NOT_RUN及能力限制。
+Session Name原子任务已归档；Recap产品b48e37b、主full892/892、独立85+11+3及真实tmux默认300004ms限定验收通过。两个入口/共享请求/命名回归/metadata中性/模型独立/清理均验证，详见 [Recap最终报告](../10-14-builtin-recap/evidence/report.md)。2026-10-15 用户直接收尾，父任务只汇总，未重复实施命名；neverPR main，明确skipbranch。保留报告NOT_RUN及能力限制。

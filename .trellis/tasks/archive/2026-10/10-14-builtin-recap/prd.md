@@ -1,7 +1,7 @@
 # 内置 Recap 与会话功能目录收纳
 
 ## 目标与背景
-将外部 `@tifan/pi-recap` 内置为独立扩展，生成用于恢复工作的短摘要。复用已完成的 [Session Name](../archive/2026-10/10-14-builtin-session-name/prd.md) 公共请求机制，两个插件统一收纳但保持独立入口、配置和状态。上游 0.4.8 行为证据见 [current-behavior.md](evidence/report.md)，最终需求以本文为准。
+将外部 `@tifan/pi-recap` 内置为独立扩展，生成用于恢复工作的短摘要。复用已完成的 [Session Name](../10-14-builtin-session-name/prd.md) 公共请求机制，两个插件统一收纳但保持独立入口、配置和状态。上游 0.4.8 行为证据见 [current-behavior.md](evidence/report.md)，最终需求以本文为准。
 
 ## 已确认需求
 ### R1 目录与归属
