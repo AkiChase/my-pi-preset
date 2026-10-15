@@ -259,12 +259,37 @@ function settleWorkflowTerminal(task: WorkflowTask): void {
   task.resolveTerminal(task.terminalResult);
 }
 
+/**
+ * Which agents failed, in index order, as one line per agent.
+ *
+ * A run that fails or completes with holes has the reasons in its progress log
+ * already — each failed child is an entry with its own `error`. Without this,
+ * the final text was just the run-level error ("Workflow aborted.") or a
+ * shorter result array, and the only way to learn which child died and why was
+ * to open the progress view. Bounded like the rest of this file: five agents,
+ * 200 characters each, so a fan-out that lost fifty children cannot turn the
+ * result into a wall of text.
+ */
+export function workflowFailureSummary(task: WorkflowTask, maxAgents = 5, maxChars = 200): string {
+  const failed = collapse(task.workflowProgress).agents.filter(entry => entry.state === "error");
+  if (failed.length === 0) return "";
+  const lines = failed.slice(0, maxAgents).map(entry => {
+    const reason = entry.error ?? "Agent failed.";
+    const phase = entry.phaseTitle !== undefined ? `${entry.phaseTitle}: ` : "";
+    return `- #${entry.index} ${phase}${reason.length > maxChars ? `${reason.slice(0, maxChars)}…` : reason}`;
+  });
+  if (failed.length > maxAgents) lines.push(`- …and ${failed.length - maxAgents} more`);
+  return `Failed agents (${failed.length}):\n${lines.join("\n")}`;
+}
+
 /** The run's outcome as text, for the notification and the LLM-facing result. */
 export function workflowResultText(task: WorkflowTask): string {
-  if (task.error !== undefined) return task.error;
-  if (task.value === undefined) return "No output.";
-  if (typeof task.value === "string") return task.value;
-  return JSON.stringify(task.value, null, 2);
+  const failures = workflowFailureSummary(task);
+  const withFailures = (text: string) => failures === "" ? text : `${text}\n\n${failures}`;
+  if (task.error !== undefined) return withFailures(task.error);
+  if (task.value === undefined) return withFailures("No output.");
+  if (typeof task.value === "string") return withFailures(task.value);
+  return withFailures(JSON.stringify(task.value, null, 2));
 }
 
 /**

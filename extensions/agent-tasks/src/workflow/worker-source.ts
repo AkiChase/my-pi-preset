@@ -129,6 +129,49 @@ function isFatal(error) {
   return !!(error && typeof error === "object" && error.workflowFatal === true);
 }
 
+/**
+ * An error the script's author wrote, not a condition the run hit.
+ *
+ * parallel() and pipeline() deliberately absorb a failing subtask into null so
+ * a script can .filter(Boolean) instead of wrapping every call in try/catch.
+ * That is right for a dead agent and wrong for a misspelled option, which can
+ * never succeed however many times it runs: swallowing it turned a typo into a
+ * silent null and the run got no further than a filter would have left it.
+ * Tagged rather than inferred from the error's class, because these throws
+ * cross the vm realm boundary where instanceof does not hold.
+ */
+function scriptError(message) {
+  const error = new Error(message);
+  error.workflowAuthorError = true;
+  return error;
+}
+
+function isAuthorError(error) {
+  return !!(error && typeof error === "object" && error.workflowAuthorError === true);
+}
+
+/** An error that must end the run rather than become a null for one item. */
+function endsRun(error) {
+  return isFatal(error) || isAuthorError(error);
+}
+
+/**
+ * Record a tolerated failure: which construct, which branch, and why.
+ *
+ * A failed agent does NOT come through here — the host returns ok: false and
+ * reports it as its own workflow_agent entry with the reason, so the worker
+ * resolves null instead of throwing. This covers the other half: a thunk or
+ * stage that threw. Before this, that half was silent — parallel() returning
+ * [answer, null] gave the caller no way to tell a dead agent from a typo in the
+ * thunk, and the run's log carried nothing either.
+ */
+function logFailure(what, where, error) {
+  emit({
+    type: "workflow_log",
+    message: what + " " + where + " failed and resolved to null: " + describe(error),
+  });
+}
+
 /* ------------------------------------------------------------------ *
  * Progress entries
  * ------------------------------------------------------------------ */
@@ -443,13 +486,13 @@ async function agentIn(scope, prompt, opts) {
   const text = requireText(prompt, "agent(prompt)");
   const options = opts === undefined || opts === null ? {} : opts;
   if (typeof options !== "object" || Array.isArray(options)) {
-    throw new Error("agent(prompt, opts) expects opts to be an object.");
+    throw scriptError("agent(prompt, opts) expects opts to be an object.");
   }
 
   for (const key of Object.keys(options)) {
     if (AGENT_OPTIONS.indexOf(key) !== -1) continue;
     const why = UNSUPPORTED_AGENT_OPTIONS[key];
-    throw new Error(
+    throw scriptError(
       why !== undefined
         ? "agent() opts." + key + " is not supported here: " + why
         : "agent() opts." + key + " is not a recognised option. Supported: " + AGENT_OPTIONS.join(", ") + "."
@@ -462,7 +505,7 @@ async function agentIn(scope, prompt, opts) {
   const agentType = optionalText(options.agentType, "agent() opts.agentType");
   const isolation = optionalText(options.isolation, "agent() opts.isolation");
   if (isolation !== undefined && isolation !== "worktree") {
-    throw new Error("agent() opts.isolation must be \\"worktree\\".");
+    throw scriptError("agent() opts.isolation must be \\"worktree\\".");
   }
   const gate = optionalText(options.gate, "agent() opts.gate");
   const resume = optionalText(options.resume, "agent() opts.resume");
@@ -470,7 +513,7 @@ async function agentIn(scope, prompt, opts) {
   const schema = options.schema;
   if (schema !== undefined) {
     if (typeof schema !== "object" || schema === null || Array.isArray(schema)) {
-      throw new Error("agent() opts.schema must be a JSON Schema object.");
+      throw scriptError("agent() opts.schema must be a JSON Schema object.");
     }
     // Structured clone would happily carry a Map or a cycle that neither the
     // journal key nor the tool's parameters can survive. Same check the return
@@ -478,7 +521,7 @@ async function agentIn(scope, prompt, opts) {
     checkBoundary(schema, "agent() opts.schema");
   }
   if (effort !== undefined && EFFORT_LEVELS.indexOf(effort) === -1) {
-    throw new Error("agent() opts.effort must be one of: " + EFFORT_LEVELS.join(", ") + ".");
+    throw scriptError("agent() opts.effort must be one of: " + EFFORT_LEVELS.join(", ") + ".");
   }
 
   // resume revives a child that already exists, so anything describing how to
@@ -487,33 +530,33 @@ async function agentIn(scope, prompt, opts) {
   // the point: silently ignoring these opts would look like they applied.
   if (resume !== undefined) {
     if (agentType !== undefined) {
-      throw new Error(
+      throw scriptError(
         "agent() opts.resume and opts.agentType are mutually exclusive: a resumed agent keeps the agent type it was started with."
       );
     }
     if (model !== undefined) {
-      throw new Error(
+      throw scriptError(
         "agent() opts.resume and opts.model are mutually exclusive: a resumed agent keeps the model it was started with."
       );
     }
     if (isolation !== undefined) {
-      throw new Error(
+      throw scriptError(
         "agent() opts.resume and opts.isolation are mutually exclusive: a resumed agent keeps the working tree it was started in."
       );
     }
     if (effort !== undefined) {
-      throw new Error(
+      throw scriptError(
         "agent() opts.resume and opts.effort are mutually exclusive: a resumed agent keeps the reasoning effort it was started with."
       );
     }
     if (schema !== undefined) {
-      throw new Error(
+      throw scriptError(
         "agent() opts.resume and opts.schema are mutually exclusive: a resumed child re-prompts the session it "
           + "already had, whose tool set was fixed when it started — it has no StructuredOutput tool to answer through."
       );
     }
     if (gate !== undefined) {
-      throw new Error("agent() opts.gate cannot be combined with opts.resume.");
+      throw scriptError("agent() opts.gate cannot be combined with opts.resume.");
     }
   }
 
@@ -553,20 +596,30 @@ async function agentIn(scope, prompt, opts) {
  * A barrier: every thunk starts now, and nothing past the await runs until all
  * of them have settled. A thunk that throws resolves to null rather than
  * failing its siblings — the script filters, it does not try/catch.
+ *
+ * Two kinds of throw are not absorbed. A fatal error (a cap breach) is the run's,
+ * and an author error can never succeed on a retry. Both end the run, where
+ * before they became a null indistinguishable from a dead agent — the caller saw
+ * a gap in its results with nothing to explain it.
+ *
+ * The null cases are logged with their branch index and reason, which is the
+ * whole value of the tolerance: the run continues, and the log says which branch
+ * produced nothing and why.
  */
 async function parallel(thunks) {
   const list = toList(thunks, "parallel(thunks)");
   for (let i = 0; i < list.length; i++) {
     if (typeof list[i] !== "function") {
-      throw new Error("parallel(thunks) expects an array of functions; item " + i + " is not one.");
+      throw scriptError("parallel(thunks) expects an array of functions; item " + i + " is not one.");
     }
   }
   const settled = await Promise.all(
-    list.map(async function (thunk) {
+    list.map(async function (thunk, index) {
       try {
         return await thunk();
       } catch (error) {
-        if (isFatal(error)) throw error;
+        if (endsRun(error)) throw error;
+        logFailure("parallel()", "branch " + index, error);
         return null;
       }
     })
@@ -581,13 +634,15 @@ async function parallel(thunks) {
  * the stages that latency is measured in minutes.
  *
  * A stage that throws drops that item to null and skips its remaining stages.
- * Every stage sees (previousResult, originalItem, index).
+ * Every stage sees (previousResult, originalItem, index). Same two exceptions as
+ * parallel(): an author error or a cap breach ends the run instead of becoming a
+ * silent null, and a dropped item is logged with the stage that dropped it.
  */
 async function pipeline(items, ...stages) {
   const list = toList(items, "pipeline(items, ...stages)");
   for (let i = 0; i < stages.length; i++) {
     if (typeof stages[i] !== "function") {
-      throw new Error("pipeline(items, ...stages) expects stages to be functions; stage " + i + " is not one.");
+      throw scriptError("pipeline(items, ...stages) expects stages to be functions; stage " + i + " is not one.");
     }
   }
   const settled = await Promise.all(
@@ -597,7 +652,8 @@ async function pipeline(items, ...stages) {
         try {
           value = await stages[s](value, item, index);
         } catch (error) {
-          if (isFatal(error)) throw error;
+          if (endsRun(error)) throw error;
+          logFailure("pipeline()", "item " + index + " stage " + s, error);
           return null;
         }
       }
