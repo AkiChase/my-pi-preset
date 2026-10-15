@@ -5,16 +5,7 @@ import type { MemoryStore } from "./store.ts";
 
 export interface ToolOrigin { store: MemoryStore; assertActive: () => void }
 export type GetOrigin = (cwd: string, signal?: AbortSignal) => ToolOrigin;
-/**
- * Schema bounds here mirror the runtime limits in `policy.ts` and `store.ts`.
- *
- * They are duplicated on purpose — the host rejects an out-of-range call before
- * `execute` and reports the field, which is a better error than the runtime's
- * own — but a value that is larger here than there is worse than either: the
- * call passes validation and then fails with a message about a limit the caller
- * was never told about. `description` was declared 320 against a 160-codepoint
- * policy, and `query` 320 against a 160-character one.
- */
+// Match the 160-codepoint limits enforced by policy.ts and store.ts.
 const Name = Type.String({ maxLength: 80, pattern: "^[a-z0-9][a-z0-9_-]*$" });
 const Revision = Type.String({ pattern: "^[a-f0-9]{64}$" });
 const Description = Type.String({ maxLength: 160 });

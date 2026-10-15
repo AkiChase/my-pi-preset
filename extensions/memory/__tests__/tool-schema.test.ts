@@ -10,7 +10,7 @@
  */
 import assert from "node:assert/strict";
 import { it } from "node:test";
-import type { ExtensionAPI, ExtensionContext, ExtensionToolContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { validateToolArguments } from "@earendil-works/pi-ai";
 import memory from "../../memory.ts";
 import { fixture } from "./helpers.ts";
@@ -18,7 +18,7 @@ import { fixture } from "./helpers.ts";
 const REVISION = "a".repeat(64);
 
 function registered(t: Parameters<typeof fixture>[0]) {
-    const { agentDir, project } = fixture(t);
+    const { agentDir } = fixture(t);
     const previous = process.env.PI_CODING_AGENT_DIR;
     process.env.PI_CODING_AGENT_DIR = agentDir;
     t.after(() => {
@@ -32,7 +32,7 @@ function registered(t: Parameters<typeof fixture>[0]) {
         on() { return () => {}; },
     } as unknown as ExtensionAPI;
     memory(pi);
-    return { tools, ctx: { cwd: project.root } as unknown as ExtensionToolContext as ExtensionContext };
+    return { tools };
 }
 
 function hostError(tools: Map<string, ToolDefinition>, name: string, args: unknown): Error | undefined {
@@ -73,8 +73,8 @@ void it("description is bounded at the policy limit, not above it", t => {
     const write = (description: string) => hostError(tools, "memory_write",
         { name: "item", type: "user", description, body: "content", expectedRevision: null });
     // The policy measures Unicode codepoints; this string is 160 of them.
-    assert.equal(write("é".repeat(160)), undefined, "160 codepoints must be accepted");
-    const err = write("é".repeat(161));
+    assert.equal(write("😀".repeat(160)), undefined, "160 astral codepoints must be accepted");
+    const err = write("😀".repeat(161));
     assert.ok(err, "161 codepoints must be rejected before reaching the store");
     assert.match(err.message, /description/);
 });
