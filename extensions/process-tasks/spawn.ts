@@ -121,7 +121,10 @@ export function spawnWithFileOutput(args: {
         if (args.errPath) {
             try { unlinkSync(args.errPath); } catch { /* best-effort */ }
         }
-        throw new Error("Failed to spawn process");
+        throw new Error(
+            `Failed to spawn executable '${bin}'; no child process was started. ` +
+            "Check that the executable is available on PATH, the working directory exists, and process/file-descriptor limits allow starting a child."
+        );
     }
     const pid = proc.pid;
 
