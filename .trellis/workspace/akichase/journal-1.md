@@ -487,3 +487,25 @@ custom 浏览不再误报 blocked，问卷使用明确 attention 事件，聚合
 ### Status
 
 [OK] **Completed**
+
+
+## Session 17: 完成内置 Recap 与会话辅助任务
+<!-- trellis-session: v=2 fp=d76c5794d04c88ce -->
+
+**Date**: 2026-10-15
+**Task**: 完成内置 Recap 与会话辅助任务
+**Branch**: `main`
+
+### Summary
+
+Recap已提交并经独立离线与真实tmux限定验收，默认5分钟实际300004ms。子任务及父任务收尾归档，原生/tree菜单、在线质量等未测项保持说明；过程报告仓外，仅最终摘要入Git。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b48e37b` | feat(recap): add built-in session recap with safe idle lifecycle |
+
+### Status
+
+[OK] **Completed**

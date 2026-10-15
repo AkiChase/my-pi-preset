@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 16
+- **Total Sessions**: 17
 - **Last Active**: 2026-10-15
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~489 | Active |
+| `journal-1.md` | ~511 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 17 | 2026-10-15 | 完成内置 Recap 与会话辅助任务 | `b48e37b` | `main` |
 | 16 | 2026-10-15 | Beautify 工具标题任务收尾 | `7abd9fe`, `21c6cc2` | `main` |
 | 15 | 2026-10-15 | Runtime task tools 验收与收尾 | - | `main` |
 | 14 | 2026-10-15 | 修复子代理完成通知可靠性 | `c4a5678`, `69bd5ba`, `b7dd7e3` | `main` |
