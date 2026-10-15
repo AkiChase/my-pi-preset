@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/development/index.md", "reason": "本仓库规范入口与质量门"}
+{"file": ".trellis/spec/development/index.md", "reason": "入口布局、依赖及文档语言"}
+{"file": ".trellis/spec/development/index.md", "reason": "公开SDK、UI安全与activation所有权"}
+{"file": ".trellis/spec/testing/index.md", "reason": "离线隔离、实际host与自然退出验证"}
+{"file": ".trellis/spec/development/index.md", "reason": "旧包conflicts、个人配置及最小本机操作"}
+{"file": ".trellis/spec/development/index.md", "reason": "README同步矩阵与开发基础设施边界"}
+{"file":".trellis/tasks/10-14-replace-pi-memory/research/package-analysis.md","reason":"旧包归属及npm适配器的已验证问题；当前自研方案不再采用npm替换"}

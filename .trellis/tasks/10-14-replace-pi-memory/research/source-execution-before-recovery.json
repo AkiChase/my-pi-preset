@@ -1,0 +1,14 @@
+{
+  "sourceRoot": "/Users/jyxc-dz-0101322/tools/my-pi-preset",
+  "repositoryIdentity": "/Users/jyxc-dz-0101322/tools/my-pi-preset/.git",
+  "taskDir": ".trellis/tasks/10-14-replace-pi-memory",
+  "version": 1,
+  "mode": "source",
+  "requestId": "ddd25a96-86bb-46c2-9a08-571965118826",
+  "role": "trellis-implement",
+  "state": "running",
+  "ownerPid": 45190,
+  "ownerToken": "e762d422-e567-4007-bf56-1f1289cfef6b",
+  "createdAt": "2026-10-15T02:02:35.099Z",
+  "agentId": "9135615e-fb3f-41c"
+}

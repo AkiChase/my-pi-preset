@@ -1,0 +1,6 @@
+{"file":".trellis/spec/development/index.md","reason":"入口、存储安全、生命周期、并行修改与文档边界"}
+{"file":".trellis/spec/testing/index.md","reason":"隔离测试、真实host验证与自然退出证据"}
+{"file":".trellis/spec/guides/index.md","reason":"跨层与复用检查入口"}
+{"file":".trellis/tasks/10-14-replace-pi-memory/prd.md","reason":"需求、安全边界与逐项验收"}
+{"file":".trellis/tasks/10-14-replace-pi-memory/design.md","reason":"存储、预算、锁、工具和生命周期合同"}
+{"file":".trellis/tasks/10-14-replace-pi-memory/implement.md","reason":"阶段一范围、验证和提交限制"}
