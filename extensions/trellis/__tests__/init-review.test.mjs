@@ -4,17 +4,25 @@ import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
 import { plan, apply, inspect, digest, verifyRuntime } from '../lib/initialization/engine.ts';
+import { resourcePlan, applyResourcePlan } from '../lib/initialization/resources.ts';
+import { copyRuntimeFixture } from './runtime-fixture.mjs';
 
-function fixture(t) {
- const root=mkdtempSync(join(tmpdir(),'pi-init-review-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
+function shape(root) {
  const put=(path,content)=>{mkdirSync(dirname(join(root,path)),{recursive:true});writeFileSync(join(root,path),content);};
  const snapshot=(directory=root)=>Object.fromEntries(readdirSync(directory,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name)).flatMap(e=>{const p=join(directory,e.name),rel=p.slice(root.length+1);return e.isDirectory()?[[rel,'directory'],...Object.entries(snapshot(p))]:[[rel,`${lstatSync(p).mode&0o777}:${readFileSync(p).toString('base64')}`]];}));
  return {root,put,snapshot};
 }
+// An initialized project costs about a second to build; every case that only mutates an installed
+// project copies one shared build instead. Cases that need the initial plan keep a fresh directory.
+function fixture(t) { return shape(copyRuntimeFixture(t,{user:'Dev'})); }
+function fresh(t) {
+ const root=mkdtempSync(join(tmpdir(),'pi-init-review-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
+ return shape(root);
+}
 function rehash(p) { const {planHash,...body}=p; p.planHash=digest(JSON.stringify(body)); }
 for(const attack of ['unknown runtime','changed runtime','overwrite identity','overwrite history','root replacement','missing required output','manifest source','task hook field','array guards','unknown schema field']) {
  test(`forged incomplete operation cannot authorize ${attack}`,t=>{
-  const f=fixture(t);f.put('AGENTS.md','User instructions\n');const p=plan(f.root,'Dev');
+  const f=fresh(t);f.put('AGENTS.md','User instructions\n');const p=plan(f.root,'Dev');
   assert.throws(()=>apply(p,{afterWrite:()=>{throw Error('interrupt');}}));
   const file=join(f.root,'.trellis/.runtime/init-operation.json'),record=JSON.parse(readFileSync(file));const q=record.plan;
   const change=(kind,text)=>{const a=q.actions.find(a=>a.kind===kind);a.output=Buffer.from(text).toString('base64');return a;};
@@ -31,20 +39,55 @@ for(const attack of ['unknown runtime','changed runtime','overwrite identity','o
   assert.equal(inspect(f.root).state,'conflict');assert.throws(()=>plan(f.root,'Dev'));assert.throws(()=>apply(q));assert.deepEqual(f.snapshot(),before);
  });
 }
-for(const attack of ['unknown template','wrong source','wrong initial template hash','missing role']) {
+for(const attack of ['unknown template','wrong source','missing role']) {
  test(`resource manifest rejects ${attack} without running or writing`,t=>{
-  const f=fixture(t);apply(plan(f.root,'Dev'));const file=join(f.root,'.trellis/.pi-trellis.json'),m=JSON.parse(readFileSync(file));
+  const f=fixture(t);const file=join(f.root,'.trellis/.pi-trellis.json'),m=JSON.parse(readFileSync(file));
   if(attack==='unknown template')m.templates['user.txt']={sha256:digest('x'),mode:0o644,origin:'package-default',source:'user.txt'};
   if(attack==='wrong source')m.files['.trellis/scripts/task.py'].source=null;
-  if(attack==='wrong initial template hash')m.templates['.trellis/workflow.md'].sha256=digest('not shipped');
   if(attack==='missing role')delete m.files['.pi/agents/trellis-check.md'];
   f.put('.trellis/.pi-trellis.json',JSON.stringify(m));const before=f.snapshot();assert.throws(()=>verifyRuntime(f.root));assert.equal(inspect(f.root).state,'conflict');assert.deepEqual(f.snapshot(),before);
+ });
+}
+// Roles are read by dispatch without hash checks and templates are user documents: an older recorded
+// fingerprint is a safe update, not a blocked or malformed project.
+for(const attack of ['stale template hash','stale role hash','stale role mode']) {
+ test(`resource manifest treats ${attack} as a safe update without writing`,t=>{
+  const f=fixture(t);const file=join(f.root,'.trellis/.pi-trellis.json'),m=JSON.parse(readFileSync(file));
+  const role=attack!=='stale template hash';
+  if(!role)m.templates['.trellis/workflow.md'].sha256=digest('not shipped');
+  if(attack==='stale role hash')m.files['.pi/agents/trellis-check.md'].sha256=digest('older role wording');
+  if(attack==='stale role mode')m.files['.pi/agents/trellis-check.md'].mode=0o600;
+  f.put('.trellis/.pi-trellis.json',JSON.stringify(m));const before=f.snapshot();
+  // The runtime gate accepts a stale role/template fingerprint; only the exact key set and format are enforced.
+  assert.ok(verifyRuntime(f.root));assert.equal(inspect(f.root).state,'ready');
+  const p=resourcePlan(f.root,'update');assert.deepEqual(p.report.conflicts,[]);assert.equal(p.unchanged,false);
+  assert.deepEqual(f.snapshot(),before);
+  // Update refreshes the recorded fingerprint without touching the user's document or role bytes.
+  applyResourcePlan(p);assert.ok(verifyRuntime(f.root));assert.equal(resourcePlan(f.root,'update').unchanged,true);
+ });
+}
+// Tampered runtime bytes and malformed rows still block independent of the role/template relaxation.
+for(const attack of ['tampered runtime row hash','tampered runtime mode','tampered runtime source']) {
+ test(`resource manifest still rejects ${attack} without writing`,t=>{
+  const f=fixture(t);const file=join(f.root,'.trellis/.pi-trellis.json'),m=JSON.parse(readFileSync(file));
+  if(attack==='tampered runtime row hash')m.files['.trellis/scripts/task.py'].sha256=digest('tampered');
+  if(attack==='tampered runtime mode')m.files['.trellis/scripts/task.py'].mode=0o600;
+  if(attack==='tampered runtime source')m.files['.trellis/scripts/task.py'].source='runtime/other.py';
+  f.put('.trellis/.pi-trellis.json',JSON.stringify(m));const before=f.snapshot();
+  assert.throws(()=>verifyRuntime(f.root));assert.equal(inspect(f.root).state,'conflict');assert.throws(()=>plan(f.root,'Dev'));assert.deepEqual(f.snapshot(),before);
+ });
+}
+for(const [attack,mutate] of [['unknown role kind',m=>{m.files['.pi/agents/trellis-check.md'].kind='runtime';}],['unknown role field',m=>{m.files['.pi/agents/trellis-check.md'].authorize=true;}],['malformed role fingerprint',m=>{m.files['.pi/agents/trellis-check.md'].sha256='A'.repeat(64);}],['malformed role source',m=>{m.files['.pi/agents/trellis-check.md'].source='runtime/task.py';}],['unknown template key',m=>{m.templates['.trellis/extra.md']=m.templates['.trellis/workflow.md'];delete m.templates['.trellis/workflow.md'];}],['malformed template fingerprint',m=>{m.templates['.trellis/workflow.md'].mode='0644';}]]) {
+ test(`resource manifest still rejects ${attack} without writing`,t=>{
+  const f=fixture(t);const file=join(f.root,'.trellis/.pi-trellis.json'),m=JSON.parse(readFileSync(file));
+  mutate(m);f.put('.trellis/.pi-trellis.json',JSON.stringify(m));const before=f.snapshot();
+  assert.throws(()=>verifyRuntime(f.root));assert.equal(inspect(f.root).state,'conflict');assert.deepEqual(f.snapshot(),before);
  });
 }
 
 test('root suffix alone cannot replace user prefix or duplicate an owned block, and skipped required root output cannot pass',t=>{
  for(const attack of ['changed prefix','duplicate block','skip root']) {
-  const f=fixture(t);f.put('AGENTS.md','User bytes\n');const p=plan(f.root,'Dev');assert.throws(()=>apply(p,{afterWrite:()=>{throw Error('interrupt');}}));
+  const f=fresh(t);f.put('AGENTS.md','User bytes\n');const p=plan(f.root,'Dev');assert.throws(()=>apply(p,{afterWrite:()=>{throw Error('interrupt');}}));
   const file=join(f.root,'.trellis/.runtime/init-operation.json'),record=JSON.parse(readFileSync(file)),q=record.plan,a=q.actions.find(a=>a.path==='AGENTS.md');
   if(attack==='changed prefix')a.output=Buffer.from('Malicious prefix\n'+readFileSync(new URL('../resources/templates/agents-block.md',import.meta.url),'utf8')).toString('base64');
   if(attack==='duplicate block'){const block=readFileSync(new URL('../resources/templates/agents-block.md',import.meta.url),'utf8');f.put('AGENTS.md',block);a.original={sha256:digest(block),mode:0o644};q.guards[a.path]=a.original;a.output=Buffer.from(block+block).toString('base64');}
@@ -54,33 +97,33 @@ test('root suffix alone cannot replace user prefix or duplicate an owned block, 
 });
 test('onboarding reused records reject malformed canonical fields without changing user history',t=>{
  for(const change of [{name:'wrong'},{status:'invalid'},{children:'bad'},{title:null}]) {
-  const f=fixture(t);apply(plan(f.root,'Dev'));rmSync(join(f.root,'.trellis/.developer'));apply(plan(f.root,'Dev'));rmSync(join(f.root,'.trellis/.developer'));
+  const f=fixture(t);rmSync(join(f.root,'.trellis/.developer'));assert.equal(apply(plan(f.root,'Dev')).state,'ready');rmSync(join(f.root,'.trellis/.developer'));
   const path='.trellis/tasks/00-join-dev/task.json',record=JSON.parse(readFileSync(join(f.root,path)));f.put(path,JSON.stringify({...record,...change}));const before=f.snapshot();assert.throws(()=>plan(f.root,'Dev'));assert.deepEqual(f.snapshot(),before);
  }
 });
 
 test('all required outputs verify before manifest publication and completion; missing workspace is not success',t=>{
- const f=fixture(t),p=plan(f.root,'Dev');
+ const f=fresh(t),p=plan(f.root,'Dev');
  assert.throws(()=>apply(p,{afterWrite:path=>{if(path.endsWith('/prd.md'))rmSync(join(f.root,'.trellis/workspace/Dev/journal-1.md'));}}));
  assert.equal(existsSync(join(f.root,'.trellis/.pi-trellis.json')),false);assert.equal(inspect(f.root).state,'incomplete');assert.equal(existsSync(join(f.root,p.task,'task.json')),true);
 });
 test('published manifest during an incomplete operation cannot authorize runtime execution',t=>{
- const f=fixture(t),p=plan(f.root,'Dev');assert.throws(()=>apply(p,{afterWrite:path=>{if(path==='.trellis/.pi-trellis.json')throw Error('interrupt');}}));
+ const f=fresh(t),p=plan(f.root,'Dev');assert.throws(()=>apply(p,{afterWrite:path=>{if(path==='.trellis/.pi-trellis.json')throw Error('interrupt');}}));
  assert.throws(()=>verifyRuntime(f.root),/incomplete|Interrupted/);assert.equal(apply(plan(f.root,'Dev')).state,'ready');
 });
 test('completed operation remains diagnostic after legitimate task edits; custom hooks are not managed overwrite authority',t=>{
- const f=fixture(t);apply(plan(f.root,'Dev'));f.put('.trellis/scripts/custom-hook.py','# user hook\n');f.put('.trellis/tasks/00-bootstrap-guidelines/task.json','{"status":"completed"}');assert.equal(inspect(f.root).state,'ready');assert.ok(verifyRuntime(f.root));assert.equal(readFileSync(join(f.root,'.trellis/scripts/custom-hook.py'),'utf8'),'# user hook\n');
+ const f=fixture(t);f.put('.trellis/scripts/custom-hook.py','# user hook\n');f.put('.trellis/tasks/00-bootstrap-guidelines/task.json','{"status":"completed"}');assert.equal(inspect(f.root).state,'ready');assert.ok(verifyRuntime(f.root));assert.equal(readFileSync(join(f.root,'.trellis/scripts/custom-hook.py'),'utf8'),'# user hook\n');
 });
 
 test('forged root append cannot bypass conflicting journal attributes',t=>{
- const f=fixture(t),p=plan(f.root,'Dev');assert.throws(()=>apply(p,{afterWrite:()=>{throw Error('interrupt');}}));const file=join(f.root,'.trellis/.runtime/init-operation.json'),record=JSON.parse(readFileSync(file)),q=record.plan,a=q.actions.find(a=>a.path==='.gitattributes');const original='*.md merge=ours\n';f.put(a.path,original);a.original={sha256:digest(original),mode:0o644};q.guards[a.path]=a.original;a.output=Buffer.from(original+readFileSync(new URL('../resources/templates/journal.gitattributes',import.meta.url),'utf8')).toString('base64');rehash(q);f.put('.trellis/.runtime/init-operation.json',JSON.stringify(record));const before=f.snapshot();assert.throws(()=>plan(f.root,'Dev'));assert.deepEqual(f.snapshot(),before);
+ const f=fresh(t),p=plan(f.root,'Dev');assert.throws(()=>apply(p,{afterWrite:()=>{throw Error('interrupt');}}));const file=join(f.root,'.trellis/.runtime/init-operation.json'),record=JSON.parse(readFileSync(file)),q=record.plan,a=q.actions.find(a=>a.path==='.gitattributes');const original='*.md merge=ours\n';f.put(a.path,original);a.original={sha256:digest(original),mode:0o644};q.guards[a.path]=a.original;a.output=Buffer.from(original+readFileSync(new URL('../resources/templates/journal.gitattributes',import.meta.url),'utf8')).toString('base64');rehash(q);f.put('.trellis/.runtime/init-operation.json',JSON.stringify(record));const before=f.snapshot();assert.throws(()=>plan(f.root,'Dev'));assert.deepEqual(f.snapshot(),before);
 });
 test('forged identity operation on an unsupported manifest cannot publish identity first',t=>{
- const f=fixture(t);apply(plan(f.root,'Dev'));rmSync(join(f.root,'.trellis/.developer'));const p=plan(f.root,'Dev');const path='.trellis/.pi-trellis.json',manifest=JSON.parse(readFileSync(join(f.root,path)));manifest.runtimeReleaseId='unsupported';const value=JSON.stringify(manifest);f.put(path,value);p.guards[path]={sha256:digest(value),mode:0o644};rehash(p);const before=f.snapshot();assert.throws(()=>apply(p));assert.deepEqual(f.snapshot(),before);
+ const f=fixture(t);rmSync(join(f.root,'.trellis/.developer'));const p=plan(f.root,'Dev');const path='.trellis/.pi-trellis.json',manifest=JSON.parse(readFileSync(join(f.root,path)));manifest.runtimeReleaseId='unsupported';const value=JSON.stringify(manifest);f.put(path,value);p.guards[path]={sha256:digest(value),mode:0o644};rehash(p);const before=f.snapshot();assert.throws(()=>apply(p));assert.deepEqual(f.snapshot(),before);
 });
 
 test('invalid task records cannot enter disk fast path or injected active task',async t=>{
- const {default:trellis,__internals}=await import('../index.ts');const f=fixture(t);apply(plan(f.root,'Dev'));const handlers=new Map(),messages=[];
+ const {default:trellis,__internals}=await import('../index.ts');const f=fixture(t);const handlers=new Map(),messages=[];
  trellis({on:(n,h)=>handlers.set(n,h),registerCommand:()=>{},registerTool:()=>{},events:{on:()=>()=>{},emit:()=>{}},sendMessage:m=>messages.push(m),getAllTools:()=>[]});const ctx={cwd:f.root,hasUI:false,ui:{},sessionManager:{getSessionId:()=>f.root,getSessionFile:()=>undefined}},key=__internals.contextKey(f.root,ctx),task='.trellis/tasks/invalid';
  f.put(`.trellis/.runtime/sessions/${key}.json`,JSON.stringify({current_task:task}));f.put(task+'/prd.md','INVALID MATERIAL');
  for(const record of [{},{title:null,status:'in_progress'},{status:{}},{foo:'not a task'}]){

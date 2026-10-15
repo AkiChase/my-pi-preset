@@ -4,7 +4,8 @@ import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, realpat
 import { isAbsolute, join, resolve } from "node:path";
 import { discoverProject } from "../project-state.ts";
 import { containsPath } from "../config.ts";
-import { checkedPath, digest, packageRoot, validateUsername, packageProvenance, type PackageProvenance, type InstalledManifest } from "./engine.ts";
+import { binarySkillFile, checkedPath, digest, packageRoot, validateUsername, packageProvenance, type PackageProvenance, type InstalledManifest } from "./engine.ts";
+import { reviewSkills } from "./skills.ts";
 
 /** Deployment-check scope: the project directory only. No session/task identity. */
 export interface DiagnosticScope {
@@ -75,7 +76,7 @@ export class DiagnosticReader {
 		this.root(root); const file = checkedPath(root, path);
 		try { return lstatSync(file); } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined; throw error; }
 	}
-	file(root: string, path: string, limit = DIAGNOSTIC_LIMITS.file, inventory = false): { data: Buffer; text?: string; sha256: string; mode: number; bytes: number } | undefined {
+	file(root: string, path: string, limit = DIAGNOSTIC_LIMITS.file, inventory = false, binary = false): { data: Buffer; text?: string; sha256: string; mode: number; bytes: number } | undefined {
 		this.checkpoint(); safePath(path); const file = checkedPath(root, path), before = this.stat(root, path);
 		if (!before) return undefined;
 		if (!before.isFile() || before.size > limit) throw Error(`Expected regular file no larger than ${limit} bytes`);
@@ -103,8 +104,9 @@ export class DiagnosticReader {
 			}
 			if (length !== before.size || identity(fstatSync(fd)) !== identity(before) || identity(this.stat(root, path)!) !== identity(before) || checkedPath(root, path) !== file) throw Error("File changed during bounded read");
 			const bytes = Buffer.concat(chunks, length);
-			if (!isUtf8(bytes) || bytes.includes(0)) throw Error("Invalid UTF-8 or NUL bytes");
-			return { data: bytes, ...(inventory ? {} : { text: bytes.toString("utf8") }), sha256: hasher.digest("hex"), mode: before.mode & 0o777, bytes: length };
+			// Only skill assets are byte/hash/mode-checked without text validation.
+			if (!binary && (!isUtf8(bytes) || bytes.includes(0))) throw Error("Invalid UTF-8 or NUL bytes");
+			return { data: bytes, ...(inventory || binary ? {} : { text: bytes.toString("utf8") }), sha256: hasher.digest("hex"), mode: before.mode & 0o777, bytes: length };
 		} finally { closeSync(fd); }
 	}
 	json(root: string, path: string, limit = DIAGNOSTIC_LIMITS.file): unknown {
@@ -123,12 +125,20 @@ type PackageSnapshot = PackageProvenance;
 /** Static provenance snapshot only. No unbounded engine validators, dynamic imports or project code. */
 function packageSnapshot(reader: DiagnosticReader): PackageSnapshot { return packageProvenance(reader); }
 function manifestEnvelope(value: unknown): asserts value is InstalledManifest {
-	fields(value, ["schemaVersion", "runtimeReleaseId", "files", "templates"], "project resource manifest");
-	if (value.schemaVersion !== 2 || typeof value.runtimeReleaseId !== "string" || value.runtimeReleaseId.length !== 86 || !/^pi-trellis-runtime-v1-[a-f0-9]{64}$/.test(value.runtimeReleaseId) || !object(value.files) || !Object.keys(value.files).length || Object.keys(value.files).length > DIAGNOSTIC_LIMITS.entries || !object(value.templates) || !Object.keys(value.templates).length || Object.keys(value.templates).length > DIAGNOSTIC_LIMITS.entries) throw Error("Invalid/nonempty managed project manifest required");
+	fields(value, ["schemaVersion", "runtimeReleaseId", "files", "templates", ...(object(value) && value.schemaVersion === 3 ? ["skills"] : [])], "project resource manifest");
+	if (![2, 3].includes(value.schemaVersion) || typeof value.runtimeReleaseId !== "string" || value.runtimeReleaseId.length !== 86 || !/^pi-trellis-runtime-v1-[a-f0-9]{64}$/.test(value.runtimeReleaseId) || !object(value.files) || !Object.keys(value.files).length || Object.keys(value.files).length > DIAGNOSTIC_LIMITS.entries || !object(value.templates) || !Object.keys(value.templates).length || Object.keys(value.templates).length > DIAGNOSTIC_LIMITS.entries) throw Error("Invalid/nonempty managed project manifest required");
 	for (const [path, row] of Object.entries(value.files)) {
 		safePath(path); fields(row, ["sha256", "mode", "kind", "source"], "project resource entry");
 		if (!hash(row.sha256) || !mode(row.mode) || !["runtime", "agent"].includes(row.kind)) throw Error("Invalid resource fingerprint/kind");
 		safePath(row.source);
+	}
+	if (value.schemaVersion === 3) {
+		if (!object(value.skills) || Object.keys(value.skills).length > DIAGNOSTIC_LIMITS.entries) throw Error("Invalid skill provenance map");
+		for (const [path, row] of Object.entries(value.skills)) {
+			safePath(path); fields(row, ["sha256", "mode", "source"], "project skill entry");
+			if (!hash(row.sha256) || !mode(row.mode)) throw Error("Invalid skill fingerprint");
+			safePath(row.source);
+		}
 	}
 	for (const [path, row] of Object.entries(value.templates)) {
 		safePath(path); fields(row, ["origin", "sha256", "mode", "source"], "template provenance");
@@ -143,7 +153,9 @@ function manifestEnvelope(value: unknown): asserts value is InstalledManifest {
 }
 function manifestSnapshot(value: unknown, pkg: PackageSnapshot): InstalledManifest {
 	manifestEnvelope(value);
-	if (value.schemaVersion !== 2 || typeof value.runtimeReleaseId !== "string" || !/^pi-trellis-runtime-v1-[a-f0-9]{64}$/.test(value.runtimeReleaseId) || value.runtimeReleaseId.length !== 86 || !object(value.files) || !object(value.templates)) throw Error("Invalid managed project manifest");
+	if (![2, 3].includes(value.schemaVersion) || typeof value.runtimeReleaseId !== "string" || !/^pi-trellis-runtime-v1-[a-f0-9]{64}$/.test(value.runtimeReleaseId) || value.runtimeReleaseId.length !== 86 || !object(value.files) || !object(value.templates)) throw Error("Invalid managed project manifest");
+	// Same rule as Update: absent skill rows are planned additions; unknown or wrong-source rows are rejected.
+	for (const [path, row] of Object.entries(value.skills ?? {})) if (!Object.hasOwn(pkg.skills, path) || row.source !== pkg.skills[path].source) throw Error(`Unknown or invalid skill provenance: ${path}`);
 	// An older release may lack rows for package-added files; the current release must match exactly.
 	const older = value.runtimeReleaseId !== pkg.release;
 	if (Object.keys(value.files).some(path => !Object.hasOwn(pkg.files, path)) || !older && Object.keys(value.files).length !== Object.keys(pkg.files).length || Object.keys(value.templates).length !== Object.keys(pkg.templates).length) throw Error("Incomplete or unknown managed resource entries");
@@ -151,12 +163,14 @@ function manifestSnapshot(value: unknown, pkg: PackageSnapshot): InstalledManife
 		if (older && !Object.hasOwn(value.files, path)) continue;
 		const row = value.files[path]; fields(row, ["sha256", "mode", "kind", "source"], "project resource entry");
 		if (!hash(row.sha256) || !mode(row.mode) || row.source !== expected.source || row.kind !== expected.kind) throw Error(`Invalid resource provenance: ${path}`);
-		if (value.runtimeReleaseId === pkg.release && (row.sha256 !== expected.sha256 || row.mode !== expected.mode)) throw Error(`Malformed project resource provenance: ${path}`);
+		// Roles are never hash-checked by dispatch, so a stale role row is a safe update, not damage;
+		// only executable runtime rows must match the current package bytes and mode exactly.
+		if (expected.kind === "runtime" && (row.sha256 !== expected.sha256 || row.mode !== expected.mode)) throw Error(`Malformed project resource provenance: ${path}`);
 	}
 	for (const [path, expected] of Object.entries(pkg.templates)) {
 		const row = value.templates[path]; fields(row, ["origin", "sha256", "mode", "source"], "template provenance");
 		if (row.origin === "package-default") {
-			if (row.source !== expected.source || !hash(row.sha256) || !mode(row.mode) || value.runtimeReleaseId === pkg.release && (row.sha256 !== expected.sha256 || row.mode !== expected.mode)) throw Error(`Malformed package template provenance: ${path}`);
+			if (row.source !== expected.source || !hash(row.sha256) || !mode(row.mode)) throw Error(`Malformed package template provenance: ${path}`);
 		} else if (row.origin === "preserved-project") {
 			fields(row.source, ["kind", "revision"], "preserved template source");
 			if (row.source.kind !== "project-snapshot" || !(row.source.revision === null || typeof row.source.revision === "string" && [40, 64].includes(row.source.revision.length) && /^[a-f0-9]+$/.test(row.source.revision))) throw Error(`Malformed preserved template source: ${path}`);
@@ -177,7 +191,7 @@ function operationSnapshot(value: unknown, root: string): "incomplete" | "comple
 	for (const action of value.plan.actions) {
 		fields(action, ["path", "original", "output", "mode", "kind"], "initialization action envelope");
 		safePath(action.path);
-		if (paths.has(action.path) || !mode(action.mode) || typeof action.output !== "string" || !["runtime", "agent", "template", "identity", "workspace", "task", "root", "manifest"].includes(action.kind)) throw Error("Invalid initialization action envelope");
+		if (paths.has(action.path) || !mode(action.mode) || typeof action.output !== "string" || !["runtime", "agent", "skill", "template", "identity", "workspace", "task", "root", "manifest"].includes(action.kind)) throw Error("Invalid initialization action envelope");
 		if (action.original !== null) { fields(action.original, ["sha256", "mode"], "initialization fingerprint"); if (!hash(action.original.sha256) || !mode(action.original.mode)) throw Error("Invalid initialization fingerprint"); }
 		paths.add(action.path);
 	}
@@ -296,6 +310,16 @@ export function collectDiagnostics(scope: DiagnosticScope, options: { signal?: A
 				add(`inventory:${kind}`, "resources", inventoryCancelled ? "cancelled" : total ? "issue" : "pass", inventoryCancelled ? "Inventory cancelled; checks not completed" : total ? `${total} fixed ${kind} resource problem(s)${total > problems.length ? `; ${total - problems.length} path details omitted` : ""}` : `Fixed ${kind} inventory verified (static)`, problems, kind === "runtime" && total ? "Runtime bytes/modes do not authorize execution." : total ? "Missing/modified roles affect dispatch or explicit update conflicts; customization alone does not prove runtime failure." : "", total ? "Review these fixed paths; explicitly update/restore resources. Custom bytes are never overwritten by Check." : "", kind === "agent" ? "warning" : total ? "error" : "info");
 			}
 			result.facts.resourcesRestorable = restorable;
+			// Project skills: same classification as Update resources; never part of runtime validity.
+			if (result.facts.manifest) attempt("inventory:skill", "resources", ".pi/skills", () => {
+				const review = reviewSkills(root!, result.facts.manifest!.skills ?? {}, pkg!.skills, path => {
+					try { const file = reader.file(root!, path, DIAGNOSTIC_LIMITS.file, true, binarySkillFile(path)); return file ? { sha256: file.sha256, mode: file.mode } : null; }
+					catch (error) { if (error instanceof Cancelled) throw error; return { sha256: "unreadable", mode: -1 }; }
+				});
+				const problems = review.rows.filter(row => row.state !== "Current"), conflicts = review.conflicts.length;
+				if (!problems.length) { add("inventory:skill", "resources", "pass", "Project skills match the package (static)"); return; }
+				add("inventory:skill", "resources", "issue", `${problems.length} project skill item(s) need attention${conflicts ? `; ${conflicts} preserved conflict(s)` : ""}${problems.length > 12 ? `; ${problems.length - 12} path details omitted` : ""}`, problems.slice(0, 12).map(row => `${row.state}: ${row.path}`), "Skills load through Pi project discovery; runtime execution is unaffected.", conflicts ? "Resolve modified/unmanaged skill files (rename, move or restore), then choose /trellis-init → Update resources." : "Choose /trellis-init → Update resources, then /reload or start a new session.", "warning");
+			}, "Project skill state is unverified; runtime execution is unaffected.", "Inspect .pi/skills; Check never changes skill files.");
 			result.facts.runtimeStaticValid = runtimeValid && templateRoutesValid && result.facts.manifest?.runtimeReleaseId === pkg.release && !result.facts.operationInvalid && result.facts.operation !== "incomplete" && !result.facts.locked;
 		}
 		// Required editable entries have no package-integrity dependency.

@@ -95,4 +95,4 @@ Full rules + anti-rationalization table in `.trellis/workflow.md`.
 
 ## Pi Execution Boundary
 
-Main-session `.trellis/...` paths are relative to the source project, not this package skill. Dispatched roles use verified absolute source material paths and separate executionRoot for code/tests. Read-only work needs no task; modifications require approval. Follow the project workflow for execution and review routing. Sub-agents must not recursively dispatch. Managed worktrees follow the package protocol referenced in the session overview. Do not modify deployed runtime to bypass release hashes.
+Main-session `.trellis/...` paths are relative to the source project, not this skill directory. Dispatched roles use verified absolute source material paths and separate executionRoot for code/tests. Read-only work needs no task; modifications require approval. Follow the project workflow for execution and review routing. Sub-agents must not recursively dispatch. Managed worktrees follow the package protocol referenced in the session overview. Do not modify deployed runtime to bypass release hashes.

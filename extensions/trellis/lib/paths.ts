@@ -7,5 +7,3 @@ export const resourceRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 export const presetRoot = dirname(dirname(resourceRoot));
 /** The only Trellis entry the host loads from this package manifest. */
 export const entryPath = join(presetRoot, "extensions/trellis.ts");
-/** Package-relative prefix of the skill source tree, as seen by settings filters on this package. */
-export const skillsPrefix = "extensions/trellis/skills";

@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { closeSync, fchmodSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { closeSync, fchmodSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, unlinkSync, writeFileSync, type Dirent } from "node:fs";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { homedir } from "node:os";
 import { readTaskRecord } from "../task-context.ts";
 import { containsPath } from "../config.ts";
@@ -20,14 +20,19 @@ export interface Fingerprint { sha256: string; mode: number }
 export type TemplateProvenance =
 	| (Fingerprint & { origin: "package-default"; source: string })
 	| ((Fingerprint | { sha256: null; mode: null }) & { origin: "preserved-project"; source: { kind: "project-snapshot"; revision: string | null } });
+/** Last-published Trellis skill file: update guard and diagnostics only, never execution authority. */
+export type SkillRecord = Fingerprint & { source: string };
 export interface InstalledManifest {
-	schemaVersion: 2; runtimeReleaseId: string;
+	/** Schema 2 (previous release) has no skills map; every write publishes schema 3. */
+	schemaVersion: 2 | 3; runtimeReleaseId: string;
 	files: Record<string, Fingerprint & { kind: "runtime" | "agent"; source: string }>;
 	templates: Record<string, TemplateProvenance>;
+	/** Schema 3 only. Rows may be absent (skill not deployed yet); unknown rows are rejected. */
+	skills?: Record<string, SkillRecord>;
 }
 export interface FileAction {
 	path: string; original: Fingerprint | null; output: string; mode: number;
-	kind: "runtime" | "agent" | "template" | "identity" | "workspace" | "task" | "root" | "manifest";
+	kind: "runtime" | "agent" | "skill" | "template" | "identity" | "workspace" | "task" | "root" | "manifest";
 }
 export interface InitPlan {
 	schemaVersion: 1; root: string; user: string; releaseId: string; operation: "initialize" | "identity";
@@ -84,7 +89,7 @@ function parse<T>(root: string, path: string): T | undefined {
 	return value === undefined ? undefined : JSON.parse(value.toString("utf8"));
 }
 export const defaultProvenanceReader: ProvenanceReader = {
-	file(root, path) { const data = bytes(root, path); return data === undefined ? undefined : { data, text: provenanceText(data), bytes: data.length, sha256: digest(data), mode: lstatSync(checkedPath(root, path)).mode & 0o777 }; },
+	file(root, path, _limit, _inventory, binary = false) { const data = bytes(root, path); return data === undefined ? undefined : { data, ...(binary ? {} : { text: provenanceText(data) }), bytes: data.length, sha256: digest(data), mode: lstatSync(checkedPath(root, path)).mode & 0o777 }; },
 	json(root, path) { const data = bytes(root, path); return data === undefined ? undefined : JSON.parse(provenanceText(data)); },
 	stat(root, path) { try { return lstatSync(checkedPath(root, path)); } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined; throw error; } },
 	path: checkedPath,
@@ -146,20 +151,86 @@ export function defaultTemplates(reader: ProvenanceReader = defaultProvenanceRea
 		origin: "package-default", sha256: digest(template(source, reader)), mode: 0o644, source: `resources/templates/${source}`,
 	}]));
 }
-export interface PackageProvenance { release: string; files: InstalledManifest["files"]; templates: InstalledManifest["templates"] }
+/** Deployed project skill folder root; package sources live under `skills/`. */
+export const SKILL_ROOT = ".pi/skills";
+/** `assets/` may hold binary files: byte/hash/mode checks only, no text validation. */
+export const binarySkillFile = (path: string) => path.split("/").includes("assets");
+/** `.pi/skills/<name>` for a deployed skill target. */
+export const skillFolder = (target: string) => target.split("/").slice(0, 3).join("/");
+/** Complete package skill trees from the skill baseline, hash-verified. Insertion order is publication
+ * order: each folder's supporting files precede its SKILL.md, so a new folder is discoverable last. */
+export function packageSkills(reader: ProvenanceReader = defaultProvenanceReader): Record<string, SkillRecord> {
+	const baseline = reader.json(packageRoot, "resources/skill-baseline.json");
+	if (!object(baseline) || baseline.schemaVersion !== 1 || !object(baseline.files) || !Object.keys(baseline.files).length || Object.keys(baseline.files).length > 256) throw new Error("Malformed package skill baseline");
+	const entry = (path: string) => path.split("/").length === 2 && path.endsWith("/SKILL.md");
+	const paths = Object.keys(baseline.files).sort((a, b) => a.split("/")[0].localeCompare(b.split("/")[0]) || Number(entry(a)) - Number(entry(b)) || a.localeCompare(b));
+	const skills: Record<string, SkillRecord> = {};
+	for (const path of paths) {
+		const record = baseline.files[path], parts = path.split("/");
+		if (parts.length < 2 || !/^trellis-[a-z0-9-]+$/.test(parts[0]) || parts.some(part => !part || part === "." || part === ".." || part.includes("\\")) || !object(record) || typeof record.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(record.sha256)) throw new Error("Malformed package skill inventory");
+		const source = `skills/${path}`, file = reader.file(packageRoot, source, MAX_BYTES, true, binarySkillFile(path));
+		if (!file || file.sha256 !== record.sha256) throw new Error(`Package skill hash mismatch: ${path}`);
+		// Git tracks only the executable bit; publish normalized modes independent of package umask.
+		skills[`${SKILL_ROOT}/${path}`] = { sha256: file.sha256, mode: file.mode & 0o111 ? 0o755 : 0o644, source };
+	}
+	for (const name of new Set(paths.map(path => path.split("/")[0]))) if (!skills[`${SKILL_ROOT}/${name}/SKILL.md`]) throw new Error(`Package skill entry missing: ${name}`);
+	return skills;
+}
+/** Skill rows grant nothing: only known package targets with their exact logical source. Missing rows are allowed. */
+export function validateSkillRecords(value: unknown, expected: Record<string, SkillRecord>): asserts value is Record<string, SkillRecord> {
+	if (!object(value) || Object.keys(value).length > Object.keys(expected).length) throw new Error("Malformed project skill provenance");
+	for (const [path, row] of Object.entries(value)) {
+		if (!Object.hasOwn(expected, path)) throw new Error(`Unknown managed skill entry: ${path}`);
+		fields(row, ["sha256", "mode", "source"], "project skill entry");
+		if (row.source !== expected[path].source) throw new Error(`Malformed project skill provenance: ${path}`);
+		checkFingerprint({ sha256: row.sha256, mode: row.mode });
+	}
+}
+/** Files and foreign entries (symlinks, specials, non-directory folder) below one skill folder; undefined when absent. Bounded. */
+export function skillFolderEntries(root: string, folder: string): { files: string[]; foreign: string[] } | undefined {
+	if (dirname(folder) !== SKILL_ROOT) throw new Error(`Invalid skill folder: ${folder}`);
+	// Ancestors must be local directories; the folder itself may be a symlink, reported as foreign.
+	const parent = checkedPath(root, SKILL_ROOT);
+	let info;
+	try { info = lstatSync(join(parent, basename(folder))); } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined; throw error; }
+	if (!info.isDirectory()) return { files: [], foreign: [folder] };
+	const result = { files: [] as string[], foreign: [] as string[] };
+	let visited = 0;
+	const walk = (path: string, depth: number) => {
+		for (const item of readdirSync(checkedPath(root, path), { withFileTypes: true }) as Dirent[]) {
+			if (++visited > 4096 || depth > 16) throw new Error(`Skill folder inventory exceeds safety bound: ${folder}`);
+			const child = `${path}/${item.name}`;
+			if (item.isDirectory()) walk(child, depth + 1);
+			else (item.isFile() ? result.files : result.foreign).push(child);
+		}
+	};
+	walk(folder, 0);
+	return result;
+}
+export interface PackageProvenance { release: string; files: InstalledManifest["files"]; templates: InstalledManifest["templates"]; skills: Record<string, SkillRecord> }
 export function packageProvenance(reader: ProvenanceReader = defaultProvenanceReader): PackageProvenance {
 	const baseline = runtimeBaseline(reader);
-	return { release: baseline.releaseId, files: packageResources(reader, baseline), templates: defaultTemplates(reader) };
+	return { release: baseline.releaseId, files: packageResources(reader, baseline), templates: defaultTemplates(reader), skills: packageSkills(reader) };
 }
 export function validateManifest(manifest: unknown, pkg: PackageProvenance = packageProvenance()): asserts manifest is InstalledManifest {
-	fields(manifest, ["schemaVersion", "runtimeReleaseId", "files", "templates"], "project resource manifest");
-	if (manifest.schemaVersion !== 2 || manifest.runtimeReleaseId !== pkg.release || !object(manifest.files) || !object(manifest.templates)) throw new Error("Unsupported project runtime release; explicit upgrade is not available");
+	const schema = object(manifest) ? manifest.schemaVersion : undefined;
+	fields(manifest, ["schemaVersion", "runtimeReleaseId", "files", "templates", ...(schema === 3 ? ["skills"] : [])], "project resource manifest");
+	if (![2, 3].includes(manifest.schemaVersion) || manifest.runtimeReleaseId !== pkg.release || !object(manifest.files) || !object(manifest.templates)) throw new Error("Unsupported project runtime release; explicit upgrade is not available");
+	// Skills are independent of runtime authority: customized or missing skills never block execution.
+	if (manifest.schemaVersion === 3) validateSkillRecords(manifest.skills, pkg.skills);
 	const expected = pkg.files;
 	if (Object.keys(manifest.files).length !== Object.keys(expected).length) throw new Error("Incomplete or unknown managed resource entries");
 	for (const [path, record] of Object.entries(expected)) {
 		const installed = manifest.files[path];
 		fields(installed, ["sha256", "mode", "kind", "source"], "project resource entry");
-		if (Object.keys(record).some(key => installed[key] !== record[key as keyof typeof record])) throw new Error(`Malformed project resource provenance: ${path}`);
+		// Roles are read by dispatch without hash checks: only runtime rows are executed, so only they
+		// need the exact current bytes. Role/template rows must stay well-formed and belong to the
+		// package, while a stale fingerprint is a safe update, never a blocked project.
+		for (const key of Object.keys(record) as (keyof typeof record)[]) {
+			if (key !== "sha256" && key !== "mode" && installed[key] !== record[key]) throw new Error(`Malformed project resource provenance: ${path}`);
+		}
+		if (typeof installed.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(installed.sha256) || !Number.isInteger(installed.mode) || installed.mode < 0 || installed.mode > 0o777) throw new Error(`Malformed project resource provenance: ${path}`);
+		if (record.kind === "runtime" && (installed.sha256 !== record.sha256 || installed.mode !== record.mode)) throw new Error(`Malformed project resource provenance: ${path}`);
 	}
 	const defaults = pkg.templates;
 	if (Object.keys(manifest.templates).length !== Object.keys(defaults).length) throw new Error("Incomplete or unknown template provenance entries");
@@ -167,7 +238,8 @@ export function validateManifest(manifest: unknown, pkg: PackageProvenance = pac
 		const installed = manifest.templates[path];
 		fields(installed, ["origin", "sha256", "mode", "source"], "template provenance");
 		if (installed.origin === "package-default") {
-			if (Object.keys(record).some(key => installed[key] !== record[key as keyof typeof record])) throw new Error(`Malformed package template provenance: ${path}`);
+			if (installed.source !== record.source || typeof installed.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(installed.sha256) || !Number.isInteger(installed.mode) || installed.mode < 0 || installed.mode > 0o777) throw new Error(`Malformed package template provenance: ${path}`);
+			// A stale fingerprint is a safe update, never a blocked project.
 		} else if (installed.origin === "preserved-project") {
 			// Diagnostic provenance only: no arbitrary source path, executable or output authority.
 			fields(installed.source, ["kind", "revision"], "preserved template source");
@@ -349,9 +421,15 @@ function validatePlan(plan: InitPlan, verifyExisting = true): void {
 	const resources = packageResources();
 	if (plan.operation === "initialize") {
 		for (const [path, resource] of Object.entries(resources)) requireOutput(path, readFileSync(checkedPath(packageRoot, resource.source)), resource.kind, resource.mode);
+		const skills = packageSkills(), order = new Map(plan.actions.map((action, index) => [action.path, index]));
+		for (const [path, resource] of Object.entries(skills)) {
+			requireOutput(path, readFileSync(checkedPath(packageRoot, resource.source)), "skill", resource.mode);
+			// A new skill folder becomes discoverable only after its supporting files exist.
+			if (order.get(path)! > order.get(`${skillFolder(path)}/SKILL.md`)!) throw new Error(`Skill entry must publish after its supporting files: ${path}`);
+		}
 		const templates = defaultTemplates();
 		for (const [path, resource] of Object.entries(templates)) requireOutput(path, readFileSync(checkedPath(packageRoot, resource.source)), "template", resource.mode);
-		requireOutput(MANIFEST, json({ schemaVersion: 2, runtimeReleaseId: plan.releaseId, files: resources, templates }), "manifest");
+		requireOutput(MANIFEST, json({ schemaVersion: 3, runtimeReleaseId: plan.releaseId, files: resources, templates, skills } satisfies InstalledManifest), "manifest");
 		if (plan.actions.at(-1)?.path !== MANIFEST) throw new Error("Manifest must publish after required outputs");
 		for (const [path, source] of [["AGENTS.md", "agents-block.md"], [".gitignore", "root.gitignore-block.txt"], [".gitattributes", "journal.gitattributes"]]) {
 			allowed.add(path);
@@ -437,6 +515,12 @@ export function plan(rootInput: string, userInput: string): InitPlan | undefined
 			add(target, readFileSync(checkedPath(packageRoot, resource.source)), resource.kind, resource.mode);
 			files[target] = resource;
 		}
+		// Never mix package files into, or claim, an existing same-name skill folder.
+		const skills = packageSkills();
+		for (const folder of new Set(Object.keys(skills).map(skillFolder))) {
+			if (skillFolderEntries(root, folder)) throw new Error(`Skill folder exists and is not managed by Trellis; preserved without changes: ${folder}. Move or rename it, then initialize again.`);
+		}
+		for (const [target, resource] of Object.entries(skills)) add(target, readFileSync(checkedPath(packageRoot, resource.source)), "skill", resource.mode);
 		for (const [source, target] of Object.entries(templateTargets)) add(target, template(source), "template");
 		for (const [path, source, start, end] of [["AGENTS.md", "agents-block.md", "<!-- TRELLIS:START -->", "<!-- TRELLIS:END -->"], [".gitignore", "root.gitignore-block.txt", "# pi-trellis:ignore:start", "# pi-trellis:ignore:end"]]) {
 			add(path, appendBlock(bytes(root, path), template(source), start, end), "root");
@@ -458,7 +542,7 @@ export function plan(rootInput: string, userInput: string): InitPlan | undefined
 	} catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
 	if (!taskReused) { add(`${task}/task.json`, json(generated.task), "task"); add(`${task}/prd.md`, template(`tasks/${operation === "initialize" ? "bootstrap" : "join"}-prd.md`), "task"); }
 	guards[MANIFEST] = fingerprint(root, MANIFEST);
-	if (operation === "initialize") add(MANIFEST, json({ schemaVersion: 2, runtimeReleaseId: state.releaseId, files, templates: defaultTemplates() } satisfies InstalledManifest), "manifest");
+	if (operation === "initialize") add(MANIFEST, json({ schemaVersion: 3, runtimeReleaseId: state.releaseId, files, templates: defaultTemplates(), skills: packageSkills() } satisfies InstalledManifest), "manifest");
 	const body = { schemaVersion: 1 as const, root, user, releaseId: state.releaseId, operation, workspaceReused, task, taskReused, actions, guards };
 	const result = { ...body, planHash: digest(JSON.stringify(body)) }; validatePlan(result); return result;
 }
@@ -472,6 +556,15 @@ function atomic(root: string, path: string, value: Buffer, mode: number, expecte
 		checkedPath(root, path); if (!same(fingerprint(root, path), expected)) throw new Error(`Concurrent change preserved: ${path}`);
 		renameSync(temporary, target);
 	} finally { if (fd !== undefined) closeSync(fd); try { unlinkSync(temporary); } catch (e) { if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e; } }
+}
+/** Under the lock: a planned skill folder may contain only this plan's files (a retry's own partial output). */
+function assertSkillFoldersOwned(plan: InitPlan): void {
+	const planned = new Set(plan.actions.filter(action => action.kind === "skill").map(action => action.path));
+	for (const folder of new Set([...planned].map(skillFolder))) {
+		const entries = skillFolderEntries(plan.root, folder);
+		const foreign = entries ? [...entries.foreign, ...entries.files.filter(path => !planned.has(path))] : [];
+		if (foreign.length) throw new Error(`Unmanaged content in skill folder preserved without changes: ${foreign.slice(0, 3).join(", ")}`);
+	}
 }
 /** Explicitly approved apply only. No rollback deletes; injected failure is test-only. */
 export function apply(plan: InitPlan, options: { afterWrite?: (path: string, count: number) => void } = {}): Inspection {
@@ -491,6 +584,7 @@ export function apply(plan: InitPlan, options: { afterWrite?: (path: string, cou
 		const current = readOperation(plan.root);
 		if (current?.status === "incomplete" && current.plan.planHash !== plan.planHash) throw new Error("Initialization record changed under lock");
 		recheck(plan, retry);
+		assertSkillFoldersOwned(plan);
 		const record: Operation = { schemaVersion: 1, status: "incomplete", plan, completed: current?.plan.planHash === plan.planHash ? current.completed : [] };
 		const save = () => atomic(plan.root, OPERATION, Buffer.from(json(record)), 0o600, fingerprint(plan.root, OPERATION));
 		save();

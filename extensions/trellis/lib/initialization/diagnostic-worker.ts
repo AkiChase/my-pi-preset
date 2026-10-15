@@ -10,7 +10,7 @@ let result: DiagnosticResult;
 const snapshots = new Map<string, ReturnType<DiagnosticReader["file"]>>();
 const routes = new Map<string, { root: string; path: string; limit?: number }>();
 const original = reader.file.bind(reader);
-reader.file = (root, path, limit, inventory) => { const file = original(root, path, limit, inventory); if (!inventory) { snapshots.set(join(root, path), file); routes.set(join(root, path), { root, path, limit }); } return file; };
+reader.file = (root, path, limit, inventory, binary) => { const file = original(root, path, limit, inventory, binary); if (!inventory) { snapshots.set(join(root, path), file); routes.set(join(root, path), { root, path, limit }); } return file; };
 const text = (root: string, path: string, error: string | null = null) => {
 	const file = snapshots.get(join(root, path));
 	return { text: file?.text ?? null, error };

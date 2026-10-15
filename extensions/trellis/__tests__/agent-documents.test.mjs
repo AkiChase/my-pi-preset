@@ -123,7 +123,7 @@ test("upstream documents retain attribution and license", () => {
   for (const role of ["implement", "check", "research"]) {
     assert.match(agent(role).text, /Adapted by pi-trellis.*from Trellis 0\.6\.17 Claude Code agents/);
     assert.match(agent(role).text, /AGPL-3\.0-only/);
-    assert.match(agent(role).text, /see README\.md#license and licenses\/trellis-AGPL-3\.0\.txt/);
+    assert.match(agent(role).text, /see extensions\/trellis\/licenses\/trellis-AGPL-3\.0\.txt in the my-pi-preset package/);
     assert.doesNotMatch(agent(role).text, /docs\/(?:trellis-agent-sync|runtime-baseline)\.md/);
   }
 });

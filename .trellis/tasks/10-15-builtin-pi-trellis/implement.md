@@ -40,6 +40,8 @@ S1 检查点：基线d0e07c9产品资源字节一致，lib/index仅路径/文案
 - [ ] 独立check→主核最终diff/关键负例/自然退出与全量→主本地阶段commit，记录精确范围/hash。
 
 ## S2 初始化完整技能部署与旧项目补齐（A2/A5/A8）
+
+S2 检查点：schema 3 manifest 独立记录技能；旧 schema 2 项目通过 Update 补齐；未托管同名目录保留并报冲突；删除动态技能加载和自动 reload。运行时检查只对运行时脚本要求指纹一致，角色和模板指纹过期改由 Check 和 Update 提示安全更新（原有规则使所有已初始化项目在文案变动后不可用，而派发读取角色时并不校验指纹）。接管在锁内复查技能目录归属。独立审查通过。Trellis 测试 460/460，约 70 秒，Python 32，`pnpm check` 1498/1498。未验证：真实 Pi 加载项目技能、信任与 `--no-skills` 行为。
 - [ ] 增加skills完整资源库存及相对引用闭包，确认init计划展示目标；项目.pi/skills原生发现，撤旧动态resources_discover技能注入/virtualfilter。
 - [ ] 初次同名未知技能/改动托管技能保护，安全更新未改文件、显式定制冲突，不touch无关/user级skills。
 - [ ] schema3独立skills库存/last-published记录，精确schema2→schema3补齐计划，不扩大未知库存信任；template/role/runtime与skills状态分别诊断，skills定制不令Python运行时失效。assets bytes与文本验证分离，支持文件先于新SKILL.md、manifestlast，partial不伪原子保证。

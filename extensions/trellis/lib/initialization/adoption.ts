@@ -1,7 +1,8 @@
 import { closeSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, unlinkSync } from "node:fs";
 import { dirname } from "node:path";
-import { checkedPath, defaultTemplates, digest, inspect, journalAttributes, packageResources, packageRoot, projectRevision, replaceBlock, template, validateManifest, verifyRuntime, type Fingerprint, type InstalledManifest } from "./engine.ts";
+import { checkedPath, defaultTemplates, digest, inspect, journalAttributes, packageResources, packageRoot, packageSkills, projectRevision, replaceBlock, SKILL_ROOT, skillFolder, skillFolderEntries, template, validateManifest, verifyRuntime, type Fingerprint, type InstalledManifest } from "./engine.ts";
 import { atomicFile, equal, read, stamp } from "./resources.ts";
+import { reviewSkills } from "./skills.ts";
 
 const MANIFEST = ".trellis/.pi-trellis.json", LOCK = ".trellis/.runtime/init.lock", OPERATION = ".trellis/.runtime/init-operation.json";
 export interface AdoptPlan {
@@ -19,7 +20,7 @@ export function adoptPlan(rootInput: string): AdoptPlan {
  // An existing lock is never removed or guessed stale, independently of the inspection diagnostic text.
  try { lstatSync(checkedPath(root, LOCK)); throw new Error("Initialization lock exists; inspect its owner before adopting"); }
  catch (e) { if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e; }
- const value: AdoptPlan = { root, releaseId: state.releaseId, rows: [], changes: [], guards: { [MANIFEST]: null, [OPERATION]: null }, manifest: { schemaVersion: 2, runtimeReleaseId: state.releaseId, files: packageResources(), templates: {} }, legacy: [] };
+ const value: AdoptPlan = { root, releaseId: state.releaseId, rows: [], changes: [], guards: { [MANIFEST]: null, [OPERATION]: null }, manifest: { schemaVersion: 3, runtimeReleaseId: state.releaseId, files: packageResources(), templates: {}, skills: {} }, legacy: [] };
  const revision = projectRevision(root);
  function add(path: string, data: Buffer, mode: number, label: string) {
   const before = stamp(root, path); value.guards[path] = before;
@@ -42,6 +43,16 @@ export function adoptPlan(rootInput: string): AdoptPlan {
    value.manifest.templates[path] = want;
   }
  }
+ // Skills are create-only here, never part of the no-backup replace loop: an existing same-name folder
+ // (e.g. from an older Trellis) is kept unmanaged; only absent folders, or exact package copies, are recorded.
+ const skills = reviewSkills(root, {}, packageSkills(), path => stamp(root, path));
+ for (const row of skills.rows) if (row.state === "Unmanaged folder — preserved") value.rows.push({ path: row.path, state: "Keep skill folder" });
+ for (const [path, want] of Object.entries(skills.next)) {
+  const data = readFileSync(checkedPath(packageRoot, want.source));
+  if (digest(data) !== want.sha256) throw new Error(`Package hash mismatch: ${path}`);
+  add(path, data, want.mode, "Install");
+ }
+ value.manifest.skills = skills.next;
  for (const [path, source, start, end] of [["AGENTS.md", "agents-block.md", "<!-- TRELLIS:START -->", "<!-- TRELLIS:END -->"], [".gitignore", "root.gitignore-block.txt", "# pi-trellis:ignore:start", "# pi-trellis:ignore:end"]]) {
   const before = stamp(root, path), existing = read(root, path);
   add(path, replaceBlock(existing, template(source), start, end), before?.mode ?? 0o644, existing?.includes(start) ? "Replace block" : before ? "Append block" : "Create");
@@ -70,10 +81,19 @@ export function adoptPlan(rootInput: string): AdoptPlan {
  return value;
 }
 function signature(value: AdoptPlan): string { return digest(JSON.stringify({ ...value, changes: value.changes.map(c => ({ ...c, data: c.data.toString("base64") })) })); }
+/** Under the lock: a skill folder this plan publishes may contain only this plan's files. */
+function assertAdoptedSkillFoldersOwned(value: AdoptPlan): void {
+ const planned = new Set(value.changes.filter(change => change.path.startsWith(SKILL_ROOT + "/")).map(change => change.path));
+ for (const folder of new Set([...planned].map(skillFolder))) {
+  const entries = skillFolderEntries(value.root, folder);
+  const foreign = entries ? [...entries.foreign, ...entries.files.filter(path => !planned.has(path))] : [];
+  if (foreign.length) throw new Error(`Unmanaged content in skill folder preserved without changes: ${foreign.slice(0, 3).join(", ")}`);
+ }
+}
 export function adoptionSummary(value: AdoptPlan): string {
  return [`Project: ${value.root}`, "Adopt existing project", ...value.rows.map(r => `${r.state}  ${r.path}`), ...value.legacy.slice(0, 256).map(path => `Legacy — left in place: ${path}`), ...(value.legacy.length > 256 ? [`${value.legacy.length - 256} additional legacy paths omitted.`] : []), ...ADOPTION_NOTES].join("\n");
 }
-const ADOPTION_NOTES = ["Runtime scripts, roles and managed root blocks are replaced without backups. Nothing is deleted.", "Existing workflow, config, spec, tasks, journals and identity are preserved."];
+const ADOPTION_NOTES = ["Runtime scripts, roles and managed root blocks are replaced without backups. Nothing is deleted.", "Existing workflow, config, spec, tasks, journals and identity are preserved.", "Skills install only into absent .pi/skills folders; existing same-name folders are kept and reported by Update resources."];
 /** Native dialogs render every title line without a viewport, so confirmation stays counted, not enumerated. */
 export function adoptionDialog(value: AdoptPlan): string {
  const counts = new Map<string, number>();
@@ -83,9 +103,10 @@ export function adoptionDialog(value: AdoptPlan): string {
   field("Changes", [...counts].map(([state, count]) => `${state} ${count}`).join(" · ") || "none"),
   field("Keeps", "workflow, config, spec, tasks, journals and identity"),
   field("Backup", "none — runtime scripts, roles and managed root blocks are replaced; nothing is deleted"),
+  field("Skills", "installed only where absent; existing skill folders are kept"),
   field("Legacy", `${value.legacy.length} path${value.legacy.length === 1 ? "" : "s"} left in place`)].join("\n");
 }
-export function applyAdoptPlan(value: AdoptPlan, options: { afterWrite?: (path: string) => void } = {}) {
+export function applyAdoptPlan(value: AdoptPlan, options: { afterWrite?: (path: string) => void; underLock?: () => void } = {}) {
  const fresh = adoptPlan(value.root);
  if (signature(value) !== signature(fresh)) throw new Error("Project or package changed since adoption preview; review again");
  const root = fresh.root, lock = checkedPath(root, LOCK), templatesBefore = JSON.stringify(defaultTemplates());
@@ -97,6 +118,10 @@ export function applyAdoptPlan(value: AdoptPlan, options: { afterWrite?: (path: 
   const outputs = new Map<string, Fingerprint>();
   const recheck = () => { for (const [path, before] of Object.entries(fresh.guards)) guard(path, outputs.get(path) ?? before); };
   recheck();
+  // Test-only seam for a change that lands after the preview but before the under-lock recheck.
+  options.underLock?.();
+  // The pre-lock preview compared a plan that may already be stale; recheck skill folder ownership here too.
+  assertAdoptedSkillFoldersOwned(fresh);
   for (const change of fresh.changes) {
    recheck();
    atomicFile(root, change.path, change.data, change.mode, change.before);
@@ -105,8 +130,9 @@ export function applyAdoptPlan(value: AdoptPlan, options: { afterWrite?: (path: 
   }
   recheck();
   // Validate package identity and all managed outputs immediately before publishing.
-  if (JSON.stringify(packageResources()) !== JSON.stringify(fresh.manifest.files) || JSON.stringify(defaultTemplates()) !== templatesBefore) throw new Error("Package changed during adoption");
-  for (const [path, record] of Object.entries(fresh.manifest.files)) guard(path, record);
+  const skills = packageSkills();
+  if (JSON.stringify(packageResources()) !== JSON.stringify(fresh.manifest.files) || JSON.stringify(defaultTemplates()) !== templatesBefore || Object.entries(fresh.manifest.skills!).some(([path, record]) => JSON.stringify(skills[path]) !== JSON.stringify(record))) throw new Error("Package changed during adoption");
+  for (const [path, record] of Object.entries({ ...fresh.manifest.files, ...fresh.manifest.skills })) guard(path, record);
   atomicFile(root, MANIFEST, Buffer.from(JSON.stringify(fresh.manifest, null, 2) + "\n"), 0o644, null);
   if (!verifyRuntime(root)) throw new Error("Adoption runtime did not verify");
   const result = inspect(root);

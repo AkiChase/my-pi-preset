@@ -7,12 +7,15 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { DIAGNOSTIC_BOOTSTRAP } from '../lib/initialization/diagnostic-bootstrap.ts';
 import { collectDiagnostics, formatDiagnostics, DIAGNOSTIC_LIMITS } from '../lib/initialization/diagnostics.ts';
-import { installRuntimeFixture } from './runtime-fixture.mjs';
+import { installRuntimeFixture, copyRuntimeFixture } from './runtime-fixture.mjs';
 import { verifyRuntime, packageRoot } from '../lib/initialization/engine.ts';
 
+// An initialized project costs about a second to build; every supported case copies one shared build.
+// copyRuntimeFixture re-roots and re-hashes the completed record, so Check validates this project's own
+// plan envelope rather than failing an unrelated assertion on a record that still names the template root.
 function fixture(t, supported=false) {
- const root=realpathSync(mkdtempSync(join(tmpdir(),'trellis-diagnostic-')));t.after(()=>rmSync(root,{recursive:true,force:true}));
- if(supported)installRuntimeFixture(root);
+ const root=supported?copyRuntimeFixture(t):realpathSync(mkdtempSync(join(tmpdir(),'trellis-diagnostic-')));
+ if(!supported)t.after(()=>rmSync(root,{recursive:true,force:true}));
  const put=(path,value)=>{mkdirSync(dirname(join(root,path)),{recursive:true});writeFileSync(join(root,path),typeof value==='object'&&!Buffer.isBuffer(value)?JSON.stringify(value):value);};
  const task=(ref='.trellis/tasks/own',record={id:'own',status:'planning'})=>{put(ref+'/task.json',record);return ref;};
  const pointer=(value,key='own')=>put(`.trellis/.runtime/sessions/${key}.json`,{current_task:value});
@@ -162,7 +165,7 @@ test('exhausted text budget does not drain or suppress independent fixed invento
  const f=fixture(t,true);f.put('.trellis/config.yaml','x'.repeat(DIAGNOSTIC_LIMITS.file));f.put('.pi/pi-trellis.json',' '.repeat(DIAGNOSTIC_LIMITS.file-2)+'{}');f.put('.pi/settings.json','{}');
  const open=fs.openSync,close=fs.closeSync,read=fs.readSync,fds=new Map();let textBytes=0;
  t.mock.method(fs,'openSync',(path,...args)=>{const fd=open(path,...args);fds.set(fd,String(path));return fd;});t.mock.method(fs,'closeSync',fd=>{fds.delete(fd);return close(fd);});
- t.mock.method(fs,'readSync',(fd,...args)=>{const count=read(fd,...args),path=fds.get(fd);if(path&&!path.includes('/runtime/')&&!path.includes('/scripts/')&&!path.includes('/agents/')&&!path.includes('/resources/templates/'))textBytes+=count;return count;});syncBuiltinESMExports();t.after(()=>{t.mock.restoreAll();syncBuiltinESMExports();});
+ t.mock.method(fs,'readSync',(fd,...args)=>{const count=read(fd,...args),path=fds.get(fd);if(path&&!path.includes('/runtime/')&&!path.includes('/scripts/')&&!path.includes('/agents/')&&!path.includes('/skills/')&&!path.includes('/resources/templates/'))textBytes+=count;return count;});syncBuiltinESMExports();t.after(()=>{t.mock.restoreAll();syncBuiltinESMExports();});
  const r=f.check();assert.equal(item(r,'inventory:runtime').status,'pass');assert.ok(textBytes<=DIAGNOSTIC_LIMITS.text+1,`actual text bytes ${textBytes}`);assert.ok(r.items.some(i=>/byte budget exceeded/.test(i.summary)));
 });
 

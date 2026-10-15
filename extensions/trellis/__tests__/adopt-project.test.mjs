@@ -74,6 +74,17 @@ test('forged/stale plans and symlink targets reject without modifying legacy run
  rmSync(join(f.root,'.trellis/scripts/task.py'));symlinkSync('/tmp/missing-adopt-victim',join(f.root,'.trellis/scripts/task.py'));assert.throws(()=>adoptPlan(f.root),/symlink/);
 });
 test('concurrent preserved-template edit during publication leaves manifest unpublished',t=>{const f=fixture(t);assert.throws(()=>applyAdoptPlan(adoptPlan(f.root),{afterWrite:()=>f.put('.trellis/workflow.md','concurrent')}),/Concurrent change/);assert.ok(!existsSync(join(f.root,'.trellis/.pi-trellis.json')));assert.equal(readFileSync(join(f.root,'.trellis/workflow.md'),'utf8'),'concurrent');});
+// The preview runs before the lock; a plan can therefore reach publication with unmanaged bytes that
+// appeared afterwards. Publication must stop under the lock with no partial skill content and no manifest.
+test('unmanaged bytes appearing in a planned skill folder after the preview block adoption under the lock',t=>{
+ const f=fixture(t),p=adoptPlan(f.root),folder=Object.keys(p.manifest.skills)[0].split('/').slice(0,3).join('/');
+ assert.throws(()=>applyAdoptPlan(p,{underLock:()=>f.put(`${folder}/intruder.md`,'unmanaged')}),/Unmanaged content in skill folder/);
+ assert.equal(readFileSync(join(f.root,`${folder}/intruder.md`),'utf8'),'unmanaged');
+ assert.ok(!existsSync(join(f.root,'.trellis/.pi-trellis.json')));assert.ok(!existsSync(join(f.root,'.trellis/.runtime/init.lock')));
+ assert.ok(!existsSync(join(f.root,`${folder}/SKILL.md`)));
+ // Removing the unmanaged file lets the same preview publish unchanged.
+ rmSync(join(f.root,`${folder}/intruder.md`));assert.equal(applyAdoptPlan(p).state,'ready');
+});
 
 test('counted adoption confirmation retains scope/preservation/destructive warnings without a full-list Check promise',t=>{
  const f=fixture(t),value=adoptPlan(f.root),dialog=adoptionDialog(value);

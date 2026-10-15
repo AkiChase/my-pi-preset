@@ -5,7 +5,7 @@ import { adoptPlan, applyAdoptPlan, adoptionDialog } from "./adoption.ts";
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { applyResourcePlan, read, resourcePlan, templatePlan, applyTemplatePlan, type TemplateScope } from "./resources.ts";
 import { initializationRoot } from "../project-state.ts";
-import { inspect, plan, apply, checkedPath, packageResources, defaultTemplates, runtimeBaseline, verifyRuntime, validateUsername, type Inspection, type InitPlan } from "./engine.ts";
+import { inspect, plan, apply, checkedPath, packageResources, packageSkills, defaultTemplates, runtimeBaseline, verifyRuntime, validateUsername, SKILL_ROOT, type Inspection, type InitPlan } from "./engine.ts";
 import { runDiagnostics } from "./diagnostic-runtime.ts";
 import { collectDiagnostics, formatDiagnostics, type DiagnosticScope } from "./diagnostics.ts";
 
@@ -18,19 +18,22 @@ const { initialize: INITIALIZE, adopt: ADOPT, resume: RESUME, identity: IDENTITY
 export const INIT_HELP = [
 	"/trellis-init — no arguments; pick an action from the menu. Only actions available in the current project are shown.",
 	...([
-		[INITIALIZE, "New directory: install runtime, roles, templates, developer identity and onboarding task."],
-		[ADOPT, "Existing .trellis without manifest: take over runtime and roles; your documents are kept."],
+		[INITIALIZE, "New directory: install runtime, roles, skills, templates, developer identity and onboarding task."],
+		[ADOPT, "Existing .trellis without manifest: take over runtime and roles, add missing skills; your documents and skill folders are kept."],
 		[RESUME, "Continue an interrupted initialization."],
 		[IDENTITY, "Fresh clone: create developer identity and workspace."],
-		[UPDATE, "Refresh unmodified managed files and restore missing ones; modified files are never overwritten."],
+		[UPDATE, "Refresh unmodified managed files and skills, restore missing ones; modified files are never overwritten."],
 		[TEMPLATE, "Replace Workflow/Spec documents with package defaults; backups are kept."],
 		[CHECK, "Read-only diagnosis of this project's Trellis deployment; never writes."],
 	] as const).map(([name, text]) => `${name.padEnd(23)}${text}`),
-	"Every write asks for confirmation first. No hooks, model turns, installs or Git changes.",
+	"Every write asks for confirmation first. No hooks, model turns, installs, reloads or Git changes.",
+	`Skills are deployed to ${SKILL_ROOT}/; run /reload or start a new session to load them.`,
 ].join("\n");
 const MIGRATION_NOTICE = "/trellis-init takes no arguments (--user, --check and --help were removed). Run /trellis-init and pick an action from the menu. Nothing was changed.";
 const INTERACTION_GUIDE = "/trellis-init needs an interactive menu. Run it in interactive mode or an RPC client with native dialogs. Nothing was changed.";
 const DIALOG_LINES = 14;
+/** No automatic reload: the user decides when the session rediscovers newly deployed project skills. */
+export const RELOAD_HINT = `deployed to ${SKILL_ROOT}/; run /reload or start a new session to load them (from the project root; project trust and Pi skill settings apply)`;
 // Root/path names may contain line breaks or terminal controls; keep facts on one physical line.
 const dialogPath = (value: string) => value.replace(/[\p{C}\p{Zl}\p{Zp}]/gu, char => `\\u{${char.codePointAt(0)!.toString(16)}}`);
 const reason = (error: unknown) => (error instanceof Error ? error.message : String(error)).replace(/^Error: /, "");
@@ -102,8 +105,8 @@ function menuSnapshot(cwd: string): MenuSnapshot {
 		if (present(".trellis/.runtime/pi-trellis/binding.json")) throw new Error("This is a managed worktree; run /trellis-init from the source project");
 		if (present(".trellis/.runtime/init.lock")) throw new Error("Initialization lock exists (.trellis/.runtime/init.lock); check its owner. It is never removed automatically.");
 		// Validate package integrity and local parent routes, even in a fresh project.
-		checkedPath(root, ".pi/agents");
-		packageResources(); defaultTemplates();
+		checkedPath(root, ".pi/agents"); checkedPath(root, SKILL_ROOT);
+		packageResources(); defaultTemplates(); packageSkills();
 		const manifest = read(root, ".trellis/.pi-trellis.json");
 		if (manifest !== undefined && !manifest.length) throw new Error("Managed project manifest is empty; explicit reconciliation is required");
 		const operation = read(root, ".trellis/.runtime/init-operation.json");
@@ -133,7 +136,9 @@ function menuSnapshot(cwd: string): MenuSnapshot {
 		}
 		if (!runtimeError) {
 			state.state = state.developer ? "ready" : "supported";
-			return { state, view: view(STATUS[state.state], [], { installed: state.releaseId }), operations: state.developer ? [UPDATE, TEMPLATE] : [IDENTITY, TEMPLATE] };
+			// Schema 2 predates deployed skills: runtime stays usable, Update adds them explicitly.
+			const issues = state.manifest!.schemaVersion === 3 ? [] : [`Project skills not deployed; choose ${UPDATE}.`];
+			return { state, view: view(STATUS[state.state], issues, { installed: state.releaseId }), operations: state.developer ? [UPDATE, TEMPLATE] : [IDENTITY, ...(issues.length ? [UPDATE] : []), TEMPLATE] };
 		}
 		// Missing/older owned resources may still be safely restored; modified resources never authorize writes.
 		const update = resourcePlan(root, "update");
@@ -218,10 +223,11 @@ export function registerInitCommand(pi: ExtensionAPI, refresh: (ctx: ExtensionCo
 					if (!await confirm(ctx, ADOPT, adoptionDialog(value))) return;
 					const adopted = applyAdoptPlan(value);
 					notify(result(ADOPT, "Done", [
-						["Changed", `${value.rows.length} files`], ["Legacy", `${value.legacy.length} paths left in place`],
+						["Changed", `${value.changes.length} files`], ["Legacy", `${value.legacy.length} paths left in place`],
+						["Skills", RELOAD_HINT],
 						["Next", adopted.state === "supported" ? `/trellis-init → ${IDENTITY}` : "none"],
 					]));
-					await refresh(ctx, adopted.root); await ctx.reload(); return;
+					await refresh(ctx, adopted.root); return;
 				}
 				if (choice === TEMPLATE) {
 					if (!["ready", "supported"].includes(state.state)) throw new Error(`Project is ${STATUS[state.state]}; ${TEMPLATE} needs a current runtime`);
@@ -230,20 +236,22 @@ export function registerInitCommand(pi: ExtensionAPI, refresh: (ctx: ExtensionCo
 				}
 				if (choice === UPDATE) {
 					const update = resourcePlan(state.root, "update");
-					if (update.report.conflicts.length) throw new Error(`Modified managed files are preserved: ${update.report.conflicts.join(", ")}`);
-					if (!update.changes.length && update.manifest.runtimeReleaseId === update.report.installed) { notify(result(UPDATE, "Up to date", [["Changed", "0 files"]])); return; }
-					const label = (before: unknown) => before ? "Update" : "Restore";
+					if (update.report.conflicts.length) throw new Error(`Modified or unmanaged files are preserved: ${update.report.conflicts.join(", ")}`);
+					if (update.unchanged) { notify(result(UPDATE, "Up to date", [["Changed", "0 files"]])); return; }
+					const added = new Set(update.report.rows.filter(row => row.state === "New — will install").map(row => row.path));
+					const label = (before: unknown, path: string) => before ? "Update" : added.has(path) ? "Install" : "Restore";
 					const dialog = confirmation(UPDATE, [
 						["Project", dialogPath(state.root)],
-						["Changes", counts(update.changes.map(c => ({ state: label(c.before) })))],
+						["Changes", counts(update.changes.map(c => ({ state: label(c.before, c.path) })))],
 						["Keeps", "identity, tasks, journals and modified documents"],
 						["Backup", "none (no automatic rollback)"],
-					], update.changes.map(c => `${label(c.before)}: ${dialogPath(c.path)}`));
+					], update.changes.map(c => `${label(c.before, c.path)}: ${dialogPath(c.path)}`));
 					if (!await confirm(ctx, UPDATE, dialog)) return;
 					applyResourcePlan(update);
 					const release = shortRelease(update.manifest.runtimeReleaseId);
-					notify(result(UPDATE, "Done", [["Changed", `${update.changes.length} files`], ...(release ? [["Runtime", release] as [string, string]] : [])]));
-					await refresh(ctx, state.root); await ctx.reload(); return;
+					const skills = update.changes.some(c => c.path.startsWith(`${SKILL_ROOT}/`));
+					notify(result(UPDATE, "Done", [["Changed", `${update.changes.length} files`], ...(release ? [["Runtime", release] as [string, string]] : []), ...(skills ? [["Skills", RELOAD_HINT] as [string, string]] : [])]));
+					await refresh(ctx, state.root); return;
 				}
 				const expected = choice === INITIALIZE ? "fresh" : choice === RESUME ? "incomplete" : "supported";
 				if (state.state !== expected) throw new Error(`Project changed: status is now ${STATUS[state.state]}`);
@@ -253,12 +261,13 @@ export function registerInitCommand(pi: ExtensionAPI, refresh: (ctx: ExtensionCo
 				if (!value) { notify(result(choice, "Up to date", [["Developer", user], ["Changed", "0 files"]])); return; }
 				if (!await confirm(ctx, choice, planSummary(value).replace(/^Confirm · [^\n]*/, `Confirm · ${choice}`))) return;
 				apply(value);
+				const deployed = value.actions.some(a => a.kind === "skill");
 				notify(result(choice, "Done", [
 					["Developer", value.user], ["Task", `${value.task} (${value.taskReused ? "reused" : "created"})`],
-					["Next", "/skill:trellis-start — review the task before starting work"],
+					...(deployed ? [["Skills", RELOAD_HINT] as [string, string]] : []),
+					["Next", `${deployed ? "/reload, then " : ""}/skill:trellis-start — review the task before starting work`],
 				]));
 				await refresh(ctx, state.root);
-				if (value.operation === "initialize") { await ctx.reload(); return; }
 			} catch (error) {
 				notify(result(action, "Failed", [["Reason", reason(error)], ["Next", `/trellis-init → ${CHECK}; partial changes, if any, are preserved`]]), "error");
 			}

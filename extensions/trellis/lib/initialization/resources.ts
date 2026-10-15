@@ -2,7 +2,8 @@ import { closeSync, fchmodSync, lstatSync, mkdirSync, openSync, readFileSync, re
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
-import { checkedPath, defaultTemplates, digest, packageResources, packageRoot, runtimeBaseline, verifyRuntime, type InstalledManifest } from "./engine.ts";
+import { checkedPath, defaultTemplates, digest, packageResources, packageRoot, packageSkills, runtimeBaseline, validateSkillRecords, verifyRuntime, type InstalledManifest } from "./engine.ts";
+import { reviewSkills } from "./skills.ts";
 
 const MANIFEST = ".trellis/.pi-trellis.json";
 const OPERATION = ".trellis/.runtime/init-operation.json";
@@ -10,7 +11,8 @@ const LOCK = ".trellis/.runtime/init.lock";
 type Stamp = { sha256: string; mode: number };
 export interface ResourceReport { root: string; installed: string; available: string; rows: { path: string; state: string }[]; conflicts: string[] }
 interface Change { path: string; data: Buffer; mode: number; before: Stamp | null }
-export interface ResourcePlan { report: ResourceReport; mode: "update" | "repair"; changes: Change[]; manifest: InstalledManifest; original: string }
+/** `unchanged`: publishing would not alter files or manifest (e.g. no schema 3 skills upgrade pending). */
+export interface ResourcePlan { report: ResourceReport; mode: "update" | "repair"; changes: Change[]; manifest: InstalledManifest; original: string; unchanged: boolean }
 export function read(root: string, path: string): Buffer | undefined {
  const p = checkedPath(root, path);
  try { const s = lstatSync(p); if (!s.isFile() || s.size > 4 * 1024 * 1024) throw new Error(`Invalid resource file: ${path}`); return readFileSync(p); }
@@ -22,9 +24,12 @@ function oldManifest(root: string): { manifest: InstalledManifest; raw: Buffer }
  const raw=read(root,MANIFEST); if (!raw) throw new Error("No managed project manifest. General migration is not available. Initialize a new project first.");
  const m=JSON.parse(raw.toString()) as InstalledManifest;
  const expected=packageResources(), templates=defaultTemplates();
- if (!m || m.schemaVersion!==2 || !/^pi-trellis-runtime-v1-[a-f0-9]{64}$/.test(m.runtimeReleaseId) || !m.files || !m.templates || Object.keys(m).sort().join()!==["files","runtimeReleaseId","schemaVersion","templates"].sort().join()) throw new Error("Invalid managed project manifest");
+ if (!m || ![2,3].includes(m.schemaVersion) || !/^pi-trellis-runtime-v1-[a-f0-9]{64}$/.test(m.runtimeReleaseId) || !m.files || !m.templates || Object.keys(m).sort().join()!==["files","runtimeReleaseId","schemaVersion","templates",...(m.schemaVersion===3?["skills"]:[])].sort().join()) throw new Error("Invalid managed project manifest");
  // Older releases may predate package-added managed files; those rows are absent and planned as new resources.
  // Unknown/removed entries, any gap within the current release, and template inventory changes remain unsupported.
+ // Skills follow the same exact rule independently of the runtime release: schema 2 predates them (all rows
+ // absent) and a package-added skill file is an absent row; unknown or wrong-source skill rows stay rejected.
+ if (m.schemaVersion===3) { try { validateSkillRecords(m.skills,packageSkills()); } catch(e) { throw new Error(`Unsupported resource inventory; explicit reconciliation is required: ${e instanceof Error?e.message:String(e)}`); } }
  const added=Object.keys(expected).filter(path=>!Object.hasOwn(m.files,path));
  if (Object.keys(m.files).some(path=>!Object.hasOwn(expected,path)) || added.length && m.runtimeReleaseId===runtimeBaseline().releaseId || Object.keys(m.templates).sort().join()!==Object.keys(templates).sort().join()) throw new Error("Unsupported resource inventory; explicit reconciliation is required");
  for(const [path,r] of Object.entries(m.files)) {
@@ -65,8 +70,16 @@ export function resourcePlan(rootInput: string, mode: "update" | "repair"): Reso
   const data=readFileSync(checkedPath(packageRoot,want.source));
   changes.push({path,data,mode:want.mode,before:actual});next.templates[path]=want;report.rows.push({path,state:actual?"Safe template update":"Missing template — will restore"});
  }
+ const skills=packageSkills(),review=reviewSkills(root,old.skills??{},skills,path=>stamp(root,path),{repair:mode==="repair"});
+ report.rows.push(...review.rows);report.conflicts.push(...review.conflicts);
+ for(const c of review.changes){
+  const data=readFileSync(checkedPath(packageRoot,c.record.source));
+  if(digest(data)!==c.record.sha256) throw new Error(`Package hash mismatch: ${c.path}`);
+  changes.push({path:c.path,data,mode:c.record.mode,before:c.before});
+ }
+ next.schemaVersion=3;next.skills=review.next;
  if(Object.entries(expected).every(([p,r])=>equal(next.files[p],r))) next.runtimeReleaseId=report.available;
- return {report,mode,changes,manifest:next,original:digest(raw)};
+ return {report,mode,changes,manifest:next,original:digest(raw),unchanged:!changes.length&&JSON.stringify(next)===JSON.stringify(old)};
 }
 export function resourceStatus(root:string):string {
  try { const {report}=resourcePlan(root,"update");return ["Project resource health",`Project: ${report.root}`,`Installed runtime: ${report.installed}`,`Available runtime: ${report.available}`,`Runtime version: ${report.installed===report.available?"Current":"Update available"}`, `Developer: ${(()=>{try{return read(report.root,".trellis/.developer")?.toString().split(/\r?\n/).find(l=>l.startsWith("name="))?.slice(5) ?? "Not set";}catch{return "Invalid identity";}})()}`,"",...report.rows.map(r=>`${r.state}: ${r.path}`)].join("\n"); }

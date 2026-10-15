@@ -1,6 +1,6 @@
 ---
 name: trellis-meta
-description: "Inspect Pi Trellis architecture and safely customize project workflow, config, specs, role definitions or package skills. Use when changing Trellis integration or understanding resource ownership."
+description: "Inspect Pi Trellis architecture and safely customize project workflow, config, specs, role definitions or Trellis skills. Use when changing Trellis integration or understanding resource ownership."
 ---
 
 # Pi Trellis Architecture and Customization

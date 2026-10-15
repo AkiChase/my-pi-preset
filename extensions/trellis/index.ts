@@ -6,7 +6,7 @@
  *   M2  active-task status in the footer
  *   M3  role-specific JSONL/artifact material handed to trellis-* subagents
  *   M4  explicit initialization and manifest-managed project resources
- *   M5  conditional skills discovered through Pi's public package resolver
+ *   M5  skills: deployed to project .pi/skills by /trellis-init; Pi discovers them natively
  *
  * No Trellis runtime implementation is copied into this TypeScript extension.
  * Bundled agent documents retain their upstream license; see licenses/trellis-AGPL-3.0.txt
@@ -34,7 +34,6 @@ import { runDiagnostics } from "./lib/initialization/diagnostic-runtime.ts";
 import { registerTaskBrowserCommand } from "./lib/task-browser/command.ts";
 import { readCurrentTaskIdentity } from "./lib/task-browser/reader.ts";
 import { checkedPath } from "./lib/initialization/engine.ts";
-import { projectSkillPaths } from "./lib/adapter-resources.ts";
 import { resourceRoot } from "./lib/paths.ts";
 import { findProjectRoot, requireProjectRuntime } from "./lib/project-state.ts";
 
@@ -1068,23 +1067,6 @@ export default function (pi: ExtensionAPI): void {
 		}
 
 		await refreshProjectDisplay(ctx, current);
-	});
-
-	pi.on("resources_discover", async (event, ctx) => {
-		try {
-			const root = findRoot(event.cwd);
-			if (!root || root !== registeredRoot || findRoot(ctx.cwd) !== root) return;
-			requireRuntime(root);
-			const skillPaths = await projectSkillPaths(event.cwd, ctx.isProjectTrusted());
-			// Resolution is asynchronous; discovery must not publish skills from a
-			// runtime that became invalid while the host resolved package resources.
-			if (findRoot(ctx.cwd) !== root) return;
-			requireRuntime(root);
-			return { skillPaths };
-		} catch (error) {
-			if (ctx.hasUI) ctx.ui.notify(`Trellis skills unavailable: ${String(error)}`, "warning");
-			return;
-		}
 	});
 
 	// ---- M1: prompt sections -----------------------------------------------

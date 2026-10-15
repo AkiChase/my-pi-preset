@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, readdirSync, lstatSync, chmodSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, readdirSync, lstatSync, chmodSync, symlinkSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
 import { plan, apply, inspect, verifyRuntime, digest, runtimeBaseline } from '../lib/initialization/engine.ts';
+import { copyRuntimeFixture } from './runtime-fixture.mjs';
 import { fileURLToPath } from 'node:url';
 
 // Trellis resource root; tests never depend on the process cwd.
@@ -14,40 +15,41 @@ const manifestPath = '.trellis/.pi-trellis.json';
 const workflow = '.trellis/workflow.md';
 const missingIndex = '.trellis/spec/index.md';
 const revision = '2e8e73cc18eaf937a41ec023a3fbd9f295642496';
-function fixture(t) {
- const root = mkdtempSync(join(tmpdir(), 'pi-manifest-v2-'));
- t.after(() => rmSync(root, { recursive: true, force: true }));
- const put = (path, value) => { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), typeof value === 'string' ? value : JSON.stringify(value)); };
+// Cases that only need an initialized project use the shared build directly; cases that mutate
+// files copy it, so one initialization per process replaces one per case.
+function shape(root) { const put = (path, value) => { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), typeof value === 'string' ? value : JSON.stringify(value)); };
  const snapshot = (directory = root) => Object.fromEntries(readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name)).flatMap(e => {
   const path = join(directory, e.name), rel = path.slice(root.length + 1);
   return e.isDirectory() ? [[rel, 'directory'], ...Object.entries(snapshot(path))] : [[rel, e.isSymbolicLink() ? 'symlink' : `${lstatSync(path).mode & 0o777}:${readFileSync(path).toString('base64')}`]];
  }));
- return { root, put, snapshot };
+ const manifestFile = join(root, manifestPath);
+ const manifest = existsSync(manifestFile) ? JSON.parse(readFileSync(manifestFile)) : undefined;
+ return { root, put, snapshot, manifest };
 }
-function initialized(t) {
- const f = fixture(t); apply(plan(f.root, 'Returning User'));
- return { ...f, manifest: JSON.parse(readFileSync(join(f.root, manifestPath))) };
-}
-// Test-only construction: public init has no preserve/migration input.
-function preserved(t) {
- const f = initialized(t);
- for (const path of Object.keys(f.manifest.templates)) {
+// Cases that only need an initialized project use the shared build directly; cases that mutate
+// files copy it, so one initialization per process replaces one per case.
+function fixture(t) { return shape(copyRuntimeFixture(t, { user: 'Returning User' })); }
+// Test-only construction: public init has no preserve/migration input. The shared build is
+// transformed once; every copying case sees the same preserved layout.
+function preserve(root) {
+ const manifest = JSON.parse(readFileSync(join(root, manifestPath)));
+ for (const path of Object.keys(manifest.templates)) {
   const absent = path === missingIndex;
   const content = `Legacy project-owned ${path}\r\nCustom conventions retained.\r\n`;
   const mode = path === workflow ? 0o640 : 0o644;
-  if (absent) rmSync(join(f.root, path));
-  else { f.put(path, content); chmodSync(join(f.root, path), mode); }
-  f.manifest.templates[path] = { origin: 'preserved-project', sha256: absent ? null : digest(content), mode: absent ? null : mode, source: { kind: 'project-snapshot', revision } };
+  if (absent) rmSync(join(root, path));
+  else { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), content); chmodSync(join(root, path), mode); }
+  manifest.templates[path] = { origin: 'preserved-project', sha256: absent ? null : digest(content), mode: absent ? null : mode, source: { kind: 'project-snapshot', revision } };
  }
- f.put(manifestPath, f.manifest);
- return f;
+ writeFileSync(join(root, manifestPath), JSON.stringify(manifest, null, 2) + '\n');
 }
+function preserved(t) { return shape(copyRuntimeFixture(t, { key: 'preserved', user: 'Returning User', prepare: preserve })); }
 function rehash(plan) { const { planHash, ...body } = plan; plan.planHash = digest(JSON.stringify(body)); }
 
-test('schema2 separates exact runtime/roles from seven preserved old-project templates and an absent index', t => {
+test('manifest separates exact runtime/roles from seven preserved old-project templates and an absent index', t => {
  const f = preserved(t), before = f.snapshot(), release = runtimeBaseline().releaseId;
  const m = verifyRuntime(f.root);
- assert.equal(m.schemaVersion, 2); assert.equal(m.runtimeReleaseId, release);
+ assert.equal(m.schemaVersion, 3); assert.equal(m.runtimeReleaseId, release);
  assert.equal(Object.values(m.files).filter(v => v.kind === 'runtime').length, Object.keys(runtimeBaseline().files).length);
  assert.equal(Object.values(m.files).filter(v => v.kind === 'agent').length, 3);
  assert.equal(Object.keys(m.templates).length, 8);
@@ -77,6 +79,14 @@ test('preserved clone identity setup/retry retains exact provenance and all proj
 
 const malformedManifests = {
  'unreleased schema1': m => { m.schemaVersion = 1; },
+ 'unreleased schema4': m => { m.schemaVersion = 4; },
+ 'skills under schema2': m => { m.schemaVersion = 2; },
+ 'schema3 without skills': m => { delete m.skills; },
+ 'unknown skill entry': m => { m.skills['.pi/skills/trellis-extra/SKILL.md'] = m.skills['.pi/skills/trellis-start/SKILL.md']; },
+ 'wrong skill source': m => { m.skills['.pi/skills/trellis-start/SKILL.md'].source = 'runtime/task.py'; },
+ 'unknown skill field': m => { m.skills['.pi/skills/trellis-start/SKILL.md'].kind = 'runtime'; },
+ 'invalid skill hash': m => { m.skills['.pi/skills/trellis-start/SKILL.md'].sha256 = 'A'.repeat(64); },
+ 'skills array': m => { m.skills = []; },
  'null files': m => { m.files = null; },
  'array files': m => { m.files = []; },
  'missing runtime': m => { delete m.files['.trellis/scripts/task.py']; },
@@ -86,7 +96,10 @@ const malformedManifests = {
  'wrong runtime kind': m => { m.files['.trellis/scripts/task.py'].kind = 'template'; },
  'wrong runtime hash': m => { m.files['.trellis/scripts/task.py'].sha256 = digest('untrusted'); },
  'wrong role source': m => { m.files['.pi/agents/trellis-check.md'].source = 'runtime/task.py'; },
- 'wrong role mode': m => { m.files['.pi/agents/trellis-check.md'].mode = 0o755; },
+ 'wrong role kind': m => { m.files['.pi/agents/trellis-check.md'].kind = 'runtime'; },
+ 'malformed role hash': m => { m.files['.pi/agents/trellis-check.md'].sha256 = 'A'.repeat(64); },
+ 'malformed role mode': m => { m.files['.pi/agents/trellis-check.md'].mode = '0644'; },
+ 'unknown role field': m => { m.files['.pi/agents/trellis-check.md'].authorize = true; },
  'unknown manifest field': m => { m.authorize = true; },
  'null templates': m => { m.templates = null; },
  'array templates': m => { m.templates = []; },
@@ -115,33 +128,46 @@ const malformedManifests = {
  'excess mode bits': m => { m.templates[workflow].mode = 0o1000; },
  'missing source revision': m => { delete m.templates[workflow].source.revision; },
  'unknown template field': m => { m.templates[workflow].output = 'untrusted'; },
- 'fake canonical claim over preserved hashes': m => { m.templates[workflow].origin = 'package-default'; m.templates[workflow].source = 'resources/templates/workflow.md'; },
 };
 for (const [attack, mutate] of Object.entries(malformedManifests)) {
- test(`schema2 rejects ${attack} with no writes`, t => {
+ test(`manifest rejects ${attack} with no writes`, t => {
   const f = preserved(t); mutate(f.manifest); f.put(manifestPath, f.manifest);
   const before = f.snapshot(); assert.throws(() => verifyRuntime(f.root)); assert.equal(inspect(f.root).state, 'conflict'); assert.throws(() => plan(f.root, 'Returning User')); assert.deepEqual(f.snapshot(), before);
  });
 }
 
-test('package-default still requires exact hash/mode/source; preserved provenance cannot relax runtime disk validation', t => {
- for (const [field, value] of [['sha256', null], ['mode', 0o640], ['source', 'resources/templates/config.yaml']]) {
-  const f = initialized(t); f.manifest.templates[workflow][field] = value; f.put(manifestPath, f.manifest); assert.throws(() => verifyRuntime(f.root));
- }
- for (const attack of ['bytes', 'mode']) {
-  const f = preserved(t), path = '.trellis/scripts/task.py';
-  if (attack === 'bytes') f.put(path, '# untrusted runtime\n'); else chmodSync(join(f.root, path), 0o600);
-  const before = f.snapshot(); assert.throws(() => verifyRuntime(f.root), /missing or modified/); assert.deepEqual(f.snapshot(), before);
- }
+test('stale role/template fingerprints are safe updates while runtime rows and malformed shapes still reject', t => {
+	// A role row that only records older bytes/mode is a safe update, never a blocked project: dispatch
+	// reads the role file without hash checks, and Update restores the exact current fingerprint.
+	const f = fixture(t), role = '.pi/agents/trellis-check.md';
+	f.manifest.files[role] = { ...f.manifest.files[role], sha256: digest('older role wording'), mode: 0o600 };
+	f.put(manifestPath, f.manifest);
+	assert.equal(inspect(f.root).state, 'ready'); assert.ok(verifyRuntime(f.root));
+	assert.ok(readFileSync(join(f.root, role), 'utf8').startsWith('---'));
+	// A package-default template row with an older fingerprint is likewise a safe refresh of the record.
+	f.manifest.templates[workflow] = { ...f.manifest.templates[workflow], sha256: digest('older workflow'), mode: 0o640 };
+	f.put(manifestPath, f.manifest); assert.ok(verifyRuntime(f.root));
+	// Only runtime rows must equal the current package bytes, and every row still needs a valid shape.
+	for (const [field, value] of [['sha256', digest('untrusted')], ['mode', 0o600], ['source', 'runtime/other.py']]) {
+	 const g = fixture(t); g.manifest.files['.trellis/scripts/task.py'][field] = value; g.put(manifestPath, g.manifest); assert.throws(() => verifyRuntime(g.root));
+	}
+	for (const [field, value] of [['sha256', null], ['mode', null], ['sha256', 'A'.repeat(64)], ['mode', 0o1000], ['source', 'resources/templates/config.yaml']]) {
+	 const g = fixture(t); g.manifest.templates[workflow][field] = value; g.put(manifestPath, g.manifest); assert.throws(() => verifyRuntime(g.root));
+	}
+	for (const attack of ['bytes', 'mode']) {
+	 const g = preserved(t), path = '.trellis/scripts/task.py';
+	 if (attack === 'bytes') g.put(path, '# untrusted runtime\n'); else chmodSync(join(g.root, path), 0o600);
+	 const before = g.snapshot(); assert.throws(() => verifyRuntime(g.root), /missing or modified/); assert.deepEqual(g.snapshot(), before);
+	}
 });
 
 test('bounded null/64-character revisions and mixed provenance are diagnostic, never filesystem source paths', t => {
- const f = preserved(t), canonical = initialized(t).manifest.templates;
+ const f = preserved(t), canonical = JSON.parse(readFileSync(join(fixture(t).root, manifestPath))).templates;
  f.manifest.templates[workflow].source.revision = null;
  f.manifest.templates['.trellis/config.yaml'].source.revision = 'a'.repeat(64);
  f.manifest.templates['.trellis/spec/guides/index.md'] = canonical['.trellis/spec/guides/index.md'];
  f.put(manifestPath, f.manifest); assert.ok(verifyRuntime(f.root));
- const victim = fixture(t); rmSync(join(f.root, missingIndex), { force: true }); symlinkSync(join(victim.root, 'absent'), join(f.root, missingIndex));
+ const victim = shape(mkdtempSync(join(tmpdir(), 'pi-manifest-victim-'))); t.after(() => rmSync(victim.root, { recursive: true, force: true })); rmSync(join(f.root, missingIndex), { force: true }); symlinkSync(join(victim.root, 'absent'), join(f.root, missingIndex));
  const before = f.snapshot(); assert.throws(() => verifyRuntime(f.root), /symlinked/); assert.deepEqual(f.snapshot(), before); assert.deepEqual(readdirSync(victim.root), []);
 });
 
