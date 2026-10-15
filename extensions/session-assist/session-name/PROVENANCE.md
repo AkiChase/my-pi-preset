@@ -6,4 +6,4 @@
 
 实际 SDK 基线为 Pi 1.2.0 的公共 extension/model/session API。不修改或发布 SDK 副本，不导入安装路径，不自行 HTTP/认证，不复制旧包 provider header patch。
 
-标题由 Pi 原生 `setSessionName` 保存，终端标题交宿主管理，不保留旧包的特殊忙闲符号。冲突声明负责移除 standalone `npm:pi-session-name`；现有历史标题保守保护，不清空个人状态。
+标题由 Pi 原生 `setSessionName` 保存，终端标题交宿主管理，不保留旧包的特殊忙闲符号。冲突声明负责移除 standalone `npm:pi-session-name`；现有历史标题与手动标题受保护，不清空个人状态；旧命名状态不沿用。

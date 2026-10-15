@@ -12,8 +12,11 @@ export const LEGACY_STATE_TYPE = "preset.session-name.v1";
 export const MATERIAL_BUDGET = 32_000;
 type Phase = "first" | "second" | "finished";
 const PHASES: readonly Phase[] = ["first", "second", "finished"];
-/** Session-level automatic quota; `anchor` is the counted input total when the first chance started. */
-interface Quota { phase: Phase; count: number; anchor: number | null; observedIds: string[] }
+/**
+ * Session-level automatic quota. `anchor` is the counted input total when the first chance started;
+ * `lastCountedId` is the latest counted user message, so later boundaries only scan newer entries.
+ */
+interface Quota { phase: Phase; count: number; anchor: number | null; lastCountedId: string | null }
 interface Ownership { titleEntryId: string | null; title: string | null; owned: boolean }
 interface Stored { version: 2; quota: Quota; ownership: Ownership }
 interface Candidate { text: string; eligible: boolean; after: Set<string> }
@@ -38,39 +41,27 @@ function quotaOf(value: unknown): Quota | undefined {
     const quota = record(value);
     if (!quota || !PHASES.includes(quota.phase as Phase) || !count(quota.count) ||
         !(quota.anchor === null || (count(quota.anchor) && quota.anchor <= quota.count)) ||
-        !Array.isArray(quota.observedIds) || !quota.observedIds.every(id => typeof id === "string")) return undefined;
-    return { phase: quota.phase as Phase, count: quota.count, anchor: quota.anchor as number | null, observedIds: [...quota.observedIds as string[]] };
+        // The second chance is scheduled from the anchor; without it the entry is unusable.
+        (quota.phase === "second" && quota.anchor === null) ||
+        !(quota.lastCountedId === null || typeof quota.lastCountedId === "string")) return undefined;
+    return { phase: quota.phase as Phase, count: quota.count, anchor: quota.anchor as number | null, lastCountedId: quota.lastCountedId as string | null };
 }
 function custom(entry: SessionEntry, type: string): Record<string, unknown> | undefined {
     return entry.type === "custom" && entry.customType === type ? record(entry.data) : undefined;
 }
-/** v1 progress was branch-local; only an all-zero history proves no automatic request ever started. */
-function legacyUnused(data: Record<string, unknown>): boolean {
-    const progress = record(data.progress);
-    return progress?.version === 1 && progress.count === 0;
-}
+const FRESH: Quota = { phase: "first", count: 0, anchor: null, lastCountedId: null };
 /**
- * Quota is restored from the whole session in append order, never the current branch, and merged
- * monotonically so branch navigation, reload or resume cannot return a consumed chance.
+ * Quota comes from the latest valid v2 entry in whole-session append order, never the current branch,
+ * so branch navigation, reload and resume keep using it. v1 or unreadable state simply starts fresh:
+ * an extra automatic rename is acceptable, and manual or unknown titles stay protected by ownership.
  */
 function restoreQuota(entries: SessionEntry[]): Quota {
-    const stored = entries.flatMap(entry => {
-        const data = custom(entry, STATE_TYPE);
+    for (let index = entries.length - 1; index >= 0; index--) {
+        const data = custom(entries[index], STATE_TYPE);
         const quota = data?.version === 2 ? quotaOf(data.quota) : undefined;
-        return quota ? [quota] : [];
-    });
-    if (!stored.length) {
-        const legacy = entries.flatMap(entry => { const data = custom(entry, LEGACY_STATE_TYPE); return data ? [data] : []; });
-        // Unknown remaining v1 quota converges to finished instead of granting a fresh pair of chances.
-        return { phase: legacy.length && !legacy.every(legacyUnused) ? "finished" : "first", count: 0, anchor: null, observedIds: [] };
+        if (quota) return quota;
     }
-    const rank = Math.max(...stored.map(quota => PHASES.indexOf(quota.phase)));
-    const anchors = stored.flatMap(quota => quota.anchor === null ? [] : [quota.anchor]);
-    const anchor = anchors.length ? Math.max(...anchors) : null;
-    // A started first chance without its anchor cannot place the second threshold safely.
-    const phase = PHASES[rank] === "second" && anchor === null ? "finished" : PHASES[rank];
-    return { phase, count: Math.max(...stored.map(quota => quota.count), anchor ?? 0), anchor,
-        observedIds: [...new Set(stored.flatMap(quota => quota.observedIds))] };
+    return { ...FRESH };
 }
 function restoreOwnership(entries: SessionEntry[]): Ownership | undefined {
     for (let index = entries.length - 1; index >= 0; index--) {
@@ -87,7 +78,7 @@ export default function registerSessionName(pi: ExtensionAPI): void {
     let configWarning = false;
     let epoch = 0;
     let controller: AbortController | undefined;
-    let quota: Quota = { phase: "first", count: 0, anchor: null, observedIds: [] };
+    let quota: Quota = { ...FRESH };
     let ownership: Ownership = { titleEntryId: null, title: null, owned: false };
     let candidates: Candidate[] = [];
     let sessionId: string | undefined;
@@ -97,11 +88,12 @@ export default function registerSessionName(pi: ExtensionAPI): void {
 
     const cancel = () => { epoch++; controller?.abort(); controller = undefined; };
     const persist = () => pi.appendEntry<Stored>(STATE_TYPE, { version: 2,
-        quota: { ...quota, observedIds: [...quota.observedIds] }, ownership: { ...ownership } });
+        quota: { ...quota }, ownership: { ...ownership } });
     const notify = (ctx: ExtensionContext, text: string, severity: "info" | "warning" | "error") => {
         if (active && ctx.sessionManager.getSessionId() === sessionId) ctx.ui.notify(text, severity);
     };
-    const remaining = () => quota.phase === "first" ? "2 automatic attempts left" :
+    const remaining = () => ownership.title !== null && !ownership.owned ? "automatic paused for the current title" :
+        quota.phase === "first" ? "2 automatic attempts left" :
         quota.phase === "second" ? "1 automatic attempt left" : "automatic attempts finished";
     /** The second chance needs N inputs after the first input and a new input after the first chance started. */
     function dueChance(): Phase | undefined {
@@ -140,8 +132,9 @@ export default function registerSessionName(pi: ExtensionAPI): void {
     }
     function collectDelivered(ctx: ExtensionContext): boolean {
         const branch = ctx.sessionManager.getBranch();
-        const observed = new Set(quota.observedIds);
-        const delivered = branch.filter(entry => entry.type === "message" && entry.message.role === "user" && !observed.has(entry.id));
+        // Candidate `after` sets already exclude older messages; the last counted id is a cheap extra guard.
+        const start = quota.lastCountedId === null ? 0 : branch.findIndex(entry => entry.id === quota.lastCountedId) + 1;
+        const delivered = branch.slice(start).filter(entry => entry.type === "message" && entry.message.role === "user");
         let changed = false;
         for (const entry of delivered) {
             if (entry.type !== "message" || entry.message.role !== "user") continue;
@@ -153,10 +146,9 @@ export default function registerSessionName(pi: ExtensionAPI): void {
                 !matches[0].after.has(other.id) && textOf(other.message.content) === text);
             if (matchingMessages.length !== 1) continue;
             quota.count++;
-            observed.add(entry.id);
+            quota.lastCountedId = entry.id;
             changed = true;
         }
-        quota.observedIds = [...observed];
         candidates = [];
         return changed;
     }
@@ -211,7 +203,8 @@ export default function registerSessionName(pi: ExtensionAPI): void {
                 persist();
                 return;
             }
-            ownership = { titleEntryId: written.id, title, owned: true };
+            // A manually requested title belongs to the user: automatic naming never replaces it.
+            ownership = { titleEntryId: written.id, title, owned: !manual };
             persist();
             if (manual) notify(ctx, `Session name: ${title}`, "info");
         } catch (error) {
