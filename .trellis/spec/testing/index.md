@@ -74,6 +74,13 @@ node --test extensions/agent-tasks/__tests__/*.test.ts
 - Tool validation: use registered schemas with the actual `validateToolArguments` boundary. Assert unknown field paths and zero execution effects; cover number and string fractions for `Number({ multipleOf: 1 })`, whitespace-only prompt/message, resume-option conflicts and frontmatter requested/effective values in returned content. For bash, assert nonzero output still includes exit code, spontaneous signals are errors while explicit cancellation is not, and Chinese/emoji output does not falsely claim byte truncation. Workflow tests must compare author-error propagation with tolerated child/thunk nulls and check retained final notification/output reasons.
 - Agent backend: `tool-waits`, `backend-waits`, `runner-cancellation`, `worktree-lifecycle`, `auxiliary-lifecycle`, `loading` and `workflow` tests cover registered interfaces/frontmatter, parent/child guards, bind races, worker natural exit, scheduler ownership, late noncooperative completion and retained artifacts. Source transformation stays restricted to the test-only in-memory `extensions/agent-tasks/__tests__/source-loader.mjs`; real Pi still loads production through its host loader. Fake Git/RPC/session seams are not actual worktree/provider end-to-end evidence.
 
+- Trellis: logic tests only, as `.mjs` under `extensions/trellis/__tests__/` (root `test` globs `extensions/**/__tests__/*.test.mjs`). Do not add real Pi host, mounted overlay, TUI rendering or menu-flow tests; drive extension handlers through a fake `pi` object instead. Build the initialized project once and copy it per case (`copyRuntimeFixture` in `runtime-fixture.mjs`, shared `mockPython` router) rather than running a full init per case; rewrite or delete the copied operation record so assertions fail for the intended reason. Python unit tests run through `python-worktree.test.mjs`. Fixtures must not depend on any external checkout or its Git history.
+
+```sh
+node --test extensions/trellis/__tests__/*.test.mjs extensions/shared/scroll-panel/__tests__/*.test.ts
+python3 -B -m unittest discover -s extensions/trellis/__tests__/python -p 'test_*.py'
+```
+
 Full natural-exit integration may use `node --test "extensions/**/__tests__/*.test.ts" "scripts/*.test.mjs"` under isolation; it is separate from the forced-exit package suite. Inspect current tests and limitations before selecting checks, rather than blindly reusing an old matrix. Existing detailed developer notes in extension TESTING files are not user docs or current acceptance; dated results belong in task evidence.
 
 ## Reporting and Documentation Gates
