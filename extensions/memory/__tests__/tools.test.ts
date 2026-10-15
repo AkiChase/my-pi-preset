@@ -22,7 +22,7 @@ it("actual registration exposes four TypeBox tools, errors are isError, lifecycl
   const emit = async (name: string) => { await handlers.get(name)?.({}, ctx); };
   memory(pi);
   assert.deepEqual([...tools.keys()], ["memory_read", "memory_list", "memory_write", "memory_forget"]);
-  assert.deepEqual([...handlers.keys()], ["session_start", "session_shutdown"]);
+  assert.deepEqual([...handlers.keys()], ["session_start", "before_agent_start", "session_shutdown"]);
   assert.equal(fs.existsSync(join(agentDir, "memory", "projects")), true); // fixture initialized a separate store only
   const call = (name: string, params: Record<string, unknown>, signal?: AbortSignal) => tools.get(name)!.execute("test", params, signal, undefined, ctx);
   assert.equal((await call("memory_list", {})).isError, true);
@@ -53,4 +53,35 @@ it("actual registration exposes four TypeBox tools, errors are isError, lifecycl
   const start = lateHandlers.get("session_start")!({}, { cwd: newCwd } as ExtensionContext);
   lateHandlers.get("session_shutdown")!({}, ctx); await assert.rejects(Promise.resolve(start), /closed/);
   assert.deepEqual(fs.readdirSync(join(agentDir, "memory", "projects")), dirs);
+});
+
+it("startup config failure keeps all tools closed after config repair until a fresh session_start", async t => {
+  const { agentDir, project } = fixture(t);
+  const previous = process.env.PI_CODING_AGENT_DIR; process.env.PI_CODING_AGENT_DIR = agentDir;
+  t.after(() => { if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = previous; });
+  const tools = new Map<string, ToolDefinition>();
+  const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => unknown>();
+  const pi = {
+    registerTool(tool: ToolDefinition) { tools.set(tool.name, tool); },
+    on(name: string, handler: (event: unknown, ctx: ExtensionContext) => unknown) { handlers.set(name, handler); return () => {}; },
+  } as unknown as ExtensionAPI;
+  memory(pi);
+  const ctx = { cwd: project.root } as ExtensionToolContext;
+  fs.writeFileSync(join(agentDir, "memory.json"), '{"enabled":"STARTUP_TOOL_SECRET"}');
+  await handlers.get("session_start")!({}, ctx);
+  fs.writeFileSync(join(agentDir, "memory.json"), '{"enabled":true}');
+  const calls: [string, Record<string, unknown>][] = [
+    ["memory_read", { name: "item" }], ["memory_list", {}],
+    ["memory_write", { name: "item", type: "user", description: "Preference", body: "Never published", expectedRevision: null }],
+    ["memory_forget", { name: "item", expectedRevision: "a".repeat(64) }],
+  ];
+  const before = fs.readdirSync(join(agentDir, "memory", "projects"));
+  for (const [name, params] of calls) {
+    const result = await tools.get(name)!.execute("test", params, undefined, undefined, ctx);
+    assert.equal(result.isError, true); assert.deepEqual(result.details, { error: "closed" });
+    assert.equal(JSON.stringify(result).includes("STARTUP_TOOL_SECRET"), false);
+  }
+  assert.deepEqual(fs.readdirSync(join(agentDir, "memory", "projects")), before);
+  await handlers.get("session_start")!({}, ctx);
+  assert.equal((await tools.get("memory_list")!.execute("test", {}, undefined, undefined, ctx)).isError, undefined);
 });

@@ -19,12 +19,14 @@
 - [x] 单测临时HOME/agentDir/cwd、Git identity seam及临时自有Git仓库（不动真实仓库配置），secret/UTF8/path/symlink/lock/crash/conflict/capacity全矩阵。
 - [x] 两个独立本地进程竞争同项目锁，验证冲突/无lost update；不只用Promise.all进程内测试。
 - [x] 独立审查c3c53b27完成，主会话通读实际修复并复测27/27自然退出0；独立strict+full800/800 exit0沿用最终未变输入。证据见research/stage-1-independent-review.md及stage-1-main-focused.log。接受既定public agentDir symlink祖先拒绝，后续UI提示和配置published/durability重读不得遗漏。
+- 阶段1提交：`f635dcc`；26个精确文件，仅memory代码/测试和本任务材料。原始.log保留本地未提交，首次staged whitespace失败因日志空白行，未篡改日志；源码/Markdown/JSONL及提交diffcheck通过。
 
 ## 2. Prompt与生命周期（AC2/6/8）
-- [ ] 公开structured sections每run合成唯一project_memory段，保留其他扩展sections、不重复叠加；空库/错误规则明确，disabled删除自己的段。
-- [ ] 初始化timeout、shutdown epoch、旧dialog/async回调不能重开；无后台模型/退出flush/timer。
-- [ ] 实际SDK stub-provider捕获两次独立prompt、resume及空库请求，证明首/后轮索引存在、无额外模型调用；另验enabled→disabled自己的段移除、其他sections保留，不以注入handler字符串断言替代host请求验证。
-- [ ] root/embedded child加载均不创建后台任务；不引入Agent工具调用或递归。
+- [x] 公开structured sections每run合成唯一project_memory段，保留其他扩展sections、不重复叠加；空库/错误规则明确，disabled删除自己的段。
+- [x] 初始化timeout、shutdown epoch、旧dialog/async回调不能重开；无后台模型/退出flush/timer。（dialog围栏在阶段3另验。）
+- [x] 实际SDK stub-provider捕获两次独立prompt、resume及空库请求，证明首/后轮索引存在、无额外模型调用；另验enabled→disabled自己的段移除、其他sections保留，不以注入handler字符串断言替代host请求验证。
+- [x] root/embedded child加载均不创建后台任务；不引入Agent工具调用或递归。
+- 独立审查24c31566 PASS，补actual custom-triggered run与startup修复后四工具closed回归；主会话核实际两测试变更并复验37/37自然exit0，独立strict/full810/810 exit0沿用。CLI/PTY/在线质量仍NOT_RUN。
 
 ## 3. 交互面板（AC5/6/7）
 - [ ] 单custom页面内部list/detail状态，SDK theme/Markdown/ScrollView/Input；全宽、细背景、英文controls、原文正文。
