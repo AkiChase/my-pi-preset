@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/development/index.md", "reason": "Tool registration, validation, execution and unrelated-change boundaries"}
+{"file": ".trellis/spec/testing/index.md", "reason": "Actual host validator, isolated tests and natural-exit acceptance"}
