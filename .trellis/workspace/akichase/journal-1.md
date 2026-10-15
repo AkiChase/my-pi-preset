@@ -509,3 +509,45 @@ Recap已提交并经独立离线与真实tmux限定验收，默认5分钟实际3
 ### Status
 
 [OK] **Completed**
+
+
+## Session 18: Session Name 两次自动命名与共享上下文
+<!-- trellis-session: v=2 fp=8d45da6ddbdbe678 -->
+
+**Date**: 2026-10-15
+**Task**: Session Name 两次自动命名与共享上下文
+**Branch**: `main`
+
+### Summary
+
+Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享上下文材料；按用户当日决定取消保守迁移并在手动标题时停止自动改名。
+
+### Main Changes
+
+- S1 cfc47d3 把 recap/material.ts 抽到 shared/material.ts，cleanText 移到 shared/text.ts（Recap 保留 reexport），Recap 行为与 b48e37b 逐字节等价。
+- S2 025d41c 引入 preset.session-name.v2 会话级额度，机会在请求前持久化；删除周期评估与失败重试；prompt 去掉 currentTitle，三种请求共用 buildMaterial(...,32000)。
+- 规则调整 6efb5b9 按用户决定：旧 v1 或不可读状态按新会话重新两次机会；Pi /name 外部改名与 /session-name 手动标题不再被自动覆盖；状态只存 phase/count/anchor/lastCountedId。
+- 8038d7b 记录 evidence/report.md 并勾选 implement.md；同步 docs/extensions/session-name.md、PROVENANCE.md、prd/design 及 testing spec 中过时的 failure backoff 描述。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cfc47d3` | refactor(session-assist): share recap material builder |
+| `025d41c` | feat(session-name): limit automatic naming to two attempts per session |
+| `6efb5b9` | feat(session-name): protect manual titles and simplify quota state |
+| `8038d7b` | docs(task): record session-name two-shot verification |
+
+### Testing
+
+- [OK] 定向 session-name/recap/shared 自然退出 92/92 exit 0（临时 PI_CODING_AGENT_DIR、已安装 SDK）。
+- [OK] pnpm check（typecheck+全部测试含 scripts manifest/sync，force-exit）927/927 exit 0，HEAD 6efb5b9。
+- [OK] S1 独立审查 86/86 + 4831 材料/65538 sanitizer 等价；S2 与规则调整各经独立只读审查，非阻塞项已修。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- NOT_RUN：在线模型标题质量、真实终端/tmux、install/sync/reload；如需真实验证另行授权。
