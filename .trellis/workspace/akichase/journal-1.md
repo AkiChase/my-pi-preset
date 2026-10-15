@@ -440,3 +440,27 @@ custom 浏览不再误报 blocked，问卷使用明确 attention 事件，聚合
 ### Status
 
 [OK] **Completed**
+
+
+## Session 15: Runtime task tools 验收与收尾
+<!-- trellis-session: v=2 fp=a46ae8fdfc241a0f -->
+
+**Date**: 2026-10-15
+**Task**: Runtime task tools 验收与收尾
+**Branch**: `main`
+
+### Summary
+
+已验收归档10-14-runtime-task-tools；source strict PASS/119focused/773full natural、真实tmux8功能+8逐cell背景PASS，独立R1-R4/N1与三方集成复查PASS。产品及文档规范未提交、托管worktree保留；无push/install/sync/reload，外部pi-trellis适配仍发布前置。
+
+### Git Commits
+
+(No commits - planning session)
+
+### Status
+
+[OK] **Completed**
+
+### 提交补正（2026-10-15）
+
+用户随后明确授权提交。产品、测试、文档与规范已在 main 提交为 `273fad3`（`feat: unify runtime task tools and management`）。此前未分阶段提交、先归档后提交的流程偏差如实保留；不伪造历史阶段提交。其他任务改动与原托管 worktree 保留，未 push。

@@ -1,0 +1,110 @@
+{
+  "cases": [
+    {
+      "case": "list-140-collapsed",
+      "width": 140,
+      "expected_rgb": [
+        37,
+        65,
+        49
+      ],
+      "status": "PASS",
+      "matching_rows": 1,
+      "bad_columns": [],
+      "text": " task_manage  list  0 tasks · ctrl+o expand"
+    },
+    {
+      "case": "list-80-collapsed",
+      "width": 80,
+      "expected_rgb": [
+        37,
+        65,
+        49
+      ],
+      "status": "PASS",
+      "matching_rows": 1,
+      "bad_columns": [],
+      "text": " task_manage  list  0 tasks · ctrl+o expand"
+    },
+    {
+      "case": "list-40-collapsed",
+      "width": 40,
+      "expected_rgb": [
+        37,
+        65,
+        49
+      ],
+      "status": "PASS",
+      "matching_rows": 1,
+      "bad_columns": [],
+      "text": " task_manage  list  0 tasks"
+    },
+    {
+      "case": "error-collapsed",
+      "width": 140,
+      "expected_rgb": [
+        91,
+        40,
+        42
+      ],
+      "status": "PASS",
+      "matching_rows": 1,
+      "bad_columns": [],
+      "text": " task_manage  status missing-runtime-object-long-title  not_found · ctrl+o expand"
+    },
+    {
+      "case": "bash-wait-partial",
+      "width": 140,
+      "expected_rgb": [
+        52,
+        56,
+        58
+      ],
+      "status": "PASS",
+      "matching_rows": 1,
+      "bad_columns": [],
+      "text": " task_manage  BashGate…a/long/runtime/title  waiting · bash · wait b4zspb0cm run b4zspb0cm · pid: 64060 · duration_ms: 1126 · ctrl+o expand"
+    },
+    {
+      "case": "bash-wait-final",
+      "width": 140,
+      "expected_rgb": [
+        37,
+        65,
+        49
+      ],
+      "status": "PASS",
+      "matching_rows": 1,
+      "bad_columns": [],
+      "text": " task_manage  BashGat…long/runtime/title  completed · bash · wait b4zspb0cm run b4zspb0cm · bytes 0-875 of 875 · pid: 64060 · ctrl+o expand"
+    },
+    {
+      "case": "child-final-collapsed",
+      "width": 140,
+      "expected_rgb": [
+        37,
+        65,
+        49
+      ],
+      "status": "PASS",
+      "matching_rows": 1,
+      "bad_columns": [],
+      "text": " task_manage  ChildG…cal final answer  completed · subagent · wait 322d7376-c879-4e5 run 1 · toolUses: 1 · duration_ms: 138 · ctrl+o expand"
+    },
+    {
+      "case": "monitor-finite-final",
+      "width": 140,
+      "expected_rgb": [
+        37,
+        65,
+        49
+      ],
+      "status": "PASS",
+      "matching_rows": 1,
+      "bad_columns": [],
+      "text": " task_manage  Monito…e ends on gate  completed · monitor · wait m4y1erqgu run m4y1erqgu · bytes 0-1010 of 1010 · pid: 64286 · ctrl+o expand"
+    }
+  ],
+  "passed": true,
+  "scope": "Captured actual SGR summary rows, per displayed cell including right padding; not arbitrary frames/themes."
+}

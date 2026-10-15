@@ -1,0 +1,85 @@
+{
+  "command": "exec /usr/bin/env -i HOME=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/runtime-tmux-v6q629j3/home PI_CODING_AGENT_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/runtime-tmux-v6q629j3/agent PI_CODING_AGENT_SESSION_DIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/runtime-tmux-v6q629j3/sessions RUNTIME_SMOKE_ROOT=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/runtime-tmux-v6q629j3 RUNTIME_SMOKE_PYTHON=/opt/homebrew/bin/python3 RUNTIME_SMOKE_WORKER=/Users/jyxc-dz-0101322/tools/my-pi-preset/.worktree/10-14-runtime-task-tools/.trellis/tasks/10-14-runtime-task-tools/research/tmux-runtime/worker.py PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PI_TRUE_COLOR=1 PI_HYPERLINKS=0 PI_IMAGE_PROTOCOL=none PI_TUI_WRITE_LOG=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/runtime-tmux-v6q629j3/terminal.raw PATH=/opt/homebrew/bin:/usr/bin:/bin TERM=tmux-256color COLORTERM=truecolor LANG=en_US.UTF-8 TMPDIR=/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/runtime-tmux-v6q629j3/tmp SHELL=/bin/bash /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir /var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/runtime-tmux-v6q629j3/sessions --use-theme dark --tui-mode fullscreen --tools bash,monitor,subagent_run,subagent_workflow,subagent_message,task_manage -e /Users/jyxc-dz-0101322/tools/my-pi-preset/.worktree/10-14-runtime-task-tools/.trellis/tasks/10-14-runtime-task-tools/research/tmux-runtime/provider.ts -e /Users/jyxc-dz-0101322/tools/my-pi-preset/.worktree/10-14-runtime-task-tools/extensions/beautify.ts -e /Users/jyxc-dz-0101322/tools/my-pi-preset/.worktree/10-14-runtime-task-tools/extensions/task-composition.ts --model runtime-offline/scripted",
+  "server": "runtime-tmux-v6q629j3",
+  "root": "/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/runtime-tmux-v6q629j3",
+  "mode": "fullscreen",
+  "theme": "dark",
+  "cases": [
+    {
+      "case": "list Ctrl+O dark/fullscreen 140",
+      "status": "PASS",
+      "width": 140
+    },
+    {
+      "case": "list Ctrl+O dark/fullscreen 80",
+      "status": "PASS",
+      "width": 80
+    },
+    {
+      "case": "list Ctrl+O dark/fullscreen 40",
+      "status": "PASS",
+      "width": 40
+    },
+    {
+      "case": "registered error + expansion",
+      "status": "PASS"
+    },
+    {
+      "case": "real bash identity/paging/partial/bg/final",
+      "status": "PASS",
+      "identity": {
+        "version": 1,
+        "task_type": "bash",
+        "task_id": "b7bcbd8hj",
+        "run_id": "b7bcbd8hj",
+        "mode": "background"
+      }
+    },
+    {
+      "case": "real local child final answer explicit+inherited offline model",
+      "status": "PASS",
+      "answer_characters": 563
+    },
+    {
+      "case": "monitor stream/wait Esc target unchanged/stop/finite completion",
+      "status": "PASS"
+    },
+    {
+      "case": "workflow simple script return",
+      "status": "PASS"
+    }
+  ],
+  "error": null,
+  "cleanup": {
+    "natural_cli_exit": true,
+    "cli_exit_status": "0",
+    "residual_owned_pids": {},
+    "cli_pid_gone": true,
+    "own_server_stopped": true,
+    "server_already_exited": true,
+    "isolated_config_removed": true
+  },
+  "not_run": [
+    "light/system/regular",
+    "physical mouse/IME",
+    "online model quality",
+    "nested child scope",
+    "subagent_message",
+    "workflow stop"
+  ],
+  "cli_pid": 31569,
+  "artifact_bytes": {
+    "events.jsonl": {
+      "original": 139442,
+      "stored": 139442,
+      "omitted_before": 0
+    },
+    "terminal.raw": {
+      "original": 306533,
+      "stored": 306533,
+      "omitted_before": 0
+    }
+  },
+  "elapsed_seconds": 4.212,
+  "driver_exit": 0
+}

@@ -1,0 +1,395 @@
+{
+  "source_head": "8158d31056b42e316039e64496903cf052ff4d46",
+  "target_base": "3bedbcc",
+  "files": [
+    {
+      "file": "extensions/agent-tasks/PROVENANCE.md",
+      "state": "three-way-CONFLICT"
+    },
+    {
+      "file": "extensions/agent-tasks/__tests__/auxiliary-lifecycle.test.ts",
+      "state": "three-way-clean"
+    },
+    {
+      "file": "extensions/agent-tasks/__tests__/backend-waits.test.ts",
+      "state": "three-way-clean"
+    },
+    {
+      "file": "extensions/agent-tasks/__tests__/host-loading-smoke.mjs",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/__tests__/source-loader.mjs",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/__tests__/tool-waits.test.ts",
+      "state": "three-way-CONFLICT"
+    },
+    {
+      "file": "extensions/agent-tasks/src/abortable.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/agent-manager.ts",
+      "state": "three-way-CONFLICT"
+    },
+    {
+      "file": "extensions/agent-tasks/src/agent-runner.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/agent-types.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/cross-extension-rpc.ts",
+      "state": "three-way-clean"
+    },
+    {
+      "file": "extensions/agent-tasks/src/custom-agents.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/index.ts",
+      "state": "three-way-clean"
+    },
+    {
+      "file": "extensions/agent-tasks/src/invocation-config.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/management.ts",
+      "state": "clean-new"
+    },
+    {
+      "file": "extensions/agent-tasks/src/mention-clone.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/mention.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/model-resolver.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/model-scope.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/nested-tools.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/output-file.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/prompts.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/schedule.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/settings.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/source.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/status-note.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/types.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/ui/schedule-menu.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/ui/workflow-card.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/waits.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/workflow/host.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/workflow/management.ts",
+      "state": "clean-new"
+    },
+    {
+      "file": "extensions/agent-tasks/src/workflow/meta.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/workflow/saved.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/workflow/task.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/agent-tasks/src/workflow/tool-description.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/beautify/TESTING.md",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/beautify/__tests__/editor.test.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/beautify/__tests__/registered-agent.test.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/beautify/__tests__/retrieval.test.ts",
+      "state": "three-way-CONFLICT"
+    },
+    {
+      "file": "extensions/beautify/__tests__/shell-collapse.test.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/beautify/__tests__/tools.test.ts",
+      "state": "three-way-CONFLICT"
+    },
+    {
+      "file": "extensions/beautify/index.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/beautify/layout.ts",
+      "state": "already-converged"
+    },
+    {
+      "file": "extensions/beautify/tools/bash.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/beautify/tools/get-subagent-result.ts",
+      "state": "clean-delete"
+    },
+    {
+      "file": "extensions/beautify/tools/jobs.ts",
+      "state": "add-delete-CONFLICT"
+    },
+    {
+      "file": "extensions/beautify/tools/optional.ts",
+      "state": "three-way-clean"
+    },
+    {
+      "file": "extensions/beautify/tools/retrieval-contracts.ts",
+      "state": "clean-delete"
+    },
+    {
+      "file": "extensions/beautify/tools/shared.ts",
+      "state": "already-converged"
+    },
+    {
+      "file": "extensions/beautify/tools/task-manage.ts",
+      "state": "clean-new"
+    },
+    {
+      "file": "extensions/process-tasks/PROVENANCE.md",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/__tests__/activation.test.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/__tests__/bash-bg.test.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/__tests__/bash-results.test.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/__tests__/error-paths.test.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/__tests__/features.test.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/__tests__/index.test.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/__tests__/jobs-read.test.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/__tests__/jobs.test.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/__tests__/management-fixture.ts",
+      "state": "clean-new"
+    },
+    {
+      "file": "extensions/process-tasks/__tests__/monitor-session.test.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/__tests__/process-harness.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/__tests__/sleep-guard.test.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/__tests__/waits.test.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/config.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/format.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/index.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/lifecycle.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/log-search.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/management.ts",
+      "state": "clean-new"
+    },
+    {
+      "file": "extensions/process-tasks/monitoring.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/notify.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/output.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/search.ts",
+      "state": "clean-new"
+    },
+    {
+      "file": "extensions/process-tasks/tools/bash-bg.ts",
+      "state": "clean-delete"
+    },
+    {
+      "file": "extensions/process-tasks/tools/bash-params.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/tools/bash.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/tools/jobs.ts",
+      "state": "clean-delete"
+    },
+    {
+      "file": "extensions/process-tasks/tools/monitor.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/process-tasks/types.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/runtime-tasks/__tests__/agent.test.ts",
+      "state": "clean-new"
+    },
+    {
+      "file": "extensions/runtime-tasks/__tests__/contracts.test.ts",
+      "state": "clean-new"
+    },
+    {
+      "file": "extensions/runtime-tasks/__tests__/handoff.test.ts",
+      "state": "clean-new"
+    },
+    {
+      "file": "extensions/runtime-tasks/__tests__/process.test.ts",
+      "state": "clean-new"
+    },
+    {
+      "file": "extensions/runtime-tasks/__tests__/public-process.test.ts",
+      "state": "clean-new"
+    },
+    {
+      "file": "extensions/runtime-tasks/__tests__/retained-child.test.ts",
+      "state": "clean-new"
+    },
+    {
+      "file": "extensions/runtime-tasks/__tests__/scope.test.ts",
+      "state": "clean-new"
+    },
+    {
+      "file": "extensions/runtime-tasks/__tests__/workflow.test.ts",
+      "state": "clean-new"
+    },
+    {
+      "file": "extensions/runtime-tasks/child-handoff.ts",
+      "state": "clean-new"
+    },
+    {
+      "file": "extensions/runtime-tasks/contracts.ts",
+      "state": "clean-new"
+    },
+    {
+      "file": "extensions/runtime-tasks/facade.ts",
+      "state": "clean-new"
+    },
+    {
+      "file": "extensions/runtime-tasks/launch.ts",
+      "state": "clean-new"
+    },
+    {
+      "file": "extensions/task-composition.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/task-ui/__tests__/mixed-waits.test.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/task-ui/__tests__/sdk-runtime.test.ts",
+      "state": "clean-update"
+    },
+    {
+      "file": "extensions/task-ui/owner.ts",
+      "state": "clean-update"
+    }
+  ],
+  "note": "Preview only; source unchanged, no commit or branch merge. Scope extensions only."
+}
