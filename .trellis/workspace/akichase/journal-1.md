@@ -464,3 +464,26 @@ custom 浏览不再误报 blocked，问卷使用明确 attention 事件，聚合
 ### 提交补正（2026-10-15）
 
 用户随后明确授权提交。产品、测试、文档与规范已在 main 提交为 `273fad3`（`feat: unify runtime task tools and management`）。此前未分阶段提交、先归档后提交的流程偏差如实保留；不伪造历史阶段提交。其他任务改动与原托管 worktree 保留，未 push。
+
+
+## Session 16: Beautify 工具标题任务收尾
+<!-- trellis-session: v=2 fp=70c8a06a4600e815 -->
+
+**Date**: 2026-10-15
+**Task**: Beautify 工具标题任务收尾
+**Branch**: `main`
+
+### Summary
+
+用户接受10-14-beautify-tool-names并授权收尾；纠正PRD中过时的终端未验证说明，归档为completed。历史验证focused71/71、strict、full699/699与真实tmux89/89 PASS；本次仅生命周期与记录，无产品修改或重新测试。main直接实施、非PR，明确skip-branch-validation；后续runtime工具迁移由独立任务承接。保留其他任务与并行改动，无push/install/sync/reload。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7abd9fe` | fix(beautify): preserve exact tool names in rendered headings |
+| `21c6cc2` | chore(task): archive 10-14-beautify-tool-names |
+
+### Status
+
+[OK] **Completed**
