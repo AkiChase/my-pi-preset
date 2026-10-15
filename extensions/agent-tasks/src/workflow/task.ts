@@ -259,33 +259,46 @@ function settleWorkflowTerminal(task: WorkflowTask): void {
   task.resolveTerminal(task.terminalResult);
 }
 
-/**
- * Which agents failed, in index order, as one line per agent.
- *
- * A run that fails or completes with holes has the reasons in its progress log
- * already — each failed child is an entry with its own `error`. Without this,
- * the final text was just the run-level error ("Workflow aborted.") or a
- * shorter result array, and the only way to learn which child died and why was
- * to open the progress view. Bounded like the rest of this file: five agents,
- * 200 characters each, so a fan-out that lost fifty children cannot turn the
- * result into a wall of text.
- */
+/** Bound each diagnostic field, explicitly disclosing shortened text. */
+function diagnosticText(text: string, maxChars: number): string {
+  const singleLine = text.replace(/\s+/g, " ").trim();
+  return singleLine.length > maxChars ? `${singleLine.slice(0, maxChars)}… (truncated)` : singleLine;
+}
+
+/** Failed children retain their index, label, phase and reason on every result surface. */
 export function workflowFailureSummary(task: WorkflowTask, maxAgents = 5, maxChars = 200): string {
   const failed = collapse(task.workflowProgress).agents.filter(entry => entry.state === "error");
   if (failed.length === 0) return "";
   const lines = failed.slice(0, maxAgents).map(entry => {
-    const reason = entry.error ?? "Agent failed.";
-    const phase = entry.phaseTitle !== undefined ? `${entry.phaseTitle}: ` : "";
-    return `- #${entry.index} ${phase}${reason.length > maxChars ? `${reason.slice(0, maxChars)}…` : reason}`;
+    const phase = entry.phaseTitle !== undefined ? ` [phase ${diagnosticText(entry.phaseTitle, 48)}]` : "";
+    return `- #${entry.index} ${diagnosticText(entry.label, 48)}${phase}: ${diagnosticText(entry.error ?? "Agent failed.", maxChars)}`;
   });
-  if (failed.length > maxAgents) lines.push(`- …and ${failed.length - maxAgents} more`);
-  return `Failed agents (${failed.length}):\n${lines.join("\n")}`;
+  if (failed.length > maxAgents) lines.push(`- …and ${failed.length - maxAgents} more (summary truncated; see progress).`);
+  const omission = failed.length > maxAgents ? ` [showing ${maxAgents}; summary truncated]` : "";
+  return `Failed agents (${failed.length}):${omission}\n${lines.join("\n")}`;
 }
 
-/** The run's outcome as text, for the notification and the LLM-facing result. */
+/** Library-emitted dropped branches/stages, not arbitrary script log messages. */
+function workflowToleratedFailureSummary(task: WorkflowTask): string {
+  const prefix = "Tolerated failure: ";
+  const failures = task.workflowProgress.flatMap(entry =>
+    entry.type === "workflow_log" && entry.message.startsWith(prefix) ? [entry.message.slice(prefix.length)] : []);
+  if (failures.length === 0) return "";
+  const lines = failures.slice(0, 5).map(message => `- ${diagnosticText(message, 300)}`);
+  if (failures.length > 5) lines.push(`- …and ${failures.length - 5} more (summary truncated; see progress logs).`);
+  const omission = failures.length > 5 ? " [showing 5; summary truncated]" : "";
+  return `Tolerated failures (${failures.length}):${omission}\n${lines.join("\n")}`;
+}
+
+/** Diagnostics precede the unchanged script text, surviving notification/preview slicing. */
 export function workflowResultText(task: WorkflowTask): string {
-  const failures = workflowFailureSummary(task);
-  const withFailures = (text: string) => failures === "" ? text : `${text}\n\n${failures}`;
+  const agents = workflowFailureSummary(task);
+  const tolerated = workflowToleratedFailureSummary(task);
+  // When both kinds exist, put one bounded example of each inside the host's
+  // 500-character preview before the longer, independently bounded sections.
+  const overview = agents && tolerated ? `Failure overview (details below):\n${diagnosticText(workflowFailureSummary(task, 1, 80).split("\n")[1] ?? "", 180)}\n${diagnosticText(tolerated.split("\n")[1] ?? "", 220)}\n\n` : "";
+  const failures = overview + [agents, tolerated].filter(Boolean).join("\n\n");
+  const withFailures = (text: string) => failures === "" ? text : `${failures}\n\n${text}`;
   if (task.error !== undefined) return withFailures(task.error);
   if (task.value === undefined) return withFailures("No output.");
   if (typeof task.value === "string") return withFailures(task.value);

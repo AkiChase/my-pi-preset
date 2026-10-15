@@ -165,10 +165,12 @@ function endsRun(error) {
  * [answer, null] gave the caller no way to tell a dead agent from a typo in the
  * thunk, and the run's log carried nothing either.
  */
-function logFailure(what, where, error) {
+function logFailure(scope, what, where, error) {
+  const title = scope.ambientPhaseTitle;
+  const context = title !== undefined ? (title.length > 80 ? title.slice(0, 80) + "... (truncated)" : title) + ": " : logPrefix(scope);
   emit({
     type: "workflow_log",
-    message: what + " " + where + " failed and resolved to null: " + describe(error),
+    message: "Tolerated failure: " + context + what + " " + where + " failed and resolved to null: " + describe(error),
   });
 }
 
@@ -238,7 +240,7 @@ let realmContext = null;
 let nestedCount = 0;
 
 function boundaryError(what, path) {
-  return new Error(
+  return scriptError(
     "Cannot pass " + what + " across the workflow VM boundary (at " + path + ")."
   );
 }
@@ -320,10 +322,10 @@ function toRealmArray(items) {
 }
 
 function toList(value, what) {
-  if (!Array.isArray(value)) throw new Error(what + " expects an array.");
+  if (!Array.isArray(value)) throw scriptError(what + " expects an array.");
   const length = value.length >>> 0;
   if (length > ITEM_CAP) {
-    throw new Error(
+    throw scriptError(
       what + " was given " + length + " items, over the limit of " + ITEM_CAP + "."
     );
   }
@@ -334,7 +336,7 @@ function toList(value, what) {
 
 function requireText(value, what) {
   if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(what + " requires a non-empty string.");
+    throw scriptError(what + " requires a non-empty string.");
   }
   return value;
 }
@@ -423,6 +425,8 @@ function makeScope(name, depth) {
   scope.workflow = function (ref, args) {
     return workflowIn(scope, ref, args);
   };
+  scope.parallel = function (thunks) { return parallel(scope, thunks); };
+  scope.pipeline = function (items, ...stages) { return pipeline(scope, items, ...stages); };
   scope.console = makeConsole(scope);
   return scope;
 }
@@ -606,7 +610,7 @@ async function agentIn(scope, prompt, opts) {
  * whole value of the tolerance: the run continues, and the log says which branch
  * produced nothing and why.
  */
-async function parallel(thunks) {
+async function parallel(scope, thunks) {
   const list = toList(thunks, "parallel(thunks)");
   for (let i = 0; i < list.length; i++) {
     if (typeof list[i] !== "function") {
@@ -619,7 +623,7 @@ async function parallel(thunks) {
         return await thunk();
       } catch (error) {
         if (endsRun(error)) throw error;
-        logFailure("parallel()", "branch " + index, error);
+        logFailure(scope, "parallel()", "branch " + index, error);
         return null;
       }
     })
@@ -638,7 +642,7 @@ async function parallel(thunks) {
  * parallel(): an author error or a cap breach ends the run instead of becoming a
  * silent null, and a dropped item is logged with the stage that dropped it.
  */
-async function pipeline(items, ...stages) {
+async function pipeline(scope, items, ...stages) {
   const list = toList(items, "pipeline(items, ...stages)");
   for (let i = 0; i < stages.length; i++) {
     if (typeof stages[i] !== "function") {
@@ -653,7 +657,7 @@ async function pipeline(items, ...stages) {
           value = await stages[s](value, item, index);
         } catch (error) {
           if (endsRun(error)) throw error;
-          logFailure("pipeline()", "item " + index + " stage " + s, error);
+          logFailure(scope, "pipeline()", "item " + index + " stage " + s, error);
           return null;
         }
       }
@@ -678,7 +682,7 @@ async function pipeline(items, ...stages) {
  */
 async function workflowIn(scope, nameOrRef, args) {
   if (scope.depth > 0) {
-    throw new Error(
+    throw scriptError(
       "workflow() cannot be nested more than one level deep — you are already inside the workflow '" +
         scope.name + "'. Call the agents inline instead."
     );
@@ -686,17 +690,17 @@ async function workflowIn(scope, nameOrRef, args) {
 
   let ref;
   if (typeof nameOrRef === "string") {
-    if (nameOrRef.trim() === "") throw new Error("workflow(nameOrRef) expects a non-empty name.");
+    if (nameOrRef.trim() === "") throw scriptError("workflow(nameOrRef) expects a non-empty name.");
     ref = { name: nameOrRef };
   } else if (nameOrRef && typeof nameOrRef === "object" && !Array.isArray(nameOrRef)) {
     const scriptPath = optionalText(nameOrRef.scriptPath, "workflow() scriptPath");
     const name = optionalText(nameOrRef.name, "workflow() name");
     if (scriptPath === undefined && name === undefined) {
-      throw new Error("workflow({ ... }) expects a \`name\` or a \`scriptPath\`.");
+      throw scriptError("workflow({ ... }) expects a \`name\` or a \`scriptPath\`.");
     }
     ref = { name: name, scriptPath: scriptPath };
   } else {
-    throw new Error("workflow(nameOrRef) expects a saved workflow name or { scriptPath }.");
+    throw scriptError("workflow(nameOrRef) expects a saved workflow name or { scriptPath }.");
   }
 
   const label = ref.name !== undefined ? ref.name : ref.scriptPath;
@@ -717,11 +721,11 @@ async function workflowIn(scope, nameOrRef, args) {
   try {
     loaded = await callHost("workflow", ref);
   } catch (error) {
-    // Resolution failures are the script's to handle — Claude Code documents
-    // workflow() as throwing on an unknown name so a script can catch it.
-    // Attributed, so a caught error says which reference failed.
-    if (isFatal(error)) throw error;
-    throw new Error('workflow("' + label + '"): ' + describe(error));
+    // Loading/validating a requested reference is author validation, not an
+    // ordinary child failure. Explicit script try/catch may still handle it.
+    const wrapped = scriptError('workflow("' + label + '"): ' + describe(error));
+    if (isFatal(error)) wrapped.workflowFatal = true;
+    throw wrapped;
   }
 
   const child = makeScope(loaded.name, scope.depth + 1);
@@ -737,17 +741,24 @@ async function workflowIn(scope, nameOrRef, args) {
       // \`meta\` is deliberately not a parameter: the body still opens with its
       // own \`const meta = { ... }\` (extractMeta strips only the \`export\`), so a
       // parameter of that name would collide with it.
-      "(async (agent, phase, log, workflow, console, args) => {" + PRELUDE + "\\n" + loaded.body + "\\n})",
+      "(async (agent, phase, log, workflow, console, args, parallel, pipeline) => {" + PRELUDE + "\\n" + loaded.body + "\\n})",
       { filename: "workflow:" + loaded.name + ".js", lineOffset: -1 }
     );
     run = compiled.runInContext(realmContext);
   } catch (error) {
-    throw new Error('workflow("' + label + '"): ' + describe(error));
+    throw scriptError('workflow("' + label + '"): ' + describe(error));
   }
 
-  const value = await run(child.agent, child.phase, child.log, child.workflow, child.console, args);
-  checkBoundary(value, 'the result of workflow("' + label + '")');
-  return value;
+  try {
+    const value = await run(child.agent, child.phase, child.log, child.workflow, child.console, args, child.parallel, child.pipeline);
+    checkBoundary(value, 'the result of workflow("' + label + '")');
+    return value;
+  } catch (error) {
+    const wrapped = isAuthorError(error) ? scriptError('workflow("' + label + '"): ' + describe(error))
+      : new Error('workflow("' + label + '"): ' + describe(error));
+    if (isFatal(error)) wrapped.workflowFatal = true;
+    throw wrapped;
+  }
 }
 
 /**
@@ -785,8 +796,8 @@ async function main() {
   rootScope = makeScope(undefined, 0);
   const sandbox = {
     agent: rootScope.agent,
-    parallel: parallel,
-    pipeline: pipeline,
+    parallel: rootScope.parallel,
+    pipeline: rootScope.pipeline,
     phase: rootScope.phase,
     log: rootScope.log,
     workflow: rootScope.workflow,
