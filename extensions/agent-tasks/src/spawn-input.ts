@@ -17,3 +17,16 @@ export function assertSpawnInput(type: unknown, prompt: unknown): asserts type i
   if (typeof type !== "string" || !type.trim()) throw new Error("Agent type must be a non-empty string");
   if (typeof prompt !== "string") throw new Error("Agent prompt must be a string");
 }
+
+/**
+ * A required non-empty string.
+ *
+ * The host's job is the type; this is the emptiness half, which a schema cannot
+ * express without a pattern that would have to allow every language's
+ * whitespace. A run started from a blank prompt or a blank description wastes a
+ * full agent turn before anyone finds out, so the tools reject it up front.
+ */
+export function assertNonEmptyString(value: unknown, label: string): asserts value is string {
+  if (typeof value !== "string") throw new Error(`${label} must be a string, got ${value === null ? "null" : typeof value}.`);
+  if (!value.trim()) throw new Error(`${label} must be a non-empty string; it was blank.`);
+}

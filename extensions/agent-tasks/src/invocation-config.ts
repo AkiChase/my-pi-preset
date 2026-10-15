@@ -1,5 +1,35 @@
-import { Type } from "typebox";
+import { Type, StringEnum } from "@earendil-works/pi-ai";
 import type { AgentConfig, IsolationMode, JoinMode, ThinkingLevel } from "./types.ts";
+
+/**
+ * Advertised thinking levels, ordered to mirror pi-ai's EXTENDED_THINKING_LEVELS
+ * (`off` + every `ThinkingLevel`). Single source for the subagent_run tool schema,
+ * the nested delegation schema, the generated-agent template, and the
+ * `/agents` wizard so these lists can't drift behind pi again (#147).
+ * Availability of any level still depends on the host pi version and the
+ * selected model — pi clamps unsupported levels down.
+ */
+export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+
+export const thinkingParamShape = {
+  thinking: Type.Optional(
+    StringEnum(THINKING_LEVELS, {
+      description: `Thinking level: ${THINKING_LEVELS.join(", ")}. Overrides agent default.`,
+    }),
+  ),
+};
+
+/**
+ * Build the `thinking` parameter for a tool schema.
+ *
+ * A closed `enum`, not a free string: with the old `Type.String` a typo like
+ * `"hight"` passed validation and was then cast straight to `ThinkingLevel`,
+ * so the level silently did nothing for the whole run. An enum makes the host
+ * reject the value and list the accepted ones.
+ */
+export function thinkingParam(): Partial<typeof thinkingParamShape> {
+  return thinkingParamShape;
+}
 
 /**
  * The model-facing `isolation` parameter, shared by the `subagent_run` tool and the
@@ -56,7 +86,15 @@ export function isolationParam(enabled: boolean): Partial<typeof isolationParamS
 
 interface AgentInvocationParams {
   model?: string;
-  thinking?: string;
+  /**
+     * Untyped on purpose, like `isolation` below. `thinkingParam()` builds this
+     * field with `StringEnum`, which is `Type.Unsafe` and erases TypeBox's
+     * literal inference to `unknown` the same way the conditional spreads do.
+     * The resolver narrows by comparison rather than trusting the declaration,
+     * which also makes it safe for the cross-extension RPC path, where options
+     * arrive unvalidated.
+     */
+  thinking?: unknown;
   run_in_background?: boolean;
   inherit_context?: boolean;
   isolated?: boolean;
@@ -124,8 +162,7 @@ export function resolveAgentInvocationConfig(
   const overriddenThinking = agentConfig?.thinking != null && params.thinking != null
     && agentConfig.thinking !== params.thinking
     ? params.thinking as ThinkingLevel
-    : undefined;
-  const overriddenModel = agentConfig?.model != null && params.model != null
+    : undefined;  const overriddenModel = agentConfig?.model != null && params.model != null
     && agentConfig.model !== params.model
     ? params.model
     : undefined;

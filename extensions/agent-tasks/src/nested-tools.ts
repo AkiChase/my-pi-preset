@@ -16,8 +16,9 @@ import {
   resolveTypeIn,
 } from "./agent-types.ts";
 import { loadCustomAgents } from "./custom-agents.ts";
-import { isolationParam, resolveAgentInvocationConfig } from "./invocation-config.ts";
+import { isolationParam, resolveAgentInvocationConfig, thinkingParam } from "./invocation-config.ts";
 import { resolveModel } from "./model-resolver.ts";
+import { assertNonEmptyString } from "./spawn-input.ts";
 import { checkModelScope } from "./model-scope.ts";
 import {
   createOutputFilePath,
@@ -110,6 +111,11 @@ function textResult(text: string, isError = false) {
   return { content: [{ type: "text" as const, text }], isError, details: {} };
 }
 
+/** A refusal, spelled without a positional boolean so the intent is visible. */
+function errorResult(text: string) {
+  return textResult(text, true);
+}
+
 function ownsRecord(record: AgentRecord | undefined, parentAgentId: string): record is AgentRecord {
   return record?.parentAgentId === parentAgentId;
 }
@@ -165,7 +171,9 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
       description: Type.String({ description: "Short 3-5 word task description." }),
       subagent_type: Type.String({ description: `Allowed nested agent type. Available: ${availableIn(loadRegistry()).join(", ") || "none"}.` }),
       model: Type.Optional(Type.String({ description: "Optional provider/model override." })),
-      thinking: Type.Optional(Type.String({ description: "Optional thinking level." })),
+      // Same enum as the top-level tool, from the same source: a typo here would
+      // otherwise be cast straight to a ThinkingLevel and quietly do nothing.
+      ...thinkingParam(),
       run_in_background: Type.Optional(
         Type.Boolean({
           description: "Defaults to false for nested spawns — the call blocks and returns the child's result inline. Set true only for work you will collect later with task_manage; a detached child is stopped when you finish.",
@@ -177,6 +185,12 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
       ...isolationParam(isWorktreeIsolationEnabled()),
     }),
     execute: async (_toolCallId, params, signal, _onUpdate, ctx) => {
+      try {
+        assertNonEmptyString(params.prompt, "`prompt`");
+        assertNonEmptyString(params.description, "`description`");
+      } catch (err) {
+        return errorResult(err instanceof Error ? err.message : String(err));
+      }
       if (params.resume) {
         const existing = context.manager.getRecord(params.resume);
         if (!ownsRecord(existing, context.parentAgentId)) {
