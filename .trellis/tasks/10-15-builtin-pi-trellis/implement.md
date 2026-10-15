@@ -64,6 +64,10 @@ S3 检查点：`extensions/trellis/lib/task-browser/native-layout.ts` 移到 `ex
 - [ ] 独立check→主最终diff/自然退出/全量→精确stagecommit。
 
 ## S4 全面用户文档与规范提炼、最终整合（A1–A8）
+
+S4 检查点（bc24fa8）：三页用户文档去掉草稿标记并按最终代码核对；`initialization.md` 按菜单最终文案重写，补充较旧项目用 Update 补技能、完成后自行 `/reload`。README 与 `docs/index.md` 把 Trellis 移到本仓库自带，删除过时的 `docs/packages/trellis.md`。`agents-block.md` 模板 `Check` 改为 `Check project` 并同步 `template-baseline.json` adapted hash，来源基线未改。英文 `spec/development` 增内置 Trellis 约束节，`spec/testing` 增 Trellis 测试方针。独立检查复核文档与代码一致，只修正一处（当前任务所在整棵树排在最前）。`pnpm check` 1504/1504；Trellis 与共享模块自然退出 466/466，约 71 秒；Python 32/32。
+
+未在本机验证：真实 Pi 项目技能加载、trust、`--no-skills`、Viewer 真实 UI、菜单文案渲染。本仓自身部署的 `.trellis/`、`.pi/` 副本与 `AGENTS.md` Trellis 块仍为旧版本，按约定不在本任务重新初始化。
 - [ ] 中文docs/extensions/trellis主入口+主题页，完成零基础概念/全流程实例与预期行为/日常协作/更新排错，按design第7节，不因去重删学习细节。
 - [ ] README/docsindex内置入口，去独立安装/旧provider/已删除refreshcollect/过时命令说明；runtimeconsumer协议路径另维护，不混用户说明。
 - [ ] 英文development/testing提炼本仓新增安全/技能发布/internaladapter升级/精选测试方法，vendor/legal原文保留，不搬邻仓整spec树。
