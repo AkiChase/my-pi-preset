@@ -243,6 +243,7 @@ void describe("bash structuredContent — the inherited output schema", () => {
             assert.ok((sc.wall_time_seconds as number) >= 0);
             if (command.endsWith("exit 7")) {
                 assert.equal(result.isError, true, "a non-zero exit is an error result");
+                assert.equal(sc.exit_code, 7, "scripts receive the observed exit code");
                 assert.match(result.content[0]!.text, /Command exited with code 7/);
             }
             if (command.startsWith("tail")) {
