@@ -11,17 +11,18 @@ export function reply(text = "New title"): AssistantMessage {
         stopReason: "stop", usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } };
 }
 export async function flush(): Promise<void> { await new Promise<void>(resolve => setImmediate(resolve)); }
-export function harness(t: TestContext, options: { existing?: string; synchronousNameEvent?: boolean; reentrantSameName?: boolean } = {}) {
+export function harness(t: TestContext, options: { existing?: string; synchronousNameEvent?: boolean; reentrantSameName?: boolean; manager?: SessionManager } = {}) {
     const directory = mkdtempSync(join(tmpdir(), "name-runtime-"));
     const previous = process.env.PI_CODING_AGENT_DIR;
     process.env.PI_CODING_AGENT_DIR = directory;
     t.after(() => { if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = previous; rmSync(directory, { recursive: true, force: true }); });
-    const manager = SessionManager.inMemory();
+    // Reusing a manager models reload/resume: a fresh extension instance over the same persisted session.
+    const manager = options.manager ?? SessionManager.inMemory();
     if (options.existing) manager.appendSessionInfo(options.existing);
     const handlers = new Map<string, ((event: unknown, ctx: ExtensionContext) => unknown)[]>();
     const commands = new Map<string, RegisteredCommand>();
     const notices: string[] = [];
-    const requests: { data: unknown; signal: AbortSignal | undefined; resolve: (value: AssistantMessage) => void; reject: (value: Error) => void }[] = [];
+    const requests: { text: string; systemPrompt: string; signal: AbortSignal | undefined; resolve: (value: AssistantMessage) => void; reject: (value: Error) => void }[] = [];
     let selection: string | undefined;
     let input: string | undefined;
     const emit = async (name: string, event: unknown = {}) => {
@@ -45,11 +46,11 @@ export function harness(t: TestContext, options: { existing?: string; synchronou
     } as unknown as ExtensionAPI;
     const ctx = {
         sessionManager: manager, model: { id: "fake", provider: "fake", api: "openai-responses" },
-        modelRegistry: { streamSimple(_model: unknown, context: { messages: UserMessage[] }, options: { signal?: AbortSignal }) {
+        modelRegistry: { streamSimple(_model: unknown, context: { systemPrompt: string; messages: UserMessage[] }, options: { signal?: AbortSignal }) {
             let resolve!: (value: AssistantMessage) => void;
             let reject!: (value: Error) => void;
             const promise = new Promise<AssistantMessage>((res, rej) => { resolve = res; reject = rej; });
-            requests.push({ data: JSON.parse(String(context.messages[0].content)), signal: options.signal, resolve, reject });
+            requests.push({ text: String(context.messages[0].content), systemPrompt: context.systemPrompt, signal: options.signal, resolve, reject });
             return { result: () => promise };
         } },
         hasUI: true, mode: "tui", isIdle: () => true,
@@ -68,5 +69,7 @@ export function harness(t: TestContext, options: { existing?: string; synchronou
         command: (args = "") => commands.get("session-name")!.handler(args, ctx),
         choose(value: string | undefined, raw?: string) { selection = value; input = raw; },
         async externalName(name: string) { manager.appendSessionInfo(name); await emit("session_info_changed", { name }); },
+        /** Count delivered genuine inputs, each followed by a normal settled boundary. */
+        async inputs(total: number, prefix = "input") { for (let n = 0; n < total; n++) { await this.user(`${prefix} ${n}`); await this.settled(); } },
     };
 }

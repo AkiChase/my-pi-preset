@@ -1,14 +1,21 @@
 import type { ExtensionAPI, ExtensionContext, SessionEntry } from "@earendil-works/pi-coding-agent";
-import { branchIdentity, fingerprint, prepareConversation } from "../shared/context.ts";
+import { branchIdentity } from "../shared/context.ts";
 import { failureDetail } from "../shared/errors.ts";
+import { buildMaterial } from "../shared/material.ts";
 import { generateText, RequestCancelled } from "../shared/request.ts";
 import { DEFAULTS, loadConfig, saveConfig, type NameConfig } from "./config.ts";
 import { readTitle, TITLE_PROMPT } from "./title.ts";
 
-const STATE_TYPE = "preset.session-name.v1";
-interface Progress { version: 1; count: number; evaluated: number; retryAt: number; observedIds: string[] }
-interface Ownership { version: 1; titleEntryId: string | null; title: string | null; owned: boolean }
-interface Stored { progress?: Progress; ownership?: Ownership }
+export const STATE_TYPE = "preset.session-name.v2";
+export const LEGACY_STATE_TYPE = "preset.session-name.v1";
+/** Naming uses a fixed shared-material budget; Recap keeps its own configurable budget. */
+export const MATERIAL_BUDGET = 32_000;
+type Phase = "first" | "second" | "finished";
+const PHASES: readonly Phase[] = ["first", "second", "finished"];
+/** Session-level automatic quota; `anchor` is the counted input total when the first chance started. */
+interface Quota { phase: Phase; count: number; anchor: number | null; observedIds: string[] }
+interface Ownership { titleEntryId: string | null; title: string | null; owned: boolean }
+interface Stored { version: 2; quota: Quota; ownership: Ownership }
 interface Candidate { text: string; eligible: boolean; after: Set<string> }
 
 function textOf(content: string | readonly { type: string; text?: string }[]): string {
@@ -18,15 +25,60 @@ function latestTitle(ctx: ExtensionContext): { id: string | null; name: string |
     const title = ctx.sessionManager.getEntries().findLast(entry => entry.type === "session_info");
     return { id: title?.id ?? null, name: ctx.sessionManager.getSessionName() ?? null };
 }
-function stored(entry: SessionEntry): Stored | undefined {
-    if (entry.type !== "custom" || entry.customType !== STATE_TYPE || !entry.data || typeof entry.data !== "object") return undefined;
-    return entry.data as Stored;
+const record = (value: unknown): Record<string, unknown> | undefined =>
+    value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+const count = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+function ownershipOf(value: unknown): Ownership | undefined {
+    const own = record(value);
+    if (!own || (own.titleEntryId !== null && typeof own.titleEntryId !== "string") ||
+        (own.title !== null && typeof own.title !== "string") || typeof own.owned !== "boolean") return undefined;
+    return { titleEntryId: own.titleEntryId as string | null, title: own.title as string | null, owned: own.owned };
 }
-function validProgress(value: Progress | undefined): value is Progress {
-    return value?.version === 1 && Number.isSafeInteger(value.count) && value.count >= 0 &&
-        Number.isSafeInteger(value.evaluated) && value.evaluated >= 0 && value.evaluated <= value.count &&
-        Number.isSafeInteger(value.retryAt) && value.retryAt >= 0 && Array.isArray(value.observedIds) &&
-        value.observedIds.every(id => typeof id === "string");
+function quotaOf(value: unknown): Quota | undefined {
+    const quota = record(value);
+    if (!quota || !PHASES.includes(quota.phase as Phase) || !count(quota.count) ||
+        !(quota.anchor === null || (count(quota.anchor) && quota.anchor <= quota.count)) ||
+        !Array.isArray(quota.observedIds) || !quota.observedIds.every(id => typeof id === "string")) return undefined;
+    return { phase: quota.phase as Phase, count: quota.count, anchor: quota.anchor as number | null, observedIds: [...quota.observedIds as string[]] };
+}
+function custom(entry: SessionEntry, type: string): Record<string, unknown> | undefined {
+    return entry.type === "custom" && entry.customType === type ? record(entry.data) : undefined;
+}
+/** v1 progress was branch-local; only an all-zero history proves no automatic request ever started. */
+function legacyUnused(data: Record<string, unknown>): boolean {
+    const progress = record(data.progress);
+    return progress?.version === 1 && progress.count === 0;
+}
+/**
+ * Quota is restored from the whole session in append order, never the current branch, and merged
+ * monotonically so branch navigation, reload or resume cannot return a consumed chance.
+ */
+function restoreQuota(entries: SessionEntry[]): Quota {
+    const stored = entries.flatMap(entry => {
+        const data = custom(entry, STATE_TYPE);
+        const quota = data?.version === 2 ? quotaOf(data.quota) : undefined;
+        return quota ? [quota] : [];
+    });
+    if (!stored.length) {
+        const legacy = entries.flatMap(entry => { const data = custom(entry, LEGACY_STATE_TYPE); return data ? [data] : []; });
+        // Unknown remaining v1 quota converges to finished instead of granting a fresh pair of chances.
+        return { phase: legacy.length && !legacy.every(legacyUnused) ? "finished" : "first", count: 0, anchor: null, observedIds: [] };
+    }
+    const rank = Math.max(...stored.map(quota => PHASES.indexOf(quota.phase)));
+    const anchors = stored.flatMap(quota => quota.anchor === null ? [] : [quota.anchor]);
+    const anchor = anchors.length ? Math.max(...anchors) : null;
+    // A started first chance without its anchor cannot place the second threshold safely.
+    const phase = PHASES[rank] === "second" && anchor === null ? "finished" : PHASES[rank];
+    return { phase, count: Math.max(...stored.map(quota => quota.count), anchor ?? 0), anchor,
+        observedIds: [...new Set(stored.flatMap(quota => quota.observedIds))] };
+}
+function restoreOwnership(entries: SessionEntry[]): Ownership | undefined {
+    for (let index = entries.length - 1; index >= 0; index--) {
+        const data = custom(entries[index], STATE_TYPE) ?? custom(entries[index], LEGACY_STATE_TYPE);
+        const ownership = data ? ownershipOf(data.ownership) : undefined;
+        if (ownership) return ownership;
+    }
+    return undefined;
 }
 
 export default function registerSessionName(pi: ExtensionAPI): void {
@@ -35,8 +87,8 @@ export default function registerSessionName(pi: ExtensionAPI): void {
     let configWarning = false;
     let epoch = 0;
     let controller: AbortController | undefined;
-    let progress: Progress = { version: 1, count: 0, evaluated: 0, retryAt: 0, observedIds: [] };
-    let ownership: Ownership = { version: 1, titleEntryId: null, title: null, owned: false };
+    let quota: Quota = { phase: "first", count: 0, anchor: null, observedIds: [] };
+    let ownership: Ownership = { titleEntryId: null, title: null, owned: false };
     let candidates: Candidate[] = [];
     let sessionId: string | undefined;
     let writingTitle = false;
@@ -44,10 +96,24 @@ export default function registerSessionName(pi: ExtensionAPI): void {
     let manualPending: number | undefined;
 
     const cancel = () => { epoch++; controller?.abort(); controller = undefined; };
-    const persist = () => pi.appendEntry<Stored>(STATE_TYPE, { progress: { ...progress, observedIds: [...progress.observedIds] }, ownership: { ...ownership } });
+    const persist = () => pi.appendEntry<Stored>(STATE_TYPE, { version: 2,
+        quota: { ...quota, observedIds: [...quota.observedIds] }, ownership: { ...ownership } });
     const notify = (ctx: ExtensionContext, text: string, severity: "info" | "warning" | "error") => {
         if (active && ctx.sessionManager.getSessionId() === sessionId) ctx.ui.notify(text, severity);
     };
+    const remaining = () => quota.phase === "first" ? "2 automatic attempts left" :
+        quota.phase === "second" ? "1 automatic attempt left" : "automatic attempts finished";
+    /** The second chance needs N inputs after the first input and a new input after the first chance started. */
+    function dueChance(): Phase | undefined {
+        if (quota.phase === "first") return quota.count > 0 ? "first" : undefined;
+        if (quota.phase === "second" && quota.anchor !== null &&
+            quota.count >= Math.max(1 + config.interval, quota.anchor + 1)) return "second";
+        return undefined;
+    }
+    /** Counted inputs still needed before the second chance becomes due. */
+    function inputsUntilSecond(): number {
+        return Math.max(1 + config.interval, (quota.anchor ?? quota.count) + 1) - quota.count;
+    }
     function restore(ctx: ExtensionContext): void {
         cancel();
         manualGeneration++;
@@ -55,13 +121,12 @@ export default function registerSessionName(pi: ExtensionAPI): void {
         active = true;
         sessionId = ctx.sessionManager.getSessionId();
         candidates = [];
-        const state = ctx.sessionManager.getBranch().map(stored).findLast(value => validProgress(value?.progress));
-        progress = state?.progress ? { ...state.progress, observedIds: [...state.progress.observedIds] } :
-            { version: 1, count: 0, evaluated: 0, retryAt: 0, observedIds: [] };
-        const own = ctx.sessionManager.getEntries().map(stored).findLast(value => value?.ownership?.version === 1)?.ownership;
+        const entries = ctx.sessionManager.getEntries();
+        quota = restoreQuota(entries);
+        const own = restoreOwnership(entries);
         const title = latestTitle(ctx);
         ownership = own && own.titleEntryId === title.id && own.title === title.name ? { ...own } :
-            { version: 1, titleEntryId: title.id, title: title.name, owned: false };
+            { titleEntryId: title.id, title: title.name, owned: false };
         try { config = loadConfig(); configWarning = false; } catch { config = { ...DEFAULTS }; configWarning = true; }
         if (configWarning) notify(ctx, "Could not load session-name configuration; using defaults. Fix session-name.json before saving changes.", "warning");
     }
@@ -69,14 +134,15 @@ export default function registerSessionName(pi: ExtensionAPI): void {
         const title = latestTitle(ctx);
         if (title.id !== ownership.titleEntryId || title.name !== ownership.title) {
             cancel();
-            ownership = { version: 1, titleEntryId: title.id, title: title.name, owned: false };
+            ownership = { titleEntryId: title.id, title: title.name, owned: false };
             persist();
         }
     }
-    function collectDelivered(ctx: ExtensionContext): void {
+    function collectDelivered(ctx: ExtensionContext): boolean {
         const branch = ctx.sessionManager.getBranch();
-        const observed = new Set(progress.observedIds);
+        const observed = new Set(quota.observedIds);
         const delivered = branch.filter(entry => entry.type === "message" && entry.message.role === "user" && !observed.has(entry.id));
+        let changed = false;
         for (const entry of delivered) {
             if (entry.type !== "message" || entry.message.role !== "user") continue;
             const text = textOf(entry.message.content);
@@ -86,37 +152,49 @@ export default function registerSessionName(pi: ExtensionAPI): void {
             const matchingMessages = delivered.filter(other => other.type === "message" && other.message.role === "user" &&
                 !matches[0].after.has(other.id) && textOf(other.message.content) === text);
             if (matchingMessages.length !== 1) continue;
-            progress.count++;
+            quota.count++;
             observed.add(entry.id);
+            changed = true;
         }
-        progress.observedIds = [...observed];
+        quota.observedIds = [...observed];
         candidates = [];
+        return changed;
     }
     async function evaluate(ctx: ExtensionContext, manual: boolean): Promise<void> {
         if (!active || ctx.sessionManager.getSessionId() !== sessionId) return;
         checkOwnership(ctx);
-        if (!manual && (!config.automatic || (ownership.title !== null && !ownership.owned))) return;
+        const chance = manual ? undefined : dueChance();
+        if (!manual && (!chance || !config.automatic || (ownership.title !== null && !ownership.owned))) return;
+        const material = buildMaterial(ctx.sessionManager, MATERIAL_BUDGET);
+        if (material.empty) {
+            // No request is sent, so an automatic chance remains unstarted.
+            if (manual) notify(ctx, "Session name refresh failed: No conversation available; previous title kept.", "error");
+            return;
+        }
+        // Without a model no request can be sent, so an automatic chance stays unstarted.
+        if (chance && !ctx.model) return;
         cancel();
+        if (chance) {
+            // Persist consumption before the request: failure, cancellation or resume never re-issues it.
+            quota = chance === "first" ? { ...quota, phase: "second", anchor: quota.count } : { ...quota, phase: "finished" };
+            persist();
+        }
         const requestEpoch = epoch;
         const requestController = new AbortController();
         controller = requestController;
         const expectedTitle = latestTitle(ctx);
         const expectedBranch = branchIdentity(ctx.sessionManager);
-        const conversation = prepareConversation(ctx.sessionManager);
-        const expectedContext = fingerprint(conversation);
-        const count = progress.count;
         const model = ctx.model;
         const thinking = pi.getThinkingLevel();
         const valid = () => active && epoch === requestEpoch && !requestController.signal.aborted &&
             ctx.sessionManager.getSessionId() === sessionId && branchIdentity(ctx.sessionManager) === expectedBranch &&
-            fingerprint(prepareConversation(ctx.sessionManager)) === expectedContext &&
+            buildMaterial(ctx.sessionManager, MATERIAL_BUDGET).identity === material.identity &&
             latestTitle(ctx).id === expectedTitle.id && latestTitle(ctx).name === expectedTitle.name;
         try {
             if (!model) throw new Error("No model selected");
-            if (!conversation.length) throw new Error("No conversation available");
             const response = await generateText({ registry: ctx.modelRegistry, model, thinking,
                 sessionId: ctx.sessionManager.getSessionId(), systemPrompt: TITLE_PROMPT,
-                data: { currentTitle: expectedTitle.name, conversation }, signal: requestController.signal });
+                data: undefined, textMaterial: material.text, signal: requestController.signal });
             const title = readTitle(response);
             if (!valid()) return;
             const beforeWriteIds = new Set(ctx.sessionManager.getEntries().filter(entry => entry.type === "session_info").map(entry => entry.id));
@@ -129,22 +207,21 @@ export default function registerSessionName(pi: ExtensionAPI): void {
             const writes = ctx.sessionManager.getEntries().filter(entry => entry.type === "session_info" && !beforeWriteIds.has(entry.id));
             if (!active || epoch !== requestEpoch || written.name !== title) return;
             if (title !== expectedTitle.name && (writes.length !== 1 || writes[0].id !== written.id)) {
-                ownership = { version: 1, titleEntryId: written.id, title: written.name, owned: false };
+                ownership = { titleEntryId: written.id, title: written.name, owned: false };
                 persist();
                 return;
             }
-            ownership = { version: 1, titleEntryId: written.id, title, owned: true };
-            progress.evaluated = count;
-            progress.retryAt = 0;
+            ownership = { titleEntryId: written.id, title, owned: true };
             persist();
             if (manual) notify(ctx, `Session name: ${title}`, "info");
         } catch (error) {
             if (error instanceof RequestCancelled || !valid()) return;
-            progress.retryAt = count + config.interval;
-            persist();
             const detail = failureDetail(error);
+            const consequence = chance === "first"
+                ? `One automatic attempt remains after ${inputsUntilSecond()} more user inputs; run /session-name to retry now.`
+                : "Automatic naming is finished for this session; run /session-name to retry.";
             notify(ctx, manual ? `Session name refresh failed: ${detail}; previous title kept.` :
-                `Automatic session naming failed: ${detail}; previous title kept. Will retry after ${config.interval} more user inputs.`, "error");
+                `Automatic session naming failed: ${detail}; previous title kept. ${consequence}`, "error");
         } finally {
             if (controller === requestController) controller = undefined;
         }
@@ -176,26 +253,25 @@ export default function registerSessionName(pi: ExtensionAPI): void {
     pi.on("agent_settled", (event, ctx) => {
         if (!active) return;
         checkOwnership(ctx);
-        collectDelivered(ctx);
-        persist();
-        const due = progress.retryAt > 0 ? progress.count >= progress.retryAt :
-            ownership.title === null ? progress.count > 0 : progress.count - progress.evaluated >= config.interval;
-        // Do not hold the notification-only settled dispatch while waiting on a provider.
-        if (!event.aborted && due && manualPending === undefined) void evaluate(ctx, false).catch(() => {});
+        // Finished sessions no longer need input progress; only ownership remains tracked.
+        if (quota.phase === "finished") { candidates = []; return; }
+        if (collectDelivered(ctx)) persist();
+        // Aborted boundaries never start a chance; do not hold the notification-only dispatch on a provider.
+        if (!event.aborted && dueChance() && manualPending === undefined) void evaluate(ctx, false).catch(() => {});
     });
     pi.registerCommand("session-name", {
-        description: "Refresh the session title, or configure automatic naming",
+        description: "Generate the session title, or configure automatic naming",
         getArgumentCompletions: prefix => "config".startsWith(prefix) ? [{ value: "config", label: "config" }] : null,
         handler: async (args, ctx) => {
             if (!active) restore(ctx);
             if (args.trim() === "config") {
                 if (!ctx.hasUI) { notify(ctx, "Session-name configuration requires an interactive UI.", "warning"); return; }
-                const choice = await ctx.ui.select(`Session naming (automatic ${config.automatic ? "on" : "off"}, N=${config.interval})`,
+                const choice = await ctx.ui.select(`Session naming (automatic ${config.automatic ? "on" : "off"}, N=${config.interval}, ${remaining()} in this session)`,
                     ["Enable automatic naming", "Disable automatic naming", "Set interval"]);
                 if (!choice || !active) return;
                 let next = { ...config };
                 if (choice === "Set interval") {
-                    const raw = await ctx.ui.input("User inputs between evaluations (1–10000)", String(config.interval));
+                    const raw = await ctx.ui.input("User inputs before the second automatic naming (1–10000)", String(config.interval));
                     if (raw === undefined || !active) return;
                     const interval = Number(raw);
                     if (!raw.trim() || !Number.isSafeInteger(interval) || interval < 1 || interval > 10_000) {
@@ -204,9 +280,9 @@ export default function registerSessionName(pi: ExtensionAPI): void {
                     next.interval = interval;
                 } else next.automatic = choice === "Enable automatic naming";
                 try {
-                    saveConfig(next); config = next; cancel();
-                    if (progress.retryAt) progress.retryAt = progress.count + config.interval;
-                    persist();
+                    saveConfig(next); config = next;
+                    // Configuration never grants or returns chances; only disabling stops an automatic request.
+                    if (!config.automatic) cancel();
                     notify(ctx, "Session-name configuration saved.", "info");
                 } catch { notify(ctx, "Could not save session-name configuration; nothing changed.", "error"); }
                 return;
