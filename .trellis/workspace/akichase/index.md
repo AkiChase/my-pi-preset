@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 18
-- **Last Active**: 2026-10-15
+- **Total Sessions**: 19
+- **Last Active**: 2026-10-16
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~553 | Active |
+| `journal-1.md` | ~608 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 19 | 2026-10-16 | Tool 参数校验与错误反馈统一 | `9cf9694`, `f108932`, `10a150c`, `b516d0f`, `19d7701`, `70b87d5`, `3a392dd`, `3cba095`, `9f62f16`, `09aa0af`, `5fbf096`, `954610a`, `4e64103`, `5e38b4e` | `main` |
 | 18 | 2026-10-15 | Session Name 两次自动命名与共享上下文 | `cfc47d3`, `025d41c`, `6efb5b9`, `8038d7b` | `main` |
 | 17 | 2026-10-15 | 完成内置 Recap 与会话辅助任务 | `b48e37b` | `main` |
 | 16 | 2026-10-15 | Beautify 工具标题任务收尾 | `7abd9fe`, `21c6cc2` | `main` |

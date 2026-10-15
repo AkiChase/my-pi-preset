@@ -551,3 +551,58 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Next Steps
 
 - NOT_RUN：在线模型标题质量、真实终端/tmux、install/sync/reload；如需真实验证另行授权。
+
+
+## Session 19: Tool 参数校验与错误反馈统一
+<!-- trellis-session: v=2 fp=f31da382bc2d319b -->
+
+**Date**: 2026-10-16
+**Task**: Tool 参数校验与错误反馈统一
+**Branch**: `main`
+
+### Summary
+
+收口自有 tools 与 pi-trellis dispatch 的输入校验与可纠正错误反馈：schema 闭合、未知字段拒绝、宿主小数转换防护、bash 结构化输出与信号/截断语义、agent 准入与生效值披露、workflow 作者错误与容忍失败诊断。独立多轮审查 + 可归因全量检查通过后归档。
+
+### Main Changes
+
+- S1 bash/monitor/task_manage：闭合对象、timeout 上界、structuredContent 四条返回路径、非零退出恒显退出码、自发信号为失败而主动取消非失败、截断按字节范围
+- S2 agent：失败分支 isError、thinking 枚举、prompt/description/message 非空、resume 与启动参数冲突前置拒绝、五个固定 schema 闭合（workflow args 保持自由）、前后台结果披露请求值与生效值
+- S3 workflow：helper 校验与 agent 选项错误统一为作者错误不再被吞成 null；子任务失败仍容错并记录；失败原因进入最终文本/通知/task_manage output，诊断前置避过截断
+- S4 Memory + dispatch：Memory 工具闭合、长度与策略对齐 160、显示 label 小写下划线；dispatch 改普通闭合对象 + 纯校验函数，校验先于 query/FS/RPC
+- 按独立审查修正模型可见契约文案、effort 与宿主 thinking 对齐、bash detach 注释
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9cf9694` | S1: close owned tool input schemas and complete the bash result contract |
+| `f108932` | S2: mark subagent failures and reject inputs that were being ignored |
+| `10a150c` | S3: end a workflow on a script-author error, keep null for a failing subtask |
+| `b516d0f` | fix(memory): close tool schemas and align limits and lowercase labels |
+| `19d7701` | test(memory): verify astral codepoint limits with a minimal fixture |
+| `70b87d5` | fix(tools): preserve fractional input and report signal and truncation outcomes |
+| `3a392dd` | fix(process): make no-PID spawn refusals correctable without inventing errno |
+| `3cba095` | docs(spec): codify host validation and model-visible tool error contracts |
+| `9f62f16` | docs(task): record validation repairs, evidence and approved finish boundary |
+| `09aa0af` | fix(agents): reject ignored admission fields and disclose effective overrides |
+| `5fbf096` | fix(workflow): classify library validation as author error and retain tolerated failure reasons |
+| `954610a` | fix(workflow): align effort levels with host thinking and correct documented contracts |
+| `4e64103` | docs(task): freeze verified stage results and remaining acceptance limits |
+| `5e38b4e` | docs(task): record attributable snapshot check and neighbor pre-existing failure |
+
+### Testing
+
+- [OK] 本仓 pnpm check 1037/1037 exit 0；HEAD 纯净快照（可归因）1016/1016 exit 0；agent-tasks 自然退出 230/230；Memory 63/63
+- [OK] 邻仓 dispatch 定向 47/47、Python 32/32；全量 554/555，唯一失败为既有 viewer SIGKILL（已在改动前纯净快照复现，与本次改动无关）
+- [OK] A3 由 Number+multipleOf:1 解决：真实宿主 validator 拒绝数字与字符串 1.5
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 邻仓 tests/task-browser-ui.test.mjs:870 的 SIGKILL 需另行定性（疑似环境/宿主，非本次改动）
+- pi-trellis 迁入本仓时需带上提交 596955a
+- NOT_RUN：在线模型质量、真实 PTY、个人配置写与 install/sync/reload
