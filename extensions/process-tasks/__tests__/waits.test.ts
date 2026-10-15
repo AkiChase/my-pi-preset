@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { BackgroundRegistry } from "../state.ts";
 import { DEFAULTS } from "../config.ts";
 import { registerBashTool } from "../tools/bash.ts";
-import { registerJobsTool } from "../tools/jobs.ts";
+import { registerManagementFixture } from "./management-fixture.ts";
 import { add, createRunningJob, getStats, stopSidebarTicker } from "../registry.ts";
 import { startBackgroundJob, terminateJobSilently } from "../lifecycle.ts";
 import { createProcessTaskSource, processTaskIdentity } from "../source.ts";
@@ -27,7 +27,7 @@ function harness() {
     const pi = { registerTool: (tool: Tool) => tools.set(tool.name, tool), sendMessage: (message: unknown) => messages.push(message) };
     const ctx = { cwd: dir, ui: { notify() {}, setWidget() {}, setStatus() {}, theme: { fg: (_color: string, text: string) => text } } };
     registerBashTool(pi as never, reg, {} as never);
-    registerJobsTool(pi as never, reg);
+    registerManagementFixture(pi as never, reg);
     const source = createProcessTaskSource(reg);
     const cleanup = async () => {
         for (const job of reg.jobs.values()) terminateJobSilently(reg, job);
@@ -82,8 +82,9 @@ for (const command of ["printf final-log", "printf failed-log; exit 7"]) {
         try {
             const result = h.tools.get("bash")!.execute("launch", { command }, undefined, undefined, h.ctx);
             const job = [...h.reg.jobs.values()][0]!;
-            if (command.includes("exit 7")) await assert.rejects(result, /failed-log/);
-            else assert.equal((await result).content[0]!.text, "final-log");
+            const returned = await result;
+            assert.equal((returned as { isError?: boolean }).isError === true, command.includes("exit 7"));
+            assert.match(returned.content[0]!.text!, command.includes("exit 7") ? /\nfailed-log$/ : /\nfinal-log$/);
             assert.equal(h.reg.jobs.get(job.id), job);
             assert.ok(readFileSync(job.logPath, "utf8").includes("log"));
             assert.equal(h.source.list()[0]!.executionMode, "foreground");
@@ -123,7 +124,7 @@ void it("bash timeout retains auto-background behavior inside the quick window",
     const h = harness();
     try {
         const result = await h.tools.get("bash")!.execute("timeout", { command: "tail -f /dev/null", timeout: 0.05 }, undefined, undefined, h.ctx);
-        assert.match(result.content[0]!.text!, /^Command running in background/);
+        assert.match(result.content[0]!.text!, /\nCommand running in background/);
         assert.equal(h.source.list()[0]!.executionMode, "background");
         assert.equal(h.reg.totalStarted, 1);
     } finally { await h.cleanup(); }
@@ -135,10 +136,10 @@ void it("already-aborted retrieval and wait:false return promptly without stoppi
         const { job, finish } = h.fakeJob();
         const signal = new AbortController();
         signal.abort();
-        const result = await h.tools.get("jobs")!.execute("retrieve", { action: "attach", jobId: job.id }, signal.signal, undefined, h.ctx);
-        assert.match(result.content[0]!.text!, /Stopped following.*running in the background/);
-        const peek = await h.tools.get("jobs")!.execute("peek", { action: "attach", jobId: job.id, wait: false }, undefined, undefined, h.ctx);
-        assert.match(peek.content[0]!.text!, /is running/);
+        const result = await h.tools.get("task_manage")!.execute("retrieve", { action: "wait", task_id: job.id }, signal.signal, undefined, h.ctx);
+        assert.match(result.content[0]!.text!, /Wait cancelled; target unchanged/);
+        const peek = await h.tools.get("task_manage")!.execute("peek", { action: "status", task_id: job.id }, undefined, undefined, h.ctx);
+        assert.match(peek.content[0]!.text!, /: running/);
         assert.doesNotMatch(peek.content[0]!.text!, /finished/);
         assert.equal(job.outcomeSurfaced, undefined);
         assert.equal(job.attachCount, 0);
@@ -153,8 +154,8 @@ void it("two retrieval waits share counts; cancelling one cannot release the sib
     try {
         const { job, finish } = h.fakeJob();
         const signal = new AbortController();
-        const a = h.tools.get("jobs")!.execute("a", { action: "attach", jobId: job.id }, signal.signal, undefined, h.ctx);
-        const b = h.tools.get("jobs")!.execute("b", { action: "attach", jobId: job.id }, undefined, undefined, h.ctx);
+        const a = h.tools.get("task_manage")!.execute("a", { action: "wait", task_id: job.id }, signal.signal, undefined, h.ctx);
+        const b = h.tools.get("task_manage")!.execute("b", { action: "wait", task_id: job.id }, undefined, undefined, h.ctx);
         assert.equal(h.source.list()[0]!.executionMode, "background");
         assert.equal(h.source.list()[0]!.waitCount, 2);
         signal.abort();
@@ -174,7 +175,7 @@ for (const winner of ["completion", "detach"] as const) {
         const h = harness();
         try {
             const { job, finish } = h.fakeJob();
-            const waits = ["a", "b"].map((id) => h.tools.get("jobs")!.execute(id, { action: "attach", jobId: job.id }, undefined, undefined, h.ctx));
+            const waits = ["a", "b"].map((id) => h.tools.get("task_manage")!.execute(id, { action: "wait", task_id: job.id }, undefined, undefined, h.ctx));
             finish();
             if (winner === "completion") await tick();
             else await Promise.resolve(); // exit marked terminal, retrieval continuation still queued
@@ -184,10 +185,10 @@ for (const winner of ["completion", "detach"] as const) {
             assert.equal(job.status, "completed");
             assert.equal(job.attachCount, 0);
             if (winner === "completion") {
-                assert.ok(results.every((result) => result.content[0]!.text!.includes("finished")));
+                assert.ok(results.every((result) => result.content[0]!.text!.includes("status=completed")));
                 assert.equal(h.messages.length, 0);
             } else {
-                assert.ok(results.every((result) => result.content[0]!.text!.includes("Stopped following")));
+                assert.ok(results.every((result) => result.content[0]!.text!.includes("Wait released; target unchanged")));
                 assert.equal(h.messages.length, 1, "last cancelled wait must recheck suppressed terminal delivery");
             }
         } finally { await h.cleanup(); }

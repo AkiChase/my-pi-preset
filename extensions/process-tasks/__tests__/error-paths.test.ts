@@ -1,3 +1,4 @@
+import { createBashToolDefinition } from "@earendil-works/pi-coding-agent";
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { setTimeout as delay } from "node:timers/promises";
@@ -7,8 +8,8 @@ import { join } from "node:path";
 import { DEFAULTS } from "../config.ts";
 import { BackgroundRegistry } from "../state.ts";
 import { registerBashTool } from "../tools/bash.ts";
-import { registerBashBgTool } from "../tools/bash-bg.ts";
-import { registerJobsTool } from "../tools/jobs.ts";
+
+import { registerManagementFixture } from "./management-fixture.ts";
 import { add, createRunningJob, getStats, stopSidebarTicker } from "../registry.ts";
 import { startBackgroundJob, terminateJobSilently } from "../lifecycle.ts";
 import { createProcessTaskSource, processTaskIdentity } from "../source.ts";
@@ -27,8 +28,7 @@ function harness(t: TestContext) {
     const pi = { registerTool: (tool: Tool) => tools.set(tool.name, tool), sendMessage: (m: unknown) => messages.push(m) };
     const ctx = { cwd: dir, ui: { setWidget(_key: string, _content: unknown) {}, setStatus() {}, notify() {}, theme: { fg: (_: string, text: string) => text } } };
     registerBashTool(pi as never, reg, {} as never);
-    registerBashBgTool(pi as never, reg);
-    registerJobsTool(pi as never, reg);
+    registerManagementFixture(pi as never, reg);
     const source = createProcessTaskSource(reg);
     t.after(async () => {
         for (const job of reg.jobs.values()) terminateJobSilently(reg, job);
@@ -133,7 +133,9 @@ test("foreground execution error survives a failing final source publication", a
         if (h.reg.coordinator.waitCount === 0) throw new Error("secondary final publication error");
         changed();
     });
-    await assert.rejects(result, /primary-command-error/);
+    const returned = await result;
+    assert.equal((returned as { isError?: boolean }).isError, true);
+    assert.match(returned.content[0].text!, /primary-command-error/);
     assert.equal(h.reg.coordinator.waitCount, 0);
     assert.equal(h.reg.jobAborts.size, 0);
     assert.equal(h.reg.foreground.size, 0);
@@ -141,11 +143,11 @@ test("foreground execution error survives a failing final source publication", a
     assert.equal(h.messages.length, 0);
 });
 
-for (const entry of ["bash", "bash_bg"] as const) {
-    test(`${entry} explicit background setup failure silently stops the spawned process and preserves original error`, async t => {
+for (const notify of [true, false]) {
+    test(`bash explicit background notify=${notify} setup failure silently stops the spawned process and preserves original error`, async t => {
         const timers = trackTimers(t);
         const h = harness(t);
-        const failure = new Error(`${entry} publication unavailable`);
+        const failure = new Error(`bash notify=${notify} publication unavailable`);
         let statusCalls = 0;
         let controller: AbortController | undefined;
         let done: Promise<void> | undefined;
@@ -155,8 +157,8 @@ for (const entry of ["bash", "bash_bg"] as const) {
             statusCalls++; controller = [...h.reg.jobAborts.values()][0];
             done = [...h.reg.jobs.values()][0]?.donePromise; throw failure;
         });
-        const params = { command: "tail -f /dev/null", run_in_background: true, timeout: 60 };
-        await assert.rejects(h.tools.get(entry)!.execute("setup", params, undefined, undefined, h.ctx), error => error === failure);
+        const params = { command: "tail -f /dev/null", run_in_background: true, timeout: 60, notify };
+        await assert.rejects(h.tools.get("bash")!.execute("setup", params, undefined, undefined, h.ctx), error => error === failure);
         const job = [...h.reg.jobs.values()][0]!;
         assert.equal(statusCalls, 1, "failure must occur on the initial render after lifecycle wiring");
         assert.ok(controller?.signal.aborted);
@@ -192,8 +194,8 @@ for (const mode of ["wait", "terminal", "sibling-cancel"] as const) {
             assert.equal(job.outcomeSurfaced, undefined, "snapshot/detail reads must remain non-consuming");
         }
         const signal = mode === "sibling-cancel" ? new AbortController() : undefined;
-        const sibling = signal ? h.tools.get("jobs")!.execute("cancelled", { action: "attach", jobId: job.id }, signal.signal, undefined, h.ctx) : undefined;
-        const result = h.tools.get("jobs")!.execute("inline", { action: "attach", jobId: job.id }, undefined, undefined, h.ctx);
+        const sibling = signal ? h.tools.get("task_manage")!.execute("cancelled", { action: "wait", task_id: job.id }, signal.signal, undefined, h.ctx) : undefined;
+        const result = h.tools.get("task_manage")!.execute("inline", { action: "wait", task_id: job.id }, undefined, undefined, h.ctx);
         if (signal) {
             assert.equal(job.attachCount, 2);
             signal.abort(); await sibling;
@@ -206,8 +208,8 @@ for (const mode of ["wait", "terminal", "sibling-cancel"] as const) {
             finish();
         }
         const report = await result;
-        assert.match(report.content[0]!.text!, /finished\. Status: completed/);
-        assert.equal(toastAttempts, 1);
+        assert.match(report.content[0]!.text!, /status=completed/);
+        assert.equal(toastAttempts, 0, "management does not add a completion toast; returned answer owns delivery");
         assert.equal(job.outcomeSurfaced, true);
         assert.equal(job.attachCount, 0);
         assert.equal(h.reg.coordinator.waitCount, 0);

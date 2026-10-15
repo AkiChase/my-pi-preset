@@ -2,7 +2,7 @@ import { Type } from "typebox";
 import type { AgentConfig, IsolationMode, JoinMode, ThinkingLevel } from "./types.ts";
 
 /**
- * The model-facing `isolation` parameter, shared by the `Agent` tool and the
+ * The model-facing `isolation` parameter, shared by the `subagent_run` tool and the
  * nested delegation tool so the two cannot drift.
  *
  * Shape matters more than wording here. As a single-value optional literal,
@@ -22,7 +22,7 @@ import type { AgentConfig, IsolationMode, JoinMode, ThinkingLevel } from "./type
  * (their enum is `worktree | remote`, so both of their values do something),
  * and neither does the uncommitted-work warning, which is the specific trap
  * #231 fell into. Deliberately absent is any "only use a worktree when…"
- * restriction: Claude Code's `Agent` tool states the capability and stops, and
+ * restriction: Claude Code's `subagent_run` tool states the capability and stops, and
  * a second legal value is what lets a model decline one, not being told to.
  */
 const isolationParamShape = {

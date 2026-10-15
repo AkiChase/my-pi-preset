@@ -302,7 +302,7 @@ export function extractMeta(source: string): MetaExtraction {
  */
 const workflowNames = new Map<string, string>();
 
-/** The label a `SubagentWorkflow` call renders under, from whichever field it carries. */
+/** The label a `subagent_workflow` call renders under, from whichever field it carries. */
 export function workflowCallName(args: { script?: string; scriptPath?: string; name?: string }): string {
   const source = args.script;
   if (source === undefined || source === "") {

@@ -1,5 +1,5 @@
 /**
- * model-scope.ts — `scopeModels` policy, shared by the top-level Agent tool and
+ * model-scope.ts — `scopeModels` policy, shared by the top-level subagent_run tool and
  * the nested delegation tools so a nested spawn can't escape the allowlist the
  * top-level path enforces.
  *

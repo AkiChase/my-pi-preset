@@ -1,7 +1,7 @@
 /**
  * task.ts — the background record one workflow run lives in.
  *
- * A `SubagentWorkflow` tool call returns a task id immediately and the run continues
+ * A `subagent_workflow` tool call returns a task id immediately and the run continues
  * without it, so the run's state cannot live in the tool call's closure: the
  * inline card, the completion notification and (later) the `/agents → Workflows` dialog
  * all read it after `execute` has returned. This is that record, shaped after
@@ -26,7 +26,19 @@ export function workflowRunId(): string {
   return `wf_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
 }
 
+export interface WorkflowTerminal {
+  readonly status: WorkflowRunStatus;
+  readonly text: string;
+  readonly logs: readonly string[];
+}
+
 export interface WorkflowTask {
+  readonly terminal: Promise<WorkflowTerminal>;
+  resolveTerminal: (result: WorkflowTerminal) => void;
+  terminalResolved: boolean;
+  terminalResult?: WorkflowTerminal;
+  resultConsumed: boolean;
+  notificationDelivered: boolean;
   /** Discriminator, alongside Claude Code's `local_agent` / `local_bash`. */
   type: "local_workflow";
   /** Backend observer only; never exposed in task source read views. */
@@ -102,7 +114,10 @@ export function createWorkflowTask(init: {
   replay?: readonly WorkflowJournalEntry[];
   resumedFrom?: string;
 }): WorkflowTask {
+  let resolveTerminal!: (result: WorkflowTerminal) => void;
+  const terminal = new Promise<WorkflowTerminal>(resolve => { resolveTerminal = resolve; });
   return {
+    terminal, resolveTerminal, terminalResolved: false, resultConsumed: false, notificationDelivered: false,
     type: "local_workflow",
     id: init.id,
     status: "running",
@@ -194,6 +209,7 @@ export function resumeWorkflowTask(task: WorkflowTask, now = Date.now()): boolea
 
 /** Settle a task from the run's own result. */
 export function completeWorkflowTask(task: WorkflowTask, result: WorkflowRunResult): void {
+  if (task.terminalResolved) return;
   // Banked before the status moves off "paused": a run that finished while held
   // still spent that time held, and the elapsed figure has to say so.
   if (task.pausedAt !== undefined) {
@@ -211,6 +227,7 @@ export function completeWorkflowTask(task: WorkflowTask, result: WorkflowRunResu
   task.value = result.value;
   task.error = result.error;
   task.endTime = Date.now();
+  settleWorkflowTerminal(task);
   task.onChanged?.();
 }
 
@@ -219,12 +236,27 @@ export function completeWorkflowTask(task: WorkflowTask, result: WorkflowRunResu
  * worker started (bad `meta`, oversized source, non-JSON `args`).
  */
 export function failWorkflowTask(task: WorkflowTask, error: string): void {
+  if (task.terminalResolved) return;
   task.control = undefined;
   task.pausedAt = undefined;
-  task.status = "failed";
+  task.status = task.abortController.signal.aborted ? "killed" : "failed";
   task.error = error;
   task.endTime = Date.now();
+  settleWorkflowTerminal(task);
   task.onChanged?.();
+}
+
+function settleWorkflowTerminal(task: WorkflowTask): void {
+  let text: string;
+  try { text = workflowResultText(task); }
+  catch (error) {
+    task.status = "failed";
+    task.error = `Cannot serialize workflow return: ${error instanceof Error ? error.message : String(error)}`;
+    text = task.error;
+  }
+  task.terminalResult = Object.freeze({ status: task.status, text, logs: Object.freeze([...task.logs]) });
+  task.terminalResolved = true;
+  task.resolveTerminal(task.terminalResult);
 }
 
 /** The run's outcome as text, for the notification and the LLM-facing result. */
@@ -266,7 +298,7 @@ export function resolveResumeTarget(
           : "Nothing has run yet — call this without `resumeFromRunId`."),
     };
   }
-  if (prior.status === "running") {
+  if (prior.status === "running" || prior.status === "paused") {
     return {
       ok: false,
       message: `Workflow "${id}" is still running. Stop it from /agents → Workflows before resuming it.`,

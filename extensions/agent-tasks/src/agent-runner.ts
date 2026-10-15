@@ -18,6 +18,9 @@ import {
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import { BUILTIN_TOOL_NAMES, getAgentConfig, getConfig, getMemoryToolNames, getReadOnlyMemoryToolNames, getToolNamesForType } from "./agent-types.ts";
+import { withChildManagement } from "../../runtime-tasks/child-handoff.ts";
+import { createRuntimeTaskFacade, runtimeTaskTool } from "../../runtime-tasks/facade.ts";
+import { TaskCoordinator } from "../../task-ui/coordinator.ts";
 import { runInChildSessionContext } from "./child-context.ts";
 import { buildParentContext, extractText } from "./context.ts";
 import { DEFAULT_AGENTS } from "./default-agents.ts";
@@ -38,10 +41,9 @@ import type { CompiledSchema } from "./workflow/json-schema.ts";
  * derived from pi — but they only need defining once.
  */
 export const SUBAGENT_TOOL_NAMES = {
-  AGENT: "Agent",
-  WORKFLOW: "SubagentWorkflow",
-  GET_RESULT: "get_subagent_result",
-  STEER: "steer_subagent",
+  AGENT: "subagent_run",
+  WORKFLOW: "subagent_workflow",
+  STEER: "subagent_message",
 } as const;
 
 /** Names of tools registered by this extension that subagents must NOT inherit. */
@@ -500,6 +502,7 @@ export interface RunOptions {
     parentAgentId: string;
     depth: number;
     maxSubagentDepth?: number;
+    management?: import("../../runtime-tasks/child-handoff.ts").ChildManagementFactory;
   };
 }
 
@@ -620,6 +623,7 @@ function checkCancelled(signal?: AbortSignal): void {
 // Shared with manager disposal: failed partial startup must close the child
 // lifecycle exactly once, even when a callback already exposed that session.
 const closedSessions = new WeakSet<AgentSession>();
+const ownedManagement = new WeakMap<AgentSession, () => void>();
 /** Backend bookkeeping only: a closed partial startup cannot be resumed. */
 export function isChildSessionClosed(session: AgentSession): boolean {
   return closedSessions.has(session);
@@ -649,6 +653,8 @@ export function shutdownChildSession(
   const close = new Promise<void>(done => { resolve = done; });
   closingSessions.set(session, close);
   closedSessions.add(session);
+  ownedManagement.get(session)?.();
+  ownedManagement.delete(session);
   let timer: ReturnType<typeof setTimeout> | undefined;
   void (async () => {
     try {
@@ -830,7 +836,12 @@ export async function runAgent(
     systemPromptOverride: () => systemPrompt,
     appendSystemPromptOverride: () => [],
   });
-  await runInChildSessionContext(() => loader.reload());
+  const childManagementFactory = agentConfig?.allowedSubagents && !options.isolated &&
+    !agentConfig.disallowedTools?.includes("task_manage") && options.nestedRuntime &&
+    options.nestedRuntime.depth < (options.nestedRuntime.maxSubagentDepth ?? getMaxSubagentDepth())
+      ? options.nestedRuntime.management : undefined;
+  let compositionTool: import("@earendil-works/pi-coding-agent").ToolDefinition | undefined;
+  await withChildManagement(childManagementFactory, () => runInChildSessionContext(() => loader.reload()), tool => { compositionTool = tool; });
   checkCancelled(options.signal);
 
   // Plain entries in `tools:` are expected to be built-in names (extension tools
@@ -926,6 +937,22 @@ export async function runAgent(
   const nestedRuntime = options.nestedRuntime && options.nestedRuntime.depth < effectiveMaxDepth
     ? options.nestedRuntime
     : undefined;
+  const managementExtensions = noExtensions ? [] : loader.getExtensions().extensions.filter(extension => extension.tools.has("task_manage"));
+  // Never override a registered tool. Ext selectors are authoritative: an
+  // owned-only custom tool must not bypass explicit extension-tool narrowing.
+  const fallbackCoordinator = childManagementFactory && managementExtensions.length === 0 && extNames.size === 0
+    ? new TaskCoordinator() : undefined;
+  const fallbackFacade = fallbackCoordinator ? createRuntimeTaskFacade([childManagementFactory!(fallbackCoordinator)]) : undefined;
+  const fallbackTools = fallbackFacade ? [runtimeTaskTool(fallbackFacade)] : [];
+  const compositionAllowed = compositionTool !== undefined && managementExtensions.some(extension => {
+    if (extension.tools.get("task_manage")?.definition !== compositionTool) return false;
+    const canons = extensionCanonicalNames(extension.path);
+    const narrowed = canons.map(name => narrowing.get(name)).find(Boolean);
+    return (extNames.size === 0 || canons.some(name => extNames.has(name))) && (!narrowed || narrowed.has("task_manage"));
+  });
+  let childSession: AgentSession | undefined;
+  const canCollectBackground = () => !disallowedSet?.has("task_manage") &&
+    (fallbackFacade !== undefined || compositionAllowed) && (!childSession || childSession.getActiveToolNames().includes("task_manage"));
   const nestedTools = agentConfig?.allowedSubagents && nestedRuntime && !options.isolated
     ? createNestedSubagentTools({
         manager: nestedRuntime.manager,
@@ -935,6 +962,7 @@ export async function runAgent(
         maxSubagentDepth: effectiveMaxDepth,
         allowedSubagents: agentConfig.allowedSubagents,
         configCwd,
+        canCollectBackground,
       })
     : [];
   const nestedToolNames = new Set(nestedTools.map(tool => tool.name));
@@ -958,6 +986,7 @@ export async function runAgent(
   // unsatisfiable by construction rather than merely restricted.
   const readmitToolNames = new Set([
     ...[...nestedToolNames].filter(name => !disallowedSet?.has(name)),
+    ...fallbackTools.map(tool => tool.name),
     ...structuredToolNames,
   ]);
 
@@ -1000,6 +1029,7 @@ export async function runAgent(
         (t) => !EXCLUDED_TOOL_NAMES.includes(t) && !disallowedSet?.has(t),
       ),
       ...[...nestedToolNames].filter((t) => !disallowedSet?.has(t)),
+      ...fallbackTools.map(tool => tool.name),
       // Not filtered through `disallowedSet`, unlike the nested tools above:
       // the caller asked for a schema, and removing the only tool that can
       // satisfy it would make the request unsatisfiable by construction rather
@@ -1069,7 +1099,7 @@ export async function runAgent(
     ...(parentModelRuntime !== undefined && { modelRuntime: parentModelRuntime as never }),
     model,
     tools: sessionTools,
-    customTools: [...nestedTools, ...structuredTools],
+    customTools: [...nestedTools, ...fallbackTools, ...structuredTools],
     resourceLoader: loader,
   };
   if (sessionExcludeTools) {
@@ -1080,7 +1110,12 @@ export async function runAgent(
   }
 
   checkCancelled(options.signal);
-  const { session } = await runInChildSessionContext(() => (dependencies.createAgentSession ?? createAgentSession)(sessionOpts));
+  const closeFallback = () => { fallbackFacade?.close(); fallbackCoordinator?.dispose(); };
+  let session: AgentSession;
+  try { ({ session } = await runInChildSessionContext(() => (dependencies.createAgentSession ?? createAgentSession)(sessionOpts))); }
+  catch (error) { closeFallback(); throw error; }
+  childSession = session;
+  if (fallbackFacade) ownedManagement.set(session, closeFallback);
 
   let promptStarted = false;
   let cleanupStartupAbort = () => {};

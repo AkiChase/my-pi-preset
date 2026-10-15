@@ -15,6 +15,7 @@ mkdirSync(parallelRootCwd);
 const entry = join(parentCwd, "composition-probe.ts");
 writeFileSync(entry, `
 import composition, { runInChildSessionContext } from ${JSON.stringify(join(root, "extensions/task-composition.ts"))};
+import { withChildManagement } from ${JSON.stringify(join(root, "extensions/runtime-tasks/child-handoff.ts"))};
 import beautify from ${JSON.stringify(join(root, "extensions/beautify.ts"))};
 import atPathCompletion from ${JSON.stringify(join(root, "extensions/at-path-completion.ts"))};
 export default async function (pi) {
@@ -34,12 +35,12 @@ export default async function (pi) {
   beautify(proxy);
   atPathCompletion(proxy);
   pi.registerCommand("probe-child", { description: "Test-only child context bridge",
-    handler: async (_args, ctx) => runInChildSessionContext(ctx.loadChild) });
+    handler: async (_args, ctx) => withChildManagement(ctx.branch, () => runInChildSessionContext(ctx.loadChild)) });
 }
 `);
 const registryKey = Symbol.for("pi-subagents:manager");
-const rootToolNames = ["Agent", "SubagentWorkflow", "bash", "bash_bg", "get_subagent_result", "jobs", "monitor", "steer_subagent"].sort();
-const childToolNames = ["bash", "bash_bg", "jobs", "monitor"].sort();
+const rootToolNames = ["subagent_run", "subagent_workflow", "bash", "task_manage", "monitor", "subagent_message"].sort();
+const childToolNames = ["bash", "task_manage", "monitor"].sort();
 const rootOnlyEvents = ["input", "session_before_switch"];
 const removedOverviewEvents = ["tool_execution_start"];
 const liveLoads = new Set();
@@ -75,7 +76,7 @@ const assertRoot = (result) => {
 const assertChild = (result, rootExt, label) => {
   const ext = result.extensions[0];
   assert.deepEqual([...ext.tools.keys()].sort(), childToolNames, `${label}: no child agent tools`);
-  for (const name of ["Agent", "SubagentWorkflow", "get_subagent_result", "steer_subagent"]) {
+  for (const name of ["subagent_run", "subagent_workflow", "subagent_message"]) {
     assert.equal(ext.tools.has(name), false, `${label}: no ${name}`);
   }
   assert.equal(ext.commands.has("agents"), false, `${label}: no root manager command`);
@@ -113,6 +114,29 @@ try {
   assert.equal(globalThis[registryKey], ownedRegistry);
   await close(differentCwdChildren);
   assert.equal(globalThis[registryKey], ownedRegistry, "different-cwd child shutdown preserves the root manager");
+
+  // The actual cached host loader crosses cwd/jiti graphs with one composite manager.
+  for (const cwd of [parentCwd, childCwd]) {
+    const branch = () => ({ list: () => [{ view: { sourceId: "agent", taskId: "owned", runId: "1", key: "owned", kind: "agent", title: "owned", status: "running", executionMode: "owned", waitCount: 0, stats: {}, artifacts: [], capabilities: { stop: true, details: true } }, manageable: true, rawStatus: "running" }], execute: async () => ({ content: [{ type: "text", text: "owned answer" }], details: { runtimeTask: { version: 1, action: "output", task_type: "subagent", task_id: "owned", run_id: "1" } } }) });
+    const child = await rootExt.commands.get("probe-child").handler("", { branch, loadChild: () => load(cwd) });
+    assertChild(child, rootExt, "composite child");
+    const ext = child.extensions[0], manage = ext.tools.get("task_manage").definition;
+    const ctx = { cwd, hasUI: false, ui: { setStatus() {}, setWidget() {}, notify() {}, theme: { fg: (_c, t) => t } } };
+    const call = (args) => manage.execute("probe", args, undefined, undefined, ctx);
+    assert.match((await call({ action: "list" })).content[0].text, /task_id=owned/);
+    assert.equal((await call({ action: "output", task_id: "root-or-sibling" })).details.runtimeTask.error_code, "not_found");
+    const launch = await ext.tools.get("bash").definition.execute("local", { command: "printf CHILD", run_in_background: true }, undefined, undefined, ctx);
+    const identity = launch.details.runtimeLaunch;
+    assert.match(launch.content[0].text, new RegExp(`task_id=${identity.task_id}`));
+    // Spawn deliberately unrefs its child; this standalone driver owns a bounded keepalive.
+    const keepalive = setTimeout(() => {}, 5000);
+    try { assert.match((await call({ action: "wait", task_id: identity.task_id })).content[0].text, /CHILD/); }
+    finally { clearTimeout(keepalive); }
+    assert.match((await call({ action: "output", task_id: "owned" })).content[0].text, /owned answer/);
+    await close(child);
+    assert.equal((await call({ action: "list" })).details.runtimeTask.error_code, "closed");
+    assert.equal(globalThis[registryKey], ownedRegistry, "child facade close never disposes root");
+  }
 
   // Changing back invalidates the graph again. Repeated parent initialization
   // must still be root, with one tool/command/shortcut registration per factory.

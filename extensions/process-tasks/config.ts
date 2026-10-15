@@ -28,7 +28,7 @@ export interface ProcessTasksConfig {
     maxConcurrentJobs: number;
     /** A job whose log exceeds this is killed. */
     maxLogBytes: number;
-    /** How much log tail `jobs output` and a finished foreground command show. */
+    /** How much log tail `task_manage output` and a finished foreground command show. */
     outputPreviewChars: number;
     /** Lines of log inlined into a failed job's notification. */
     failureTailLines: number;

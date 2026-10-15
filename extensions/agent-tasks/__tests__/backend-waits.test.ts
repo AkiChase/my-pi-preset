@@ -84,12 +84,16 @@ void it("nested actual delegation ignores legacy turn budgets and keeps user def
     const launch = tool.execute("nested", params, undefined, undefined, ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext); await tick();
     assert.equal(f.manager.getRecord(f.calls[0]!.id)?.maxTurns, 7);
     assert.equal(f.manager.getRecord(f.calls[0]!.id)?.invocation?.maxTurns, 7);
-    f.calls[0]!.finish(); await launch;
+    f.calls[0]!.finish();
+    const launchResult = await launch;
+    assert.match(launchResult.content.map(block => block.type === "text" ? block.text : "").join(""), new RegExp(`task_id=${f.calls[0]!.id} run_id=1`));
     setDefaultMaxTurns(9);
     const resume = tool.execute("nested-resume", { ...params, resume: f.calls[0]!.id }, undefined, undefined, ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext); await tick();
     assert.equal(f.resumes[0]!.options?.maxTurns, 9);
     assert.equal(f.manager.getRecord(f.calls[0]!.id)?.invocation?.maxTurns, 9);
-    f.resumes[0]!.finish(); await resume;
+    f.resumes[0]!.finish();
+    const resumedResult = await resume;
+    assert.match(resumedResult.content.map(block => block.type === "text" ? block.text : "").join(""), new RegExp(`task_id=${f.calls[0]!.id} run_id=2`));
   } finally { await f.close(); setDefaultMaxTurns(undefined); }
 });
 

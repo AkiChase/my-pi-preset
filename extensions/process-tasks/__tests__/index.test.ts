@@ -1,3 +1,4 @@
+import { createRuntimeTaskFacade, registerRuntimeTaskTool, type RuntimeTaskCapability } from "../../runtime-tasks/facade.ts";
 /**
  * index.ts session lifecycle — Claude Code parity:
  *   - the registry is born empty on session_start (no persistence, no revival;
@@ -85,7 +86,11 @@ const uiCtx = {
 
 function startExtension() {
     const h = makePi();
-    const backend = extension(h.pi as never);
+    const capabilities: RuntimeTaskCapability[] = [];
+    const backend = extension(h.pi as never, { onManagement: c => capabilities.push(c) });
+    const facade = createRuntimeTaskFacade(capabilities);
+    backend.lifecycle.onClose(facade.close);
+    registerRuntimeTaskTool(h.pi as never, facade);
     return { ...h, backend };
 }
 
@@ -103,9 +108,9 @@ void describe("session_start — registry is born empty (no revival)", () => {
         };
         await h.handlers.get("session_start")!({}, ctx);
 
-        const jobs = h.tools.get("jobs")!;
+        const jobs = h.tools.get("task_manage")!;
         const res = await jobs.execute("t1", { action: "list" }, undefined, undefined, uiCtx);
-        assert.equal(res.content[0].text, "No background jobs");
+        assert.equal(res.content[0].text, "No runtime tasks in this scope.");
         assert.equal(h.appendedEntries.length, 0, "no state snapshot is written");
     });
     void it("session replacement stops old tasks and starts an empty registry", async () => {
@@ -116,8 +121,8 @@ void describe("session_start — registry is born empty (no revival)", () => {
         assert.ok(liveMarkedProcesses() > 0);
         await h.handlers.get("session_start")!({ reason: "new" }, uiCtx);
         await sleep(200);
-        const list = await h.tools.get("jobs")!.execute("new-list", { action: "list" }, undefined, undefined, uiCtx);
-        assert.equal(list.content[0].text, "No background jobs");
+        const list = await h.tools.get("task_manage")!.execute("new-list", { action: "list" }, undefined, undefined, uiCtx);
+        assert.equal(list.content[0].text, "No runtime tasks in this scope.");
         assert.equal(liveMarkedProcesses(), 0);
         assert.equal(h.messages.filter((m) => m.customType === EVENT.taskNotification).length, 0);
         await h.handlers.get("session_shutdown")!({}, {});
@@ -146,8 +151,8 @@ void describe("session_shutdown — kills running tasks on ANY reason", () => {
             await h.handlers.get("session_shutdown")!({ reason }, {});
             await sleep(200); // let the SIGTERM land
 
-            const jobs = h.tools.get("jobs")!;
-            await assert.rejects(jobs.execute("t3", { action: "list" }, undefined, undefined, uiCtx), /activation is closed/);
+            const jobs = h.tools.get("task_manage")!;
+            assert.match((await jobs.execute("t3", { action: "list" }, undefined, undefined, uiCtx)).content[0].text, /activation is closed/);
             assert.equal(h.backend.source.list().length, 0, "disposed source no longer exposes runtime rows");
             assert.equal(liveMarkedProcesses(), 0, "no orphaned process survives");
             assert.equal(
@@ -361,7 +366,7 @@ test("actual factory retains hundreds of terminals beyond admission: bounded sin
         assert.equal(failed.details.monitorBatchOverflow.manifestPath, undefined); assert.match(failed.content, /manifest unavailable/);
         // Existing jobs list exposes unsurfaced terminal notifyError, without
         // consuming outcomes or requiring another unsolicited wakeup.
-        const list = await h.tools.get("jobs")!.execute("list", { action: "list" }, undefined, undefined, context);
+        const list = await h.tools.get("task_manage")!.execute("list", { action: "list" }, undefined, undefined, context);
         assert.match(list.content[0]!.text, /notification.*failed|notify.*failed/i);
         t.mock.timers.tick(100000); assert.equal(h.messages.length, 2);
         live.emit("message", { data: "fresh live activity" }); t.mock.timers.tick(200);

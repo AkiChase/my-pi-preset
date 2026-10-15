@@ -38,11 +38,11 @@ void it("shutdown stops fg/bg/command monitor/pending/attach and owned timers de
     const h = processActivation(dir);
     try {
         const foreground = h.execute("bash", { command: ignoring });
-        await h.execute("bash_bg", { command: ignoring });
+        await h.execute("bash", { run_in_background: true, command: ignoring });
         await h.execute("monitor", { command: "trap '' TERM; printf 'first\n'; printf 'pending\n'; while true; do sleep 0.1; done", description: "watch" });
         const jobs = [...h.reg.jobs.values()];
         await until(() => jobs.every((job) => readFileSync(job.logPath, "utf8").length > 0));
-        const retrieval = h.execute("jobs", { action: "attach", jobId: jobs[1]!.id });
+        const retrieval = h.execute("task_manage", { action: "wait", task_id: jobs[1]!.id });
         const pending = createRunningJob({ id: "pending", command: "pending", pid: 0, logPath: join(dir, "pending.log"), toolCallId: "pending" });
         pending.status = "pending"; ensureCompletionPromise(pending); add(h.reg, pending);
         const terminal = pending.donePromise!;
@@ -58,9 +58,10 @@ void it("shutdown stops fg/bg/command monitor/pending/attach and owned timers de
         assert.equal(h.reg.sweepTimer, undefined); assert.equal(h.reg.sidebarTimer, undefined);
         assert.equal(h.reg.notificationRetries.size, 0); assert.equal(h.source.list().length, 0);
         await sleep(40); assert.equal(h.messages.length, beforeMessages, "silent stop must not flush monitor pending");
-        for (const name of ["bash", "bash_bg", "monitor", "jobs"]) {
-            const params = name === "monitor" ? { command: "echo late", description: "late" } : name === "jobs" ? { action: "list" } : { command: "echo late" };
-            await assert.rejects(h.execute(name, params), /closed/);
+        for (const name of ["bash", "bash", "monitor", "task_manage"]) {
+            const params = name === "monitor" ? { command: "echo late", description: "late" } : name === "task_manage" ? { action: "list" } : { command: "echo late" };
+            if (name === "task_manage") assert.match((await h.execute(name, params)).content[0].text!, /closed/);
+            else await assert.rejects(h.execute(name, params), /closed/);
         }
         for (const job of jobs) assert.ok(readFileSync(job.logPath, "utf8").length > 0);
     } finally { await h.lifecycle.shutdown(); rmSync(dir, { recursive: true, force: true }); }
@@ -91,7 +92,7 @@ void it("TERM-killed group leader cannot strand its TERM-ignoring descendant", {
     const h = processActivation(dir);
     try {
         // The leader accepts TERM, its descendant does not. Child writes its own PID.
-        await h.execute("bash_bg", { command: "bash -c 'trap \"\" TERM; echo $$ > child.pid; while true; do sleep 0.1; done' & wait" });
+        await h.execute("bash", { run_in_background: true, command: "bash -c 'trap \"\" TERM; echo $$ > child.pid; while true; do sleep 0.1; done' & wait" });
         const job = [...h.reg.jobs.values()][0]!;
         await until(() => {
             try { return Number(readFileSync(join(dir, "child.pid"), "utf8")) > 0; } catch { return false; }
@@ -157,8 +158,8 @@ void it("throwing backend stop hook cannot prevent actual kill or sibling cleanu
     const dir = mkdtempSync(join(tmpdir(), "process-stop-throw-"));
     const h = processActivation(dir);
     try {
-        await h.execute("bash_bg", { command: "tail -f /dev/null" });
-        await h.execute("bash_bg", { command: "tail -f /dev/null" });
+        await h.execute("bash", { run_in_background: true, command: "tail -f /dev/null" });
+        await h.execute("bash", { run_in_background: true, command: "tail -f /dev/null" });
         const jobs = [...h.reg.jobs.values()];
         jobs[0]!.stop = () => { throw new Error("stop hook failure"); };
         await h.lifecycle.shutdown();

@@ -41,7 +41,7 @@ function makeJob(overrides: Partial<Job> = {}): Job {
     };
 }
 
-void describe("bash_bg --name 라벨", () => {
+void describe("bash description 라벨", () => {
     void it("formatJobLine은 이름 있는 잡에 대해 'name (job-id)' 헤더 사용", () => {
         const job = makeJob({ id: "job-1", name: "build" });
         const line = formatJobLine(job);

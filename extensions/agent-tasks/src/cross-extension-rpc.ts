@@ -47,7 +47,7 @@ export interface SpawnCapable {
   getRecord(id: string): Pick<AgentRecord, "parentAgentId" | "workflowId"> | undefined;
   /**
    * Mark a settled agent's result as read by the caller, suppressing the
-   * completion notification — what `get_subagent_result` does when it returns
+   * completion notification — what `task_manage` does when it returns
    * one. False when there is no such agent, or it has not settled yet.
    */
   consumeResult(id: string): boolean;
@@ -162,7 +162,7 @@ export function registerRpcHandlers(deps: RpcDeps): RpcHandle {
         }
 
         // A model on the RPC payload is an orchestrator-level choice, exactly
-        // like Agent({ model }) — so it gets the Agent tool's hard error, never
+        // like Agent({ model }) — so it gets the subagent_run tool's hard error, never
         // the frontmatter warn (#240). The check reads the RESOLVED model:
         // resolveModel is fuzzy, so a bare "sonnet" can land on a provider the
         // caller never named. Frontmatter-pinned and parent-inherited models are

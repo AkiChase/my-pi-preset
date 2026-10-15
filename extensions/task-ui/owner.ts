@@ -57,7 +57,7 @@ export function createTaskUIOwner(pi: ExtensionAPI, coordinator: TaskCoordinator
         async openPanel(origin: ExtensionContext): Promise<void> {
             if (!active() || interaction) return;
             if (origin.mode !== "tui" || !origin.ui.custom) {
-                origin.ui.notify("Task Panel requires interactive TUI mode; use jobs/get_subagent_result for details.", "info"); return;
+                origin.ui.notify("Task Panel requires interactive TUI mode; use task_manage for details.", "info"); return;
             }
             const current: Interaction = {};
             interaction = current; // Publish owner BEFORE custom can reenter shutdown.

@@ -1,5 +1,13 @@
 # beautify 验证边界
 
+## 当前运行任务展示接口
+
+可选 adapter 只识别 `task_manage` 的 version=1 runtimeTask 元数据；七 action／四 task_type、参数 action/type/task_id/run_id 匹配、safe counts/range、partial waiting 与终态分别验证。未知 version、details={}、异形／旧名记录委托原 renderer，无原 renderer 则安全通用降级。展开只显示已返回正文，不访问 backend、不追加 I/O 或消费。
+
+`retrieval.test.ts` 与 `registered-agent.test.ts` 执行真实管理注册和 actual host component；process 字节页／regex／stats／wait release／stop、subagent running／final／verbose／not_found／cancelled 同时核返回不被 renderer 改写。default/self once padding、mouse hit bounds、pending/success/error 背景及同轮 partial→final callback 槽保留。layout/shared/optional 的工具名独立预算迁入当前源码成果，长详情不能截断工具名；原 read/bash/find/grep 无新增执行 owner。新 launcher 没有专门 Beautify adapter。
+
+历史段落与计数是前置迁移的证据，不是当前新接口验收。当前自动命令、失败诊断和真实终端未验范围在 owning task 的 `research/stage-2-implementation-report.md`；通用方法以 `.trellis/spec/testing/` 为准。
+
 ## 环境与命令
 
 2026-10-14 实测 Node 24.14.1、Pi SDK 1.2.0。使用已安装 SDK 的 node_modules，设置临时 `PI_CODING_AGENT_DIR`；不读个人配置、不执行真实 install/sync/reload、不调用模型或网络。
@@ -31,7 +39,7 @@ rm -rf "$agent_dir"
 
 ## 定向终端修复复验
 
-用户授权后的 tmux targeted 证据见本 task [terminal-fix-report](../../.trellis/tasks/10-13-beautify-tool-shell-collapse/research/terminal-fix-report.md)。`terminal-layout.test.ts` 新增逐打印cell的 terminal-effective SGR背景回归：纯文本标题head/metadata被SDK截断后不得reset宿主背景，长Bash/Read ENOENT与右侧padding先3项行为红后绿。新增actual TuiAltScreen最新emitted frame检查140→80→40→140 hint完整或整项省略、展开/收回；不只调用summary或查有无48m。
+用户授权后的 tmux targeted 证据见本 task [terminal-fix-report](../../.trellis/tasks/archive/2026-10/10-13-beautify-tool-shell-collapse/research/terminal-fix-report.md)。`terminal-layout.test.ts` 新增逐打印cell的 terminal-effective SGR背景回归：纯文本标题head/metadata被SDK截断后不得reset宿主背景，长Bash/Read ENOENT与右侧padding先3项行为红后绿。新增actual TuiAltScreen最新emitted frame检查140→80→40→140 hint完整或整项省略、展开/收回；不只调用summary或查有无48m。
 
 真实tmux本轮仅Read、长Bash、Read error三种调用，dark/fullscreen；40列等待CLI实际发出完整新宽度frame，再发送真实Ctrl+O。旧driver仅等tmux裁短border造成残缺hint，raw写流证明CLI尚未重绘，不改产品预算迁就夹具。长标题和metadata纯文本截断后移除SDK自动reset，再交现有fg及host Box各自着色；不改通用highlight clip或SDK。完整命令、红绿/9项targeted PASS/cleanup和其他NOT_RUN见报告。
 

@@ -24,6 +24,7 @@ export function bashParamSchema(config: ProcessTasksConfig) {
                     `Output is saved to ${config.logDir}/<jobId>.log.`,
             })
         ),
+        notify: Type.Optional(Type.Boolean({ description: "Completion notification (default true); only valid with run_in_background=true" })),
         description: Type.Optional(
             Type.String({ description: "Short description of what this command does" })
         ),

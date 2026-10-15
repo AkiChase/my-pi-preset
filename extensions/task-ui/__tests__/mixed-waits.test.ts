@@ -11,7 +11,7 @@ import { DEFAULTS as UI_DEFAULTS } from "../config.ts";
 import { BackgroundRegistry } from "../../process-tasks/state.ts";
 import { DEFAULTS } from "../../process-tasks/config.ts";
 import { registerBashTool } from "../../process-tasks/tools/bash.ts";
-import { registerJobsTool } from "../../process-tasks/tools/jobs.ts";
+import { registerManagementFixture } from "../../process-tasks/__tests__/management-fixture.ts";
 import { terminateJobSilently } from "../../process-tasks/lifecycle.ts";
 import { stopSidebarTicker } from "../../process-tasks/registry.ts";
 import { processExists } from "../../process-tasks/spawn.ts";
@@ -52,7 +52,7 @@ void it("one shared /bg releases mixed shell/agent launch and retrieval waits wi
     const offProcess = coordinator.registerSource(processSource);
     const offAgent = coordinator.registerSource(agentSource);
     registerBashTool(pi, reg, {} as Parameters<typeof registerBashTool>[2]);
-    registerJobsTool(pi, reg);
+    registerManagementFixture(pi, reg);
     try {
         const shellParent = new AbortController(), agentParent = new AbortController();
         const shellLaunch = tools.get("bash")!.execute("mixed-shell", { command: "printf 'shell-before\\n'; tail -f /dev/null" }, shellParent.signal, undefined, ctx);
@@ -62,7 +62,7 @@ void it("one shared /bg releases mixed shell/agent launch and retrieval waits wi
         });
         const run = manager.getRun(id)!;
         const agentLaunch = registerAgentWait(manager, coordinator, run, "launch", agentParent.signal);
-        const shellRetrieval = tools.get("jobs")!.execute("mixed-shell-retrieval", { action: "attach", jobId: job.id }, undefined, undefined, ctx);
+        const shellRetrieval = tools.get("task_manage")!.execute("mixed-shell-retrieval", { action: "wait", task_id: job.id }, undefined, undefined, ctx);
         const agentRetrieval = registerAgentWait(manager, coordinator, run, "retrieval");
         const before = coordinator.list();
         assert.equal(before.length, 2);
@@ -89,7 +89,7 @@ void it("one shared /bg releases mixed shell/agent launch and retrieval waits wi
         const shellResult = await shellLaunch;
         const retrievalResult = await shellRetrieval;
         assert.match(shellResult.content[0]?.type === "text" ? shellResult.content[0].text : "", new RegExp(job.id));
-        assert.match(retrievalResult.content[0]?.type === "text" ? retrievalResult.content[0].text : "", /Stopped following/);
+        assert.match(retrievalResult.content[0]?.type === "text" ? retrievalResult.content[0].text : "", /Wait released; target unchanged/);
         assert.equal(coordinator.waitCount, 0);
         assert.equal(starts, 1);
         assert.equal(backendSignal?.aborted, false);

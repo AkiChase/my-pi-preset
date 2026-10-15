@@ -143,7 +143,7 @@ export function completionSummary(job: Job, status?: TerminalStatus): string {
  * Record that the agent has seen a job's outcome (Claude Code's
  * markTaskNotified). Idempotent. Called by every path that surfaces the
  * outcome WITHOUT a notification: kill paths (before the kill, so the exit
- * handler skips notifying) and terminal reads (jobs output / attach).
+ * handler skips notifying) and terminal reads (task_manage output / wait).
  */
 export function markOutcomeSurfaced(job: Job, reg?: BackgroundRegistry): void {
     job.outcomeSurfaced = true;
@@ -156,12 +156,12 @@ export function markOutcomeSurfaced(job: Job, reg?: BackgroundRegistry): void {
 /**
  * Send a terminal job's notification, at most once.
  *
- * Skipped — without marking the outcome surfaced — while a `jobs attach` is
+ * Skipped — without marking the outcome surfaced — while a `task_manage wait` is
  * waiting on the job, because that attach's result is the report. Skipped
  * permanently once the outcome has been surfaced by any route.
  *
  * A send that throws records `job.notifyError` and returns false, leaving the
- * job terminal, unsurfaced, and still in the registry so `jobs list` can
+ * job terminal, unsurfaced, and still in the registry so `task_manage list` can
  * report it. Upstream dropped it to a console.error and the outcome was gone.
  *
  * Delivery does not affect metadata retention.

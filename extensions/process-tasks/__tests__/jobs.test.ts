@@ -9,7 +9,7 @@ import { writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BackgroundRegistry } from "../state.ts";
-import { registerJobsTool } from "../tools/jobs.ts";
+import { registerManagementFixture } from "./management-fixture.ts";
 import { add, createRunningJob } from "../registry.ts";
 import { markOutcomeSurfaced } from "../notify.ts";
 import type { Job, UiContext } from "../types.ts";
@@ -39,7 +39,7 @@ function harness() {
         },
     };
     const reg = new BackgroundRegistry();
-    registerJobsTool(pi as never, reg);
+    registerManagementFixture(pi as never, reg);
     const ctx = {
         ui: {
             notify() {},
@@ -73,14 +73,14 @@ void describe("jobs kill — CC's TaskStopTool", () => {
         const job = mkJob(reg, { id: `job-${process.pid}-k1`, command: "npm run\nbuild" });
         const res = await tool.execute(
             "t1",
-            { action: "kill", jobId: job.id },
+            { action: "stop", task_id: job.id },
             undefined,
             undefined,
             ctx
         );
         assert.equal(
             res.content[0].text,
-            `Successfully stopped task: ${job.id} (npm run build)`
+            `task_type=bash task_id=${job.id} run_id=${job.id}\nStop requested; observed status=killed. Actual execution may still be draining.`
         );
         assert.equal(job.status, "killed");
         assert.equal(job.outcomeSurfaced, true, "marked so the exit path skips notifying");
@@ -89,10 +89,7 @@ void describe("jobs kill — CC's TaskStopTool", () => {
 
     void it("unknown id errors with CC's exact string", async () => {
         const { tool, ctx } = harness();
-        await assert.rejects(
-            () => tool.execute("t2", { action: "kill", jobId: "nope" }, undefined, undefined, ctx),
-            /^Error: No task found with ID: nope$/
-        );
+        assert.match((await tool.execute("t2", { action: "stop", task_id: "nope" }, undefined, undefined, ctx)).content[0].text, /not found/i);
     });
 });
 
@@ -102,23 +99,20 @@ void describe("jobs output — a read surfaces the outcome", () => {
         const job = mkJob(reg, { id: `job-${process.pid}-o1` });
         job.status = "completed";
         job.exitCode = 0;
-        await tool.execute("t3", { action: "output", jobId: job.id }, undefined, undefined, ctx);
+        await tool.execute("t3", { action: "output", task_id: job.id }, undefined, undefined, ctx);
         assert.equal(job.outcomeSurfaced, true);
     });
 
     void it("does NOT mark a still-running job (peek)", async () => {
         const { tool, reg, ctx } = harness();
         const job = mkJob(reg, { id: `job-${process.pid}-o2` });
-        await tool.execute("t4", { action: "output", jobId: job.id }, undefined, undefined, ctx);
+        await tool.execute("t4", { action: "output", task_id: job.id }, undefined, undefined, ctx);
         assert.equal(job.outcomeSurfaced, undefined, "completion must still notify later");
     });
 
     void it("unknown id errors with CC's exact string", async () => {
         const { tool, ctx } = harness();
-        await assert.rejects(
-            () => tool.execute("t5", { action: "output", jobId: "ghost" }, undefined, undefined, ctx),
-            /No task found with ID: ghost/
-        );
+        assert.match((await tool.execute("t5", { action: "output", task_id: "ghost" }, undefined, undefined, ctx)).content[0].text, /not found/i);
     });
 });
 
@@ -136,7 +130,7 @@ void describe("jobs list — retained metadata", () => {
 
         assert.equal(reg.jobs.has(swept.id), true, "listing must not reclaim metadata");
         assert.ok(text.includes("run-me"), "running job listed");
-        assert.ok(text.includes("done-read - ✓ completed"));
+        assert.match(text, /status=completed[\s\S]*done-read/);
         assert.equal(text.split("done-read").length - 1, 1);
         assert.ok(running.status === "running");
     });
@@ -170,7 +164,7 @@ void describe("jobs attach — suppression is scoped to the wait", () => {
         const ac = new AbortController();
         const pending = tool.execute(
             "t8",
-            { action: "attach", jobId: job.id, wait: true },
+            { action: "wait", task_id: job.id },
             ac.signal,
             () => {},
             ctx
@@ -181,7 +175,7 @@ void describe("jobs attach — suppression is scoped to the wait", () => {
         ac.abort();
         const res = await pending;
 
-        assert.match(res.content[0].text, /Stopped following/);
+        assert.match(res.content[0].text, /Wait cancelled; target unchanged/);
         // Upstream wrote `job.notified = false` here, clobbering the shared
         // latch. The counter is scoped instead, and the outcome was never
         // surfaced, so the job's own notification can still fire.
@@ -194,8 +188,8 @@ void describe("jobs attach — suppression is scoped to the wait", () => {
         const job = mkJob(reg, { id: `job-${process.pid}-a2`, command: "long-build" });
         const first = new AbortController();
         const second = new AbortController();
-        const a = tool.execute("t9", { action: "attach", jobId: job.id, wait: true }, first.signal, () => {}, ctx);
-        const b = tool.execute("t10", { action: "attach", jobId: job.id, wait: true }, second.signal, () => {}, ctx);
+        const a = tool.execute("t9", { action: "wait", task_id: job.id }, first.signal, () => {}, ctx);
+        const b = tool.execute("t10", { action: "wait", task_id: job.id }, second.signal, () => {}, ctx);
         assert.equal(job.attachCount, 2);
 
         first.abort();

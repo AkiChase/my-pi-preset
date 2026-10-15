@@ -1,7 +1,7 @@
 /**
  * Streaming log search service.
  *
- * The jobs tool owns parameter parsing and result formatting; this module owns
+ * The process management capability owns parameter parsing and formatting; this module owns
  * full-log scanning, match counting, bounded display-hit retention, context
  * lines around each hit, and the tail fallback used when the log file cannot be
  * streamed line-by-line.
@@ -10,7 +10,7 @@
 import { createReadStream } from "node:fs";
 import { createInterface } from "node:readline";
 import { PREVIEW_CHARS, type Job } from "./types.ts";
-import { readLogTail } from "./registry.ts";
+import { readBoundedTailOrThrow } from "./output.ts";
 
 export interface LogSearchHit {
     path: string;
@@ -27,11 +27,14 @@ export interface LogSearchGroup {
     name?: string;
     count: number;
     hits: LogSearchHit[];
+    /** Set only when both the stream and bounded fallback are unavailable. */
+    error?: { path: string; error_code: "log_error" };
 }
 
 export interface LogSearchResult {
     totalHits: number;
     groups: LogSearchGroup[];
+    errors: LogSearchGroup[];
 }
 
 interface ScanOptions {
@@ -61,13 +64,13 @@ export async function searchLogs(args: {
 
     // Each job's log is an independent stream — scan them concurrently. Results
     // come back in jobs[] order, so group ordering stays stable.
-    const groups = (
-        await Promise.all(jobs.map((job) => scanOneJob(job, args.pattern, options)))
-    ).filter((g) => g.count > 0);
+    const scanned = await Promise.all(jobs.map((job) => scanOneJob(job, args.pattern, options)));
+    const groups = scanned.filter(group => group.count > 0);
+    const errors = scanned.filter(group => group.error !== undefined);
 
     let totalHits = 0;
     for (const group of groups) totalHits += group.count;
-    return { totalHits, groups };
+    return { totalHits, groups, errors };
 }
 
 /** Scan one job's log (streamed line-by-line, falling back to the tail when the
@@ -80,7 +83,16 @@ async function scanOneJob(
     const group: LogSearchGroup = { jobId: job.id, name: job.name, count: 0, hits: [] };
     const scanned = await streamLogFile(job, re, group, options);
     if (!scanned) {
-        scanTailText(job, re, readLogTail(job, options.previewChars), group, options);
+        // A failed stream may have produced hits: do not count them twice or
+        // publish an incomplete stream as a complete scan.
+        group.count = 0;
+        group.hits = [];
+        try {
+            const tail = readBoundedTailOrThrow(job.logPath, options.previewChars);
+            if (tail) scanTailText(job, re, tail, group, options);
+        } catch {
+            group.error = { path: job.logPath, error_code: "log_error" };
+        }
     }
     return group;
 }
@@ -152,21 +164,33 @@ async function streamLogFile(
 ): Promise<boolean> {
     return await new Promise<boolean>((resolve) => {
         let lineNo = 0;
-        let sawFile = false;
+        let failed = false;
         const collector = new ContextCollector(group, options);
-        const stream = createReadStream(job.logPath, { encoding: "utf-8" });
-        stream.on("error", () => resolve(false));
-        const rl = createInterface({ input: stream, crlfDelay: Infinity });
+        let stream: ReturnType<typeof createReadStream>;
+        try { stream = createReadStream(job.logPath, { encoding: "utf-8" }); }
+        catch { resolve(false); return; }
+        let rl: ReturnType<typeof createInterface> | undefined;
+        const fail = () => {
+            failed = true;
+            rl?.close();
+            stream.destroy();
+        };
+        // readline forwards input errors to its own emitter. Both emitters
+        // need an owning handler; a promise catch cannot catch an unhandled event.
+        stream.on("error", fail);
+        // Settle only after actual fd close, even after partial setup failure.
+        stream.on("close", () => { rl?.close(); resolve(!failed); });
+        try { rl = createInterface({ input: stream, crlfDelay: Infinity }); }
+        catch { fail(); return; }
+        rl.on("error", fail);
         rl.on("line", (line) => {
-            sawFile = true;
+            if (failed) return;
             lineNo++;
-            // A global or sticky regex carries lastIndex between .test() calls
-            // and would skip matches; the jobs tool builds a fresh non-global
-            // one, and this stays correct if that ever changes.
+            // Global/sticky regexes carry lastIndex between .test() calls.
             re.lastIndex = 0;
             collector.push(line, lineNo, re.test(line), job.logPath);
         });
-        rl.on("close", () => resolve(sawFile));
+        rl.on("close", () => { stream.destroy(); });
     });
 }
 

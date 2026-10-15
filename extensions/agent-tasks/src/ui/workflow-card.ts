@@ -65,7 +65,7 @@ const DEFAULT_WIDTH = 80;
  * ------------------------------------------------------------------------- */
 
 export interface WorkflowGlyphs {
-  /** Tool-title pointer, matching the Agent tool's `▸`. */
+  /** Tool-title pointer, matching the subagent_run tool's `▸`. */
   pointer: string;
   tick: string;
   cross: string;
@@ -81,7 +81,7 @@ export interface WorkflowGlyphs {
   vertical: string;
   branch: string;
   lastBranch: string;
-  /** Log-line prefix, matching the Agent tool's result lines. */
+  /** Log-line prefix, matching the subagent_run tool's result lines. */
   log: string;
   warning: string;
 }
@@ -170,7 +170,7 @@ export interface WorkflowCardInput {
   /** Swap in the ASCII glyph tier for terminals without unicode. */
   ascii?: boolean;
   /**
-   * Lead with `▸ SubagentWorkflow`.
+   * Lead with `▸ subagent_workflow`.
    *
    * True where the card stands alone — the session entry a flag-launched run
    * writes, which has no tool call above it to say what it is. False as a tool
@@ -312,12 +312,12 @@ export function layoutWorkflowCard(input: WorkflowCardInput): WorkflowCardLine[]
 
   // ---- Header: `<name>` with the stats flush right ----
   // The tool name appears only when nothing above the card already carries it.
-  // As a tool result there is a `▸ SubagentWorkflow …` call line directly above,
+  // As a tool result there is a `▸ subagent_workflow …` call line directly above,
   // and repeating it put two near-identical pointer lines back to back.
   const left: WorkflowCardLine = input.showToolTitle
     ? [
         { text: `${glyphs.pointer} `, color: "toolTitle" },
-        { text: "SubagentWorkflow", color: "toolTitle", bold: true },
+        { text: "subagent_workflow", color: "toolTitle", bold: true },
         { text: "  " },
         { text: head.name, color: "muted" },
       ]

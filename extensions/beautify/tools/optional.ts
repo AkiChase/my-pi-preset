@@ -3,7 +3,7 @@ import { Box, Container, Text, type Component } from "@earendil-works/pi-tui";
 import { clean, toolHeading, wrap } from "../layout.ts";
 import { text, type Args, type RenderContext } from "../types.ts";
 import { component, type Metadata } from "./shared.ts";
-import type { RetrievalContract } from "./retrieval-contracts.ts";
+import type { RetrievalContract } from "./task-manage.ts";
 
 type Options = Parameters<NonNullable<ToolRenderers["renderResult"]>>[1];
 type HostResult = Parameters<NonNullable<ToolRenderers["renderResult"]>>[0];

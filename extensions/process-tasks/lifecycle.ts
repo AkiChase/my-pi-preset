@@ -173,7 +173,7 @@ export function startBackgroundJob(args: {
  *
  *   - "auto" (default): completeJob sends it on exit.
  *   - "self": the caller sends its own stream-specific summary.
- *   - "suppressed": `bash_bg notify: false` — never sent.
+ *   - "suppressed": `bash run_in_background: true, notify: false` — never sent.
  *
  * Notification ownership does not affect retention: all terminal records stay
  * for ten minutes, whether or not their outcome reached the agent.
@@ -182,8 +182,8 @@ export type NotificationOwner = "auto" | "self" | "suppressed";
 
 /**
  * Standard completion flow after a job exits — abortJob → markTerminal →
- * notify → renderSidebar. Shared by every tool's exit callback (bash,
- * bash_bg, monitor) as the canonical termination protocol.
+ * notify → renderSidebar. Shared by bash and monitor exit callbacks as the
+ * canonical termination protocol.
  *
  * Notifications never evict metadata; the session sweep owns retention.
  */
@@ -278,7 +278,7 @@ export function markKilledSilently(reg: BackgroundRegistry, job: Job): void {
 
 /** Kill a job quietly and abort its registered monitors/timers. The outcome is
  *  marked surfaced BEFORE the kill so the exit handler's notification is
- *  suppressed (panel x, jobs kill, session quit). */
+ *  suppressed (panel x, task_manage stop, session quit). */
 export function terminateJobSilently(reg: BackgroundRegistry, job: Job): void {
     if (isTerminalStatus(job.status)) return;
     markOutcomeSurfaced(job);
@@ -362,7 +362,7 @@ export function isAutoBackgroundAllowed(command: string): boolean {
 export const SLEEP_WAIT_GUIDANCE =
     "A fixed `sleep N` to wait wastes time and leaves a job lingering for the " +
     "full duration. Instead:\n" +
-    "• Waiting on a background job you started? Use jobs action='attach' — it " +
+    "• Waiting on a background job you started? Use task_manage action='wait' — it " +
     "returns as soon as that job finishes.\n" +
     "• Waiting for a condition? Use the monitor tool, or a poll loop that EXITS " +
     "when ready (e.g. `until grep -q READY log; do sleep 0.5; done`).\n" +

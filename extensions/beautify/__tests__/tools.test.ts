@@ -1,3 +1,4 @@
+import { launchMetadata, launchText } from "../../runtime-tasks/launch.ts";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -26,7 +27,7 @@ function tui() {
 function result(renderer: ToolRenderers, raw: string, args = {}, overrides = {}) {
   const ctx = context(args, overrides);
   const call = renderer.renderCall!(ctx.args, theme, ctx);
-  const body = renderer.renderResult!({ content: [{ type: "text", text: raw }], details: undefined }, { expanded: ctx.expanded, isPartial: false }, theme, ctx);
+  const body = renderer.renderResult!({ content: [{ type: "text", text: raw }], details: (overrides as { details?: unknown }).details }, { expanded: ctx.expanded, isPartial: false }, theme, ctx);
   return { render: (width: number) => [...call.render(width), ...body.render(width)] };
 }
 
@@ -40,7 +41,7 @@ test("actual loader/resolver owns six display adapters, original tool execution/
     assert.equal(extension.handlers.has("tool_result"), false);
     const runner = resolver(loaded, dir);
     const base = { renderShell: "default" };
-    for (const name of ["edit", "write", "ls", "codemode", "Agent", "ask_user_question"]) assert.equal(runner.resolveToolRenderers(name, () => base), base);
+    for (const name of ["edit", "write", "ls", "codemode", "subagent_run", "subagent_workflow", "subagent_message", "Agent", "ask_user_question"]) assert.equal(runner.resolveToolRenderers(name, () => base), base);
     for (const name of ["read", "bash", "find", "grep"]) assert.equal(runner.resolveToolRenderers(name, () => base).renderShell, "default");
     let reads = 0;
     const definition = createReadToolDefinition(dir, { operations: { async access() {}, async readFile() { reads++; return Buffer.from("const x = 1;\nlast"); }, async detectImageMimeType() { return undefined; } } });
@@ -102,8 +103,9 @@ test("four actual host components obey widths/padding/expansion and native metad
       if (fixture.name === "grep") { assert.match(expanded, /65 │ A.B/); assert.match(expanded, /66 ┊ context/); }
     }
     const bash = runner.resolveToolRenderers("bash", () => undefined);
-    const handle = "Command running in background with ID: abc. Output is being written to: /fixture/log";
-    assert.match(plain(result(bash, handle, {}, { expanded: false }).render(120).join("\n")), /ID: abc/);
+    const identity = launchMetadata("bash", "abc", "abc", "background");
+    const handle = `${launchText(identity)}\nCommand running in background with ID: abc. Output is being written to: /fixture/log`;
+    assert.match(plain(result(bash, handle, {}, { expanded: false, details: { runtimeLaunch: identity } }).render(120).join("\n")), /ID: abc/);
     assert.match(plain(result(bash, "failed", {}, { isError: true, expanded: false }).render(80).join("\n")), /failed/);
     assert.match(plain(result(bash, "", {}, { expanded: false, durationMs: undefined }).render(80).join("\n")), /no output/);
     for (const [name, output] of [["find", "No files found matching pattern"], ["grep", "No matches found"]]) assert.match(plain(result(runner.resolveToolRenderers(name, () => undefined), output).render(80).join("\n")), /No /);
@@ -120,19 +122,15 @@ test("built-in tool identity precedes details across pending/results, expansion 
     { name: "grep", renderer: grepRenderers, args: { pattern: long, path: "目录" } },
   ];
   try {
-    for (const { name, renderer, args } of fixtures) {
-      for (const expanded of [false, true]) {
-        for (const status of ["pending", "success", "error"]) {
-          const ctx = context(args, { expanded, isPartial: status === "pending", isError: status === "error" });
-          const call = renderer.renderCall!(args, theme, ctx);
-          if (status !== "pending") renderer.renderResult!({ content: [{ type: "text", text: "failure" }], details: undefined }, { expanded, isPartial: false }, theme, ctx);
-          for (const width of [1, 2, name.length, name.length + 1, 13, 40, 80, 120]) {
-            const lines = call.render(width).map(plain);
-            assert.ok(lines.every(line => visibleWidth(line) <= width), `${name}/${status}/${expanded}/${width}`);
-            if (width >= name.length) assert.ok(lines[0]!.startsWith(name), `${name}/${status}/${expanded}/${width}: ${lines[0]}`);
-            assert.doesNotMatch(lines[0]!, new RegExp(`^${name}\\s+${name}\\b`));
-          }
-        }
+    for (const { name, renderer, args } of fixtures) for (const expanded of [false, true]) for (const status of ["pending", "success", "error"]) {
+      const ctx = context(args, { expanded, isPartial: status === "pending", isError: status === "error" });
+      const call = renderer.renderCall!(args, theme, ctx);
+      if (status !== "pending") renderer.renderResult!({ content: [{ type: "text", text: "failure" }], details: undefined }, { expanded, isPartial: false }, theme, ctx);
+      for (const width of [1, 2, name.length, name.length + 1, 13, 40, 80, 120]) {
+        const lines = call.render(width).map(plain);
+        assert.ok(lines.every(line => visibleWidth(line) <= width), `${name}/${status}/${expanded}/${width}`);
+        if (width >= name.length) assert.ok(lines[0]!.startsWith(name), `${name}/${status}/${expanded}/${width}: ${lines[0]}`);
+        assert.doesNotMatch(lines[0]!, new RegExp(`^${name}\\s+${name}\\b`));
       }
     }
     assert.match(plain(result(readRenderers(highlighter), "body", { path: "sample.ts", offset: 65 }, { expanded: false }).render(120).join("\n")), /^read  sample\.ts:65/);

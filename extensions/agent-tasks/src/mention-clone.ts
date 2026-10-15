@@ -33,7 +33,7 @@
  * Three details make the spawn belong to the real session rather than the
  * clone:
  *
- *   - the clone is handed the *registered* `Agent` tool, whose handler closes
+ *   - the clone is handed the *registered* `subagent_run` tool, whose handler closes
  *     over the main activation, so it spawns top-level: widget, fleet row,
  *     handle, completion notification, all as if the main model had called it;
  *   - that tool is re-bound to the main `ExtensionContext`, because the handler
@@ -80,7 +80,7 @@ export interface MentionCloneOptions {
   type: SubagentType;
   /** What the user typed after the handle. */
   message: string;
-  /** The registered `Agent` tool, reused so the spawn is an ordinary one. */
+  /** The registered `subagent_run` tool, reused so the spawn is an ordinary one. */
   agentTool: ToolDefinition;
   signal?: AbortSignal;
   isActive?: () => boolean;
@@ -88,7 +88,7 @@ export interface MentionCloneOptions {
 }
 
 export interface MentionCloneResult {
-  /** True once the clone actually called `Agent`. */
+  /** True once the clone actually called `subagent_run`. */
   spawned: boolean;
   /** Why not, when it didn't. Absent on success. */
   error?: string;

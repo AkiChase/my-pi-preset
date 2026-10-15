@@ -16,7 +16,7 @@
  *     on completion: `resume` reaches back to a child that has already
  *     finished.
  *   - **agent type and model.** Resolved through `resolveSpawnType` and
- *     `getAgentConfig` — the same dispatch the `Agent` tool uses — so a
+ *     `getAgentConfig` — the same dispatch the `subagent_run` tool uses — so a
  *     workflow and a tool call disagree about nothing.
  *   - **failure.** A strict worktree-isolation failure throws out of
  *     `spawnAndWait`; the script must see that as an agent that failed
@@ -206,7 +206,7 @@ export function createWorkflowHost(deps: WorkflowHostOptions): WorkflowHost {
         const dispatch = resolveSpawnType(request.agentType);
         if (!dispatch.ok) return { ok: false, error: dispatch.message };
 
-        // Same precedence as the Agent tool: the caller's model wins, the agent
+        // Same precedence as the subagent_run tool: the caller's model wins, the agent
         // definition's is next, and the parent's is the floor. A model the script
         // named and we cannot resolve is an error; one the definition named falls
         // back to the parent silently, because the script never asked for it.
@@ -222,7 +222,7 @@ export function createWorkflowHost(deps: WorkflowHostOptions): WorkflowHost {
           }
         }
 
-        // Same scopeModels policy as the Agent tool and the nested delegation
+        // Same scopeModels policy as the subagent_run tool and the nested delegation
         // tools: a script's `agent({ model })` is a runtime LLM choice, and the
         // script is written by the model, so it must not reach a model the user's
         // enabledModels list excludes. `callerSupplied` keys off `request.model`

@@ -2,13 +2,9 @@
  * Background tasks for the pi agent — vendored fork of pi-patty-bg-tasks.
  * See PROVENANCE.md for the upstream commit this diverged from.
  *
- * Registers four tools:
- *   - bash (override)
- *   - bash_bg
- *   - jobs
- *   - monitor (streaming-event watch)
- *
- * Also registers keyboard shortcuts and slash commands.
+ * Registers bash (override) and monitor (streaming-event watch).
+ * Returns a finite management capability to composition's unique task_manage.
+ * Also registers process diagnostic commands; shared controls belong to composition.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -21,8 +17,6 @@ import { startRegistrySweep, stopRegistrySweep, stopSidebarTicker } from "./regi
 import { EVENT } from "./types.ts";
 import { loadConfig } from "./config.ts";
 import { registerBashTool } from "./tools/bash.ts";
-import { registerBashBgTool } from "./tools/bash-bg.ts";
-import { registerJobsTool } from "./tools/jobs.ts";
 import { registerMonitorTool } from "./tools/monitor.ts";
 import { registerCommands } from "./commands.ts";
 import { TaskLifecycle } from "../task-ui/lifecycle.ts";
@@ -32,7 +26,11 @@ import { registerTaskControls } from "../task-ui/controls.ts";
 import { createProcessTaskSource } from "./source.ts";
 import { createTaskUIOwner } from "../task-ui/owner.ts";
 
+import { createProcessManagement } from "./management.ts";
+import type { RuntimeTaskCapability } from "../runtime-tasks/facade.ts";
+
 export interface ProcessTasksOptions {
+    readonly onManagement?: (capability: RuntimeTaskCapability) => void;
     readonly coordinator?: TaskCoordinator;
     readonly lifecycle?: TaskLifecycle;
     readonly uiConfig?: TaskUIConfig;
@@ -50,6 +48,7 @@ export default function (pi: ExtensionAPI, options: ProcessTasksOptions = {}) {
     const lifecycle = options.lifecycle ?? new TaskLifecycle(coordinator);
     const reg = new BackgroundRegistry(config, coordinator, uiLoad.config);
     const source = createProcessTaskSource(reg);
+    options.onManagement?.(createProcessManagement(reg, source));
     const unregisterSource = coordinator.registerSource(source);
     // Surface config problems where they will actually be seen. There is no UI
     // context yet at load time, so stderr now (pi's log) and `/process-tasks-version`
@@ -64,8 +63,6 @@ export default function (pi: ExtensionAPI, options: ProcessTasksOptions = {}) {
     // that drops them).
     const originalBash = createBashToolDefinition(process.cwd());
     registerBashTool(pi, reg, originalBash);
-    registerBashBgTool(pi, reg);
-    registerJobsTool(pi, reg);
     registerMonitorTool(pi, reg);
 
     // Direct factory fixtures get scoped shared controls; production composition registers them once.

@@ -34,7 +34,7 @@ export function isTerminalStatus(status: JobStatus): boolean {
     return status === "completed" || status === "failed" || status === "killed";
 }
 
-/** What kind of background job this is. "shell" is the default (bash/bash_bg);
+/** What kind of background job this is. "shell" is the default (bash);
  *  "monitor" is a
  *  streaming-event watch (the monitor tool). */
 export type JobKind = "shell" | "monitor";
@@ -64,7 +64,7 @@ export interface Job {
     /**
      * Whether the agent has seen this job's terminal outcome — by
      * <task-notification>, by asking for the kill, or by reading it through
-     * `jobs output` / `jobs attach`. Set only AFTER the outcome actually
+     * `task_manage output` / `task_manage wait`. Set only AFTER the outcome actually
      * reached the agent. Delivery does not control metadata retention; all
      * terminal records stay for the same ten-minute window.
      *
@@ -75,7 +75,7 @@ export interface Job {
      */
     outcomeSurfaced?: boolean;
     /**
-     * In-flight `jobs attach` waits. While above zero the terminal
+     * In-flight `task_manage wait` waits. While above zero the terminal
      * notification is skipped — the attach result IS the report — but the
      * outcome is NOT marked surfaced, so detaching early still leaves the job
      * able to notify later. A counter rather than a flag because two attaches
@@ -85,7 +85,7 @@ export interface Job {
     attachCount?: number;
     /**
      * Why the last notification send failed. The outcome is then stranded:
-     * nothing reached the agent, so `jobs list` has to show the job and say
+     * nothing reached the agent, so `task_manage list` has to show the job and say
      * so, rather than silently dropping it.
      */
     notifyError?: string;

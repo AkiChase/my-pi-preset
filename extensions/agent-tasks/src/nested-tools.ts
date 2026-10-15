@@ -1,3 +1,4 @@
+import { launchMetadata, launchText } from "../../runtime-tasks/launch.ts";
 import type { Model } from "@earendil-works/pi-ai";
 import {
   type AgentSession,
@@ -7,7 +8,6 @@ import {
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { abortable } from "./abortable.ts";
 import {
   buildAgentRegistry,
   getAgentConfigIn,
@@ -47,7 +47,7 @@ let maxSubagentDepth = 2;
 export function getMaxSubagentDepth(): number { return maxSubagentDepth; }
 export function setMaxSubagentDepth(n: number): void { maxSubagentDepth = Math.max(0, Math.floor(n)); }
 
-const NESTED_TOOL_NAMES = ["Agent", "get_subagent_result", "steer_subagent"] as const;
+const NESTED_TOOL_NAMES = ["subagent_run", "subagent_message"] as const;
 
 interface NestedSpawnOptions {
   description: string;
@@ -102,6 +102,8 @@ export interface NestedToolContext {
   allowedSubagents: "all" | string[];
   /** Root used for agent/config discovery; may differ from the agent's working directory. */
   configCwd: string;
+  /** Loader-scoped availability; an explicit deny must reject detached admission. */
+  canCollectBackground?: () => boolean;
 }
 
 function textResult(text: string, isError = false) {
@@ -113,15 +115,10 @@ function ownsRecord(record: AgentRecord | undefined, parentAgentId: string): rec
 }
 
 /**
- * How the caller received this record, which decides the outcome wording.
- *
- *   - "inline": a foreground spawn or a resume. The full output is in this very
- *     result and no agent id was handed back, so the note must say there is
- *     nothing left to fetch — otherwise the parent invents an id, calls
- *     `get_subagent_result`, and hits "not owned by this parent" (#174, the same
- *     trap the top-level foreground path fell into).
- *   - "fetched": `get_subagent_result` on a background child. The parent holds a
- *     valid id and can poll again, so the background wording applies.
+ * Inline returns already contain the full answer and a runtime identity. A
+ * partial-outcome note describes the run's limit/cancellation, not hidden text
+ * that can be recovered by another retrieval. Fetched background results retain
+ * the original status wording.
  */
 type ResultPosition = "inline" | "fetched";
 
@@ -171,7 +168,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
       thinking: Type.Optional(Type.String({ description: "Optional thinking level." })),
       run_in_background: Type.Optional(
         Type.Boolean({
-          description: "Defaults to false for nested spawns — the call blocks and returns the child's result inline. Set true only for work you will collect later with get_subagent_result; a detached child is stopped when you finish.",
+          description: "Defaults to false for nested spawns — the call blocks and returns the child's result inline. Set true only for work you will collect later with task_manage; a detached child is stopped when you finish.",
         }),
       ),
       resume: Type.Optional(Type.String({ description: "Resume a nested agent owned by this parent." })),
@@ -187,7 +184,10 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
         }
         const resumed = await context.manager.resume(params.resume, params.prompt, signal);
         return resumed
-          ? textResult(formatRecord(resumed, "inline"), resumed.status === "error")
+          ? (() => {
+            const identity = launchMetadata("subagent", resumed.id, resumed.runId ?? "1", "foreground");
+            return { ...textResult(`${launchText(identity)}\n${formatRecord(resumed, "inline")}`, resumed.status === "error"), details: { runtimeLaunch: identity } };
+          })()
           : textResult(`Failed to resume nested agent "${params.resume}".`, true);
       }
 
@@ -227,6 +227,9 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
         worktreeAllowed: isWorktreeIsolationEnabled(),
         defaultRunInBackground: false,
       });
+      if (invocation.runInBackground && context.canCollectBackground?.() === false) {
+        return textResult("Nested background launch requires an available owned task_manage tool. Use foreground execution or allow task_manage.", true);
+      }
       let model = ctx.model;
       if (invocation.modelInput) {
         const resolvedModel = resolveModel(invocation.modelInput, ctx.modelRegistry);
@@ -237,7 +240,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
         }
       }
 
-      // Same scopeModels policy as the top-level Agent tool — a nested spawn
+      // Same scopeModels policy as the top-level subagent_run tool — a nested spawn
       // must not escape the allowlist. A "warn" verdict proceeds silently:
       // child sessions have no UI surface to toast to.
       const scopeVerdict = checkModelScope({
@@ -329,7 +332,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
       // wrong conversation under inherit_context, and the wrong inherited model.
       //
       // spawn() throws on strict worktree-isolation failure and cwd validation —
-      // report it as a tool error, like the top-level Agent tool does, instead of
+      // report it as a tool error, like the top-level subagent_run tool does, instead of
       // letting it escape into the child's turn.
       try {
         if (invocation.runInBackground) {
@@ -343,7 +346,8 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
           // Worktree isolation starts the agent asynchronously; surface its
           // failure as a tool error, like the synchronous throw used to.
           await context.manager.awaitStartup(id);
-          return textResult(`Nested agent started in background. Agent ID: ${id}`);
+          const identity = launchMetadata("subagent", id, context.manager.getRecord(id)!.runId ?? "1", "background");
+          return { ...textResult(`${launchText(identity)}\nNested agent started in background.`), details: { runtimeLaunch: identity } };
         }
 
         const { record } = await context.manager.spawnAndWait(
@@ -354,42 +358,16 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
           { ...options, signal },
           attachTranscript,
         );
-        return textResult(formatRecord(record, "inline"), record.status === "error");
+        const identity = launchMetadata("subagent", record.id, record.runId ?? "1", "foreground");
+        return { ...textResult(`${launchText(identity)}\n${formatRecord(record, "inline")}`, record.status === "error"), details: { runtimeLaunch: identity } };
       } catch (err) {
         return textResult(err instanceof Error ? err.message : String(err), true);
       }
     },
   });
 
-  const resultTool = defineTool({
-    name: NESTED_TOOL_NAMES[1],
-    label: "Get Nested Agent Result",
-    description: "Check or wait for a background nested agent owned by this parent.",
-    parameters: Type.Object({
-      agent_id: Type.String(),
-      wait: Type.Optional(Type.Boolean()),
-    }),
-    execute: async (_toolCallId, params, signal) => {
-      const record = context.manager.getRecord(params.agent_id);
-      if (!ownsRecord(record, context.parentAgentId)) {
-        return textResult(`Nested agent not found or not owned by this parent: "${params.agent_id}".`, true);
-      }
-      // Wait for completion if requested. Cancellation (e.g. the parent's tool
-      // call is aborted) stops only this wait; the nested child keeps running and
-      // stays unconsumed. Queued records have no promise until the manager starts
-      // them, so poll — abortably — until they leave the queue, then await.
-      if (params.wait && (record.status === "queued" || record.status === "running")) {
-        while (record.status === "queued") {
-          await abortable(new Promise<void>(resolve => setTimeout(resolve, 250)), signal);
-        }
-        if (record.promise) await abortable(record.promise, signal);
-      }
-      return textResult(formatRecord(record, "fetched"), record.status === "error");
-    },
-  });
-
   const steerTool = defineTool({
-    name: NESTED_TOOL_NAMES[2],
+    name: NESTED_TOOL_NAMES[1],
     label: "Steer Nested Agent",
     description: "Send guidance to a running nested agent owned by this parent.",
     parameters: Type.Object({
@@ -417,5 +395,5 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
     },
   });
 
-  return [agentTool, resultTool, steerTool];
+  return [agentTool, steerTool];
 }

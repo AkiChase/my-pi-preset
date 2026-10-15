@@ -110,7 +110,7 @@ export type ViewerMarkdownMode = 'off' | 'assistant' | 'all';
 /**
  * How `@handle message` starts an agent that is not already running.
  * - `model`: inject Claude Code's `agent_mention` reminder and let the main
- *   model spawn it with the `Agent` tool, which is what Claude Code does.
+ *   model spawn it with the `subagent_run` tool, which is what Claude Code does.
  * - `direct`: spawn it here, immediately, with the typed message as its prompt
  *   and no main-model turn spent.
  * - `off`: `@` means only "attach a file" again.
@@ -177,6 +177,8 @@ export interface AgentRecord {
   startedAt: number;
   completedAt?: number;
   session?: AgentSession;
+  /** Formatted conversation captured synchronously when this run becomes terminal. */
+  terminalConversation?: string;
   abortController?: AbortController;
   promise?: Promise<string>;
   /**
@@ -199,7 +201,7 @@ export interface AgentRecord {
   worktree?: { path: string; branch: string; baseSha: string; workPath: string };
   /** Worktree cleanup result after agent completion. */
   worktreeResult?: { hasChanges: boolean; branch?: string };
-  /** The tool_use_id from the original Agent tool call. */
+  /** The tool_use_id from the original subagent_run tool call. */
   toolCallId?: string;
   /** Path to the streaming output transcript file. */
   outputFile?: string;
@@ -223,7 +225,7 @@ export interface AgentRecord {
   /**
    * Whether this agent was spawned to run in the background. Tri-state, set at
    * spawn from `SpawnOptions.isBackground`: `true` = background, `false` =
-   * foreground (has an inline Agent tool-result surface), `undefined` = the
+   * foreground (has an inline subagent_run tool-result surface), `undefined` = the
    * caller never declared it (e.g. a cross-extension RPC spawn, which is detached
    * and has no inline surface). The widget's background-only filter keys off this
    * — and excludes only explicit `false`, so `undefined` agents stay visible.
@@ -346,7 +348,7 @@ export interface ScheduledSubagent {
   /** Computed at create time for interval/once. */
   intervalMs?: number;
 
-  // spawn params (subset of Agent tool params; no inherit_context, no resume)
+  // spawn params (subset of subagent_run tool params; no inherit_context, no resume)
   subagent_type: SubagentType;
   prompt: string;
   model?: string;

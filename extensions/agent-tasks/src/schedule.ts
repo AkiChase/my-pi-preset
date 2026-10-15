@@ -272,7 +272,7 @@ export class SubagentScheduler {
       // Re-resolve at fire time against the registry as it stands. This does not
       // reload from disk (the scheduler has no reason to rebuild process-global
       // state from a timer), so it catches changes that went through /agents or
-      // an Agent call — not a file deleted directly from a shell. The catch below turns
+      // an subagent_run call — not a file deleted directly from a shell. The catch below turns
       // this into lastStatus: "error" plus an error event, like any other
       // fire-time failure.
       const dispatch = resolveSpawnType(job.subagent_type);
@@ -295,7 +295,7 @@ export class SubagentScheduler {
         // would only be right until then.
         invocation: {
           thinking: job.thinking,
-          // Normalized like the Agent tool's own snapshot: `0` means unlimited,
+          // Normalized like the subagent_run tool's own snapshot: `0` means unlimited,
           // and rendering it as "max turns: 0" would read as a limit of none.
           maxTurns: normalizeMaxTurns(job.max_turns),
           isolated: job.isolated,

@@ -65,7 +65,7 @@ void describe("bash tool — Claude Code tool-result strings", () => {
         spawnedPids.push(job.pid);
         assert.equal(
             res.content[0].text,
-            `Command running in background with ID: ${job.id}. Output is being written to: ${job.logPath}`
+            `task_type=bash task_id=${job.id} run_id=${job.id}\nCommand running in background with ID: ${job.id}. Output is being written to: ${job.logPath}`
         );
     });
 
@@ -85,7 +85,7 @@ void describe("bash tool — Claude Code tool-result strings", () => {
         spawnedPids.push(job.pid);
         assert.equal(
             res.content[0].text,
-            `Command was manually backgrounded by user with ID: ${job.id}. Output is being written to: ${job.logPath}`
+            `task_type=bash task_id=${job.id} run_id=${job.id}\nCommand was manually backgrounded by user with ID: ${job.id}. Output is being written to: ${job.logPath}`
         );
     });
 
@@ -102,7 +102,7 @@ void describe("bash tool — Claude Code tool-result strings", () => {
         spawnedPids.push(job.pid);
         assert.equal(
             res.content[0].text,
-            `Command running in background with ID: ${job.id}. Output is being written to: ${job.logPath}`
+            `task_type=bash task_id=${job.id} run_id=${job.id}\nCommand running in background with ID: ${job.id}. Output is being written to: ${job.logPath}`
         );
     });
 

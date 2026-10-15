@@ -40,6 +40,14 @@ The files in this directory started as a one-time copy of the `src/` tree of
 - `__tests__/error-paths.test.ts` 使用实际工具入口、lifecycle、coordinator，以及隔离 subprocess／可控 exit；假时钟推进两秒 hint，分别触发 show+clear、clear-only、poller stop 和 final status 错误。两条后台入口都强制 `lastSidebarContent` 首次 diff，防止 fixture 未触发真实 `setStatus`。另覆盖 throwing completion toast、已终态 retrieval、两个并发 wait 取消一个及只读结果快照。
 - Monitor source／buffer／timer／pending 及显式 stop 契约没有修改；本修补不扩大 SDK 异常策略，也不实现 agent、epoch 或最终面板阶段。
 
+## 2026-10：统一运行任务接口
+
+- `bash` 与 `monitor` 是本后端的两个公开启动工具；删除 `bash_bg` 和 `jobs` 注册，不提供别名。composition 单次注册 `task_manage`，通过有限 capability 复用本后端 registry、日志和生命周期，不建立第二执行注册表。
+- 所有成功启动，包括前台快速完成和手动／超时转后台，正文与 `runtimeLaunch` 带相同 task_id/run_id。转后台不更换 PID／日志／执行身份。原 `notify:false` 只迁入显式 `bash run_in_background=true`；普通后台 timeout 不变成硬截止，非 auto-background 命令保留安全 timeout、日志标记与回滚。
+- `management.ts` 提供 status/output/wait/stop/search/stats；list/status/search 不消费。process output/wait 保留 byte 分页、范围／省略、regex／context／计数与 activation 累计统计。正常终态 wait 在 suppression 释放前读取并消费；日志失败返回 log_error，不伪造成功空日志或压掉通知。
+- wait 复用 shared retrieval lease，取消／解除只结束等待；monitor wait 等整个监听终态，事件通知仍归原 owner。停止报告请求与观察状态，不以 terminal 元数据代替实际 OS drain。未知／过期身份不恢复执行；关闭先封 facade 再停止后端。
+- 维护边界与新回归入口：`extensions/runtime-tasks/__tests__/`、本目录既有 lifecycle／monitor／waits 回归。新验收证据属于 owning task research；前文旧名称／计数保留为历史来源说明。
+
 ## This is a fork, not a vendored dependency
 
 There is no sync path back to upstream, and that is deliberate: the point of the copy

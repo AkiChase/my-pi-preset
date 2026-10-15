@@ -51,7 +51,7 @@ export function statusLabel(job: Job, duration?: string): string {
     }
 }
 
-/** "b7f3k9a2x1 [shell]: ls -la (last 80 chars)" — single line for `jobs list`.
+/** "b7f3k9a2x1 [shell]: ls -la (last 80 chars)" — single line for `task_manage list`.
  *  Every line carries the kind tag (shell/agent/monitor) so the unified list
  *  shows what each task is. */
 export function formatJobLine(job: Job): string {
@@ -60,10 +60,10 @@ export function formatJobLine(job: Job): string {
     // No separate duration suffix: statusLabel() already embeds the elapsed time
     // for running jobs, and upstream v2.0.0 appended it a second time, printing
     // "▶ bg (12s) (12s)". oneLine() so a multi-line command cannot break the
-    // one-job-per-line contract of `jobs list` (killAction already did this).
+    // one-job-per-line contract of `task_manage list` (killAction already did this).
     const command = oneLine(job.command).slice(0, PREVIEW_CHARS.line);
     // A stranded outcome is worth a word: this job finished and the agent was
-    // never told, so the line in `jobs list` is the only trace of it.
+    // never told, so the line in `task_manage list` is the only trace of it.
     const stranded = job.notifyError
         ? ` [notification failed: ${oneLine(job.notifyError).slice(0, PREVIEW_CHARS.line)}]`
         : "";

@@ -148,6 +148,13 @@ actualSDKhost/editor/Pretty/TUI分发回归与GC4/4资源回收通过（parentta
 - runner 不新增描述参数；record 与 worktree cleanup 使用同一规范化描述。实际 factory/RPC/manager 和离线真实宿主回归记录在本任务材料。
 - 完成通知构造或同步提交失败时仅简短 UI warning（无 UI 时安全日志），不新增持久诊断、不自动重试；提示错误不能影响结果检索或 cleanup。individual/group发送后按捕获run身份标记SDK已提交，不宣称持久化ACK。
 - stopped组成员按公开终态结算，即使非合作runner仍在drain也不拖延兄弟通知；自身不发完成通知，真正running成员保留partial timeout。
+## 2026-10：统一运行任务接口
+
+- 公开工具改为 `subagent_run`、`subagent_workflow`、`subagent_message`；删除独立结果注册，不提供旧别名。composition 独占 `task_manage`，agent/workflow 提供有限管理 capability；RPC ping/spawn cwd/stop/consume 协议与真实 record ID 保持，不伪造旧模型事件。
+- 新建／resume 结果公开 task_id/run_id；resume 保 stable record ID＋新 run。管理调用捕获精确 run，拒 stale／ambiguous；终态 answer 与 formatted conversation 在 manager resolve 当刻快照，避免同步 resume 替换旧 wait 内容。status/list 不消费，终态 output／winning wait 保 consume、usage 与 notice suppression/reconsider；wait 取消不停止执行。
+- WorkflowTask 创建即拥有 terminal，覆盖初始化失败／提前取消；不可变 final text/logs 与 worker／host 实际 drain 分离。management 返回完整 script return/error 与明确有界 progress，不拿 UI 16K detail 替代最终回答。terminal retrieval 消费先于 suppression 释放，cancel 后重查 held 通知；stop 静默，paused run 不允许 replay。
+- child composition 仍只注册一个 task_manage，组合 local process 与当前 parent/run 的 owned nested capability，不以同名 SDK customTools 覆盖。新增独立 ALS holder 只在 loader 期间传有限 builder，finally 退役，undefined admission 遮蔽外层；不是 root manager singleton。child shutdown 只关闭自身 facade；composition 缺席时，仅在权限允许下复用 owned-only 管理工具，不恢复被禁本地进程或根能力。retained session 的能力跟随合法当前 owner，每次操作仍冻结 owner／child run；后台任务无可用收集入口时在启动前拒绝。root 可见 descendants，但模型管理仍保 top-level ownership；root/sibling 不进入 child scope。
+- 新接口回归在 `extensions/runtime-tasks/__tests__/`，actual host same/different cwd 与 root/child ownership 在本目录 loading fixture。在线 provider／外部 pi-trellis 新名门禁由对应 owner 另验，不以本仓库工具改名声称已完成组合发布。通知 description admission／诊断由独立任务已完成，本次三方集成保留其成果；接口实施阶段不接手或覆盖其行为。历史记录中的旧名称与计数不回写。
 
 ## 2026-10-13：beautify 替换 Pretty
 

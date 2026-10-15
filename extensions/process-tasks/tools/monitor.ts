@@ -1,3 +1,4 @@
+import { launchMetadata, launchText } from "../../runtime-tasks/launch.ts";
 // Monitor tool: event-arrival notifications, bounded batching, optional silence wakes.
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -42,7 +43,7 @@ export function registerMonitorTool(pi: ExtensionAPI, reg: BackgroundRegistry): 
             "Both stdout and stderr are received. command | grep filters stdout only; command 2>&1 | grep filters both streams.",
             "Flush pipeline stages per line: grep --line-buffered, awk fflush(). A partial command line does not wake the agent.",
             "Silence is not success. Optional wake_absent_ms reminds once per silence; recovery is timely (within 200ms) and the watch continues.",
-            "No timeout unless timeout_ms is provided. Stop session-length watches via jobs action='kill'; explicit stop sends no final notification.",
+            "No timeout unless timeout_ms is provided. Stop session-length watches via task_manage action='stop'; explicit stop sends no final notification.",
             "Give a specific description. Read the log for output omitted by bounded previews. stderr content alone is not failure.",
             "Oversized batches include an omitted-source count and local JSONL manifest path; read it for source metadata/log paths. Manifest save failures are explicit, not automatic retries.",
             "WebSocket messages, including empty messages, count as activity; progress is batched, not one notification per line.",
@@ -138,16 +139,16 @@ export function registerMonitorTool(pi: ExtensionAPI, reg: BackgroundRegistry): 
 
             const sourceDesc = hasWs ? `WebSocket ${p.ws!.url}` : "command";
             const deadlineDesc = p.timeout_ms === undefined
-                ? "no deadline (stop via jobs action='kill')" : `timeout ${p.timeout_ms}ms`;
+                ? "no deadline (stop via task_manage action='stop')" : `timeout ${p.timeout_ms}ms`;
             return {
                 content: [
                     textBlock(
-                        `Monitor ${id} started — ${sourceDesc}, ${deadlineDesc}. ` +
+                        `${launchText(launchMetadata("monitor", id, id, "background"))}\nMonitor ${id} started — ${sourceDesc}, ${deadlineDesc}. ` +
                             `Events ("${description}") will arrive as notifications. ` +
                             `Output: ${logPath}`
                     ),
                 ],
-                details: undefined,
+                details: { runtimeLaunch: launchMetadata("monitor", id, id, "background") },
             };
         },
     });

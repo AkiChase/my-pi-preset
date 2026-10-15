@@ -17,7 +17,7 @@ import { openWsMonitorSource, spawnCommandSource, type MonitorSinks, type Monito
 import { TaskPanel } from "../../task-ui/panel.ts";
 import { DEFAULTS as UI_DEFAULTS } from "../../task-ui/config.ts";
 import { createProcessTaskSource } from "../source.ts";
-import { registerJobsTool } from "../tools/jobs.ts";
+import { registerManagementFixture } from "./management-fixture.ts";
 import { DELIVER_STEER, EVENT } from "../types.ts";
 import { processActivation } from "./process-harness.ts";
 
@@ -198,8 +198,8 @@ test("AC18: viewing/closing panel leaves monitor scheduling alone; panel x and j
 test("AC18: jobs kill of active monitor with pending/silence timer uses the same silent boundary", async t => {
     const h = harness(t, {}, { wakeAbsentMs: 10000 }); h.emit("first"); h.tick(200); h.emit("pending");
     let execute!: (id: string, params: unknown, signal: unknown, update: unknown, ctx: unknown) => Promise<unknown>;
-    registerJobsTool({ registerTool(def: { execute: typeof execute }) { execute = def.execute; } } as never, h.reg);
-    await execute("kill", { action: "kill", jobId: h.job.id }, undefined, undefined,
+    registerManagementFixture({ registerTool(def: { execute: typeof execute }) { execute = def.execute; } } as never, h.reg);
+    await execute("kill", { action: "stop", task_id: h.job.id }, undefined, undefined,
         { ui: { setWidget() {}, setStatus() {}, theme: { fg: (_: string, s: string) => s } } });
     h.tick(100000); assert.equal(h.sent.length, 1); assert.equal(h.job.outcomeSurfaced, true);
 });
@@ -347,10 +347,10 @@ for (const sendError of [null, undefined]) {
 test("shared retrieval detach on the terminal tick re-delivers the bounded monitor final, not a failure tail", async t => {
     const h = harness(t);
     let jobs!: { execute(id: string, params: unknown, signal: unknown, onUpdate: unknown, ctx: unknown): Promise<{ content: { text: string }[] }> };
-    registerJobsTool({ registerTool: (tool: typeof jobs) => { jobs = tool; } } as never, h.reg);
+    registerManagementFixture({ registerTool: (tool: typeof jobs) => { jobs = tool; } } as never, h.reg);
     const ctx = { ui: { notify() {} } };
-    const a = jobs.execute("a", { action: "attach", jobId: h.job.id }, undefined, undefined, ctx);
-    const b = jobs.execute("b", { action: "attach", jobId: h.job.id }, undefined, undefined, ctx);
+    const a = jobs.execute("a", { action: "wait", task_id: h.job.id }, undefined, undefined, ctx);
+    const b = jobs.execute("b", { action: "wait", task_id: h.job.id }, undefined, undefined, ctx);
     h.emit("first"); h.tick(200); h.emit("pending");
     // end() awaits two microtasks; detach after onExit suppresses final but before result completion.
     const ending = h.end({ code: 0, signal: null }, "final fragment");
@@ -498,8 +498,8 @@ test("actual session keeps absent/resumed order inside one short window and does
 test("inline attach completion consumes delayed terminal without notification or retry owner", async t => {
     const h = harness(t); h.emit("first"); h.tick(200); h.emit("pending");
     let jobs!: { execute(id: string, params: unknown, signal: unknown, onUpdate: unknown, ctx: unknown): Promise<{ content: { text: string }[] }> };
-    registerJobsTool({ registerTool: (tool: typeof jobs) => { jobs = tool; } } as never, h.reg);
-    const result = jobs.execute("attach", { action: "attach", jobId: h.job.id }, undefined, undefined, { ui: { notify() {} } });
+    registerManagementFixture({ registerTool: (tool: typeof jobs) => { jobs = tool; } } as never, h.reg);
+    const result = jobs.execute("attach", { action: "wait", task_id: h.job.id }, undefined, undefined, { ui: { notify() {} } });
     await h.end({ code: 0, signal: null }, "tail"); await result;
     assert.equal(h.job.outcomeSurfaced, true); assert.equal(h.reg.notificationRetries.size, 0);
     h.tick(200); h.tick(100000); assert.equal(h.sent.length, 1);

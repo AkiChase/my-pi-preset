@@ -15,7 +15,7 @@ import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-
  * agent's `output_transcript` overrides it per agent.
  *
  * State lives here rather than in an index.ts closure because both spawn paths
- * need it — the top-level Agent tool and the nested delegation tools. Same
+ * need it — the top-level subagent_run tool and the nested delegation tools. Same
  * reason `scopeModels` lives in model-scope.ts: a setting only one path can read
  * is a setting the other path silently ignores.
  */

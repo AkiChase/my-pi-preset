@@ -1,5 +1,7 @@
+import { registerBashTool } from "../tools/bash.ts";
+import { createBashToolDefinition } from "@earendil-works/pi-coding-agent";
 /**
- * `bash_bg` tool — timeout kill must be loud: a log marker plus a killed
+ * `bash` explicit background — timeout kill must be loud: a log marker plus a killed
  * <task-notification>, mirroring the foreground bash timeout path (the agent
  * must learn its command was timeout-killed).
  */
@@ -8,7 +10,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { BackgroundRegistry } from "../state.ts";
-import { registerBashBgTool } from "../tools/bash-bg.ts";
+
 import { EVENT } from "../types.ts";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -36,7 +38,7 @@ function harness() {
         sendMessage: (m: CapturedMessage) => { messages.push(m); },
     };
     const reg = new BackgroundRegistry();
-    registerBashBgTool(pi as never, reg);
+    registerBashTool(pi as never, reg, createBashToolDefinition(process.cwd()));
     const ctx = {
         cwd: process.cwd(),
         ui: {
@@ -49,7 +51,7 @@ function harness() {
     return { tool: tool!, reg, ctx, messages };
 }
 
-void describe("bash_bg — timeout kill is loud", () => {
+void describe("bash explicit background — timeout kill is loud", () => {
     void it("marks the log AND sends a killed notification", async () => {
         const { tool, ctx, messages } = harness();
         // `sleep` is excluded from auto-backgrounding, and a float duration
@@ -57,7 +59,7 @@ void describe("bash_bg — timeout kill is loud", () => {
         // path (same trick as the foreground timeout test).
         const res = await tool.execute(
             "t1",
-            { command: "sleep 1.5", timeout: 1 },
+            { run_in_background: true, command: "sleep 1.5", timeout: 1 },
             undefined,
             undefined,
             ctx

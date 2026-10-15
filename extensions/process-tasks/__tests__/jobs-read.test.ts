@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BackgroundRegistry } from "../state.ts";
 import { DEFAULTS } from "../config.ts";
-import { registerJobsTool } from "../tools/jobs.ts";
+import { registerManagementFixture } from "./management-fixture.ts";
 import { add, createRunningJob } from "../registry.ts";
 import { readLogSlice } from "../output.ts";
 import type { Job, UiContext } from "../types.ts";
@@ -45,7 +45,7 @@ function harness(config = DEFAULTS) {
         sendMessage() {},
     };
     const reg = new BackgroundRegistry(config);
-    registerJobsTool(pi as never, reg);
+    registerManagementFixture(pi as never, reg);
     const ctx = {
         ui: {
             notify() {},
@@ -120,7 +120,7 @@ void describe("jobs output — paging", () => {
     void it("defaults to the tail and says which bytes it showed", async () => {
         const { tool, reg, ctx } = harness({ ...DEFAULTS, outputPreviewChars: 10 });
         const job = jobWithLog(reg, "pg-1", "abcdefghijklmnopqrstuvwxyz");
-        const out = await text(tool, { action: "output", jobId: job.id }, ctx);
+        const out = await text(tool, { action: "output", task_id: job.id }, ctx);
         assert.match(out, /bytes 16-26 of 26/);
         assert.ok(out.includes("qrstuvwxyz"));
     });
@@ -128,16 +128,16 @@ void describe("jobs output — paging", () => {
     void it("names the offset to continue from when more remains", async () => {
         const { tool, reg, ctx } = harness();
         const job = jobWithLog(reg, "pg-2", "abcdefghij");
-        const out = await text(tool, { action: "output", jobId: job.id, offset: 0, limit: 4 }, ctx);
+        const out = await text(tool, { action: "output", task_id: job.id, offset: 0, limit: 4 }, ctx);
         assert.match(out, /bytes 0-4 of 10/);
-        assert.match(out, /\[6 more bytes — continue with offset=4\]/);
+        assert.match(out, /\[6 more bytes; offset=4\]/);
     });
 
     void it("flags the bytes it skipped so a tail cannot read as the whole log", async () => {
         const { tool, reg, ctx } = harness();
         const job = jobWithLog(reg, "pg-3", "abcdefghij");
-        const out = await text(tool, { action: "output", jobId: job.id, limit: 4 }, ctx);
-        assert.match(out, /\[6 earlier bytes not shown — read them with offset=0\]/);
+        const out = await text(tool, { action: "output", task_id: job.id, limit: 4 }, ctx);
+        assert.match(out, /\[6 earlier bytes omitted; offset=0\]/);
     });
 
     void it("pages the whole log without overlap or gaps", async () => {
@@ -148,17 +148,17 @@ void describe("jobs output — paging", () => {
         for (let i = 0; i < 10 && offset < 10; i++) {
             const out = await text(
                 tool,
-                { action: "output", jobId: job.id, offset, limit: 3 },
+                { action: "output", task_id: job.id, offset, limit: 3 },
                 ctx
             );
             // Strip the header and both bracketed markers; what's left is the
             // slice's own bytes.
             seen += out
                 .split("\n")
-                .slice(1)
+                .slice(2)
                 .filter((l) => !l.startsWith("["))
                 .join("\n");
-            const next = /continue with offset=(\d+)/.exec(out);
+            const next = /more bytes; offset=(\d+)/.exec(out);
             if (!next) break;
             offset = Number(next[1]);
         }
@@ -168,8 +168,8 @@ void describe("jobs output — paging", () => {
     void it("says so plainly when the offset lands past the end", async () => {
         const { tool, reg, ctx } = harness();
         const job = jobWithLog(reg, "pg-5", "abc");
-        const out = await text(tool, { action: "output", jobId: job.id, offset: 99 }, ctx);
-        assert.match(out, /No output at offset 99/);
+        const out = await text(tool, { action: "output", task_id: job.id, offset: 99 }, ctx);
+        assert.match(out, /bytes 3-3 of 3[\s\S]*\(no output\)/);
     });
 });
 
@@ -178,16 +178,14 @@ void describe("jobs — required parameters", () => {
         // Upstream's `p.jobId!` surfaced as "No task found with ID: undefined"
         // for output and a TypeError elsewhere.
         const { tool, ctx } = harness();
-        for (const action of ["output", "kill", "attach"]) {
-            await assert.rejects(
-                () => tool.execute("t", { action }, undefined, undefined, ctx),
-                new RegExp(`jobs action '${action}' requires jobId`)
-            );
+        for (const action of ["output", "stop", "wait"]) {
+            const result = await tool.execute("t", { action }, undefined, undefined, ctx);
+            assert.match(result.content[0].text, new RegExp(`${action} requires task_id`));
+            assert.equal((result as { isError?: boolean }).isError, true);
         }
-        await assert.rejects(
-            () => tool.execute("t", { action: "search" }, undefined, undefined, ctx),
-            /jobs action 'search' requires pattern/
-        );
+        const result = await tool.execute("t", { action: "search" }, undefined, undefined, ctx);
+        assert.match(result.content[0].text, /search requires pattern/);
+        assert.equal((result as { isError?: boolean }).isError, true);
     });
 });
 
@@ -215,7 +213,7 @@ void describe("jobs search — scope, case, context", () => {
         jobWithLog(reg, "s-4", LOG);
         const out = await text(
             tool,
-            { action: "search", pattern: "ERROR", jobId: only.id },
+            { action: "search", pattern: "ERROR", task_id: only.id },
             ctx
         );
         assert.match(out, /across 1 job\(s\)/);
@@ -224,17 +222,9 @@ void describe("jobs search — scope, case, context", () => {
 
     void it("errors on an unknown jobId instead of silently scanning everything", async () => {
         const { tool, ctx } = harness();
-        await assert.rejects(
-            () =>
-                tool.execute(
-                    "t",
-                    { action: "search", pattern: "x", jobId: "ghost" },
-                    undefined,
-                    undefined,
-                    ctx
-                ),
-            /No task found with ID: ghost/
-        );
+        const result = await tool.execute("t", { action: "search", task_id: "ghost", pattern: "x" }, undefined, undefined, ctx);
+        assert.equal((result as { isError?: boolean }).isError, true);
+        assert.match(result.content[0].text, /not found/i);
     });
 
     void it("is case-sensitive by default and case-insensitive on request", async () => {
@@ -243,14 +233,14 @@ void describe("jobs search — scope, case, context", () => {
         // "warning" appears only as "WARNING:", so case is the only variable.
         const strict = await text(
             tool,
-            { action: "search", pattern: "warning", jobId: job.id },
+            { action: "search", pattern: "warning", task_id: job.id },
             ctx
         );
         assert.match(strict, /No matches for \/warning\//);
 
         const loose = await text(
             tool,
-            { action: "search", pattern: "warning", jobId: job.id, ignoreCase: true },
+            { action: "search", pattern: "warning", task_id: job.id, ignore_case: true },
             ctx
         );
         assert.match(loose, /Found 1 matches for \/warning\/i/);
@@ -261,7 +251,7 @@ void describe("jobs search — scope, case, context", () => {
         const job = jobWithLog(reg, "s-6", LOG);
         const out = await text(
             tool,
-            { action: "search", pattern: "ERROR", jobId: job.id, context: 1 },
+            { action: "search", pattern: "ERROR", task_id: job.id, context: 1 },
             ctx
         );
         assert.match(out, /:3- still going/);
@@ -274,7 +264,7 @@ void describe("jobs search — scope, case, context", () => {
         const job = jobWithLog(reg, "s-7", "ERROR: first line\nsecond");
         const out = await text(
             tool,
-            { action: "search", pattern: "ERROR", jobId: job.id, context: 2 },
+            { action: "search", pattern: "ERROR", task_id: job.id, context: 2 },
             ctx
         );
         assert.match(out, /:1: ERROR: first line/);
@@ -288,7 +278,7 @@ void describe("jobs search — scope, case, context", () => {
         const job = jobWithLog(reg, "s-8", many);
         const out = await text(
             tool,
-            { action: "search", pattern: "ERROR", jobId: job.id, context: 1 },
+            { action: "search", pattern: "ERROR", task_id: job.id, context: 1 },
             ctx
         );
         assert.match(out, /Found 25 matches/);
@@ -300,7 +290,7 @@ void describe("jobs search — scope, case, context", () => {
         const job = jobWithLog(reg, "s-9", LOG);
         const out = await text(
             tool,
-            { action: "search", pattern: "ERROR", jobId: job.id },
+            { action: "search", pattern: "ERROR", task_id: job.id },
             ctx
         );
         const hitLines = out.split("\n").filter((l) => l.includes(".log:"));

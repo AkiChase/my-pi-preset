@@ -30,7 +30,7 @@ import { describeJob } from "./format.ts";
 export function watchStalls(args: {
     jobId: string;
     command: string;
-    /** Job name (bash/bash_bg `description`); falls back to the command. */
+    /** Job name (bash `description`); falls back to the command. */
     name?: string;
     logPath: string;
     pi: ExtensionAPI;

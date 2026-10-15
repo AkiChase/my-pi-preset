@@ -5,16 +5,14 @@ import { bashRenderers } from "./tools/bash.ts";
 import { findRenderers } from "./tools/find.ts";
 import { grepRenderers } from "./tools/grep.ts";
 import { optionalRenderers } from "./tools/optional.ts";
-import { agentContract } from "./tools/get-subagent-result.ts";
-import { jobsContract } from "./tools/jobs.ts";
+import { taskManageContract } from "./tools/task-manage.ts";
 import { registerAppearance } from "./editor/owner.ts";
 export default function beautify(pi: ExtensionAPI): void {
   const highlighter = new Highlighter();
   const tools = { read: readRenderers(highlighter), bash: bashRenderers, find: findRenderers, grep: grepRenderers };
   pi.registerToolRenderer((name, next) => {
     if (Object.hasOwn(tools, name)) return tools[name as keyof typeof tools];
-    if (name === "get_subagent_result") return optionalRenderers(name, next(), agentContract);
-    if (name === "jobs") return optionalRenderers(name, next(), jobsContract);
+    if (name === "task_manage") return optionalRenderers(name, next(), taskManageContract);
     return next();
   });
   registerAppearance(pi);

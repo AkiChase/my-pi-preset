@@ -103,7 +103,7 @@ export function stripAgentPrefix(handle: string): string | undefined {
 /**
  * A spawn needs the short description every agent surface renders. A mention
  * carries no separate label, so the message itself becomes one: first line,
- * whitespace collapsed, clipped to roughly the 3-5 words the Agent tool asks of
+ * whitespace collapsed, clipped to roughly the 3-5 words the subagent_run tool asks of
  * the model.
  */
 export function describeMention(message: string): string {
@@ -122,7 +122,7 @@ export function describeMention(message: string): string {
  * Ported verbatim from the 2.1.233 bundle's attachment renderer, trailing space
  * before the closing newline included, so the wording the model was trained
  * against is the wording it gets. The one substitution is ours: pi's equivalent
- * of Task is the `Agent` tool, and the agent listing that teaches valid
+ * of Task is the `subagent_run` tool, and the agent listing that teaches valid
  * `subagent_type` values is the tool spec rather than a separate attachment.
  */
 export function agentMentionReminder(type: string): string {

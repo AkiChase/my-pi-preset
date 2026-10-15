@@ -44,7 +44,7 @@ function fileDetail(path: string, request?: TaskDetailRequest): TaskDetail | und
   finally { if (fd !== undefined) { try { closeSync(fd); } catch { /* a failed detail read owns no runtime */ } } }
 }
 
-export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCoordinator, workflows: ReadonlyMap<string, WorkflowTask>): TaskSource {
+export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCoordinator, workflows: ReadonlyMap<string, WorkflowTask>, options: { observe?: boolean; filter?: (record: AgentRecord) => boolean } = {}): TaskSource {
   let revision = 0, disposed = false;
   const listeners = new Set<() => void>();
   const changed = () => {
@@ -52,10 +52,10 @@ export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCo
     revision++;
     for (const listener of listeners) { try { listener(); } catch { /* isolate view observers */ } }
   };
-  const offBackend = manager.subscribe(changed);
+  const offBackend = options.observe === false ? () => {} : manager.subscribe(changed);
   // General coordinator subscriptions include source changes and would recurse.
-  const offWaits = coordinator.subscribeWaits(changed);
-  manager.setOwnerRetention(record => {
+  const offWaits = options.observe === false ? () => {} : coordinator.subscribeWaits(changed);
+  if (options.observe !== false) manager.setOwnerRetention(record => {
     if (record.workflowId) {
       const task = workflows.get(record.workflowId);
       if (task?.status === "running" || task?.status === "paused") return true;
@@ -70,7 +70,7 @@ export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCo
     get revision() { return revision; },
     list() {
       if (disposed) return Object.freeze([]);
-      const views: TaskView[] = manager.listAgents().map(record => {
+      const views: TaskView[] = manager.listAgents().filter(record => !options.filter || options.filter(record)).map(record => {
         const identity = agentTaskIdentity(record);
         const parent = record.parentAgentId ? manager.getRecord(record.parentAgentId) : undefined;
         const parentKey = record.parentAgentId ? taskKey({ sourceId: "agent", taskId: record.parentAgentId, runId: record.parentRunId ?? parent?.runId ?? "0" }) : record.workflowId ? taskKey(workflowTaskIdentity(record.workflowId)) : undefined;
@@ -125,7 +125,7 @@ export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCo
         return textDetail(text, request);
       }
       const record = manager.getRecord(identity.taskId);
-      if (!record || record.runId !== identity.runId) return undefined;
+      if (!record || record.runId !== identity.runId || (options.filter && !options.filter(record))) return undefined;
       if (record.outputFile) {
         const detail = fileDetail(record.outputFile, request);
         if (detail) return detail;
@@ -149,12 +149,13 @@ export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCo
         for (const record of manager.listAgents()) if (record.workflowId === task.id) manager.abort(record.id);
         manager.notifyChanged(); return true;
       }
-      return manager.stopRun(identity);
+      const record = manager.getRecord(identity.taskId);
+      return record !== undefined && (!options.filter || options.filter(record)) && manager.stopRun(identity);
     },
     subscribe(listener) { if (!disposed) listeners.add(listener); return () => { listeners.delete(listener); }; },
     dispose() {
       if (disposed) return;
-      disposed = true; offBackend(); offWaits(); manager.setOwnerRetention(); listeners.clear();
+      disposed = true; offBackend(); offWaits(); if (options.observe !== false) manager.setOwnerRetention(); listeners.clear();
     },
   };
   return Object.freeze(source);

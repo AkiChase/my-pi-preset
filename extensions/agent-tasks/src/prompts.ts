@@ -30,7 +30,7 @@ export interface PromptExtras {
    *
    * Deliberately NOT applied to every subagent. In pi an ordinary agent's
    * output IS read by a human — through FleetView, the conversation viewer and
-   * `get_subagent_result` — so terse raw data would be the wrong answer there.
+   * `task_manage` — so terse raw data would be the wrong answer there.
    */
   workflowChild?: boolean;
 }

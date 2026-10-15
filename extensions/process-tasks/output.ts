@@ -8,15 +8,22 @@ import { FOREGROUND_TAIL_BYTES } from "./types.ts";
  * descriptor — no separate path-stat, so no stat-then-read race.
  */
 export function readBoundedTail(logPath: string, maxChars: number): string {
-    let fd: number;
     try {
-        fd = openSync(logPath, "r");
+        return readBoundedTailOrThrow(logPath, maxChars) || "(no output yet)";
     } catch {
         return "(no output yet)";
     }
+}
+
+/** Same bounded read, but management/search must distinguish unavailable logs
+ * from an empty readable file. The descriptor is closed before either outcome. */
+export function readBoundedTailOrThrow(logPath: string, maxChars: number): string {
+    const fd = openSync(logPath, "r");
     try {
-        const { size } = fstatSync(fd);
-        if (size === 0) return "(no output yet)";
+        const stat = fstatSync(fd);
+        if (!stat.isFile()) throw new Error("Not a log file");
+        const { size } = stat;
+        if (size === 0) return "";
         const toRead = Math.min(size, maxChars);
         const buf = Buffer.alloc(toRead);
         readSync(fd, buf, 0, toRead, Math.max(0, size - toRead));
@@ -24,8 +31,6 @@ export function readBoundedTail(logPath: string, maxChars: number): string {
         return size > maxChars
             ? `...[truncated, showing last ${maxChars} chars]\n${body}`
             : body;
-    } catch {
-        return "(no output yet)";
     } finally {
         closeSync(fd);
     }
@@ -123,7 +128,7 @@ export function readLastLine(logPath: string, scanBytes = 2_048): string {
 /**
  * The last `maxLines` non-empty lines of a log, ANSI-stripped and bounded by
  * `maxChars` of trailing bytes — what a failure notification inlines so the
- * model can see *why* a job failed without a second `jobs output` round-trip.
+ * model can see *why* a job failed without a second `task_manage output` round-trip.
  *
  * Progress-bar redraws (`\r`) collapse to their final segment, same as
  * readLastLine: a 500-frame download bar would otherwise eat the whole budget
@@ -215,7 +220,7 @@ export type ToolTextUpdate = (update: {
 /**
  * Stream a log file's live tail into a tool's onUpdate callback — the shared
  * "show live output while a job runs" mechanic used by bash and the
- * jobs attach action. Returns the poller's stop handle.
+ * task_manage wait action. Returns the poller's stop handle.
  */
 export function streamLog(
     logPath: string,

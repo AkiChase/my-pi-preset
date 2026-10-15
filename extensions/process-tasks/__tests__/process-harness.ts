@@ -7,8 +7,8 @@ import { TaskLifecycle } from "../../task-ui/lifecycle.ts";
 import { BackgroundRegistry } from "../state.ts";
 import { DEFAULTS, type ProcessTasksConfig } from "../config.ts";
 import { registerBashTool } from "../tools/bash.ts";
-import { registerBashBgTool } from "../tools/bash-bg.ts";
-import { registerJobsTool } from "../tools/jobs.ts";
+
+import { registerManagementFixture } from "./management-fixture.ts";
 import { registerMonitorTool } from "../tools/monitor.ts";
 import { startRegistrySweep } from "../registry.ts";
 import { createProcessLifecycleParticipant } from "../lifecycle.ts";
@@ -39,7 +39,8 @@ export function processActivation(dir: string, config: Partial<ProcessTasksConfi
     const pi = partialPi as ExtensionAPI;
     const context = ctx as unknown as ExtensionToolContext;
     registerBashTool(pi, reg, createBashToolDefinition(dir));
-    registerBashBgTool(pi, reg); registerJobsTool(pi, reg); registerMonitorTool(pi, reg);
+    const closeManagement = registerManagementFixture(pi, reg); registerMonitorTool(pi, reg);
+    lifecycle.onClose(closeManagement);
     const source = createProcessTaskSource(reg);
     const unregister = coordinator.registerSource(source);
     lifecycle.register(createProcessLifecycleParticipant(reg, () => { unregister(); source.dispose(); }));

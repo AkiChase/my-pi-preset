@@ -15,6 +15,9 @@
  */
 
 import { normalizeAgentDescription } from "./spawn-input.ts";
+import { createAgentManagement } from "./management.ts";
+import { createAgentTaskSource } from "./source.ts";
+import { getAgentConversation } from "./agent-runner.ts";
 import type { TaskIdentity } from "../../task-ui/types.ts";
 import { randomUUID } from "node:crypto";
 import { statSync } from "node:fs";
@@ -76,7 +79,7 @@ export type CompactionInfo = { reason: "manual" | "threshold" | "overflow"; toke
  * (`backgroundByDefault`): foreground agents bypass this pool entirely, so
  * while foreground was the default a fan-out of six ran six. With background
  * as the default every top-level agent takes a slot, and a limit of 4 would
- * have silently queued the tail of exactly the parallel fan-outs the `Agent`
+ * have silently queued the tail of exactly the parallel fan-outs the `subagent_run`
  * tool description tells the model to send.
  */
 const DEFAULT_MAX_CONCURRENT = 10;
@@ -87,7 +90,7 @@ const DEFAULT_MAX_CONCURRENT = 10;
  *
  * Off by default because nothing here ever bounded foreground work, and pi
  * dispatches a message's tool calls through `Promise.all`, so an unqualified
- * fan-out of blocking `Agent` calls has always run all at once. Users who want
+ * fan-out of blocking `subagent_run` calls has always run all at once. Users who want
  * it bounded — chiefly local models, where parallel agents thrash the prompt
  * cache (#253) — opt in; everyone else keeps today's behaviour exactly.
  */
@@ -469,7 +472,10 @@ export class AgentManager {
     run.terminalResolved = true;
     run.unlinkParent?.(); run.unlinkParent = undefined;
     // Snapshot outcome so a later resume cannot replace an earlier wait's text.
-    run.resolve({ ...record, lifetimeUsage: { ...record.lifetimeUsage }, invocation: record.invocation ? { ...record.invocation } : undefined });
+    let terminalConversation = "";
+    try { if (record.session) terminalConversation = getAgentConversation(record.session); }
+    catch { terminalConversation = "[Conversation unavailable at run completion.]"; }
+    run.resolve({ ...record, terminalConversation, lifetimeUsage: { ...record.lifetimeUsage }, invocation: record.invocation ? { ...record.invocation } : undefined });
     run.resolveText(record.result ?? "");
   }
   private acquireSlot(record: AgentRecord): void {
@@ -827,6 +833,7 @@ export class AgentManager {
     this.notifyChanged();
     if (!this.current(record, run) || record.abortController?.signal.aborted) { this.settleRun(record, run); return; }
 
+    let bindManagementSession: (session: AgentSession) => void = () => {};
     const promise = (this.dependencies.runAgent ?? runAgent)(ctx, type, prompt, {
       onSessionOwned: session => this.ownSession(session, run),
       canEmitShutdown: () => this.hostEffectsAllowed,
@@ -878,6 +885,38 @@ export class AgentManager {
         try { if (this.current(record, run) && !record.abortController?.signal.aborted) options.onCompaction?.(info); } catch { /* isolate optional observer */ }
       },
       nestedRuntime: {
+        management: (() => {
+          // This capability belongs to the retained child SESSION, not its first run.
+          // Resume is legitimate only while that exact session remains on this record.
+          let session: AgentSession | undefined;
+          const currentOwner = () => {
+            const owner = this.runs.get(id);
+            return owner && session && record.session === session && owner.sessions.has(session) &&
+              !isChildSessionClosed(session) && this.current(record, owner) && !record.abortController?.signal.aborted
+              ? owner : undefined;
+          };
+          // Session creation occurs after the loader has requested the capability.
+          bindManagementSession = value => { session = value; };
+          return coordinator => {
+            const owns = (candidate: AgentRecord, owner = currentOwner()) => owner !== undefined &&
+              candidate.parentAgentId === id && candidate.parentRunId === owner.identity.runId;
+            const source = createAgentTaskSource(this, coordinator, new Map(), { observe: false, filter: candidate => owns(candidate) });
+            return {
+              list: () => source.list().map(view => ({ view, manageable: true, rawStatus: this.agents.get(view.taskId)?.status ?? view.status })),
+              execute: (identity, params, signal, onUpdate, context) => {
+                // Freeze the exact owner at call admission. An old await cannot take
+                // over children admitted by a subsequent resumed owner run.
+                const owner = currentOwner();
+                return createAgentManagement({ manager: this, coordinator, source,
+                  active: () => owner !== undefined && currentOwner() === owner,
+                  owns: candidate => owns(candidate, owner),
+                  format: (child, verbose) => `${child.description}: ${child.status}\n${child.result ?? child.error ?? "No output."}${verbose ? `\n${child.terminalConversation ?? (child.session ? getAgentConversation(child.session) : "")}` : ""}`,
+                  cancelNotice: () => {}, reconsider: () => {},
+                }).execute(identity, params, signal, onUpdate, context);
+              },
+            };
+          };
+        })(),
         manager: this,
         parentAgentId: id,
         depth: record.depth ?? 1,
@@ -886,6 +925,7 @@ export class AgentManager {
       onSessionCreated: (session) => {
         this.ownSession(session, run);
         if (!this.current(record, run) || record.abortController?.signal.aborted) return;
+        bindManagementSession(session);
         record.starting = false;
         record.session = session;
         // Capture now, while the session object exists: after eviction this
@@ -1135,7 +1175,7 @@ export class AgentManager {
     onSpawned?: (id: string) => void,
   ): Promise<{ id: string; record: AgentRecord }> {
     // `blocking` is what maxConcurrentForeground bounds, also set by the
-    // root Agent tool when preparing its coordinator launch lease. onSpawned rides on the options rather than on a field of this
+    // root subagent_run tool when preparing its coordinator launch lease. onSpawned rides on the options rather than on a field of this
     // manager: a queued spawn starts at drain time, long after any install/
     // restore pair around this call would have put the field back — and it now
     // fires after an await (worktree creation) even on the immediate path.
@@ -1165,7 +1205,7 @@ export class AgentManager {
     return outcome;
   }
 
-  /** Synchronous preparation lets the Agent tool register its launch lease before awaits. */
+  /** Synchronous preparation lets the subagent_run tool register its launch lease before awaits. */
   resumeRun(id: string, prompt: string, signal?: AbortSignal, options: ResumeOptions = {}): AgentRecord | undefined {
     const record = this.agents.get(id);
     if (this.admissionClosed || !record?.session || this.isRunActive(id)) return undefined;
@@ -1265,7 +1305,7 @@ export class AgentManager {
   }
 
   /**
-   * Send a steering message to an agent from the UI (mirrors the steer_subagent
+   * Send a steering message to an agent from the UI (mirrors the subagent_message
    * tool). A live session delivers it now — it interrupts the agent after its
    * current tool execution and appears as a user message. If the session isn't
    * ready yet, the message is queued on `pendingSteers` and flushed when the

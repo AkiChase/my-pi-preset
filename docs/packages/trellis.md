@@ -34,7 +34,7 @@
 ## 环境与配置
 
 - Pi ≥ 1.2.0；初始化与运行时脚本需要本机 Python ≥ 3.10，普通启动不需要。
-- 派发角色需要环境中存在提供 `Agent` 工具的扩展；本预设自带的 [Task composition](../extensions/task-composition.md) 已提供，无需单独安装 `@tintinweb/pi-subagents`（该包在清单中已列为冲突来源）。
+- 派发角色需要可用的子代理扩展及匹配其工具接口的 pi-trellis 版本。当前 Task Composition 提供 `subagent_run` 和 `task_manage`；若 pi-trellis 仍检测 `Agent`，其角色派发与普通子代理的材料／worktree 门禁不能视为可用，需先完成关联适配并验证。不要靠安装清单中的冲突包 `@tintinweb/pi-subagents` 或注册旧名称绕过这一限制。
 - Windows 未验证，建议在 macOS 或 Linux 使用。
 
 | 环境变量 | 用途 |

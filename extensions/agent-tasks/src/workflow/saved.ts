@@ -1,5 +1,5 @@
 /**
- * saved.ts — resolve `SubagentWorkflow({ name })` to a script on disk.
+ * saved.ts — resolve `subagent_workflow({ name })` to a script on disk.
  *
  * A saved workflow is a plain `.js` file whose contents are exactly what
  * `script` would have carried. Nothing is parsed here: `extractMeta` still runs
@@ -175,7 +175,7 @@ function isWorkflowFile(path: string): boolean {
 }
 
 /**
- * Resolve which source a `SubagentWorkflow` call runs.
+ * Resolve which source a `subagent_workflow` call runs.
  *
  * `scriptPath` wins over `script`, which wins over `name` — Claude Code's
  * order — and at least one is required: a call with none is a mistake worth

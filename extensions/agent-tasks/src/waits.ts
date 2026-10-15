@@ -8,6 +8,7 @@ export function registerAgentWait(
   manager: AgentManager, coordinator: TaskCoordinator, run: AgentRunHandle,
   kind: "launch" | "retrieval", signal?: AbortSignal,
   reconsider?: () => void,
+  canConsume: () => boolean = () => true,
 ): WaitLease<AgentRecord> {
   const lease = coordinator.registerWait<AgentRecord>({
     identity: run.identity, label: `Agent ${run.identity.taskId}`, kind, signal,
@@ -16,7 +17,7 @@ export function registerAgentWait(
     },
     onInterrupt: () => { manager.stopRun(run.identity); },
     onDispose: kind === "launch" ? () => { manager.stopRun(run.identity); } : undefined,
-    onComplete: () => { manager.consumeRun(run.identity); },
+    onComplete: () => { if (canConsume()) manager.consumeRun(run.identity); },
     // Reconsider after the coordinator has removed this wait. A microtask also
     // lets a completed winner consume before a suppressed terminal notice runs.
     cleanup: () => { if (reconsider) queueMicrotask(reconsider); },

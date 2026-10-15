@@ -24,7 +24,7 @@ function cloneFixture() {
     async createSession(options) { counts.create++; tool = options!.customTools![0]!; await create.promise; return { session } as Awaited<ReturnType<MentionCloneDependencies["createSession"]>>; },
   };
   const ctx = { cwd: tmpdir(), getSystemPrompt: () => "parent", modelRegistry: {}, sessionManager: { getBranch: () => [], getSessionId: () => "origin" } } as unknown as ExtensionContext;
-  const agentTool: ToolDefinition = { name: "Agent", label: "Agent", description: "offline", parameters: Type.Object({}), async execute(_id: string, params: unknown) { counts.spawn++; assert.equal((params as { run_in_background: boolean }).run_in_background, true); return { content: [], details: {} }; } };
+  const agentTool: ToolDefinition = { name: "subagent_run", label: "subagent_run", description: "offline", parameters: Type.Object({}), async execute(_id: string, params: unknown) { counts.spawn++; assert.equal((params as { run_in_background: boolean }).run_in_background, true); return { content: [], details: {} }; } };
   return { reload, create, prompt, counts, session, ctx, dependencies, agentTool, tool: () => tool };
 }
 void it("actual clone cancellation after reload prevents create, late create only locally disposes", async () => {

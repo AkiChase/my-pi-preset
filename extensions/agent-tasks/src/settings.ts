@@ -14,7 +14,7 @@ export interface SubagentsSettings {
    * Max concurrent FOREGROUND (blocking) agents — `0` = unlimited, the default,
    * which preserves the behaviour that has always applied: nothing bounded
    * foreground work, and pi dispatches a message's tool calls through
-   * `Promise.all`, so an unqualified fan-out of blocking `Agent` calls runs all
+   * `Promise.all`, so an unqualified fan-out of blocking `subagent_run` calls runs all
    * at once. Set it to bound that (#253 — on local models, parallel agents
    * thrash the prompt cache).
    *
@@ -41,7 +41,7 @@ export interface SubagentsSettings {
   graceTurns?: number;
   defaultJoinMode?: JoinMode;
   /**
-   * Whether a top-level `Agent` spawn that doesn't say runs detached.
+   * Whether a top-level `subagent_run` spawn that doesn't say runs detached.
    * Defaults to `true`, following Claude Code, where the agent backgrounds
    * unless the caller passes `run_in_background: false`. Set `false` to restore
    * the previous behaviour, where an unqualified spawn blocked the turn and
@@ -59,7 +59,7 @@ export interface SubagentsSettings {
   backgroundByDefault?: boolean;
   /**
    * Master switch for the schedule subagent feature. Defaults to `true`.
-   * When `false`: the `Agent` tool's `schedule` param + its guideline are
+   * When `false`: the `subagent_run` tool's `schedule` param + its guideline are
    * stripped from the tool spec at registration (zero LLM-context cost), the
    * scheduler doesn't bind to the session, and the `/agents → Scheduled jobs`
    * menu entry is hidden. Schema-level removal applies at extension load
@@ -92,7 +92,7 @@ export interface SubagentsSettings {
    * When true, an unreadable or unparseable agent `.md` aborts extension load
    * instead of being skipped with a warning — pi exits, naming the file.
    *
-   * Startup only, by design. Mid-session reloads (one per `Agent` call) keep
+   * Startup only, by design. Mid-session reloads (one per `subagent_run` call) keep
    * warning: a bad edit at 3pm should not kill the session on the next
    * unrelated spawn, where the failure would look disconnected from its cause.
    * For a checked-in `.pi/agents/`, failing at startup is the point — the
@@ -108,7 +108,7 @@ export interface SubagentsSettings {
    */
   disableDefaultAgents?: boolean;
   /**
-   * Which Agent tool description the LLM sees. "full" (default) is the rich
+   * Which subagent_run tool description the LLM sees. "full" (default) is the rich
    * Claude Code-style prompt; "compact" is a ~75% smaller version (one-line
    * agent type list, terse usage notes) for small/local models where tool-spec
    * tokens are expensive; "custom" reads `.pi/agent-tool-description.md`
@@ -124,7 +124,7 @@ export interface SubagentsSettings {
    * pi's file completion. Defaults to `model`. Applied live.
    *
    *   - `model`: mentioning an agent that is not running asks the main model to
-   *     spawn it with the `Agent` tool, Claude Code's behaviour. Costs a turn,
+   *     spawn it with the `subagent_run` tool, Claude Code's behaviour. Costs a turn,
    *     and the model writes the agent's prompt rather than your text being it.
    *   - `direct`: that agent is started here instead, with the typed message as
    *     its prompt and no main-model turn spent.
@@ -183,7 +183,7 @@ export interface SubagentsSettings {
   /**
    * Master switch for scripted workflows. Defaults to `true`.
    *
-   * Off is not a soft hide: the `SubagentWorkflow` tool is never registered, so
+   * Off is not a soft hide: the `subagent_workflow` tool is never registered, so
    * the model is not told it exists and cannot call it, the `/agents`
    * Workflows entry is hidden, and `--subagents-workflow-file` is refused.
    *

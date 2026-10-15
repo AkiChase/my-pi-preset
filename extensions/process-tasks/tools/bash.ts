@@ -17,6 +17,8 @@ import {
     createBashToolDefinition,
     type BashToolDetails,
 } from "@earendil-works/pi-coding-agent";
+import { launchMetadata, launchText, type RuntimeLaunchMetadata } from "../../runtime-tasks/launch.ts";
+import { isTerminalStatus } from "../types.ts";
 import { appendFileSync } from "node:fs";
 import type { BackgroundRegistry } from "../state.ts";
 import {
@@ -52,6 +54,7 @@ import { textBlock } from "../format.ts";
 import { bashParamSchema } from "./bash-params.ts";
 
 /** UI context + cwd is all this tool needs from the host context. */
+type LaunchDetails = BashToolDetails & { runtimeLaunch: RuntimeLaunchMetadata };
 type BashCtx = UiContext & { cwd: string };
 
 /** Register the overridden `bash` tool. */
@@ -60,7 +63,7 @@ export function registerBashTool(
     reg: BackgroundRegistry,
     originalBash: ReturnType<typeof createBashToolDefinition>
 ): void {
-    pi.registerTool({
+    pi.registerTool<ReturnType<typeof bashParamSchema>, LaunchDetails | undefined>({
         ...originalBash,
         name: "bash",
         description:
@@ -73,9 +76,9 @@ export function registerBashTool(
         promptGuidelines: [
             "Use bash with run_in_background=true when a command is expected to run for a long time.",
             "run_in_background is for ONE notification (the command exits when done). For per-event streaming (watching logs, polling an API, file changes), use the monitor tool instead.",
-            "Never `sleep N` to wait for something — the job lingers for the full sleep. Wait on a background job with jobs action='attach', watch with the monitor tool, or poll with an `until` loop that exits when ready.",
-            "Check background job status with jobs action='list'.",
-            "Read background output with jobs action='output'.",
+            "Never `sleep N` to wait for something — the job lingers for the full sleep. Wait on a background job with task_manage action='wait', watch with the monitor tool, or poll with an `until` loop that exits when ready.",
+            "Check background job status with task_manage action='list'.",
+            "Read background output with task_manage action='output'.",
         ],
         parameters: bashParamSchema(reg.config),
 
@@ -85,9 +88,12 @@ export function registerBashTool(
                 timeout?: number;
                 run_in_background?: boolean;
                 description?: string;
+                notify?: boolean;
             };
             const bashCtx = ctx as BashCtx;
 
+            if (p.notify !== undefined && p.run_in_background !== true) throw new Error("notify requires run_in_background=true");
+            if (p.timeout !== undefined && (!Number.isFinite(p.timeout) || p.timeout <= 0)) throw new Error("timeout must be finite and positive");
             if (isBlankCommand(p.command)) throw new Error("Command is empty.");
             requireExistingCwd(bashCtx.cwd);
 
@@ -104,6 +110,8 @@ export function registerBashTool(
                     toolCallId,
                     command: p.command,
                     name: p.description,
+                    notify: p.notify,
+                    timeout: p.timeout,
                     cwd: bashCtx.cwd,
                     reg,
                     pi,
@@ -115,6 +123,7 @@ export function registerBashTool(
             return runForeground({
                 toolCallId,
                 command: p.command,
+                name: p.description,
                 timeoutMs: p.timeout ? p.timeout * 1000 : reg.config.timeoutMs,
                 signal,
                 onUpdate,
@@ -131,13 +140,14 @@ export function registerBashTool(
 async function runForeground(args: {
     toolCallId: string;
     command: string;
+    name?: string;
     timeoutMs: number;
     signal: AbortSignal | undefined;
-    onUpdate: AgentToolUpdateCallback<BashToolDetails | undefined> | undefined;
+    onUpdate: AgentToolUpdateCallback<LaunchDetails | undefined> | undefined;
     ctx: BashCtx;
     reg: BackgroundRegistry;
     pi: ExtensionAPI;
-}): Promise<AgentToolResult<BashToolDetails | undefined>> {
+}): Promise<AgentToolResult<LaunchDetails | undefined>> {
     const { toolCallId, command, timeoutMs, signal, onUpdate, ctx, reg, pi } =
         args;
     const id = newJobId("shell", reg);
@@ -152,7 +162,7 @@ async function runForeground(args: {
     });
 
     let handedToBackground = false;
-    const job = createRunningJob({ id, command, pid: spawned.pid, logPath, toolCallId, isBackgrounded: false });
+    const job = createRunningJob({ id, name: args.name, command, pid: spawned.pid, logPath, toolCallId, isBackgrounded: false });
     job.stop = () => spawned.execution.stop();
     add(reg, job);
     let progressPoller: { stop: () => void } | undefined;
@@ -221,14 +231,14 @@ async function runForeground(args: {
         // The backend retains terminal metadata and the log after inline completion.
         const finishForeground = (
             exit: SpawnExit
-        ): AgentToolResult<BashToolDetails | undefined> => {
+        ): AgentToolResult<LaunchDetails | undefined> => {
             const output = readLogTail(job, reg.config.outputPreviewChars);
             // A signal death (e.g. Esc-cancel killed the process group) is a
             // deliberate cancel, not a command failure — never an error result.
             if (exit.signal === null && exit.code !== 0) {
-                throw new Error(output || `Command exited with code ${exit.code ?? 1}`);
+                return { content: [textBlock(`${launchText(launchMetadata("bash", id, id, "foreground"))}\n${output || `Command exited with code ${exit.code ?? 1}`}`)], details: { runtimeLaunch: launchMetadata("bash", id, id, "foreground") }, isError: true };
             }
-            return { content: [textBlock(output || "(no output)")], details: undefined };
+            return { content: [textBlock(`${launchText(launchMetadata("bash", id, id, "foreground"))}\n${output || "(no output)"}`)], details: { runtimeLaunch: launchMetadata("bash", id, id, "foreground") } };
         };
 
         // Explicit detach participates in the initial window, not only after two seconds.
@@ -249,7 +259,7 @@ async function runForeground(args: {
             const text = outcome.reason === "manual"
                 ? `Command was manually backgrounded by user with ID: ${id}. Output is being written to: ${logPath}`
                 : `Command running in background with ID: ${id}. Output is being written to: ${logPath}`;
-            return { content: [textBlock(text)], details: undefined };
+            return { content: [textBlock(`${launchText(launchMetadata("bash", id, id, "background"))}\n${text}`)], details: { runtimeLaunch: launchMetadata("bash", id, id, "background") } };
         }
         // Genuine cancellation kills the launch, then preserves its observed final log.
         const exit = await spawned.exit;
@@ -274,11 +284,13 @@ async function spawnBackground(args: {
     toolCallId: string;
     command: string;
     name?: string;
+    notify?: boolean;
+    timeout?: number;
     cwd: string;
     reg: BackgroundRegistry;
     pi: ExtensionAPI;
     ctx: UiContext;
-}): Promise<AgentToolResult<BashToolDetails | undefined>> {
+}): Promise<AgentToolResult<LaunchDetails | undefined>> {
     const id = newJobId("shell", args.reg);
     const logPath = logPathFor(args.reg, id);
 
@@ -299,7 +311,17 @@ async function spawnBackground(args: {
     job.stop = () => spawned.execution.stop();
     add(args.reg, job);
     try {
-        startBackgroundJob({ reg: args.reg, pi: args.pi, ctx: args.ctx, job, exit: spawned.exit, execution: spawned.execution });
+        const owner = startBackgroundJob({ reg: args.reg, pi: args.pi, ctx: args.ctx, job, exit: spawned.exit, execution: spawned.execution, notification: args.notify === false ? "suppressed" : "auto" });
+        if (args.timeout !== undefined) {
+            const timer = setTimeout(() => {
+                if (isTerminalStatus(job.status) || args.reg.nonInteractive || isAutoBackgroundAllowed(args.command)) return;
+                try { appendFileSync(logPath, `Command timed out after ${args.timeout}s\n`); } catch { /* best effort marker */ }
+                spawned.execution.stop();
+            }, args.timeout * 1000);
+            timer.unref();
+            owner.signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
+            if (owner.signal.aborted) clearTimeout(timer);
+        }
     } catch (error) {
         // No handle was returned: setup failure must not leave an owned process
         // or completion/stall hooks alive. Preserve the log and original error.
@@ -311,9 +333,9 @@ async function spawnBackground(args: {
     return {
         content: [
             textBlock(
-                `Command running in background with ID: ${id}. Output is being written to: ${logPath}`
+                `${launchText(launchMetadata("bash", id, id, "background"))}\nCommand running in background with ID: ${id}. Output is being written to: ${logPath}`
             ),
         ],
-        details: undefined,
+        details: { runtimeLaunch: launchMetadata("bash", id, id, "background") },
     };
 }

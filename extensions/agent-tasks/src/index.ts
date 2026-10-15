@@ -1,12 +1,18 @@
+import { launchMetadata, launchText, isLaunchMetadata } from "../../runtime-tasks/launch.ts";
+import { createAgentManagement } from "./management.ts";
+import { createWorkflowManagement } from "./workflow/management.ts";
+import type { RuntimeTaskCapability } from "../../runtime-tasks/facade.ts";
+
 import { TaskLifecycle } from "../../task-ui/lifecycle.ts";
 import { TaskCoordinator } from "../../task-ui/coordinator.ts";
 /**
  * pi-agents — A pi extension providing Claude Code-style autonomous sub-agents.
  *
  * Tools:
- *   Agent             — LLM-callable: spawn a sub-agent
- *   get_subagent_result  — LLM-callable: check background agent status/result
- *   steer_subagent       — LLM-callable: send a steering message to a running agent
+ *   subagent_run      — LLM-callable: spawn or resume a subagent
+ *   subagent_workflow — LLM-callable: execute an opted-in workflow
+ *   subagent_message  — LLM-callable: guide a running subagent
+ * Management is registered once by composition as task_manage.
  *
  * Commands:
  *   /agents                 — Interactive agent management menu
@@ -83,7 +89,8 @@ import { escapeXml } from "./xml.ts";
 
 /** Tool execute return value for a text response. */
 function textResult(msg: string, details?: AgentDetails) {
-  return { content: [{ type: "text" as const, text: msg }], details: details as any };
+  const identity = (details as { runtimeLaunch?: unknown } | undefined)?.runtimeLaunch;
+  return { content: [{ type: "text" as const, text: isLaunchMetadata(identity) ? `${launchText(identity)}\n${msg}` : msg }], details: details as any };
 }
 
 export function renderRunningAgentStatus(
@@ -153,7 +160,7 @@ function createActivityTracker(maxTurns?: number, onStreamUpdate?: () => void) {
 
 /**
  * Advertised thinking levels, ordered to mirror pi-ai's EXTENDED_THINKING_LEVELS
- * (`off` + every `ThinkingLevel`). Single source for the Agent tool description,
+ * (`off` + every `ThinkingLevel`). Single source for the subagent_run tool description,
  * the generated-agent template, and the `/agents` wizard so these lists can't
  * drift behind pi again (#147). Availability of any level still depends on the
  * host pi version and the selected model — pi clamps unsupported levels down.
@@ -186,7 +193,7 @@ function formatTaskNotification(record: AgentRecord, resultMaxLen: number, showC
 
   const resultPreview = record.result
     ? record.result.length > resultMaxLen
-      ? record.result.slice(0, resultMaxLen) + "\n...(truncated, use get_subagent_result for full output)"
+      ? record.result.slice(0, resultMaxLen) + "\n...(truncated, use task_manage for full output)"
       : record.result
     : "No output.";
 
@@ -257,7 +264,7 @@ function buildNotificationDetails(record: AgentRecord, resultMaxLen: number, act
 }
 
 /**
- * Format an agent's tool scope for the Agent tool description.
+ * Format an agent's tool scope for the subagent_run tool description.
  *
  * This suffix describes BUILT-IN scope only — extension tools are resolved when
  * the agent runs (extensions can register asynchronously), so they cannot be
@@ -305,6 +312,8 @@ export { FOREIGN_WORKFLOW_TOOL_NAMES, WORKFLOW_ENTRY_TYPE, type WorkflowEntryDat
 
 /** Composition owns the shared coordinator; direct offline factories may own a scoped one. */
 export interface AgentTasksOptions {
+  readonly onManagementResult?: (report: (id: string, result: import("../../runtime-tasks/contracts.ts").RuntimeTaskResult) => import("../../runtime-tasks/contracts.ts").RuntimeTaskResult) => void;
+  readonly onManagement?: (capability: RuntimeTaskCapability) => void;
   readonly coordinator?: TaskCoordinator;
   /** Composition-owned activation shutdown protocol. */
   readonly lifecycle?: import("../../task-ui/lifecycle.ts").TaskLifecycle;
@@ -449,7 +458,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
   // the initial load, which happens hundreds of lines before settings are applied.
   let strictAgentFiles = loadSettings(process.cwd()).strictAgentFiles === true;
 
-  /** Reload agents from project/global custom agent dirs and merge with defaults (called on init and each Agent invocation). */
+  /** Reload agents from project/global custom agent dirs and merge with defaults (called on init and each subagent_run invocation). */
   const reloadCustomAgents = (strict = false) => {
     const userAgents = loadCustomAgents(process.cwd(), strict);
     registerAgents(userAgents);
@@ -498,7 +507,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
   const pendingUsage = new PendingUsagePool();
 
   // ---- Cancellable pending notifications ----
-  // Holds notifications briefly so get_subagent_result can cancel them
+  // Holds notifications briefly so task_manage can cancel them
   // before they reach pi.sendMessage (fire-and-forget).
   const pendingNudges = new Map<string, ReturnType<typeof setTimeout>>();
   const NUDGE_HOLD_MS = 200;
@@ -596,7 +605,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
 
         pi.sendMessage<NotificationDetails>({
           customType: "subagent-notification",
-          content: `Background agent group completed: ${label}\n\n${notifications}\n\nUse get_subagent_result for full output.`,
+          content: `Background agent group completed: ${label}\n\n${notifications}\n\nUse task_manage for full output.`,
           display: true,
           details,
         }, { deliverAs: "followUp", triggerTurn: true });
@@ -736,23 +745,23 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     // The RPC layer already throws for an unresolvable model rather than falling
     // back silently; a bad agent type should not be quieter. Throws become error
     // envelopes at the RPC boundary. Reload first so an agent file added mid
-    // session is spawnable here too, not only through the Agent tool.
+    // session is spawnable here too, not only through the subagent_run tool.
     reloadCustomAgents();
     const dispatch = resolveSpawnType(type);
     if (!dispatch.ok) throw new Error(dispatch.message);
     // Every programmatic spawn lands here — cross-extension RPC, both `@handle`
     // mention paths, and the `Symbol.for("pi-subagents:manager")` registry — and
-    // none came through the Agent tool, which is where the UI activity tracker is
+    // none came through the subagent_run tool, which is where the UI activity tracker is
     // otherwise created. Without one the widget and FleetView have no tool name
     // and no turn count, so the row reads `thinking…` for the agent's whole life
     // while the header's tool-use count climbs beside it (#181). Double-tracking
-    // is not possible: the Agent tool calls `manager.spawn` directly. The tracker
+    // is not possible: the subagent_run tool calls `manager.spawn` directly. The tracker
     // callbacks are the funnel's own — a caller's are not honoured, since a
     // half-wired tracker renders worse than none.
     //
     // The turn limit is resolved rather than read off `options`, which a mention
     // spawn deliberately omits so the agent's own config can decide: a tracker
-    // built with `undefined` renders `↻3` where the Agent tool renders `↻3≤20`.
+    // built with `undefined` renders `↻3` where the subagent_run tool renders `↻3≤20`.
     // Like the tool's own, it is a prediction — editing the agent file mid-run
     // leaves the displayed ceiling stale.
     const { state, callbacks } = createActivityTracker(resolveEffectiveMaxTurns(dispatch.type, options?.maxTurns));
@@ -885,7 +894,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
           abort: (id) => manager.abort(id),
           consumeResult: (id) => {
             const record = resolveAgentRef(id);
-            // Same guard as get_subagent_result: a running agent has no result
+            // Same guard as task_manage: a running agent has no result
             // to consume, and its notification is still the caller's only
             // signal that it finished.
             if (!record || record.parentAgentId) return false;
@@ -955,7 +964,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     // headless `pi -p "@explore …"` reaches here too — and claiming it would
     // answer with silence, which the background hold cannot fix: `handled`
     // returns from prompt() before any turn starts, so the loop that patch wraps
-    // never runs (it holds subagents spawned by the Agent tool MID-turn, a
+    // never runs (it holds subagents spawned by the subagent_run tool MID-turn, a
     // different path). The agent would detach, `ctx.ui.notify` is a no-op
     // outside the TUI, and print mode would exit having printed nothing.
     //
@@ -995,7 +1004,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
 
       if (record.status === "running" || record.status === "queued") {
         // Steering interrupts after the current tool call, exactly like the
-        // steer_subagent tool. Un-consume the result so the agent's reply to
+        // subagent_message tool. Un-consume the result so the agent's reply to
         // this message is still relayed even if the LLM read its last answer.
         record.resultConsumed = false;
         manager.steer(record.id, mention.message);
@@ -1046,7 +1055,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
         return { action: "handled" as const };
       }
 
-      // The Agent tool deliberately falls back to general-purpose for a type it
+      // The subagent_run tool deliberately falls back to general-purpose for a type it
       // cannot resolve (#183), which covers a deleted file AND a merely
       // disabled one. A resume must not inherit that: reopening this
       // conversation under a different agent's prompt and tools is not
@@ -1104,14 +1113,14 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     // Claude Code never starts the agent itself: `@agent-<type>` becomes an
     // attachment asking the main model to do it, and the model writes the
     // agent's prompt from the conversation rather than forwarding the typed
-    // text. That buys a real `Agent` tool call — transcript, per-tool widget
+    // text. That buys a real `subagent_run` tool call — transcript, per-tool widget
     // detail, tool-use-id correlation, join grouping — and a prompt with the
     // context a cold spawn lacks.
     //
     // It also costs a visible turn, spent narrating a decision the user already
     // made by typing the handle. So the turn is taken by a clone of this
     // conversation instead (mention-clone.ts): same messages, same system
-    // prompt, off-screen, holding only the `Agent` tool. Nothing reaches the
+    // prompt, off-screen, holding only the `subagent_run` tool. Nothing reaches the
     // chat, and what it starts is an ordinary top-level agent.
     if (getAgentMentionMode() === "model") {
       const label = `@${handleBase(type)}`;
@@ -1251,7 +1260,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
   function setBackgroundByDefault(b: boolean) { backgroundByDefault = b; }
 
   // Master switch for the schedule subagent feature. Defaults to enabled.
-  // Read once at extension init (before tool registration) so the Agent tool's
+  // Read once at extension init (before tool registration) so the subagent_run tool's
   // param schema reflects the persisted setting. Runtime toggles via /agents
   // → Settings short-circuit the menu entry + the execute-time addJob path
   // immediately, but the schema-level removal only takes effect on next
@@ -1261,7 +1270,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
   function setSchedulingEnabled(b: boolean) { schedulingEnabled = b; }
 
   // Master switch for scripted workflows. Defaults to ON. Off means the
-  // `SubagentWorkflow` tool is never registered: the model is not told the
+  // `subagent_workflow` tool is never registered: the model is not told the
   // feature exists (zero context cost) and has nothing to call. The
   // `/agents → Workflows` view and `--subagents-workflow-file` are refused too, so
   // there is no second door into the same machinery.
@@ -1292,7 +1301,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     reloadCustomAgents(); // re-register with new setting
   }
 
-  // ---- Agent tool description mode ----
+  // ---- subagent_run tool description mode ----
   // "full" (default) keeps the rich Claude Code-style description; "compact"
   // swaps in a ~75% smaller one for small/local models (#91). Read once at
   // tool registration — flipping it applies on the next pi session.
@@ -1349,7 +1358,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
    * re-running agent needs: transcript anchoring, activity tracking, join-mode
    * batching, the widget/fleet refresh, and the `subagents:created` event.
    *
-   * Shared by the Agent tool's `resume` + `run_in_background` branch and the
+   * Shared by the subagent_run tool's `resume` + `run_in_background` branch and the
    * `@handle message` prompt mention — they differ only in how they report the
    * outcome. Returns the record, or undefined when the manager refused because
    * the agent is still running (see AgentManager.resume).
@@ -1506,7 +1515,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     (event, payload) => pi.events.emit(event, payload),
   );
 
-  // ---- Agent tool ----
+  // ---- subagent_run tool ----
 
   // Schedule param + its guideline are gated on `schedulingEnabled` (read once
   // at registration; flipping the setting later requires next pi session for
@@ -1545,7 +1554,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     ? `\n- isolation: "worktree" gives the agent its own git worktree (removed on completion); changes land on a branch named in the result.`
     : "";
 
-  // Compact Agent tool description (#91, `toolDescriptionMode: "compact"`) —
+  // Compact subagent_run tool description (#91, `toolDescriptionMode: "compact"`) —
   // the same load-bearing facts as the full version at ~75% fewer tokens, for
   // small/local models. Per-option details live in the param descriptions.
   const compactAgentToolDescription = `Launch an autonomous agent for complex, multi-step tasks. Agent types:
@@ -1555,10 +1564,10 @@ Custom agents: .pi/agents/<name>.md (project) or ${getAgentDir()}/agents/<name>.
 
 Notes:
 - description: 3-5 words (shown in UI). Prompts must be self-contained — the agent has not seen this conversation.
-- Parallel work: one message, multiple Agent calls — they run concurrently.
+- Parallel work: one message, multiple subagent_run calls — they run concurrently.
 - Subagents run in the background by default; you'll be notified when one completes. Pass run_in_background: false only when your very next action depends on the result and nothing else could usefully happen while it runs. Never fabricate or predict a pending agent's results — if the user asks before the notification arrives, say it's still running.
 - The result is not shown to the user — summarize it for them. Verify an agent's claimed code changes before reporting work done.
-- resume continues a previous agent by ID; steer_subagent messages a running one.${isolationCompactGuideline}`;
+- resume continues a previous agent by ID; subagent_message messages a running one.${isolationCompactGuideline}`;
 
   const fullAgentToolDescription = `Launch a new agent to handle complex, multi-step tasks autonomously. Each agent type has specific capabilities and tools available to it.
 
@@ -1567,7 +1576,7 @@ ${buildTypeListText()}
 
 Custom agents can be defined in .pi/agents/<name>.md (project) or ${getAgentDir()}/agents/<name>.md (global) — they are picked up automatically. Project-level agents override global ones. Creating a .md file with the same name as a default agent overrides it.
 
-When using the Agent tool, specify a subagent_type parameter to select which agent type to use.
+When using the subagent_run tool, specify a subagent_type parameter to select which agent type to use.
 
 ## When not to use
 
@@ -1576,14 +1585,14 @@ If the target is already known, use a direct tool — \`read\` for a known path,
 ## Usage notes
 
 - Always include a short (3-5 word) description summarizing what the agent will do (shown in UI).
-- When you launch multiple agents for independent work, send them in a single message with multiple tool uses so they run concurrently. If the user specifies that they want you to run agents "in parallel", you MUST send a single message with multiple Agent tool use content blocks.
+- When you launch multiple agents for independent work, send them in a single message with multiple tool uses so they run concurrently. If the user specifies that they want you to run agents "in parallel", you MUST send a single message with multiple subagent_run tool use content blocks.
 - When the agent is done, it returns a single message back to you. The result is not visible to the user — to show the user, send a text message with a concise summary.
 - Trust but verify: an agent's summary describes what it intended to do, not necessarily what it did. When an agent writes or edits code, check the actual changes before reporting the work as done.
 - Agents run in the background by default. When an agent runs in the background, you will be automatically notified when it completes — do NOT sleep, poll, or proactively check on its progress. Continue with other work or respond to the user instead.
 - **Foreground vs background**: Pass \`run_in_background: false\` only when your very next action depends on the agent's result and nothing else could usefully happen while it runs — e.g., a research agent whose finding gates the edit you're about to make. Otherwise let it run in the background (the default) — this includes fire-and-forget work, independent investigations, and anything where the user might hand you something else in the meantime. Wanting the result "next" is not enough on its own.
 - **Don't race**: after launching a background agent, you know nothing about its results. Never fabricate or predict them in any format — not as prose, summary, or structured output. The completion notification arrives in a later turn; it is never something you write yourself. If the user asks before it lands, say the agent is still running — give status, not a guess.
-- Use resume with an agent ID to continue a previous agent's work. A new (non-resume) Agent call starts a fresh agent with no memory of prior runs, so the prompt must be self-contained.
-- Use steer_subagent to send mid-run messages to a running background agent.
+- Use resume with an agent ID to continue a previous agent's work. A new (non-resume) subagent_run call starts a fresh agent with no memory of prior runs, so the prompt must be self-contained.
+- Use subagent_message to send mid-run messages to a running background agent.
 - Clearly tell the agent whether you expect it to write code or just to do research (search, file reads, etc.), since it is not aware of the user's intent.
 - If an agent's description says it should be used proactively, try to use it without the user having to ask for it first.
 - Use model to specify a different model (as "provider/modelId", or fuzzy e.g. "haiku", "sonnet").
@@ -1660,8 +1669,8 @@ Terse command-style prompts produce shallow, generic work.
     description: agentToolDescription,
     promptSnippet: "Launch autonomous sub-agents for complex multi-step tasks",
     promptGuidelines: [
-      "Use Agent with specialized agents when the task matches an agent type's description. Subagents are valuable for parallelizing independent queries or for protecting the main context window from excessive results, but should not be used excessively when not needed. Importantly, avoid duplicating work that subagents are already doing — if you delegate research to a subagent, do not also perform the same searches yourself.",
-      "For broad codebase exploration or research, spawn Agent with an appropriate subagent_type (e.g. Explore). Otherwise use direct tools (read, grep, find) when the target is already known.",
+      "Use subagent_run with specialized agents when the task matches an agent type's description. Subagents are valuable for parallelizing independent queries or for protecting the main context window from excessive results, but should not be used excessively when not needed. Importantly, avoid duplicating work that subagents are already doing — if you delegate research to a subagent, do not also perform the same searches yourself.",
+      "For broad codebase exploration or research, spawn subagent_run with an appropriate subagent_type (e.g. Explore). Otherwise use direct tools (read, grep, find) when the target is already known.",
       "When an agent runs in the background, you will be notified on completion — do not poll or sleep waiting for it. Continue with other work instead.",
       "Trust but verify: an agent's summary describes intent, not outcome. When an agent writes or edits code, check the actual changes before reporting work as done.",
     ],
@@ -1675,7 +1684,7 @@ Terse command-style prompts produce shallow, generic work.
       name: Type.Optional(
         Type.String({
           description:
-            'Optional memorable name for this agent, e.g. "auth-audit", so it can be addressed as `@name` at the prompt and by steer_subagent / get_subagent_result. Letters, digits, `_` and `-`. Worth setting when several agents of the same type run at once; omit for one-off work. The agent stays reachable by its type either way.',
+            'Optional memorable name for this agent, e.g. "auth-audit", so it can be addressed as `@name` at the prompt and by subagent_message. Use its returned task_id with task_manage. Names accept letters, digits, `_` and `-`. Worth setting when several agents of the same type run at once; omit for one-off work. The agent stays reachable by its type either way.',
         }),
       ),
       subagent_type: Type.String({
@@ -1699,7 +1708,7 @@ Terse command-style prompts produce shallow, generic work.
       ),
       resume: Type.Optional(
         Type.String({
-          description: "Optional agent ID to resume from. Continues from previous context. Resumes detached like any other spawn; pass run_in_background: false to block and get the result inline. An agent can only be resumed once its current run has finished — use steer_subagent to reach one mid-run.",
+          description: "Optional agent ID to resume from. Continues from previous context. Resumes detached like any other spawn; pass run_in_background: false to block and get the result inline. An agent can only be resumed once its current run has finished — use subagent_message to reach one mid-run.",
         }),
       ),
       isolated: Type.Optional(
@@ -1795,7 +1804,7 @@ Terse command-style prompts produce shallow, generic work.
               line += "\n" + theme.fg("dim", `  ${l}`);
             }
             if (resultText.split("\n").length > 50) {
-              line += "\n" + theme.fg("muted", "  ... (use get_subagent_result with verbose for full output)");
+              line += "\n" + theme.fg("muted", "  ... (use task_manage action=output with verbose for full output)");
             }
           }
         } else {
@@ -1980,13 +1989,16 @@ Terse command-style prompts produce shallow, generic work.
        * agent TYPE, not the invocation, so tags taken straight from
        * buildInvocationTags would silently drop `twin`.
        */
-      const detailBaseFor = (rec: AgentRecord | undefined): typeof detailBase => {
-        if (!rec?.invocation) return detailBase;
+      const detailBaseFor = (rec: AgentRecord | undefined) => {
+        if (!rec) return detailBase;
+        const identity = { runtimeLaunch: launchMetadata("subagent", rec.id, rec.runId ?? "1", rec.isBackground ? "background" : "foreground") };
+        if (!rec.invocation) return { ...detailBase, ...identity };
         const type = rec.type;
         const { modelName: recModelName, tags } = buildInvocationTags(rec.invocation);
         const recModeLabel = getPromptModeLabel(type);
         const recTags = recModeLabel ? [recModeLabel, ...tags] : tags;
         return {
+          ...identity,
           displayName: getDisplayName(type),
           description: rec.description,
           subagentType: type,
@@ -2065,7 +2077,7 @@ Terse command-style prompts produce shallow, generic work.
           if (existing.status === "running" || existing.status === "queued") {
             return textResult(
               `Agent "${params.resume}" is still ${existing.status} — it can only be resumed once its current run finishes.\n` +
-              `Use steer_subagent to send it a message mid-run, or get_subagent_result to wait for it.`,
+              `Use subagent_message to send it a message mid-run, or task_manage action=wait to wait for it.`,
             );
           }
 
@@ -2087,7 +2099,7 @@ Terse command-style prompts produce shallow, generic work.
             (record.outputFile ? `Output file: ${record.outputFile}\n` : "") +
             (isQueued ? `Position: queued (max ${manager.getMaxConcurrent()} concurrent)\n` : "") +
             `\nYou will be notified when this agent completes.\n` +
-            `Use get_subagent_result to retrieve full results, or steer_subagent to send it messages.`,
+            `Use task_manage action=output to retrieve full results, or subagent_message to send it messages.`,
             { ...detailBaseFor(record), toolUses: record.toolUses, tokens: "", durationMs: 0, status: "background" as const, agentId: id },
           );
         }
@@ -2223,7 +2235,7 @@ Terse command-style prompts produce shallow, generic work.
           (record?.outputFile ? `Output file: ${record.outputFile}\n` : "") +
           (isQueued ? `Position: queued (max ${manager.getMaxConcurrent()} concurrent)\n` : "") +
           `\nYou will be notified when this agent completes.\n` +
-          `Use get_subagent_result to retrieve full results, or steer_subagent to send it messages.\n` +
+          `Use task_manage action=output to retrieve full results, or subagent_message to send it messages.\n` +
           `Do not duplicate this agent's work.`,
           { ...detailBaseFor(record), toolUses: 0, tokens: "", durationMs: 0, status: "background" as const, agentId: id },
         );
@@ -2408,6 +2420,11 @@ Terse command-style prompts produce shallow, generic work.
       },
     };
   }
+  options.onManagementResult?.((id, result) => {
+    assertActive();
+    const usage = reportUsage && id ? pendingUsage.drain() : undefined;
+    return usage ? { ...result, usage } : result;
+  });
   function registerToolReportingUsage(tool: any): void {
     pi.registerTool(withUsageReporting(tool));
   }
@@ -2438,6 +2455,13 @@ Terse command-style prompts produce shallow, generic work.
    */
   const workflowTasks = new Map<string, WorkflowTask>();
   const agentSource = createAgentTaskSource(manager, coordinator, workflowTasks);
+  options.onManagement?.(createAgentManagement({ manager, coordinator, source: agentSource, active,
+    owns: isTopLevelAgent, format: (record, verbose) => formatRetrievedAgent(record, verbose).content.map(block => block.text).join("\n"),
+    cancelNotice: cancelNudge, reconsider: reconsiderAgentNotice,
+  }));
+  options.onManagement?.(createWorkflowManagement({ manager, coordinator, source: agentSource, tasks: workflowTasks, active,
+    cancelNotice: cancelNudge, reconsider: notifyWorkflowFinished,
+  }));
   // abort() exposes terminal state before the runner completion callback. All
   // stopped members must still close their group without sending a notice.
   const observedStops = new Set<string>();
@@ -2464,7 +2488,10 @@ Terse command-style prompts produce shallow, generic work.
 
   function runWorkflowTask(ctx: ExtensionContext, task: WorkflowTask): Promise<void> {
     return own(async () => {
-      if (!workflowActive(task)) return;
+      if (!workflowActive(task)) {
+        if (workflowTasks.get(task.id) === task && task.abortController.signal.aborted) failWorkflowTask(task, "Workflow cancelled before runtime startup.");
+        return;
+      }
       try {
         const result = await runWorkflow({
           script: task.script,
@@ -2505,11 +2532,11 @@ Terse command-style prompts produce shallow, generic work.
    * triggers a turn, rendered by the existing `subagent-notification` renderer.
    */
   function notifyWorkflowFinished(task: WorkflowTask) {
-    if (!workflowActive(task)) return;
+    if (!workflowActive(task) || !task.terminalResolved || task.resultConsumed || task.notificationDelivered || coordinator.countWaits({ sourceId: "agent", taskId: task.id, runId: task.id }) > 0) return;
     assertActive();
     const result = workflowResultText(task);
     scheduleNudge(task.id, () => {
-      if (!workflowActive(task)) return;
+      if (!workflowActive(task) || task.resultConsumed || task.notificationDelivered || coordinator.countWaits({ sourceId: "agent", taskId: task.id, runId: task.id }) > 0) return;
       pi.sendMessage<NotificationDetails>({
         customType: "subagent-notification",
         content: formatWorkflowNotification(task),
@@ -2527,19 +2554,20 @@ Terse command-style prompts produce shallow, generic work.
           resultPreview: result.length > 500 ? `${result.slice(0, 500)}…` : result,
         },
       }, { deliverAs: "followUp", triggerTurn: true });
+      task.notificationDelivered = true;
     });
   }
 
   // Defined unconditionally, registered only when the feature is on — the same
-  // shape the Agent tool uses. Keeping the definition out of the `if` means the
+  // shape the subagent_run tool uses. Keeping the definition out of the `if` means the
   // switch changes exactly one thing: whether pi is ever told about the tool.
   const workflowTool = defineTool({
     name: SUBAGENT_TOOL_NAMES.WORKFLOW,
-    label: "SubagentWorkflow",
+    label: "subagent_workflow",
     description: renderToolDescriptionTemplate(fullWorkflowToolDescription),
     promptSnippet: "Run a deterministic script that orchestrates many subagents",
     promptGuidelines: [
-      "Use SubagentWorkflow when the number of agents depends on something discovered at runtime, when work flows through stages, or when findings should be independently verified. Use Agent for one delegated task or a handful you can name up front.",
+      "Use subagent_workflow when the number of agents depends on something discovered at runtime, when work flows through stages, or when findings should be independently verified. Use subagent_run for one delegated task or a handful you can name up front.",
       "Prefer `pipeline` over `parallel` — a barrier costs wall-clock whenever the stages are unevenly sized.",
       "A workflow runs in the background and notifies you when it finishes — do not poll or sleep waiting for it.",
     ],
@@ -2588,7 +2616,7 @@ Terse command-style prompts produce shallow, generic work.
 
     renderCall(args, theme) {
       return new Text(
-        `${theme.fg("toolTitle", "▸ ")}${theme.bold(theme.fg("toolTitle", "SubagentWorkflow"))}  ${theme.fg("muted", workflowCallName(args))}`,
+        `${theme.fg("toolTitle", "▸ ")}${theme.bold(theme.fg("toolTitle", "subagent_workflow"))}  ${theme.fg("muted", workflowCallName(args))}`,
         0,
         0,
       );
@@ -2690,7 +2718,7 @@ Terse command-style prompts produce shallow, generic work.
           type: "text" as const,
           text:
             `Workflow "${meta.name}" started in the background.\n` +
-            `Task ID: ${runId}\n` +
+            `${launchText(launchMetadata("workflow", runId, runId, "background"))}\n` +
             (task.scriptPath ? `Script: ${task.scriptPath}\n` : "") +
             (task.resumedFrom !== undefined
               ? `Resuming ${task.resumedFrom}: ${task.replay?.length ?? 0} recorded call(s) available to replay.\n`
@@ -2698,9 +2726,9 @@ Terse command-style prompts produce shallow, generic work.
                 ? `Nothing to replay from ${params.resumeFromRunId} — every agent runs live.\n`
                 : "") +
             `\nYou will be notified when it finishes — do NOT poll or sleep waiting for it.\n` +
-            `To iterate, edit the script file and call SubagentWorkflow again with scriptPath.`,
+            `To iterate, edit the script file and call subagent_workflow again with scriptPath.`,
         }],
-        details: { taskId: runId },
+        details: { taskId: runId, runtimeLaunch: launchMetadata("workflow", runId, runId, "background") },
       };
     },
   });
@@ -2855,56 +2883,6 @@ Terse command-style prompts produce shallow, generic work.
     });
   }
 
-  // ---- get_subagent_result tool ----
-
-  registerToolReportingUsage(defineTool({
-    name: SUBAGENT_TOOL_NAMES.GET_RESULT,
-    label: "Get Agent Result",
-    description:
-      "Check status and retrieve a background agent's full result — its completion notification carries only a preview. Use the agent ID returned by Agent.",
-    promptSnippet: "Check status and retrieve results from a background agent",
-    parameters: Type.Object({
-      agent_id: Type.String({
-        description: "The agent ID to check. The agent's handle also works — its `name` if you gave it one, otherwise its type (`explore`, `explore-2`).",
-      }),
-      wait: Type.Optional(
-        Type.Boolean({
-          description: "If true, wait for the agent to complete before returning. Default: false.",
-        }),
-      ),
-      verbose: Type.Optional(
-        Type.Boolean({
-          description: "If true, include the agent's full conversation (messages + tool calls). Default: false.",
-        }),
-      ),
-    }),
-    execute: async (_toolCallId, params, signal, _onUpdate, _ctx) => {
-      const record = resolveAgentRef(params.agent_id);
-      if (!record || !isTopLevelAgent(record)) {
-        return textResult(`Agent not found: "${params.agent_id}". It may have been cleaned up.`);
-      }
-
-      const run = manager.getRun(record.id);
-      if (params.wait && run) {
-        const lease = registerAgentWait(manager, coordinator, run, "retrieval", signal, () => reconsiderAgentNotice(record));
-        const outcome = await lease.result;
-        assertActive();
-        if (outcome.kind !== "completed") {
-          return textResult(`Result wait ${outcome.kind === "detached" ? "released" : "cancelled"}. Agent ${record.id} continues unchanged; completion notification remains eligible.`);
-        }
-        // Use the captured outcome if another caller resumes before this tool's
-        // continuation. Its result belongs to the run this lease waited for.
-        return formatRetrievedAgent(outcome.value, params.verbose);
-      }
-      const result = formatRetrievedAgent(record, params.verbose);
-      if (run && !manager.isRunActive(record.id)) {
-        manager.consumeRun(run.identity);
-        cancelNudge(record.id);
-      }
-      return result;
-    },
-  }));
-
   function formatRetrievedAgent(record: AgentRecord, verbose?: boolean) {
       const displayName = getDisplayName(record.type);
       const duration = formatDuration(record.startedAt, record.completedAt);
@@ -2926,7 +2904,7 @@ Terse command-style prompts produce shallow, generic work.
         `Description: ${record.description}\n\n`;
 
       if (record.status === "running" || record.status === "queued") {
-        output += `Agent is still ${record.status}. Use wait: true or check back later.`;
+        output += `Agent is still ${record.status}. Use task_manage action=wait or check back later.`;
       } else if (record.status === "error") {
         output += `Error: ${record.error}${partialOutputSuffix(record)}`;
       } else {
@@ -2934,8 +2912,8 @@ Terse command-style prompts produce shallow, generic work.
       }
 
       // Verbose: include full conversation
-      if (verbose && record.session) {
-        const conversation = getAgentConversation(record.session);
+      if (verbose && (record.terminalConversation !== undefined || record.session)) {
+        const conversation = record.terminalConversation ?? getAgentConversation(record.session!);
         if (conversation) {
           output += `\n\n--- Agent Conversation ---\n${conversation}`;
         }
@@ -2944,7 +2922,7 @@ Terse command-style prompts produce shallow, generic work.
       return textResult(output);
   }
 
-  // ---- steer_subagent tool ----
+  // ---- subagent_message tool ----
 
   registerToolReportingUsage(defineTool({
     name: SUBAGENT_TOOL_NAMES.STEER,
@@ -3735,14 +3713,14 @@ Write the file using the write tool. Only write the file, nothing else.`;
         {
           id: "backgroundByDefault",
           label: "Background by default",
-          description: "An Agent call that doesn't say runs detached (off = blocks the turn and returns inline)",
+          description: "A subagent_run call that doesn't say runs detached (off = blocks the turn and returns inline)",
           currentValue: getBackgroundByDefault() ? "on" : "off",
           values: ["on", "off"],
         },
         {
           id: "schedulingEnabled",
           label: "Scheduling",
-          description: "Schedule subagent feature (off removes `schedule` param from Agent tool spec on next pi session)",
+          description: "Schedule subagent feature (off removes `schedule` param from subagent_run tool spec on next pi session)",
           currentValue: isSchedulingEnabled() ? "on" : "off",
           values: ["on", "off"],
         },
@@ -3751,7 +3729,7 @@ Write the file using the write tool. Only write the file, nothing else.`;
           label: "Workflows",
           description:
             "Scripted workflows, on unless another extension provides a workflow tool "
-            + "(off keeps the SubagentWorkflow tool out of the tool spec; applies on next pi session)",
+            + "(off keeps the subagent_workflow tool out of the tool spec; applies on next pi session)",
           currentValue: isWorkflowsEnabled() ? "on" : "off",
           values: ["on", "off"],
         },
@@ -3794,7 +3772,7 @@ Write the file using the write tool. Only write the file, nothing else.`;
           id: "worktreeIsolation",
           label: "Worktree isolation",
           description:
-            "Allow isolation: worktree to copy the repo. Off refuses worktrees on every path immediately — for repos where a copy costs too much time or disk — and drops the `isolation` param from the Agent tool spec on next pi session.",
+            "Allow isolation: worktree to copy the repo. Off refuses worktrees on every path immediately — for repos where a copy costs too much time or disk — and drops the `isolation` param from the subagent_run tool spec on next pi session.",
           currentValue: isWorktreeIsolationEnabled() ? "on" : "off",
           values: ["on", "off"],
         },
@@ -3825,7 +3803,7 @@ Write the file using the write tool. Only write the file, nothing else.`;
         {
           id: "agentMentions",
           label: "Agent mentions",
-          description: "Route `@handle message` at the prompt to that agent. model = an off-screen clone of this conversation calls the Agent tool, so the agent gets a context-written prompt, a transcript and per-tool detail, and the chat stays clean; direct = started here from your text, no model call. Messaging and resuming are direct either way.",
+          description: "Route `@handle message` at the prompt to that agent. model = an off-screen clone of this conversation calls the subagent_run tool, so the agent gets a context-written prompt, a transcript and per-tool detail, and the chat stays clean; direct = started here from your text, no model call. Messaging and resuming are direct either way.",
           currentValue: getAgentMentionMode(),
           values: ["model", "direct", "off"],
         },
@@ -3839,7 +3817,7 @@ Write the file using the write tool. Only write the file, nothing else.`;
         {
           id: "toolDescriptionMode",
           label: "Tool description",
-          description: "Agent tool description sent to the LLM: full (rich, default), compact (~75% fewer tokens, for small/local models), or custom (.pi/agent-tool-description.md with {{placeholders}})",
+          description: "subagent_run tool description sent to the LLM: full (rich, default), compact (~75% fewer tokens, for small/local models), or custom (.pi/agent-tool-description.md with {{placeholders}})",
           currentValue: getToolDescriptionMode(),
           values: ["full", "compact", "custom"],
         },
@@ -3897,8 +3875,8 @@ Write the file using the write tool. Only write the file, nothing else.`;
         notifyApplied(
           ctx,
           enabled
-            ? "Agent calls run in the background unless they pass run_in_background: false"
-            : "Agent calls block and return inline unless they pass run_in_background: true",
+            ? "subagent_run calls run in the background unless they pass run_in_background: false"
+            : "subagent_run calls block and return inline unless they pass run_in_background: true",
         );
       } else if (id === "schedulingEnabled") {
         const enabled = value === "on";
