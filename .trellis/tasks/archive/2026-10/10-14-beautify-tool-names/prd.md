@@ -68,4 +68,8 @@ git diff --check
 
 ## 实施结果
 
-单阶段实施与主会话自检完成。最终 focused 71/71 自然退出，strict typecheck 与 full 699/699 通过；真实 tmux/问卷视觉验证未执行。详见 [验证记录](research/main-verification.md)。
+单阶段实施与主会话自检完成，产品提交为 `7abd9fe`。最终 focused 71/71 自然退出，strict typecheck 与 full 699/699 通过；后续真实 tmux/问卷终端验收 89/89 PASS、error=null、exit 0。详见 [验证记录](research/main-verification.md) 和 [终端验收](research/terminal-acceptance.md)。
+
+## 收尾（2026-10-15）
+
+用户已接受交付并授权收尾。本任务在 main 直接实施，未使用独立 feature branch 或 PR；归档使用明确的 `--skip-branch-validation`，不宣称 PR 已合并。保留上述历史验收证据，不将其视作后续 runtime 工具迁移后的重新测试；工具 API 改名及适配由已完成的 runtime-task-tools 任务承接。本次仅更新任务完成记录、归档和 journal，无产品改动，无 push、安装、个人同步或 reload。既有开发规范已覆盖标题宽度与委托约束，无需新增 spec。
