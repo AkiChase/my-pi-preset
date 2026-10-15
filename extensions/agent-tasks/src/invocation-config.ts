@@ -1,5 +1,5 @@
 import { Type, StringEnum } from "@earendil-works/pi-ai";
-import type { AgentConfig, IsolationMode, JoinMode, ThinkingLevel } from "./types.ts";
+import type { AgentConfig, AgentInvocation, IsolationMode, JoinMode, ThinkingLevel } from "./types.ts";
 
 /**
  * Advertised thinking levels, ordered to mirror pi-ai's EXTENDED_THINKING_LEVELS
@@ -162,7 +162,8 @@ export function resolveAgentInvocationConfig(
   const overriddenThinking = agentConfig?.thinking != null && params.thinking != null
     && agentConfig.thinking !== params.thinking
     ? params.thinking as ThinkingLevel
-    : undefined;  const overriddenModel = agentConfig?.model != null && params.model != null
+    : undefined;
+  const overriddenModel = agentConfig?.model != null && params.model != null
     && agentConfig.model !== params.model
     ? params.model
     : undefined;
@@ -183,6 +184,19 @@ export function resolveAgentInvocationConfig(
       ? { thinking: overriddenThinking, model: overriddenModel }
       : undefined,
   };
+}
+
+/** Model-visible disclosure, using the same effective snapshot as the record. */
+export function formatInvocationOverrideNote(invocation: AgentInvocation | undefined): string {
+  if (!invocation) return "";
+  const changes: string[] = [];
+  if (invocation.requestedModel !== undefined) {
+    changes.push(`model requested ${JSON.stringify(invocation.requestedModel)}, effective ${JSON.stringify(invocation.modelId ?? invocation.modelName ?? "inherited model")}`);
+  }
+  if (invocation.requestedThinking !== undefined && invocation.requestedThinking !== invocation.thinking) {
+    changes.push(`thinking requested ${JSON.stringify(invocation.requestedThinking)}, effective ${JSON.stringify(invocation.thinking ?? "inherited")}`);
+  }
+  return changes.length ? `Note: Agent configuration overrides requested values: ${changes.join("; ")}.\n\n` : "";
 }
 
 export function resolveJoinMode(defaultJoinMode: JoinMode, runInBackground: boolean): JoinMode | undefined {

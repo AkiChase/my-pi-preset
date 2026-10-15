@@ -18,6 +18,26 @@ export function assertSpawnInput(type: unknown, prompt: unknown): asserts type i
   if (typeof prompt !== "string") throw new Error("Agent prompt must be a string");
 }
 
+/** Resume continues stored settings; reject supplied start-time options before lookup. */
+export function assertResumeOptions(params: {
+  resume?: unknown;
+  model?: unknown;
+  thinking?: unknown;
+  isolated?: unknown;
+  inherit_context?: unknown;
+  isolation?: unknown;
+}): void {
+  if (params.resume === undefined) return;
+  const conflicting = (["model", "thinking", "isolated", "inherit_context", "isolation"] as const)
+    .filter(key => params[key] !== undefined).map(key => `\`${key}\``);
+  if (conflicting.length) {
+    throw new Error(
+      `Cannot combine \`resume\` with ${conflicting.join(", ")}. A resumed agent continues its stored session, ` +
+      `so start-time parameters are ignored. Omit them, or start a new agent instead of resuming. No agent was resumed.`,
+    );
+  }
+}
+
 /**
  * A required non-empty string.
  *

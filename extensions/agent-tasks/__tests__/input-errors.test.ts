@@ -37,7 +37,7 @@ function deferred<T>() {
  * manager, and nothing else. Anything this file asserts about comes from the
  * real tool definitions, so a stubbed assertion would prove nothing.
  */
-async function factory(settings: Record<string, unknown> = {}) {
+async function factory(settings: Record<string, unknown> = {}, extra: AgentManagerDependencies = {}) {
     const root = mkdtempSync(join(tmpdir(), "agent-input-errors-"));
     const cwd = join(root, "cwd");
     const config = join(root, "agent");
@@ -45,9 +45,9 @@ async function factory(settings: Record<string, unknown> = {}) {
     mkdirSync(config);
     if (settings.customAgent) {
         mkdirSync(join(config, "agents"));
-        writeFileSync(join(config, "agents", "custom.md"), "---\nname: custom\ndescription: Offline agent\n---\nDo work.\n");
+        writeFileSync(join(config, "agents", "custom.md"), typeof settings.customAgent === "string" ? settings.customAgent : "---\nname: custom\ndescription: Offline agent\n---\nDo work.\n");
     }
-    writeFileSync(join(config, "agent-tasks.json"), JSON.stringify({ schedulingEnabled: false, ...settings }));
+    writeFileSync(join(config, "agent-tasks.json"), JSON.stringify({ schedulingEnabled: false, outputTranscript: false, rememberAgents: false, defaultJoinMode: "async", ...settings }));
     const previous = process.env.PI_CODING_AGENT_DIR;
     process.env.PI_CODING_AGENT_DIR = config;
 
@@ -63,9 +63,12 @@ async function factory(settings: Record<string, unknown> = {}) {
             options.signal?.addEventListener("abort", () => result.resolve({ session: {} as AgentSession, responseText: "stopped", aborted: true, steered: false }), { once: true });
             return result.promise;
         },
+        ...extra,
     };
+    const eventNames: string[] = [];
     const events = {
         emit(name: string, data: unknown) {
+            eventNames.push(name);
             if (name === "subagents:created") calls.push({ id: (data as { id: string }).id } as AgentRecord);
             for (const fn of bus.get(name) ?? []) fn(data);
         },
@@ -113,8 +116,9 @@ async function factory(settings: Record<string, unknown> = {}) {
         tools.get(name)!.execute("call", params, undefined, () => {}, ctx);
     const paramSchema = (name: string) => tools.get(name)!.parameters;
 
+    const registry = Reflect.get(globalThis, Symbol.for("pi-subagents:manager")) as { getRecord(id: string): AgentRecord | undefined };
     return {
-        root, cwd, config, tools, calls, ctx, paramSchema, execute,
+        root, cwd, config, tools, calls, ctx, paramSchema, execute, registry, coordinator, eventNames,
         nested: () => createNestedSubagentTools({
             manager: {} as import("../src/nested-tools.ts").NestedAgentManager,
             pi: {} as ExtensionAPI, parentAgentId: "parent", depth: 1,
@@ -135,11 +139,11 @@ function text(result: { content: { type: string; text?: string }[] }): string {
     return result.content.filter((block) => block.type === "text").map((block) => block.text ?? "").join("\n");
 }
 
-function hostError(parameters: unknown, args: unknown): Error | undefined {
+function hostError(parameters: unknown, args: unknown, name = "subagent_run"): Error | undefined {
     try {
         validateToolArguments(
-            { name: "subagent_run", description: "", parameters } as never,
-            { id: "call", name: "subagent_run", arguments: args } as never
+            { name, description: "", parameters } as never,
+            { id: "call", name, arguments: args } as never
         );
         return undefined;
     } catch (err) {
@@ -258,4 +262,167 @@ void it("a frontmatter override keeps the caller's own value visible in the effe
     assert.deepEqual(resolved.overridden, { thinking: "minimal", model: "sonnet" });
     // Asked-for-what-they-got is not an override.
     assert.equal(resolveAgentInvocationConfig({ name: "pinned", description: "x", thinking: "high" } as never, { thinking: "high" }).overridden, undefined);
+});
+
+void it("all five registered fixed schemas reject unknown fields through the host validator", async () => {
+    const f = await factory();
+    try {
+        const nested = f.nested();
+        const run = { subagent_type: "general-purpose", description: "work", prompt: "work" };
+        const steering = { agent_id: "agent", message: "continue" };
+        const cases = [
+            [f.tools.get("subagent_run")!, run],
+            [f.tools.get("subagent_workflow")!, { script: "export const meta = { name: 'x', description: 'x' }; return args;" }],
+            [f.tools.get("subagent_message")!, steering],
+            [nested[0]!, run], [nested[1]!, steering],
+        ] as const;
+        for (const [tool, args] of cases) {
+            const err = hostError(tool.parameters, { ...args, misspelled_field: true }, tool.name);
+            assert.ok(err, `${tool.name} must reject unknown fields`);
+            assert.match(err.message, /misspelled_field/);
+            assert.equal(hostError(tool.parameters, { ...args }, tool.name), undefined);
+        }
+        const args = { arbitrary: { model: "script-owned", strange_field: [null, 1, { extra: true }] } };
+        assert.equal(hostError(f.paramSchema("subagent_workflow"), { script: "return args;", args }, "subagent_workflow"), undefined, "workflow args remain free-form JSON");
+        assert.equal(f.calls.length, 0);
+    } finally { await f.close(); }
+});
+
+void it("blank root steering is refused before lookup, events, queueing or session steer", async t => {
+    const f = await factory();
+    const { AgentManager } = await import("../src/agent-manager.ts");
+    const getRecord = AgentManager.prototype.getRecord;
+    let lookups = 0, steers = 0;
+    try {
+        await f.execute("subagent_run", { subagent_type: "general-purpose", description: "work", prompt: "work", run_in_background: true });
+        const id = f.calls[0]!.id, record = f.registry.getRecord(id)!;
+        const mock = t.mock.method(AgentManager.prototype, "getRecord", function (this: InstanceType<typeof AgentManager>, ref: string) {
+            lookups++; return getRecord.call(this, ref);
+        });
+        for (const ready of [false, true]) {
+            record.session = ready ? { async steer() { steers++; } } as unknown as AgentSession : undefined;
+            const eventCount = f.eventNames.length;
+            lookups = 0;
+            for (const message of ["", "  \t\n", "\u3000"]) {
+                const result = await f.execute("subagent_message", { agent_id: id, message });
+                assert.equal(result.isError, true);
+                assert.match(text(result), /`message` must be a non-empty string/);
+            }
+            assert.equal(lookups, 0);
+            assert.equal(f.eventNames.length, eventCount);
+            assert.equal(record.pendingSteers, undefined);
+            assert.equal(steers, 0);
+        }
+        record.session = undefined;
+        mock.mock.restore();
+    } finally { await f.close(); }
+});
+
+void it("nested steering blanks and resume conflicts are refused before any manager effect", async () => {
+    const f = await factory();
+    let lookups = 0, resumes = 0, steers = 0;
+    const record = { id: "owned", parentAgentId: "parent", status: "running" } as AgentRecord;
+    const manager = {
+        getRecord() { lookups++; return record; },
+        async resume() { resumes++; return record; },
+        spawn() { throw new Error("unexpected spawn"); },
+        async awaitStartup() {},
+        async spawnAndWait() { throw new Error("unexpected spawnAndWait"); },
+    } satisfies import("../src/nested-tools.ts").NestedAgentManager;
+    try {
+        const [run, steer] = createNestedSubagentTools({ manager, pi: {} as ExtensionAPI, parentAgentId: "parent", depth: 1,
+            maxSubagentDepth: 2, allowedSubagents: "all", configCwd: f.cwd });
+        for (const ready of [false, true]) {
+            record.session = ready ? { async steer() { steers++; } } as unknown as AgentSession : undefined;
+            for (const message of ["", " \t\n", "\u3000"]) {
+                const result = await steer!.execute("call", { agent_id: "owned", message }, undefined, undefined, f.ctx);
+                assert.equal(result.isError, true);
+                assert.match(text(result), /`message` must be a non-empty string/);
+            }
+        }
+        const base = { subagent_type: "general-purpose", description: "resume", prompt: "continue", resume: "owned" };
+        for (const [key, value] of [["model", ""], ["thinking", "off"], ["isolated", false], ["inherit_context", false], ["isolation", "off"]] as const) {
+            const result = await run!.execute("call", { ...base, [key]: value }, undefined, undefined, f.ctx);
+            assert.equal(result.isError, true);
+            assert.match(text(result), new RegExp(key));
+            assert.match(text(result), /No agent was resumed/);
+        }
+        assert.equal(lookups, 0);
+        assert.equal(resumes, 0);
+        assert.equal(steers, 0);
+        assert.equal(record.pendingSteers, undefined);
+        record.status = "completed";
+        await run!.execute("call", base, undefined, undefined, f.ctx);
+        assert.equal(resumes, 1, "a plain nested resume still reaches the manager");
+    } finally { await f.close(); }
+});
+
+const pinnedModel = { provider: "offline", id: "pinned", name: "Pinned" };
+const otherModel = { provider: "offline", id: "other", name: "Other" };
+function modelRegistry(ctx: ExtensionToolContext) {
+    ctx.model = otherModel as ExtensionToolContext["model"];
+    ctx.modelRegistry = {
+        getAll: () => [pinnedModel, otherModel], getAvailable: () => [pinnedModel, otherModel],
+        find: (_provider: string, id: string) => [pinnedModel, otherModel].find(model => model.id === id),
+    } as unknown as ExtensionToolContext["modelRegistry"];
+}
+const pinnedAgent = "---\nname: custom\ndescription: Pinned offline agent\nmodel: offline/pinned\nthinking: high\noutput_transcript: false\n---\nDo work.\n";
+function assertOverride(textValue: string, thinking = "high") {
+    assert.match(textValue, /model requested "other", effective "offline\/pinned"/);
+    assert.match(textValue, new RegExp(`thinking requested "minimal", effective "${thinking}"`));
+}
+
+for (const background of [false, true]) void it(`root ${background ? "background" : "foreground"} returns model-visible requested/effective overrides`, async () => {
+    const f = await factory({ customAgent: pinnedAgent }, {
+        async runAgent(_ctx, _type, _prompt, options) {
+            assert.equal(options.model?.id, "pinned");
+            assert.equal(options.thinkingLevel, "high", "frontmatter precedence is unchanged");
+            const session = { model: pinnedModel, thinkingLevel: "low", messages: [], subscribe: () => () => {},
+                dispose() {}, sessionManager: { getSessionFile: () => undefined } } as unknown as AgentSession;
+            options.onSessionCreated?.(session);
+            return { session, responseText: "visible answer", aborted: false, steered: false };
+        },
+    });
+    try {
+        modelRegistry(f.ctx);
+        const result = await f.execute("subagent_run", { subagent_type: "custom", description: "work", prompt: "work",
+            model: "other", thinking: "minimal", run_in_background: background });
+        assertOverride(text(result), "low");
+        if (!background) assert.match(text(result), /visible answer/);
+        const same = await f.execute("subagent_run", { subagent_type: "custom", description: "work", prompt: "work",
+            model: "pinned", thinking: "low", run_in_background: background });
+        assert.doesNotMatch(text(same), /model requested/, "same-model fuzzy alias is not a model override");
+        assert.doesNotMatch(text(same), /thinking requested/, "actual effective level matching the request is not an override");
+    } finally { await f.close(); }
+});
+
+for (const background of [false, true]) void it(`nested ${background ? "background" : "foreground"} returns overrides from actual invocation metadata`, async () => {
+    const f = await factory({ customAgent: pinnedAgent });
+    const records = new Map<string, AgentRecord>();
+    const manager: import("../src/nested-tools.ts").NestedAgentManager = {
+        getRecord: id => records.get(id), async resume(id) { return records.get(id); }, async awaitStartup() {},
+        spawn(_pi, _ctx, _type, _prompt, options) {
+            assert.equal(options.model?.id, "pinned"); assert.equal(options.thinkingLevel, "high");
+            const id = `child-${records.size}`;
+            records.set(id, { id, runId: "1", status: "completed", result: "nested answer", parentAgentId: "parent",
+                invocation: { ...options.invocation, thinking: "low" } } as AgentRecord);
+            return id;
+        },
+        async spawnAndWait(pi, ctx, type, prompt, options, onSpawned) {
+            const id = this.spawn(pi, ctx, type, prompt, options); onSpawned?.(id);
+            return { id, record: records.get(id)! };
+        },
+    };
+    try {
+        modelRegistry(f.ctx);
+        const run = createNestedSubagentTools({ manager, pi: {} as ExtensionAPI, parentAgentId: "parent", depth: 1,
+            maxSubagentDepth: 2, allowedSubagents: "all", configCwd: f.cwd })[0]!;
+        const result = await run.execute("call", { subagent_type: "custom", description: "work", prompt: "work",
+            model: "other", thinking: "minimal", run_in_background: background }, undefined, undefined, f.ctx);
+        assertOverride(text(result), "low");
+        if (!background) assert.match(text(result), /nested answer/);
+        const same = await run.execute("call", { subagent_type: "custom", description: "work", prompt: "work",
+            model: "pinned", thinking: "low", run_in_background: background }, undefined, undefined, f.ctx);
+        assert.doesNotMatch(text(same), /model requested|thinking requested/);
+    } finally { await f.close(); }
 });

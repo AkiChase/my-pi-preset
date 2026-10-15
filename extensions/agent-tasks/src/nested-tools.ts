@@ -16,9 +16,9 @@ import {
   resolveTypeIn,
 } from "./agent-types.ts";
 import { loadCustomAgents } from "./custom-agents.ts";
-import { isolationParam, resolveAgentInvocationConfig, thinkingParam } from "./invocation-config.ts";
-import { resolveModel } from "./model-resolver.ts";
-import { assertNonEmptyString } from "./spawn-input.ts";
+import { formatInvocationOverrideNote, isolationParam, resolveAgentInvocationConfig, thinkingParam } from "./invocation-config.ts";
+import { describeModel, resolveModel } from "./model-resolver.ts";
+import { assertNonEmptyString, assertResumeOptions } from "./spawn-input.ts";
 import { checkModelScope } from "./model-scope.ts";
 import {
   createOutputFilePath,
@@ -183,11 +183,12 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
       isolated: Type.Optional(Type.Boolean()),
       inherit_context: Type.Optional(Type.Boolean()),
       ...isolationParam(isWorktreeIsolationEnabled()),
-    }),
+    }, { additionalProperties: false }),
     execute: async (_toolCallId, params, signal, _onUpdate, ctx) => {
       try {
         assertNonEmptyString(params.prompt, "`prompt`");
         assertNonEmptyString(params.description, "`description`");
+        assertResumeOptions(params);
       } catch (err) {
         return errorResult(err instanceof Error ? err.message : String(err));
       }
@@ -200,7 +201,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
         return resumed
           ? (() => {
             const identity = launchMetadata("subagent", resumed.id, resumed.runId ?? "1", "foreground");
-            return { ...textResult(`${launchText(identity)}\n${formatRecord(resumed, "inline")}`, resumed.status === "error"), details: { runtimeLaunch: identity } };
+            return { ...textResult(`${launchText(identity)}\n${formatInvocationOverrideNote(resumed.invocation)}${formatRecord(resumed, "inline")}`, resumed.status === "error"), details: { runtimeLaunch: identity } };
           })()
           : textResult(`Failed to resume nested agent "${params.resume}".`, true);
       }
@@ -271,6 +272,26 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
       // off the owning parent rather than this child session's own id.
       const rootSessionId = context.manager.getRecord(context.parentAgentId)?.rootSessionId;
       const childDepth = context.depth + 1;
+      const modelIdentity = model ? describeModel(model) : {};
+      // Fuzzy aliases of the same effective model are not an override.
+      const requestedModel = invocation.overridden?.model;
+      const resolvedAsked = requestedModel === undefined ? undefined : resolveModel(requestedModel, ctx.modelRegistry);
+      const askedModel = resolvedAsked !== undefined && (typeof resolvedAsked === "string"
+        || resolvedAsked.provider !== model?.provider || resolvedAsked.id !== model?.id)
+        ? requestedModel : undefined;
+      const agentInvocation: AgentInvocation = {
+        ...modelIdentity,
+        thinking: invocation.thinking,
+        requestedThinking: invocation.overridden?.thinking,
+        requestedModel: askedModel,
+        maxTurns: invocation.maxTurns,
+        isolated: invocation.isolated,
+        inheritContext: invocation.inheritContext,
+        runInBackground: invocation.runInBackground,
+        isolation: invocation.isolation,
+      };
+      const overrideNoteFor = (record: AgentRecord | undefined) =>
+        formatInvocationOverrideNote(record?.invocation ?? agentInvocation);
       const options: NestedSpawnOptions = {
         description: params.description,
         model,
@@ -279,14 +300,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
         inheritContext: invocation.inheritContext,
         thinkingLevel: invocation.thinking,
         isolation: invocation.isolation,
-        invocation: {
-          thinking: invocation.thinking,
-          maxTurns: invocation.maxTurns,
-          isolated: invocation.isolated,
-          inheritContext: invocation.inheritContext,
-          runInBackground: invocation.runInBackground,
-          isolation: invocation.isolation,
-        },
+        invocation: agentInvocation,
         // Nested children are hidden from every reporting surface, so their spend
         // would otherwise be unattributable. Fold it into every ancestor's record:
         // the top-level one appears in lifecycle events, completion notifications,
@@ -361,7 +375,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
           // failure as a tool error, like the synchronous throw used to.
           await context.manager.awaitStartup(id);
           const identity = launchMetadata("subagent", id, context.manager.getRecord(id)!.runId ?? "1", "background");
-          return { ...textResult(`${launchText(identity)}\nNested agent started in background.`), details: { runtimeLaunch: identity } };
+          return { ...textResult(`${launchText(identity)}\n${overrideNoteFor(context.manager.getRecord(id))}Nested agent started in background.`), details: { runtimeLaunch: identity } };
         }
 
         const { record } = await context.manager.spawnAndWait(
@@ -373,7 +387,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
           attachTranscript,
         );
         const identity = launchMetadata("subagent", record.id, record.runId ?? "1", "foreground");
-        return { ...textResult(`${launchText(identity)}\n${formatRecord(record, "inline")}`, record.status === "error"), details: { runtimeLaunch: identity } };
+        return { ...textResult(`${launchText(identity)}\n${overrideNoteFor(record)}${formatRecord(record, "inline")}`, record.status === "error"), details: { runtimeLaunch: identity } };
       } catch (err) {
         return textResult(err instanceof Error ? err.message : String(err), true);
       }
@@ -386,9 +400,11 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
     description: "Send guidance to a running nested agent owned by this parent.",
     parameters: Type.Object({
       agent_id: Type.String(),
-      message: Type.String(),
-    }),
+      message: Type.String({ minLength: 1, description: "Non-blank guidance for the running nested agent." }),
+    }, { additionalProperties: false }),
     execute: async (_toolCallId, params) => {
+      try { assertNonEmptyString(params.message, "`message`"); }
+      catch (err) { return errorResult(err instanceof Error ? err.message : String(err)); }
       const record = context.manager.getRecord(params.agent_id);
       if (!ownsRecord(record, context.parentAgentId) || record.status !== "running") {
         return textResult(`Running nested agent not found or not owned by this parent: "${params.agent_id}".`, true);

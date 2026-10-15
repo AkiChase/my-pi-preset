@@ -37,7 +37,7 @@ export { runInChildSessionContext };
 import { type RpcHandle, registerRpcHandlers } from "./cross-extension-rpc.ts";
 import { loadCustomAgents } from "./custom-agents.ts";
 import { GroupJoinManager } from "./group-join.ts";
-import { isolationParam, resolveAgentInvocationConfig, resolveJoinMode, THINKING_LEVELS, thinkingParam } from "./invocation-config.ts";
+import { formatInvocationOverrideNote, isolationParam, resolveAgentInvocationConfig, resolveJoinMode, THINKING_LEVELS, thinkingParam } from "./invocation-config.ts";
 import { describeMention, handleBase, isReservedHandle, parseMention, resolveHandleToType, stripAgentPrefix } from "./mention.ts";
 import { runMentionClone } from "./mention-clone.ts";
 import { describeModel, type ModelRegistry, resolveModel } from "./model-resolver.ts";
@@ -82,7 +82,7 @@ import { resolveWorkflowScript } from "./workflow/saved.ts";
 import { completeWorkflowTask, createWorkflowTask, failWorkflowTask, formatWorkflowNotification, resolveResumeTarget, updateWorkflowProgressBatch, type WorkflowTask, workflowResultText, workflowRunId } from "./workflow/task.ts";
 import { fullWorkflowToolDescription } from "./workflow/tool-description.ts";
 import { isWorktreeIsolationEnabled, setWorktreeIsolationEnabled } from "./worktree.ts";
-import { assertNonEmptyString, assertSpawnInput, normalizeAgentDescription, parseSpawnOptions } from "./spawn-input.ts";
+import { assertNonEmptyString, assertResumeOptions, assertSpawnInput, normalizeAgentDescription, parseSpawnOptions } from "./spawn-input.ts";
 import { escapeXml } from "./xml.ts";
 
 // ---- Shared helpers ----
@@ -1727,7 +1727,7 @@ Terse command-style prompts produce shallow, generic work.
       ),
       ...isolationParam(isWorktreeIsolationEnabled()),
       ...scheduleParam,
-    }),
+    }, { additionalProperties: false }),
 
     // ---- Custom rendering: Claude Code style ----
 
@@ -1881,17 +1881,8 @@ Terse command-style prompts produce shallow, generic work.
       // isolation and context inheritance; accepting these silently meant a
       // caller could ask for a specific model and get a run on a different one
       // with no indication that the request had been dropped.
-      if (params.resume !== undefined) {
-        const conflicting = ([['model', params.model], ['thinking', params.thinking], ['isolated', params.isolated],
-          ['inherit_context', params.inherit_context], ['isolation', params.isolation]] as const)
-          .filter(([, value]) => value !== undefined).map(([key]) => `\`${key}\``);
-        if (conflicting.length > 0) {
-          return errorResult(
-            `Cannot combine \`resume\` with ${conflicting.join(", ")}. A resumed agent continues its stored session, ` +
-            `so start-time parameters are ignored. Omit them, or start a new agent instead of resuming.`,
-          );
-        }
-      }
+      try { assertResumeOptions(params); }
+      catch (err) { return errorResult(err instanceof Error ? err.message : String(err)); }
       // Computed at resolution rather than after the run, so the background and
       // schedule branches carry it too — previously it existed only on the
       // foreground path. Resume deliberately doesn't: it replays the stored
@@ -1990,6 +1981,8 @@ Terse command-style prompts produce shallow, generic work.
         runInBackground,
         isolation,
       };
+      const overrideNoteFor = (rec: AgentRecord | undefined) =>
+        formatInvocationOverrideNote(rec?.invocation ?? agentInvocation);
       // Tool-result render shows the mode label too; viewer's header already does.
       const modeLabel = getPromptModeLabel(subagentType);
       const { tags: invocationTags } = buildInvocationTags(agentInvocation);
@@ -2119,7 +2112,7 @@ Terse command-style prompts produce shallow, generic work.
 
           const isQueued = record.status === "queued";
           return textResult(
-            `Agent ${isQueued ? "queued" : "resumed"} in background.\n` +
+            `${overrideNoteFor(record)}Agent ${isQueued ? "queued" : "resumed"} in background.\n` +
             `Agent ID: ${id}\n` +
             `Type: ${existing.type}\n` +
             (record.outputFile ? `Output file: ${record.outputFile}\n` : "") +
@@ -2157,7 +2150,7 @@ Terse command-style prompts produce shallow, generic work.
         const outcome = await lease.result;
         assertActive();
         if (outcome.kind === "detached") {
-          return textResult(`Agent resumed in background.\nAgent ID: ${id}\nRun ID: ${run.identity.runId}\nThe same session continues; you will be notified when it completes.`,
+          return textResult(`${overrideNoteFor(existing)}Agent resumed in background.\nAgent ID: ${id}\nRun ID: ${run.identity.runId}\nThe same session continues; you will be notified when it completes.`,
             { ...detailBaseFor(existing), status: "background" as const, agentId: id, toolUses: existing.toolUses, tokens: "", durationMs: 0 });
         }
         if (outcome.kind !== "completed") return errorResult(`Agent ${id} interrupted.`);
@@ -2165,10 +2158,10 @@ Terse command-style prompts produce shallow, generic work.
         // A failed resume surfaces the error, plus any partial output THIS
         // resume produced (never the previous turn's answer, #144).
         if (record.status === "error") {
-          return errorResult(`Agent failed: ${record.error}${partialOutputSuffix(record)}`, buildDetails(detailBaseFor(record), record));
+          return errorResult(`${overrideNoteFor(record)}Agent failed: ${record.error}${partialOutputSuffix(record)}`, buildDetails(detailBaseFor(record), record));
         }
         return textResult(
-          record.result?.trim() || "No output.",
+          overrideNoteFor(record) + (record.result?.trim() || "No output."),
           buildDetails(detailBaseFor(record), record),
         );
       }
@@ -2254,7 +2247,7 @@ Terse command-style prompts produce shallow, generic work.
         assertActive();
         const isQueued = record?.status === "queued";
         return textResult(
-          `${fallbackNote}Agent ${isQueued ? "queued" : "started"} in background.\n` +
+          `${fallbackNote}${overrideNoteFor(record)}Agent ${isQueued ? "queued" : "started"} in background.\n` +
           `Agent ID: ${id}\n` +
           `Type: ${displayName}\n` +
           `Description: ${params.description}\n` +
@@ -2381,7 +2374,7 @@ Terse command-style prompts produce shallow, generic work.
         const outcome = await lease.result;
         assertActive();
         if (outcome.kind === "detached") {
-          return textResult(`${fallbackNote}Agent continuing in background.\nAgent ID: ${fgId}\nRun ID: ${run.identity.runId}\n` +
+          return textResult(`${fallbackNote}${overrideNoteFor(live)}Agent continuing in background.\nAgent ID: ${fgId}\nRun ID: ${run.identity.runId}\n` +
             (live.outputFile ? `Output file: ${live.outputFile}\n` : "") + "The same execution continues; you will be notified when it completes.",
             { ...detailBaseFor(live), toolUses: live.toolUses, tokens: "", durationMs: 0, status: "background" as const, agentId: fgId });
         }
@@ -2402,7 +2395,7 @@ Terse command-style prompts produce shallow, generic work.
 
       if (record.status === "error") {
         // Error headline + any partial output the run produced before failing.
-        return errorResult(`${fallbackNote}Agent failed: ${record.error}${partialOutputSuffix(record)}`, details);
+        return errorResult(`${fallbackNote}${overrideNoteFor(record)}Agent failed: ${record.error}${partialOutputSuffix(record)}`, details);
       }
 
       const durationMs = (record.completedAt ?? Date.now()) - record.startedAt;
@@ -2413,7 +2406,7 @@ Terse command-style prompts produce shallow, generic work.
         if (costText) statsParts.push(costText);
       }
       return textResult(
-        `${fallbackNote}Agent completed in ${formatMs(durationMs)} (${statsParts.join(", ")})${getForegroundOutcomeNote(record.status)}.\n\n` +
+        `${fallbackNote}${overrideNoteFor(record)}Agent completed in ${formatMs(durationMs)} (${statsParts.join(", ")})${getForegroundOutcomeNote(record.status)}.\n\n` +
         (record.result?.trim() || "No output."),
         details,
       );
@@ -2638,7 +2631,7 @@ Terse command-style prompts produce shallow, generic work.
       description: Type.Optional(
         Type.String({ description: "Ignored — set the workflow description in the script's `meta` block." }),
       ),
-    }),
+    }, { additionalProperties: false }),
 
     renderCall(args, theme) {
       return new Text(
@@ -2962,10 +2955,13 @@ Terse command-style prompts produce shallow, generic work.
         description: "The agent ID to steer (must be currently running). The agent's handle also works — its `name` if you gave it one, otherwise its type (`explore`, `explore-2`).",
       }),
       message: Type.String({
-        description: "The steering message to send. This will appear as a user message in the agent's conversation.",
+        minLength: 1,
+        description: "The non-blank steering message to send. This will appear as a user message in the agent's conversation.",
       }),
-    }),
+    }, { additionalProperties: false }),
     execute: async (_toolCallId, params, _signal, _onUpdate, _ctx) => {
+      try { assertNonEmptyString(params.message, "`message`"); }
+      catch (err) { return errorResult(err instanceof Error ? err.message : String(err)); }
       const record = resolveAgentRef(params.agent_id);
       if (!record || !isTopLevelAgent(record)) {
         return errorResult(`Agent not found: "${params.agent_id}". It may have been cleaned up.`);
