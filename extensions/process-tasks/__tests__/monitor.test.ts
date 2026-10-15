@@ -81,7 +81,7 @@ void describe("monitor tool — validation", () => {
         const { tool, ctx } = makeHarness();
         await assert.rejects(
             () => tool.execute("t3", { command: "echo hi", description: "   " }, undefined, undefined, ctx),
-            /description` is required/
+            /description` must be a non-empty string/
         );
     });
 });

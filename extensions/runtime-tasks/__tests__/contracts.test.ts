@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { isRuntimeTaskMetadata, taskResult, validateRuntimeTaskParams, validateTargetOptions } from "../contracts.ts";
-import { createRuntimeTaskFacade, type RuntimeTaskCapability } from "../facade.ts";
+import { createRuntimeTaskFacade, runtimeTaskTool, type RuntimeTaskCapability } from "../facade.ts";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { TaskView } from "../../task-ui/types.ts";
 const ctx = {} as ExtensionContext;
@@ -12,6 +12,47 @@ test("flat action validation rejects ignored fields and unsafe values", () => {
   assert.equal(validateRuntimeTaskParams({ action: "wait", task_id: "x", run_id: "1", verbose: false }), undefined);
   assert.ok(validateTargetOptions({ action: "output", limit: 10 }, "workflow"));
   assert.ok(validateTargetOptions({ action: "search", pattern: "x" }, "subagent"));
+});
+
+test("an inapplicable field is reported by name, with the fields the action does accept", () => {
+  // Previously: "Inapplicable field for status." — true, but it left the caller
+  // to bisect its own arguments. The message now names the field so the next
+  // call can be correct instead of merely different.
+  const message = validateRuntimeTaskParams({ action: "status", task_id: "x", offset: 0 });
+  assert.ok(message);
+  assert.match(message, /`offset` is not accepted for action 'status'/);
+  assert.match(message, /Accepted fields: action, task_id, run_id\./);
+});
+
+test("offset/limit/context must be integers when the host validator is bypassed", () => {
+  // The schema declares Type.Integer, so a fraction can only arrive from a
+  // direct caller. Paging a log from byte 1.5 would read from byte 1 silently.
+  for (const key of ["offset", "limit", "context"] as const) {
+    const message = validateRuntimeTaskParams({ action: "output", task_id: "x", [key]: 1.5 });
+    assert.ok(message, `${key}=1.5 must be rejected`);
+    assert.match(message, new RegExp(key));
+  }
+  assert.equal(validateRuntimeTaskParams({ action: "output", task_id: "x", offset: 0, limit: 1 }), undefined);
+});
+
+test("the registered task_manage schema is closed and types offset/limit/context as integers", () => {
+  const capability: RuntimeTaskCapability = {
+    list: () => [],
+    execute: async () => taskResult("x", { action: "output" }),
+  };
+  const tool = runtimeTaskTool(createRuntimeTaskFacade([capability]));
+  const schema = JSON.parse(JSON.stringify(tool.parameters)) as {
+    additionalProperties?: unknown;
+    properties: Record<string, { type?: unknown; minimum?: unknown; description?: unknown }>;
+  };
+  // Closed so a typo like `limt` cannot reach the facade as a silently ignored key.
+  assert.equal(schema.additionalProperties, false);
+  for (const key of ["offset", "limit", "context"]) {
+    assert.equal(schema.properties[key]!.type, "integer", `${key} must be an integer`);
+    assert.equal(typeof schema.properties[key]!.description, "string");
+  }
+  assert.equal(schema.properties.limit!.minimum, 1, "limit 0 would return nothing to a caller that asked for output");
+  assert.equal(schema.properties.offset!.minimum, 0);
 });
 
 test("versioned public metadata rejects foreign envelopes and invalid ranges", () => {

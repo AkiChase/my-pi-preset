@@ -84,14 +84,24 @@ const allowed: Record<RuntimeTaskAction, readonly string[]> = {
 export function validateRuntimeTaskParams(value: unknown): string | undefined {
   if (!object(value) || !TASK_ACTIONS.includes(value.action as RuntimeTaskAction)) return "Unknown task action.";
   const action = value.action as RuntimeTaskAction;
-  if (Object.keys(value).some(key => !allowed[action].includes(key))) return `Inapplicable field for ${action}.`;
+  // Name the offending field and what this action does accept. The previous
+  // wording ("Inapplicable field for <action>.") said something was wrong
+  // without saying which field, so recovery meant guessing one field at a time.
+  const inapplicable = Object.keys(value).find(key => !allowed[action].includes(key));
+  if (inapplicable) {
+    return `Field \`${inapplicable}\` is not accepted for action '${action}'. Accepted fields: ${allowed[action].join(", ")}.`;
+  }
   for (const key of ["task_id", "run_id"])
     if (value[key] !== undefined && (typeof value[key] !== "string" || !String(value[key]).trim())) return `${key} must be a non-empty string.`;
   if (["status", "output", "wait", "stop"].includes(action) && value.task_id === undefined) return `${action} requires task_id.`;
   if (value.run_id !== undefined && value.task_id === undefined) return "run_id requires task_id.";
   if (value.task_type !== undefined && !TASK_TYPES.includes(value.task_type as RuntimeTaskType)) return "Unknown task_type.";
+  // Integer, not just a safe count: the schema declares `Type.Integer`, so a
+  // fractional value here means a caller bypassed the host validator. Truncating
+  // it silently would page a log from a byte the caller never asked for.
   for (const key of ["offset", "limit", "context"])
-    if (value[key] !== undefined && (!safeCount(value[key]) || (key === "limit" && value[key] === 0))) return `${key} must be a safe ${key === "limit" ? "positive" : "non-negative"} integer.`;
+    if (value[key] !== undefined && (!Number.isSafeInteger(value[key]) || (value[key] as number) < 0 || (key === "limit" && value[key] === 0)))
+      return `${key} must be a safe ${key === "limit" ? "positive" : "non-negative"} integer.`;
   for (const key of ["verbose", "ignore_case"])
     if (value[key] !== undefined && typeof value[key] !== "boolean") return `${key} must be boolean.`;
   if (action === "search" && (typeof value.pattern !== "string" || value.pattern.length === 0)) return "search requires pattern.";

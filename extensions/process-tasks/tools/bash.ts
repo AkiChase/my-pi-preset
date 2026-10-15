@@ -20,6 +20,7 @@ import {
 import { launchMetadata, launchText, type RuntimeLaunchMetadata } from "../../runtime-tasks/launch.ts";
 import { isTerminalStatus } from "../types.ts";
 import { appendFileSync } from "node:fs";
+import { constants as osConstants } from "node:os";
 import type { BackgroundRegistry } from "../state.ts";
 import {
     QUICK_COMPLETION_MS,
@@ -27,7 +28,7 @@ import {
     type UiContext,
 } from "../types.ts";
 import { spawnWithFileOutput, type SpawnExit } from "../spawn.ts";
-import { streamLog } from "../output.ts";
+import { streamLog, readLogSlice } from "../output.ts";
 import { showBackgroundHint, clearBackgroundHint } from "../hint.ts";
 import {
     add,
@@ -51,11 +52,47 @@ import {
 import { markOutcomeSurfaced } from "../notify.ts";
 import { processTaskIdentity } from "../source.ts";
 import { textBlock } from "../format.ts";
-import { bashParamSchema } from "./bash-params.ts";
+import { bashParamSchema, MAX_TIMEOUT_SECONDS } from "./bash-params.ts";
 
 /** UI context + cwd is all this tool needs from the host context. */
 type LaunchDetails = BashToolDetails & { runtimeLaunch: RuntimeLaunchMetadata };
 type BashCtx = UiContext & { cwd: string };
+
+/**
+ * Bound on the `structuredContent.output` this tool returns, matching the
+ * built-in bash tool's own 1 MiB cap on the same field. The model-facing
+ * content is bounded much smaller (`outputPreviewChars`); this field exists for
+ * programmatic callers (codemode scripts) that want the whole run and can
+ * afford it.
+ */
+const STRUCTURED_OUTPUT_MAX_BYTES = 1024 * 1024;
+
+/**
+ * The output contract the inherited `outputSchema` declares.
+ *
+ * The built-in definition carries an `outputSchema`, which this override
+ * inherits through `...originalBash`. That schema is a promise about the shape
+ * of `structuredContent`: with it declared, a codemode script receives
+ * `structuredContent` as the call's value, and a result without it is rejected
+ * (`structuredContent` was undefined). So `output`/`truncated`/`exit_code`
+ * have to be filled in for every outcome, including the failures — a script
+ * must be able to read the exit code instead of parsing prose.
+ */
+function structuredOutcome(args: {
+    logPath: string;
+    exitCode: number;
+    wallTimeSeconds: number;
+}): AgentToolResult<LaunchDetails | undefined>["structuredContent"] {
+    const slice = readLogSlice(args.logPath, { limit: STRUCTURED_OUTPUT_MAX_BYTES });
+    const truncated = slice !== undefined && slice.size > slice.text.length;
+    return {
+        output: slice?.text ?? "",
+        truncated,
+        ...(truncated ? { full_output_path: args.logPath } : {}),
+        exit_code: args.exitCode,
+        wall_time_seconds: args.wallTimeSeconds,
+    } as AgentToolResult<LaunchDetails | undefined>["structuredContent"];
+}
 
 /** Register the overridden `bash` tool. */
 export function registerBashTool(
@@ -93,7 +130,18 @@ export function registerBashTool(
             const bashCtx = ctx as BashCtx;
 
             if (p.notify !== undefined && p.run_in_background !== true) throw new Error("notify requires run_in_background=true");
-            if (p.timeout !== undefined && (!Number.isFinite(p.timeout) || p.timeout <= 0)) throw new Error("timeout must be finite and positive");
+            // The host already rejects these against the schema above; repeating the
+            // check keeps a direct `execute()` (tests, SDK callers that bypass
+            // validation) from reaching `setTimeout` with an out-of-range delay.
+            if (p.timeout !== undefined && (!Number.isFinite(p.timeout) || p.timeout <= 0)) {
+                throw new Error(`timeout must be a finite number of seconds greater than 0, got ${String(p.timeout)}.`);
+            }
+            if (p.timeout !== undefined && p.timeout > MAX_TIMEOUT_SECONDS) {
+                throw new Error(
+                    `timeout must not exceed ${MAX_TIMEOUT_SECONDS} seconds, got ${p.timeout}. ` +
+                    "A larger value overflows the millisecond timer and would fire immediately."
+                );
+            }
             if (isBlankCommand(p.command)) throw new Error("Command is empty.");
             requireExistingCwd(bashCtx.cwd);
 
@@ -160,6 +208,7 @@ async function runForeground(args: {
         cwd: ctx.cwd,
         logPath,
     });
+    const startedAt = Date.now();
 
     let handedToBackground = false;
     const job = createRunningJob({ id, name: args.name, command, pid: spawned.pid, logPath, toolCallId, isBackgrounded: false });
@@ -230,15 +279,46 @@ async function runForeground(args: {
         // Foreground completion (quick or normal): read output, surface errors.
         // The backend retains terminal metadata and the log after inline completion.
         const finishForeground = (
-            exit: SpawnExit
+            exit: SpawnExit,
+            cancelled = false
         ): AgentToolResult<LaunchDetails | undefined> => {
             const output = readLogTail(job, reg.config.outputPreviewChars);
-            // A signal death (e.g. Esc-cancel killed the process group) is a
-            // deliberate cancel, not a command failure — never an error result.
-            if (exit.signal === null && exit.code !== 0) {
-                return { content: [textBlock(`${launchText(launchMetadata("bash", id, id, "foreground"))}\n${output || `Command exited with code ${exit.code ?? 1}`}`)], details: { runtimeLaunch: launchMetadata("bash", id, id, "foreground") }, isError: true };
+            // Node reports code === null when the child died by signal, so the
+            // signal half is what separates a crash from a clean exit. Exposed to
+            // scripts as 128+signal — the same convention the host documents for
+            // its own `BashOperations.exec`.
+            const exitCode = SignalExitCode(exit);
+            const details = { runtimeLaunch: launchMetadata("bash", id, id, "foreground") };
+            const structuredContent = structuredOutcome({
+                logPath,
+                exitCode,
+                wallTimeSeconds: (Date.now() - startedAt) / 1000,
+            });
+            // A signal death (Esc-cancel, source stop) is a deliberate cancel, not
+            // a command failure: it carries no exit status the model can act on, so
+            // it stays a successful result and the text says the command was
+            // cancelled. `structuredContent.exit_code` still reports 128+signal — a
+            // script that cancelled the run can see how the process actually died.
+            if (cancelled) {
+                return {
+                    content: [textBlock(`${launchText(details.runtimeLaunch)}\nCommand was cancelled${exit.signal ? ` (${exit.signal})` : ""} before it finished.\n${output}`)],
+                    details,
+                    structuredContent,
+                };
             }
-            return { content: [textBlock(`${launchText(launchMetadata("bash", id, id, "foreground"))}\n${output || "(no output)"}`)], details: { runtimeLaunch: launchMetadata("bash", id, id, "foreground") } };
+            if (exit.signal === null && exit.code !== 0) {
+                return {
+                    content: [textBlock(`${launchText(details.runtimeLaunch)}\n${output || `Command exited with code ${exit.code ?? 1}`}`)],
+                    details,
+                    structuredContent,
+                    isError: true,
+                };
+            }
+            return {
+                content: [textBlock(`${launchText(details.runtimeLaunch)}\n${output || "(no output)"}`)],
+                details,
+                structuredContent,
+            };
         };
 
         // Explicit detach participates in the initial window, not only after two seconds.
@@ -259,11 +339,24 @@ async function runForeground(args: {
             const text = outcome.reason === "manual"
                 ? `Command was manually backgrounded by user with ID: ${id}. Output is being written to: ${logPath}`
                 : `Command running in background with ID: ${id}. Output is being written to: ${logPath}`;
-            return { content: [textBlock(`${launchText(launchMetadata("bash", id, id, "background"))}\n${text}`)], details: { runtimeLaunch: launchMetadata("bash", id, id, "background") } };
+            const details = { runtimeLaunch: launchMetadata("bash", id, id, "background") };
+            // The command is still running, so there is no exit code yet. A
+            // script gets the log path rather than a wall time it would misread
+            // as a completed run's duration.
+            return {
+                content: [textBlock(`${launchText(details.runtimeLaunch)}\n${text}`)],
+                details,
+                structuredContent: {
+                    output: readLogSlice(logPath, { limit: STRUCTURED_OUTPUT_MAX_BYTES })?.text ?? "",
+                    truncated: false,
+                    exit_code: 0,
+                    wall_time_seconds: (Date.now() - startedAt) / 1000,
+                } as AgentToolResult<LaunchDetails | undefined>["structuredContent"],
+            };
         }
         // Genuine cancellation kills the launch, then preserves its observed final log.
         const exit = await spawned.exit;
-        return finishForeground(exit);
+        return finishForeground(exit, true);
     } finally {
         // Dispose before optional display cleanup. If setup/hint rendering threw,
         // stop and observe the process exit before rejecting with that same error.
@@ -279,6 +372,18 @@ async function runForeground(args: {
 }
 
 // --- Background backend --------------------------------------------------
+
+/**
+ * Exit status for a finished child: its code, or 128+signal when a signal
+ * killed it (the convention the host's own `BashOperations` documents).
+ * `null` code with no signal is reported as 1 — the host treats it as failed.
+ */
+function SignalExitCode(exit: SpawnExit): number {
+    if (exit.code !== null) return exit.code;
+    if (exit.signal === null) return 1;
+    const signalNumber = osConstants.signals[exit.signal];
+    return signalNumber === undefined ? 1 : 128 + signalNumber;
+}
 
 async function spawnBackground(args: {
     toolCallId: string;
@@ -337,5 +442,12 @@ async function spawnBackground(args: {
             ),
         ],
         details: { runtimeLaunch: launchMetadata("bash", id, id, "background") },
+        // Started, not finished — same contract as the foreground detach path.
+        structuredContent: {
+            output: "",
+            truncated: false,
+            exit_code: 0,
+            wall_time_seconds: 0,
+        } as AgentToolResult<LaunchDetails | undefined>["structuredContent"],
     };
 }

@@ -103,10 +103,17 @@ export function runtimeTaskTool(facade: ReturnType<typeof createRuntimeTaskFacad
       "search is regex over bash/monitor logs only. stats separates current retained counts from process activation cumulative metrics.",
     ],
     parameters: Type.Object({
-      action: StringEnum(TASK_ACTIONS), task_id: Type.Optional(Type.String()), run_id: Type.Optional(Type.String()),
-      task_type: Type.Optional(StringEnum(TASK_TYPES)), offset: Type.Optional(Type.Number()), limit: Type.Optional(Type.Number()),
-      verbose: Type.Optional(Type.Boolean()), pattern: Type.Optional(Type.String()), ignore_case: Type.Optional(Type.Boolean()), context: Type.Optional(Type.Number()),
-    }),
+      action: StringEnum(TASK_ACTIONS),
+      task_id: Type.Optional(Type.String({ description: "Target task id, as returned by launch/list." })),
+      run_id: Type.Optional(Type.String({ description: "Exact run id; omitting it binds the current run at call admission." })),
+      task_type: Type.Optional(StringEnum(TASK_TYPES)),
+      offset: Type.Optional(Type.Integer({ minimum: 0, description: "Byte offset to start reading at (output/search)." })),
+      limit: Type.Optional(Type.Integer({ minimum: 1, description: "Maximum bytes or lines to return; must be at least 1." })),
+      verbose: Type.Optional(Type.Boolean({ description: "Include full subagent detail (subagent output/wait only)." })),
+      pattern: Type.Optional(Type.String({ description: "Regular expression to search for (search only)." })),
+      ignore_case: Type.Optional(Type.Boolean({ description: "Case-insensitive matching (search only)." })),
+      context: Type.Optional(Type.Integer({ minimum: 0, description: "Lines of context around each match (search only)." })),
+    }, { additionalProperties: false }),
     execute: async (id: string, params: RuntimeTaskParams, signal: AbortSignal | undefined, onUpdate: AgentToolUpdateCallback<RuntimeTaskDetails> | undefined, ctx: ExtensionContext) => report(id, await facade.execute(params, signal, onUpdate, ctx)),
   };
 }

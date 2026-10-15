@@ -48,6 +48,9 @@ export function registerMonitorTool(pi: ExtensionAPI, reg: BackgroundRegistry): 
             "Oversized batches include an omitted-source count and local JSONL manifest path; read it for source metadata/log paths. Manifest save failures are explicit, not automatic retries.",
             "WebSocket messages, including empty messages, count as activity; progress is batched, not one notification per line.",
         ],
+        // Closed at both levels. A misspelled `wake_absent_ms` (say `wake_abscent_ms`)
+        // otherwise passed validation and the watch silently ran without the
+        // silence reminder the caller asked for.
         parameters: Type.Object({
             command: Type.Optional(
                 Type.String({ description: "Shell script; complete stdout or stderr lines are activity. Mutually exclusive with ws." })
@@ -56,9 +59,13 @@ export function registerMonitorTool(pi: ExtensionAPI, reg: BackgroundRegistry): 
                 Type.Object(
                     {
                         url: Type.String({ description: "WebSocket URL (ws:// or wss://)" }),
-                        protocols: Type.Optional(Type.Array(Type.String())),
+                        protocols: Type.Optional(
+                            Type.Array(Type.String({ description: "Subprotocol name" }), {
+                                description: "WebSocket subprotocols to request, in preference order",
+                            })
+                        ),
                     },
-                    { description: "WebSocket source; each text frame is an event. Mutually exclusive with command." }
+                    { additionalProperties: false, description: "WebSocket source; each text frame is an event. Mutually exclusive with command." }
                 )
             ),
             description: Type.String({ description: "Specific description, shown on every notification." }),
@@ -68,23 +75,33 @@ export function registerMonitorTool(pi: ExtensionAPI, reg: BackgroundRegistry): 
             wake_absent_ms: Type.Optional(
                 Type.Number({ description: "Optional finite positive event-arrival silence threshold in milliseconds; remind once, keep watching." })
             ),
-        }),
+        }, { additionalProperties: false }),
 
         async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
             const p = params as MonitorParams;
             const mctx = ctx as MonitorCtx;
 
             // --- Validation: command XOR ws -------------------------------
+            // The dependency is a cross-field rule, so it stays a runtime check
+            // rather than turning the schema into `oneOf` (which the host's strict
+            // schema mode rejects). "Provided" is judged by the raw value: a caller
+            // that sends `command: ""` meant to pass a command, and saying "provide
+            // either" is more useful than a blank-command message about the other
+            // source.
+            const commandGiven = p.command !== undefined;
+            const wsGiven = p.ws !== undefined;
             const hasCommand = typeof p.command === "string" && !isBlankCommand(p.command);
             const hasWs = !!p.ws && typeof p.ws.url === "string" && p.ws.url.length > 0;
-            if (hasCommand && hasWs) {
+            if (commandGiven && wsGiven) {
                 throw new Error("Provide either `command` or `ws`, not both.");
             }
             if (!hasCommand && !hasWs) {
+                if (commandGiven) throw new Error("`command` is empty; provide a shell script or a `ws` source.");
+                if (wsGiven) throw new Error("`ws.url` must be a non-empty WebSocket URL (ws:// or wss://).");
                 throw new Error("A monitor needs a `command` or a `ws` source.");
             }
-            if (!p.description || p.description.trim().length === 0) {
-                throw new Error("`description` is required (shown on every notification).");
+            if (typeof p.description !== "string" || p.description.trim().length === 0) {
+                throw new Error("`description` must be a non-empty string (shown on every notification).");
             }
             if (hasWs && !isWsSupported()) {
                 throw new Error(
@@ -98,7 +115,7 @@ export function registerMonitorTool(pi: ExtensionAPI, reg: BackgroundRegistry): 
             for (const key of ["timeout_ms", "wake_absent_ms"] as const) {
                 const value = p[key];
                 if (value !== undefined && (typeof value !== "number" || !Number.isFinite(value) || value <= 0)) {
-                    throw new Error(`\`${key}\` must be a finite positive number.`);
+                    throw new Error(`\`${key}\` must be a finite positive number, got ${String(value)}.`);
                 }
             }
             const description = p.description.trim();
