@@ -79,6 +79,15 @@ describe("package.json pi.extensions", () => {
     assert.equal(Object.hasOwn(preset.files, "session-name.json"), false);
   });
 
+  it("loads Recap once and replaces its external package without managing personal model configuration", () => {
+    assert.equal(declaredExtensions().filter(path => path === "extensions/recap.ts").length, 1);
+    assert.equal(declaredExtensions().some(path => path.startsWith("extensions/session-assist/")), false);
+    assert.ok(preset.conflicts.includes("npm:@tifan/pi-recap"));
+    assert.equal(Object.hasOwn(preset.packages, "npm:@tifan/pi-recap"), false);
+    assert.equal(Object.hasOwn(preset.files, "recap.json"), false);
+    assert.equal(Object.hasOwn(preset.files, "pi-recap.json"), false);
+  });
+
   it("covers the resource types this repo ships", () => {
     // A pi manifest switches off convention discovery for the types it does not list, so a
     // new skills/ or prompts/ directory is silently ignored until it is declared here.

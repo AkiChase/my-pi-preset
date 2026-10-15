@@ -10,7 +10,7 @@ it("actual Pi host loader loads a single session-name entry without starting res
         const result = spawnSync(process.execPath, ["--input-type=module", "-e", `
             import assert from "node:assert/strict";
             const {loadExtensionsCached} = await import(new URL("./core/extensions/loader.js", import.meta.resolve("@earendil-works/pi-coding-agent")));
-            const result = await loadExtensionsCached([${JSON.stringify(new URL("../../session-name.ts", import.meta.url).pathname)}], process.cwd());
+            const result = await loadExtensionsCached([${JSON.stringify(new URL("../../../session-name.ts", import.meta.url).pathname)}], process.cwd());
             assert.deepEqual(result.errors, []);
             assert.equal(result.extensions.length, 1);
             const extension = result.extensions[0];

@@ -60,7 +60,7 @@ Reusable authorized CLI/TUI procedures are in [tmux testing](tmux.md). Documenta
 Run selected commands under the same temporary agent-dir/existing SDK isolation above, without forced exit. These are verification entry points, not historical PASS claims:
 
 ```sh
-node --test extensions/session-name/__tests__/*.test.ts extensions/session-assist/__tests__/*.test.ts
+node --test extensions/session-assist/session-name/__tests__/*.test.ts extensions/session-assist/shared/__tests__/*.test.ts
 node --test extensions/at-path-completion/__tests__/*.test.ts
 node --test extensions/beautify/__tests__/*.test.ts extensions/task-ui/__tests__/editor.test.ts
 node --test extensions/task-ui/__tests__/*.test.ts extensions/process-tasks/__tests__/*.test.ts

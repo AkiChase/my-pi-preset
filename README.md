@@ -51,6 +51,7 @@ PI_BIN=/path/to/pi ./install.sh
 | 插件 | 一句话介绍 |
 | --- | --- |
 | [Session Name](docs/extensions/session-name.md) | 自动评估会话标题，也可手动刷新并保护手动命名。 |
+| [Recap](docs/extensions/recap.md) | 会话结束并空闲后生成简短回顾，帮助恢复工作。 |
 | [Task Composition](docs/extensions/task-composition.md) | 在共享面板中管理命令、子 Agent 和 workflow 的执行与等待。 |
 | [Monitor](docs/extensions/monitor.md) | 持续监听命令或 WebSocket，分批通知并提醒静默与恢复。 |
 | [Beautify](docs/extensions/beautify.md) | 精简工具结果展示，并美化输入框。 |
@@ -70,7 +71,6 @@ Monitor 属于 Task Composition，不是额外顶层入口；Agent、进程和�
 | [pi-web-access](docs/packages/web-access.md) | 提供网页搜索、内容抓取及结果分页读取。 |
 | [pi-memory](docs/packages/memory.md) | 保存跨会话记忆、日志和便签，并提供检索。 |
 | [rpiv-ask-user-question](docs/packages/ask-user-question.md) | 让模型通过选项问卷澄清需求。 |
-| [pi-recap](docs/packages/recap.md) | 回到会话时显示简短回顾。 |
 | [pi-trellis](docs/packages/trellis.md) | 按项目维护任务、规范与角色派发的开发工作流。 |
 
 第三方包由 Pi 安装，本仓库不修改其代码。清单目前使用 `latest`，实际功能以安装版本为准。清单中的 `conflicts` 用于防止功能重复加载，同步时会移除这些冲突来源。

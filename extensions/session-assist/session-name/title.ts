@@ -1,5 +1,5 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
-import { RequestFailed } from "../session-assist/request.ts";
+import { RequestFailed } from "../shared/request.ts";
 
 export const TITLE_PROMPT = [
     "Evaluate one concise, searchable title for the user's main current goal.",

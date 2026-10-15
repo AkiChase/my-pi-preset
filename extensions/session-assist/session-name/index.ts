@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext, SessionEntry } from "@earendil-works/pi-coding-agent";
-import { branchIdentity, fingerprint, prepareConversation } from "../session-assist/context.ts";
-import { generateText, RequestCancelled } from "../session-assist/request.ts";
+import { branchIdentity, fingerprint, prepareConversation } from "../shared/context.ts";
+import { failureDetail } from "../shared/errors.ts";
+import { generateText, RequestCancelled } from "../shared/request.ts";
 import { DEFAULTS, loadConfig, saveConfig, type NameConfig } from "./config.ts";
 import { readTitle, TITLE_PROMPT } from "./title.ts";
 
@@ -141,8 +142,9 @@ export default function registerSessionName(pi: ExtensionAPI): void {
             if (error instanceof RequestCancelled || !valid()) return;
             progress.retryAt = count + config.interval;
             persist();
-            notify(ctx, manual ? "Session name refresh failed; previous title kept." :
-                `Automatic session naming failed; previous title kept. Will retry after ${config.interval} more user inputs.`, "error");
+            const detail = failureDetail(error);
+            notify(ctx, manual ? `Session name refresh failed: ${detail}; previous title kept.` :
+                `Automatic session naming failed: ${detail}; previous title kept. Will retry after ${config.interval} more user inputs.`, "error");
         } finally {
             if (controller === requestController) controller = undefined;
         }

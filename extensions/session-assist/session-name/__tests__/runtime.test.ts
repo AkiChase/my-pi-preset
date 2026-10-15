@@ -29,12 +29,28 @@ it("tool/custom/extension/slash/handled inputs do not count; steering/follow-up 
 });
 it("failure is visible and waits N additional user inputs rather than retrying each settled boundary", async t => {
     const h = harness(t); await h.start(); await h.user("first"); await h.settled();
-    h.requests[0].reject(new Error("secret provider detail")); await flush();
-    assert.equal(h.notices.length, 1); assert.match(h.notices[0], /failed/); assert.equal(h.notices[0].includes("secret"), false);
+    h.requests[0].reject(new Error("Provider rejected reasoning level")); await flush();
+    assert.equal(h.notices.length, 1); assert.match(h.notices[0], /failed: Provider rejected reasoning level/);
     await h.settled(); assert.equal(h.requests.length, 1);
     for (let n = 0; n < 7; n++) { await h.user(`retry ${n}`); await h.settled(); }
     assert.equal(h.requests.length, 1);
     await h.user("retry eighth"); await h.settled(); assert.equal(h.requests.length, 2);
+});
+it("manual and automatic failures show returned SDK details safely and preserve existing titles", async t => {
+    const h = harness(t, { existing: "Protected title" }); await h.start(); await h.user("data"); await h.settled();
+    const manual = h.command(); await flush();
+    h.requests[0].resolve({ ...reply(), stopReason: "error", errorMessage: 'Invalid reasoning api_key="private-key" headers={"trace":"private-trace"} payload={"messages":["private-body"]} stack="private-stack" Authorization: Basic private-basic' });
+    await manual;
+    assert.equal(h.manager.getSessionName(), "Protected title");
+    assert.match(h.notices.at(-1)!, /refresh failed: Invalid reasoning api_key=\[redacted\]/);
+    for (const value of ["private-key", "private-trace", "private-body", "private-stack", "private-basic"]) assert.equal(h.notices.at(-1)!.includes(value), false);
+    const refresh = h.command(); await flush(); h.requests[1].resolve(reply("Owned title")); await refresh; await flush();
+    for (let n = 0; n < 8; n++) { await h.user(`new ${n}`); await h.settled(); }
+    h.requests[2].resolve({ ...reply(), stopReason: "error", errorMessage: "Provider overloaded" }); await flush();
+    assert.equal(h.manager.getSessionName(), "Owned title");
+    assert.match(h.notices.at(-1)!, /Automatic session naming failed: Provider overloaded; previous title kept/);
+    assert.match(h.notices.at(-1)!, /8 more user inputs/);
+    await h.settled(); assert.equal(h.requests.length, 3);
 });
 it("unknown existing and externally changed titles are protected until manual refresh succeeds", async t => {
     const h = harness(t, { existing: "Manual" }); await h.start(); await h.user("first"); await h.settled();

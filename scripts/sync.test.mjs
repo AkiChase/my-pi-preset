@@ -110,6 +110,19 @@ function run({
   console.log("PASS session-name conflict replacement preserves global naming configuration");
 }
 
+// Recap conflict reconciliation never installs the old package or changes user-owned model files.
+{
+  const preset = JSON.parse(readFileSync(resolve(scriptDir, "..", "pi-preset.json"), "utf8"));
+  const configs = { "recap.json": '{"model":"fixture/model","thinking":"high"}', "pi-recap.json": '{"legacy":"untouched"}' };
+  const result = run({ manifest: preset.packages, conflicts: preset.conflicts,
+    listOutput: "User packages:\n  npm:@tifan/pi-recap@0.4.8\n    /p/recap", seedFiles: configs, args: ["--sync", "packages"] });
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(result.calls.some(call => /^remove npm:@tifan\/pi-recap(?:@0\.4\.8)?$/.test(call)));
+  assert.equal(result.calls.some(call => /^(install|update) npm:@tifan\/pi-recap/.test(call)), false);
+  for (const [name, text] of Object.entries(configs)) assert.equal(result.fileTexts[name], text);
+  console.log("PASS Recap conflict replacement preserves user-owned configuration");
+}
+
 // Composition replacement is a real offline dry-run plan, not a comment-only guard.
 {
   const preset = JSON.parse(readFileSync(resolve(scriptDir, "..", "pi-preset.json"), "utf8"));

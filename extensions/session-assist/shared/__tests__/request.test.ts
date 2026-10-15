@@ -56,6 +56,17 @@ it("total deadline is bounded even if the provider ignores cancellation", async 
     await assert.rejects(generateText({ ...args, timeoutMs: 5 }), RequestFailed);
     assert.equal(getEventListeners(args.signal, "abort").length, 0);
 });
+it("preserves SDK errorMessage, exception and deadline details with explicit fallback", async () => {
+    const returned = setup(() => stream(Promise.resolve({ ...response(), stopReason: "error", errorMessage: "Unsupported reasoning level" })));
+    await assert.rejects(generateText(returned), { name: "Error", message: "Unsupported reasoning level" });
+    const empty = setup(() => stream(Promise.resolve({ ...response(), stopReason: "length", errorMessage: "  " })));
+    await assert.rejects(generateText(empty), /Provider response ended with length/);
+    const exception = new Error("Provider unavailable");
+    const thrown = setup(() => { throw exception; });
+    await assert.rejects(generateText(thrown), error => error === exception);
+    const timed = setup(() => stream(new Promise(() => {})));
+    await assert.rejects(generateText({ ...timed, timeoutMs: 5 }), /Request timed out/);
+});
 it("rejects provider errors and malformed title bodies", async () => {
     const args = setup(() => stream(Promise.resolve({ ...response(), stopReason: "error" })));
     await assert.rejects(generateText(args), RequestFailed);

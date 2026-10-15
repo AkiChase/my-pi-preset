@@ -13,6 +13,8 @@ export async function generateText(args: {
     sessionId: string;
     systemPrompt: string;
     data: unknown;
+    /** Explicit literal material; omitting it preserves the naming JSON wire format. */
+    textMaterial?: string;
     signal: AbortSignal;
     timeoutMs?: number;
 }): Promise<AssistantMessage> {
@@ -35,7 +37,7 @@ export async function generateText(args: {
         const result = await Promise.race([
             args.registry.streamSimple(args.model, {
                 systemPrompt: args.systemPrompt,
-                messages: [{ role: "user", content: JSON.stringify(args.data), timestamp: Date.now() }],
+                messages: [{ role: "user", content: args.textMaterial ?? JSON.stringify(args.data), timestamp: Date.now() }],
             }, {
                 // Public simple options represent the current 'off' level by absence.
                 reasoning: args.thinking === "off" ? undefined : args.thinking, signal: controller.signal,
@@ -44,7 +46,10 @@ export async function generateText(args: {
             cancelled,
         ]);
         if (args.signal.aborted) throw new RequestCancelled("Request cancelled");
-        if (result.stopReason !== "stop") throw new RequestFailed("Provider did not return a complete response");
+        if (result.stopReason !== "stop") {
+            const detail = result.errorMessage?.trim();
+            throw new RequestFailed(detail || `Provider response ended with ${result.stopReason}`);
+        }
         return result;
     } finally {
         clearTimeout(timer);
