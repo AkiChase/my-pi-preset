@@ -1,0 +1,9 @@
+{"file": ".trellis/spec/development/index.md", "reason": "共享请求、配置、资源清理及目录入口所有权规范"}
+{"file": ".trellis/spec/testing/index.md", "reason": "隔离测试、actual SDK、自然退出和证据边界"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "命名与Recap共享请求但不混用材料/状态"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "请求身份、通知、持久化和跨插件边界"}
+{"file": ".trellis/tasks/10-14-builtin-recap/prd.md", "reason": "已授权产品需求及S1-S4实施边界"}
+{"file": ".trellis/tasks/10-14-builtin-recap/design.md", "reason": "活动资格分离、请求前后围栏和配置合同"}
+{"file": ".trellis/tasks/10-14-builtin-recap/implement.md", "reason": "分阶段检查与no-commit授权限制"}
+{"file": ".trellis/tasks/10-14-builtin-recap/evidence/report.md", "reason": "S2真实原因丢失与旧测试反向约束"}
+{"file": ".trellis/tasks/10-14-builtin-recap/evidence/report.md", "reason": "S3公开事件边界与待核实恢复策略"}

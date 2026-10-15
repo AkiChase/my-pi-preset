@@ -1,0 +1,29 @@
+{
+  "id": "builtin-session-assist",
+  "name": "builtin-session-assist",
+  "title": "内置会话命名与 Recap",
+  "description": "按顺序内置 Session Name 与 Recap，共用 Pi 公共请求；命名跟随当前会话，Recap 显式配置自身模型/思考等级",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "akichase",
+  "assignee": "akichase",
+  "createdAt": "2026-10-14",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "10-14-builtin-recap",
+    "10-14-builtin-session-name"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "2026-10-15 批准同步父规划并开始 Recap S1-S4 实施/验证；命名已归档不重复实施。父任务仅汇总跨插件验收，产品执行绑定 Recap。保留 no-commit/push/install/sync/reload/archive。",
+  "meta": {}
+}
