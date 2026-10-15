@@ -2,7 +2,8 @@ import { basename } from "node:path";
 import { getMarkdownTheme, type Theme } from "@earendil-works/pi-coding-agent";
 import * as hostTui from "@earendil-works/pi-tui";
 import { Markdown, Text, matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi, type TUI, type TuiMouseEvent, type TuiMouseEventResult } from "@earendil-works/pi-tui";
-import { type NativeFrame, type NativeLayout, NativeLayoutError } from "./native-layout.ts";
+import { type NativeFrame, type NativeLayout, type NativeLayoutError, layoutError } from "../../../shared/scroll-panel/native-layout.ts";
+import { consumeWheel } from "../../../shared/scroll-panel/wheel.ts";
 import { displayValue, readDocument, readTasks, safeText, taskLabel, type BrowserTask, type TaskDocument, type TaskSnapshot } from "./reader.ts";
 
 const { ScrollView, VStack } = hostTui;
@@ -182,11 +183,8 @@ export class TaskBrowser {
 	}
 	handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
 		if (this.closed || event.type !== "wheel") return undefined;
-		// The host already normalizes/accelerates wheelDelta. Consume fixed regions
-		// and edges too: an unhandled overlay wheel can scroll the main transcript.
 		try {
-			const clip = this.nativeLayout.scrollBox(this.ensureInputFrame(), this.activeScroll).clip;
-			if (event.x >= clip.x && event.x < clip.x + clip.width && event.y >= clip.y && event.y < clip.y + clip.height) this.activeScroll.scrollBy(event.wheelDelta ?? 0);
+			return consumeWheel(event, this.nativeLayout.scrollBox(this.ensureInputFrame(), this.activeScroll).clip, this.activeScroll);
 		} catch (cause) { this.refuse(cause); }
 		return { handled: true };
 	}
@@ -306,7 +304,7 @@ export class TaskBrowser {
 		return total ? Array.from({ length: total }, (_, index) => this.listLine(index, width, layout)) : [this.theme.fg("muted", "No tasks found")];
 	}
 	private refuse(cause: unknown): NativeLayoutError {
-		const error = cause instanceof NativeLayoutError ? cause : new NativeLayoutError(cause);
+		const error = layoutError(cause, "Task viewer");
 		if (!this.closed) {
 			this.closed = true; this.frame = undefined;
 			try { this.unavailable(error); } catch { /* Host notification may be unavailable. */ }

@@ -4,8 +4,9 @@ import { type Component } from "@earendil-works/pi-tui";
 const { ScrollView, VStack } = hostTui;
 type ScrollView = hostTui.ScrollView;
 
-// The overlay host only calls render(width). Keep its explicitly approved internal
-// bounded-layout dependency here, resolving the same host entry as our public imports.
+// The overlay host only calls render(width). This is the single owner of the explicitly
+// approved internal bounded-layout dependency (renderLayoutFrame/getScrollViewBox), resolved
+// from the same host entry as our public imports. Consumers keep their own state and lifecycle.
 export interface NativeBox {
 	component: Component;
 	rect: { x: number; y: number; width: number; height: number };
@@ -19,9 +20,13 @@ export interface NativeLayout {
 	scrollBox(frame: NativeFrame, scroll: ScrollView): NativeBox;
 }
 export class NativeLayoutError extends Error {
-	constructor(cause: unknown) {
-		super("Task viewer unavailable: the host's native bounded ScrollView layout is incompatible. Update Pi or report this compatibility error; no custom scrollbar fallback is used.", { cause });
+	constructor(cause: unknown, label = "Panel") {
+		super(`${label} unavailable: the host's native bounded ScrollView layout is incompatible. Update Pi or report this compatibility error; no custom scrollbar fallback is used.`, { cause });
 	}
+}
+/** Present any layout failure under the consumer's own label, keeping the original cause. */
+export function layoutError(cause: unknown, label: string): NativeLayoutError {
+	return new NativeLayoutError(cause instanceof NativeLayoutError ? cause.cause : cause, label);
 }
 function validRect(rect: NativeBox["rect"] | undefined): rect is NativeBox["rect"] {
 	return !!rect && [rect.x, rect.y, rect.width, rect.height].every(Number.isSafeInteger) && rect.width >= 0 && rect.height >= 0;

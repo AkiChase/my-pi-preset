@@ -54,6 +54,8 @@ S2 检查点：schema 3 manifest 独立记录技能；旧 schema 2 项目通过 
 - [ ] 独立check→主复验→精确stagecommit（源码/测试/相关hash一起）。
 
 ## S3 共享原生layout工具及Viewer首消费者（A3/A4）
+
+S3 检查点：`extensions/trellis/lib/task-browser/native-layout.ts` 移到 `extensions/shared/scroll-panel/native-layout.ts`（错误文案改为由使用方传入名称，新增 `layoutError`），新增 `wheel.ts`（`contains`/`consumeWheel`）；任务浏览器改用这两个模块，行为不变。按测试方针只加纯逻辑测试（wheel 与错误标签，6 个），不做真实宿主/overlay 测试。Memory 与 Task Panel 计划已指向同一路径，无需修改。`pnpm typecheck` 通过，`pnpm check` 1504/1504。
 - [ ] extensions/shared/scroll-panel/native-layout.ts集中actualhost解析/同实例/内部函数/frame/scrollbar/scroll行为校验；wheel.ts公开事件/几何/consume，无SDKcopy/globalstate。
 - [ ] Trellis Viewer换共享接入，不改变既有选择/文档/刷新/读者安全与生命周期；旧native-layout实现不留重复接入。
 - [ ] 第二独立consumerfixture证明基础工具不耦合Trellis业务；Memory/TaskPanel更新规划依赖owner，实际业务接线回各原任务。

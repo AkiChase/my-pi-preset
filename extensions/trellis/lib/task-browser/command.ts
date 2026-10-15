@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { TaskBrowser } from "./component.ts";
-import { loadNativeLayout, NativeLayoutError } from "./native-layout.ts";
+import { layoutError, loadNativeLayout } from "../../../shared/scroll-panel/native-layout.ts";
 
 export function registerTaskBrowserCommand(pi: ExtensionAPI, dependencies: {
 	findRoot: (cwd: string, ctx: ExtensionCommandContext) => string | undefined;
@@ -25,7 +25,7 @@ export function registerTaskBrowserCommand(pi: ExtensionAPI, dependencies: {
 					root, tui, () => ctx.ui.theme, () => done(), () => dependencies.currentTask(root, ctx), nativeLayout,
 					error => notice(error.message),
 				), { overlay: true, overlayOptions: { width: "100%", maxHeight: "100%", anchor: "top-left", margin: 0 } });
-			} catch (error) { notice((error instanceof NativeLayoutError ? error : new NativeLayoutError(error)).message); }
+			} catch (error) { notice(layoutError(error, "Task viewer").message); }
 		},
 	});
 }
