@@ -633,3 +633,36 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Status
 
 [OK] **Completed**
+
+
+## Session 21: Check project 英文结构化与主题配色
+<!-- trellis-session: v=2 fp=4ed291644fd41e6d -->
+
+**Date**: 2026-10-16
+**Task**: Check project 英文结构化与主题配色
+**Branch**: `main`
+
+### Summary
+
+菜单 Check 结果改为消息区英文报告，六类状态分别计数，异常优先、主题配色和原生展开细节；用户已接受并授权收尾，任务已归档。
+
+### Main Changes
+
+- 保持诊断执行、安全门槛及只读行为；清理本次拥有的仓库外临时日志，保留失败原因和重跑记录。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c36f6ee` | feat(trellis): show structured themed Check reports in messages |
+| `a5e91e3` | chore(task): record Check report verification checkpoint |
+| `5257413` | chore(task): archive 10-16-check-report-readability |
+
+### Testing
+
+- [OK] Trellis 自然退出 470/470；诊断专项 67/67；全仓 pnpm check 与单独 pnpm test 1522/1522；最终 typecheck 和 diff 检查通过。
+- [OK] 主会话自审，无独立审查或真实终端视觉验证；未部署、未推送，其他任务改动保留。
+
+### Status
+
+[OK] **Completed**

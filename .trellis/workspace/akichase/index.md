@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 20
+- **Total Sessions**: 21
 - **Last Active**: 2026-10-16
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~630 | Active |
+| `journal-1.md` | ~668 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 21 | 2026-10-16 | Check project 英文结构化与主题配色 | `c36f6ee`, `a5e91e3`, `5257413` | `main` |
 | 20 | 2026-10-16 | 将 pi-trellis 内置到预设 | `9b09a6a` | `main` |
 | 19 | 2026-10-16 | Tool 参数校验与错误反馈统一 | `9cf9694`, `f108932`, `10a150c`, `b516d0f`, `19d7701`, `70b87d5`, `3a392dd`, `3cba095`, `9f62f16`, `09aa0af`, `5fbf096`, `954610a`, `4e64103`, `5e38b4e` | `main` |
 | 18 | 2026-10-15 | Session Name 两次自动命名与共享上下文 | `cfc47d3`, `025d41c`, `6efb5b9`, `8038d7b` | `main` |
