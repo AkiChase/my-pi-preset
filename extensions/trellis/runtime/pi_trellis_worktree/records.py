@@ -69,9 +69,18 @@ def git(root, args, allowed=(0,)):
     return stdout.decode("utf-8").strip()
 
 
-def repository(cwd):
-    root = canonical(git(cwd, ["rev-parse", "--show-toplevel"]))
-    common = canonical(root / git(root, ["rev-parse", "--git-common-dir"]))
+def repository_identity(cwd):
+    lines = git(cwd, ["rev-parse", "--show-toplevel", "--git-common-dir"]).splitlines()
+    if len(lines) != 2:
+        raise ValueError("git repository identity returned an unexpected number of paths")
+    root = canonical(lines[0])
+    common = canonical(root / lines[1])
+    return dict(root=str(root), commonDir=str(common))
+
+
+def repository(cwd, identity=None):
+    identity = repository_identity(cwd) if identity is None else identity
+    root = Path(identity["root"])
     rows = []
     for field in git(root, ["worktree", "list", "--porcelain", "-z"]).split("\0"):
         if field.startswith("worktree "):
@@ -82,7 +91,7 @@ def repository(cwd):
             rows[-1]["branch"] = field[18:]
         elif rows and field == "bare":
             rows[-1]["bare"] = True
-    return dict(root=str(root), commonDir=str(common), worktrees=rows)
+    return dict(root=str(root), commonDir=identity["commonDir"], worktrees=rows)
 
 
 def resolve_base(root, base="HEAD"):
@@ -314,11 +323,11 @@ def owner_alive(record):
         return True  # Unknown/unsupported PID is not proof of death.
 
 
-def binding_problems(b, source):
+def binding_problems(b, source, target=None):
     try:
         if b["sourceRoot"] != source["root"] or b["repositoryIdentity"] != source["commonDir"]:
             raise ValueError("Source repository identity does not match binding")
-        target = repository(b["worktreePath"])
+        target = target or repository(b["worktreePath"])
         row = next((r for r in source["worktrees"] if r["path"] == b["worktreePath"]), None)
         if not row or row["bare"] or target["root"] != b["worktreePath"] or target["commonDir"] != source["commonDir"]:
             raise ValueError("Target is not this repository's registered worktree")
@@ -333,19 +342,24 @@ def binding_problems(b, source):
 
 
 def source_for(cwd):
-    local_repo = repository(cwd)
-    marker = read_marker(local_repo["root"])
+    local_identity = repository_identity(cwd)
+    marker = read_marker(local_identity["root"])
     if marker:
         source = repository(marker["sourceRoot"])
         authoritative = read_binding(source["root"], marker["taskDir"])
         if not authoritative or not same_identity(marker, authoritative):
             raise ValueError("Untrusted target marker: source binding missing or mismatched")
-        problems = binding_problems(authoritative, source)
+        # Re-read the target's complete Git facts only after the authoritative
+        # source binding is loaded. This preserves the final identity check while
+        # avoiding an unused early worktree-list subprocess.
+        local_repo = repository(local_identity["root"], local_identity)
+        problems = binding_problems(authoritative, source, local_repo)
         if problems:
             raise ValueError("; ".join(problems))
         if local_repo["root"] != marker["worktreePath"]:
             raise ValueError("Marker is not in its bound worktree")
         return source, authoritative
+    local_repo = repository(local_identity["root"], local_identity)
     if not local_repo["worktrees"] or local_repo["worktrees"][0]["path"] != local_repo["root"]:
         raise ValueError("Unbound linked worktree: manage from the source project or explicitly adopt this directory there")
     return local_repo, None

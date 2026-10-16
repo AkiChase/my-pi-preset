@@ -42,6 +42,18 @@ class NativeContracts(unittest.TestCase):
             with self.subTest(field=field), self.assertRaises(ValueError):
                 parse_binding(dict(b, **{field: value}))
 
+    def test_repository_identity_uses_one_combined_rev_parse(self):
+        from pi_trellis_worktree import records
+        (self.root / ".git").mkdir()
+        calls = []
+        def queried(root, args, allowed=(0,)):
+            calls.append((str(root), args))
+            self.assertEqual(args, ["rev-parse", "--show-toplevel", "--git-common-dir"])
+            return str(self.root) + "\n.git"
+        with patch.object(records, "git", queried):
+            self.assertEqual(records.repository_identity(self.root), {"root": str(self.root), "commonDir": str(self.root / ".git")})
+        self.assertEqual(len(calls), 1)
+
     def test_parser_values_and_removed_operations(self):
         args = parser().parse_args(["create", "--task", self.task, "--base", " HEAD "])
         self.assertEqual(args.base, " HEAD ")

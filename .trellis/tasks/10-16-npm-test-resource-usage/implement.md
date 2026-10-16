@@ -23,6 +23,7 @@
 - 最终全量：`npm test` exit0，**1416/1416**，78 suites，0 fail/cancelled/skipped；**72.10s wall / 355.83 CPU s**。
 - 同批前一轮：83.12s / 390.62CPU s；观察减少11.02s/34.79CPU s，非严格A/B，不主张因果或峰值问题已解决。
 - CPU 采样的一轮全量：76.79s、376.13CPU s；200ms进程树采样峰值约560%（5.6核）、P90约452%（4.5核）。短命Python/Git可漏采样，累计CPU更可靠；树RSS求和不能当物理内存峰值。
+- **query Git 去重**：`records.repository_identity()` 合并 `--show-toplevel --git-common-dir`；managed query 先读target identity、验证source binding后才最终完整读取target，避免未使用的早期worktree list，同时保留最终target Git/marker/branch验证。Python38/38、deployed CLI/dispatch smoke7/7、typecheck通过。全量受并行 agent-task 修改影响，1400/1419、19失败；错误均为agent runner前端/通知断言，不是Trellis失败，未修范围外代码。
 
 ## 限制与材料
 

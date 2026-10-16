@@ -263,7 +263,7 @@
       "sourcePath": "python/pi_trellis_worktree/records.py",
       "sourceSha256": "ab1d129e5d598315737f639c0942dc75332b7905595cb5fdb483010d04e0f02a",
       "license": "MIT",
-      "sha256": "03e73de91bf812a6da385148d901691065d946cfa9f778321b2a2a59f29ec8a4",
+      "sha256": "25b884c742dd37a48410c4afe0b2218fad5e546b2a02b08dfb2456d31b869f3d",
       "modified": true,
       "sourceRevision": "9af75d2f52f78ee932bb31563cc29fe7ce5a9b73"
     },
@@ -328,6 +328,6 @@
       "modified": true
     }
   },
-  "releaseId": "pi-trellis-runtime-v1-f585fde4c0f8f0b539815ca5daa78581581b5e9d7d5313d058cf4a052712c7e6",
+  "releaseId": "pi-trellis-runtime-v1-fdce3a57938638e9a777eb02ba0bc31db6dc9df4b65a023c26e360d25550331b",
   "projectSourceRevision": "9af75d2f52f78ee932bb31563cc29fe7ce5a9b73"
 }
