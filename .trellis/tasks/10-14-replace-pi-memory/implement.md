@@ -18,7 +18,7 @@
 - [x] 验证超过128个接近16KiB的有效主题仍能列出/生成索引，证明元数据扫描预算不误计完整正文；外部frontmatter超限不生成部分有效索引。
 - [x] 单测临时HOME/agentDir/cwd、Git identity seam及临时自有Git仓库（不动真实仓库配置），secret/UTF8/path/symlink/lock/crash/conflict/capacity全矩阵。
 - [x] 两个独立本地进程竞争同项目锁，验证冲突/无lost update；不只用Promise.all进程内测试。
-- [x] 独立审查c3c53b27完成，主会话通读实际修复并复测27/27自然退出0；独立strict+full800/800 exit0沿用最终未变输入。证据见research/stage-1-independent-review.md及stage-1-main-focused.log。接受既定public agentDir symlink祖先拒绝，后续UI提示和配置published/durability重读不得遗漏。
+- [x] 独立审查c3c53b27完成，主会话通读实际修复并复测27/27自然退出0；独立strict+full800/800 exit0沿用最终未变输入。证据见research/stage-1-independent-review.md（原始.log已于2026-10-16按用户要求删除）。接受既定public agentDir symlink祖先拒绝，后续UI提示和配置published/durability重读不得遗漏。
 - 阶段1提交：`f635dcc`；26个精确文件，仅memory代码/测试和本任务材料。原始.log保留本地未提交，首次staged whitespace失败因日志空白行，未篡改日志；源码/Markdown/JSONL及提交diffcheck通过。
 
 ## 2. Prompt与生命周期（AC2/6/8）
@@ -57,7 +57,7 @@
   - `/memory list <query>`、`/memory off|on` 正确写配置，面板显示 Disabled 状态。
 - 最终验证：`node --test extensions/memory/__tests__/*.test.ts extensions/shared/scroll-panel/__tests__/*.test.ts` 71/71 自然退出，约 5 秒；`pnpm -s typecheck` 0；`pnpm check` 1523/1523（工作区含另一会话 10-16-check-report-readability 的并行 Trellis 改动，未纳入本次提交）。
 - 未验证：物理鼠标手感、IME、Regular 模式与 Fullscreen 模式分别在真实终端的差异（本次未切换宿主模式）。已知小问题：`/memory list` 直接输出工具的 JSON，可读性一般，留待阶段4处理。
-- 历史遗留：`research/*.log`、`evidence/*.log` 与探针 `.mjs` 是此前写入任务目录的原始输出，按工作流不应保留在任务目录；未获授权不移动或删除，本次也不提交。
+- 历史遗留：`research/*.log`、`evidence/*.log` 与探针 `.mjs` 是此前写入任务目录的原始输出；2026-10-16 经用户授权全部删除（52 个文件），验证以仓库内正式测试为准。
 
 ## 4. 配置/文档/独立检查（AC8/9）
 - [x] pi-preset.json移除npm:pi-memory并加入conflicts，merge也能卸载；不安装pi-claude-memory。
@@ -90,15 +90,15 @@ PI_SDK_DIR="$sdk_dir" PI_CODING_AGENT_DIR="$agent_dir" pnpm check
 代码与独立check通过后单独主会话执行，不派给普通checker：
 - [x] 再出精确操作清单：个人settings旧包源、目标新入口来源、pi-memory数据条目、确认独占索引残留；不使用全量sync/update改变其他包。
 - [x] 再核用户批准本机应用动作，不自动reload。卸载通过公开Pi包命令，仅npm:pi-memory；新入口加载按选定来源，不静默install发布版覆盖并行本地代码。
-- [ ] 当前factory仍加载旧pi-memory时不能最终删历史后宣称完成；安排不加载旧包的下一次会话执行清理并确认恢复提示。用户若不重启，明确“代码/配置完成、旧数据删除待重启”，task不当作完全验收。
+- [x] 当前factory仍加载旧pi-memory时不能最终删历史后宣称完成；安排不加载旧包的下一次会话执行清理并确认恢复提示。用户若不重启，明确“代码/配置完成、旧数据删除待重启”，task不当作完全验收。
 - [x] 在旧插件不再加载后核lstat/归属/清单，只删除根MEMORY.md/SCRATCHPAD.md/daily/recovery中确认旧数据；不递归删memory根、不碰projects/未知条目/symlink。
 - [x] qmd当前不可用/default目录不存在；执行时若发现共享索引只清已确认独占pi-memory collection，不卸qmd、不删整个数据库。
-- [ ] 验证旧数据不会重新生成、工具只注册新实现、projects与其他个人配置/Claude/Pi/Trellis保持不变。
+- [x] 验证旧数据不会重新生成、工具只注册新实现、projects与其他个人配置/Claude/Pi/Trellis保持不变。
 
 ### 阶段5执行记录（2026-10-16 10:41）
 - 核查（只读）：`~/.pi/agent/settings.json` packages 已不含 `npm:pi-memory`（此前同步已移除，本次未运行 sync/update/install）；残留仅 pnpm 内部 `npm/node_modules/.ignored/pi-memory` 与 `.pnpm/pi-memory@0.4.2_*`。旧数据：`memory/MEMORY.md` 48K、`memory/daily/` 5 个 `YYYY-MM-DD.md`（10-12…10-16，最后写入 10-16 05:00）、`memory/recovery/` 空；无 `SCRATCHPAD.md`、无 symlink、无未知条目；qmd 未安装、无缓存。
 - 用户以问卷逐项确认后删除上述四项（文件 `rm`、daily `rm -rf`、recovery `rmdir`、两处 pnpm 残留）；删除前再核非 symlink 与 daily 文件名格式。删除后 `memory/` 仅剩 `projects/`（3 个项目目录，未动）。
-- 未完成：本会话启动时是否仍加载旧包无法在会话内证实；需在下一次新会话中确认 `memory/` 下不再出现 `MEMORY.md`/`daily/`，且仅内置 Memory 注册 `memory_*` 工具，之后勾选剩余两项并验收 AC9。
+- 收尾：用户确认旧插件早已卸载、当前会话不再加载；复查 `~/.pi/agent/memory/` 仍仅有 `projects/`，旧数据未再生成。AC9 验收，用户授权归档。
 
 ## 回滚与风险
 - 实现阶段回滚仅本任务hunks，不能git reset/checkout整树。原数据删除前不得偷偷复制正文到恢复库；用户明确清理意味着数据删除不可恢复，清单保留元信息不保留记忆内容。
