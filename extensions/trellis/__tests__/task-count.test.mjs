@@ -1,3 +1,4 @@
+import "./host-env.mjs";
 // Logic-only port of the unfinished-task count rules (display rendering is intentionally not tested).
 import assert from "node:assert/strict";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";

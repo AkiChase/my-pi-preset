@@ -1,3 +1,4 @@
+import './host-env.mjs';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync, lstatSync, existsSync, realpathSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';

@@ -75,6 +75,18 @@ S4 检查点（bc24fa8）：三页用户文档去掉草稿标记并按最终代�
 - [ ] isolatedexistingSDK pnpmcheck、memory已提交相关回归、Trellisfocusedsuite+Python自然退出、sharedlayoutmountedtests；准确区分PASS/FAIL/NOT_RUN。
 - [ ] 独立最终审查→主复核→stage/finalintegration localcommit；新完整UI未实测物理mouse不宣全真机兼容。
 
+## 真实宿主实测与修复（2026-10-16）
+
+用户同步预设并重载后，用 tmux 在临时 git 项目（`mktemp -d`，测试用开发者 `e2e-tester`）中实测已安装的 `323c624`：
+- 加载的是 `my-pi-preset:trellis.ts`，旧独立包已不在。`/trellis-init` 菜单文案与文档一致，确认页默认 Cancel；初始化创建 89 个文件、9 个技能、3 个角色、schema 3 manifest，没有自动 reload。
+- `/reload` 后 `[Skills]` 中出现全部 9 个 trellis 技能，项目信任已保存。
+- 初始化后菜单显示 Ready / current runtime；`Check project` 0 issues，只读。
+- **失败**：`/trellis-task-viewer` 拒绝打开，报 native layout incompatible。原因：已安装的 Pi 是打包版 CLI（`dist/bundle/cli.js`），jiti virtualModules 只映射 `import`，`import.meta.resolve("@earendil-works/pi-tui")` 在其中抛 Cannot find module；旧实现还要求解析出的磁盘模块与宿主公开组件同一实例，这在打包版里不可能成立。源码模式的测试和 jiti alias 探针都覆盖不到这条路径。
+- **修复**：`locateTuiEntry` 先用模块解析，失败后从真实启动器（`process.argv[1]`）旁边安装的 pi-tui 定位；去掉实例同一性检查。布局节点用 `Symbol.for` 协议识别，现有行为自检（frame、滚动条、scrollBy）仍是打开前的门。新增 3 个纯逻辑测试。
+- 修复后在真实打包宿主中：探针扩展 `loadNativeLayout OK`；浏览器打开，列表、详情四个分区、方向键滚动、SGR 滚轮在正文内滚动、标题栏滚轮被吞掉不滚动、Esc 返回再关闭均正常（通过 `-e` 加载仓库源码验证）。
+- **测试隔离**：新版 Trellis 生效后会给每条 bash 注入 `TRELLIS_CONTEXT_ID`；扩展在模块加载时读取它来固定 key，导致在 Pi 内运行测试时 3 个 agent-context 用例失败（产品行为正确，去掉该变量即通过）。新增 `__tests__/host-env.mjs`，在导入扩展入口的 10 个测试文件中最先导入，清掉继承的变量。
+- 独立审查 4f3d7bf7 通过，无修改：跨副本无 instanceof 或模块级状态依赖；已接受风险为自检只覆盖 `scrollbar: "always"`。带着继承变量运行 `pnpm check`：1507/1507。
+
 ## 精确验证接线（实施后按实际文件确定）
 已有SDK解析及整个invocation临时agentDir，不下载依赖；mktemp路径realpath以免平台symlink拒绝误测。测试runner必须保留独立exit，不以最后命令掩盖前失败。
 ```sh

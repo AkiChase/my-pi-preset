@@ -1,3 +1,6 @@
+import { realpathSync } from "node:fs";
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
 import { stripVTControlCharacters } from "node:util";
 import * as hostTui from "@earendil-works/pi-tui";
 import { type Component } from "@earendil-works/pi-tui";
@@ -5,8 +8,14 @@ const { ScrollView, VStack } = hostTui;
 type ScrollView = hostTui.ScrollView;
 
 // The overlay host only calls render(width). This is the single owner of the explicitly
-// approved internal bounded-layout dependency (renderLayoutFrame/getScrollViewBox), resolved
-// from the same host entry as our public imports. Consumers keep their own state and lifecycle.
+// approved internal bounded-layout dependency (renderLayoutFrame/getScrollViewBox). Consumers
+// build their tree from the public pi-tui imports and keep their own state and lifecycle.
+//
+// The bundled Pi CLI embeds pi-tui and only maps `import` specifiers to that copy, so
+// import.meta.resolve cannot find the package there. The internal layout module is then loaded
+// from the pi-tui installed next to the running CLI. Layout nodes are recognised through a
+// Symbol.for protocol rather than class identity, so that module can lay out the host's public
+// ScrollView/VStack; the behavioural self-test below proves this before any panel opens.
 export interface NativeBox {
 	component: Component;
 	rect: { x: number; y: number; width: number; height: number };
@@ -31,14 +40,25 @@ export function layoutError(cause: unknown, label: string): NativeLayoutError {
 function validRect(rect: NativeBox["rect"] | undefined): rect is NativeBox["rect"] {
 	return !!rect && [rect.x, rect.y, rect.width, rect.height].every(Number.isSafeInteger) && rect.width >= 0 && rect.height >= 0;
 }
+/**
+ * Locate the pi-tui entry that carries the internal layout module: the module resolver first,
+ * then the package installed beside the running launcher (bundled CLI).
+ */
+export function locateTuiEntry(resolve: () => string, launcher: string | undefined, realpath: (path: string) => string = realpathSync): string {
+	try { return resolve(); }
+	catch (cause) {
+		if (!launcher) throw cause;
+		try { return pathToFileURL(createRequire(realpath(launcher)).resolve("@earendil-works/pi-tui")).href; }
+		catch (fallback) { throw new Error("Cannot locate @earendil-works/pi-tui from the module resolver or the running Pi launcher", { cause: [cause, fallback] }); }
+	}
+}
 let loaded: Promise<NativeLayout> | undefined;
 export function loadNativeLayout(): Promise<NativeLayout> {
 	return loaded ??= resolveNativeLayout().catch(cause => { loaded = undefined; throw new NativeLayoutError(cause); });
 }
 async function resolveNativeLayout(): Promise<NativeLayout> {
-	const entry = import.meta.resolve("@earendil-works/pi-tui");
-	const host = await import(entry);
-	if (typeof ScrollView !== "function" || typeof VStack !== "function" || host.ScrollView !== ScrollView || host.VStack !== VStack) throw new Error("Resolved TUI is not the mounted host TUI");
+	if (typeof ScrollView !== "function" || typeof VStack !== "function") throw new Error("Host TUI lacks ScrollView/VStack");
+	const entry = locateTuiEntry(() => import.meta.resolve("@earendil-works/pi-tui"), process.argv[1]);
 	const internal = await import(new URL("./layout.js", entry).href);
 	if (typeof internal.renderLayoutFrame !== "function" || typeof internal.getScrollViewBox !== "function") throw new Error("Missing layout capabilities");
 	const native: NativeLayout = {
@@ -60,7 +80,8 @@ async function resolveNativeLayout(): Promise<NativeLayout> {
 			} catch (cause) { throw new NativeLayoutError(cause); }
 		},
 	};
-	// Verify actual layout-node identity, cropping and scrolling, not just exports.
+	// Verify that the located layout module lays out the host's public components: real
+	// layout-node recognition, cropping, scrollbar and scrolling, not just exports.
 	const child = { render: () => Array.from({ length: 10 }, (_, i) => String(i)), invalidate() {} };
 	const scroll = new ScrollView(child, { scrollbar: "always", follow: "none", overscroll: "contain" });
 	const root = new VStack([{ component: scroll, basis: 0, grow: 1 }]);
