@@ -15,7 +15,7 @@ function fixture(t,runtime=false) {
 }
 function harness(root) {
  const commands=new Map(),tools=new Map(),handlers=new Map(),messages=[],notices=[],display={};let subscriptions=0;
- trellis({registerCommand:(n,c)=>commands.set(n,c),registerTool:t=>tools.set(t.name,t),events:{on:()=>{subscriptions++;return()=>{};},emit:()=>{}},on:(n,h)=>{const previous=handlers.get(n);handlers.set(n,previous?async(...args)=>{await previous(...args);await h(...args);}:h);},getAllTools:()=>[{name:'subagent_run'}],sendMessage:m=>messages.push(m)});
+ trellis({registerMessageRenderer:()=>{},registerCommand:(n,c)=>commands.set(n,c),registerTool:t=>tools.set(t.name,t),events:{on:()=>{subscriptions++;return()=>{};},emit:()=>{}},on:(n,h)=>{const previous=handlers.get(n);handlers.set(n,previous?async(...args)=>{await previous(...args);await h(...args);}:h);},getAllTools:()=>[{name:'subagent_run'}],sendMessage:m=>messages.push(m)});
  const ctx={cwd:root,hasUI:true,sessionManager:{getSessionId:()=>root,getSessionFile:()=>undefined},ui:{theme:{fg:(_c,t)=>t,bold:t=>t},notify:t=>notices.push(t),setWidget:(_k,v)=>display.widget=v,setStatus:(_k,v)=>display.status=v}};
  return {commands,tools,handlers,messages,notices,display,ctx,get subscriptions(){return subscriptions;}};
 }

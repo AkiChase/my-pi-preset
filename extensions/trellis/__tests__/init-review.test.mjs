@@ -125,7 +125,7 @@ test('forged identity operation on an unsupported manifest cannot publish identi
 
 test('invalid task records cannot enter disk fast path or injected active task',async t=>{
  const {default:trellis,__internals}=await import('../index.ts');const f=fixture(t);const handlers=new Map(),messages=[];
- trellis({on:(n,h)=>handlers.set(n,h),registerCommand:()=>{},registerTool:()=>{},events:{on:()=>()=>{},emit:()=>{}},sendMessage:m=>messages.push(m),getAllTools:()=>[]});const ctx={cwd:f.root,hasUI:false,ui:{},sessionManager:{getSessionId:()=>f.root,getSessionFile:()=>undefined}},key=__internals.contextKey(f.root,ctx),task='.trellis/tasks/invalid';
+ trellis({registerMessageRenderer:()=>{},on:(n,h)=>handlers.set(n,h),registerCommand:()=>{},registerTool:()=>{},events:{on:()=>()=>{},emit:()=>{}},sendMessage:m=>messages.push(m),getAllTools:()=>[]});const ctx={cwd:f.root,hasUI:false,ui:{},sessionManager:{getSessionId:()=>f.root,getSessionFile:()=>undefined}},key=__internals.contextKey(f.root,ctx),task='.trellis/tasks/invalid';
  f.put(`.trellis/.runtime/sessions/${key}.json`,JSON.stringify({current_task:task}));f.put(task+'/prd.md','INVALID MATERIAL');
  for(const record of [{},{title:null,status:'in_progress'},{status:{}},{foo:'not a task'}]){
   f.put(task+'/task.json',JSON.stringify(record));assert.equal(__internals.readActiveTaskFromDisk(f.root,key),undefined);

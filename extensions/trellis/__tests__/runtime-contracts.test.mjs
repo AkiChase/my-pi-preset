@@ -187,7 +187,7 @@ test('supported entrypoints run without trellis and suppress all bytecode/update
 
 test('real runtime child binding/deactivate cannot resurrect from repeated dispatch header; failed binding never borrows parent',async t=>{
  const f=fixture(t);rmSync(join(f.root,'.trellis'),{recursive:true});installRuntimeFixture(f.root);const path=f.task('own',{status:'in_progress'});f.put(path+'/implement.jsonl','{"file":"'+path+'/prd.md"}');const handlers=new Map(),messages=[];
- trellis({events:{on:()=>()=>{},emit:()=>{}},registerCommand: () => {}, registerTool:()=>{},on:(name,fn)=>handlers.set(name,fn),sendMessage:m=>messages.push(m),getAllTools:()=>[]});
+ trellis({registerMessageRenderer:()=>{},events:{on:()=>()=>{},emit:()=>{}},registerCommand: () => {}, registerTool:()=>{},on:(name,fn)=>handlers.set(name,fn),sendMessage:m=>messages.push(m),getAllTools:()=>[]});
  const ctx=name=>({cwd:f.root,hasUI:false,sessionManager:{getSessionId:()=>name,getSessionFile:()=>undefined},ui:{}});
  const parent=ctx('runtime-parent'),child=ctx('runtime-child'),parentKey=__internals.contextKey(f.root,parent);f.pointer(parentKey,path);
  const prompt=assembleDispatchPrompt({prompt:'Implement',contextId:'runtime-child',role:'trellis-implement',executionRoot:f.root,materials:requireMaterials(await queryWorktree(f.root,path,false,undefined,false,'implement'))});

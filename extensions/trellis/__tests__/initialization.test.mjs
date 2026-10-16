@@ -86,7 +86,7 @@ test('concurrent file changes after preview conflict before lock or writes; iden
 });
 
 test('task_error stays distinct from no_task and command tools scope/invalidate without touching WebSocket monitors',async t=>{
- const f=fixture(t);apply(plan(f.root,'Dev'));const handlers=new Map(),messages=[];trellis({on:(n,h)=>handlers.set(n,h),registerCommand:()=>{},registerTool:()=>{},events:{on:()=>()=>{},emit:()=>{}},sendMessage:m=>messages.push(m),getAllTools:()=>[]});const ctx={cwd:f.root,hasUI:false,ui:{},sessionManager:{getSessionId:()=>f.root,getSessionFile:()=>undefined}};const key=__internals.contextKey(f.root,ctx);const before=()=>handlers.get('before_agent_start')({prompt:'inspect',systemPromptOptions:{sections:{}}},ctx);
+ const f=fixture(t);apply(plan(f.root,'Dev'));const handlers=new Map(),messages=[];trellis({registerMessageRenderer:()=>{},on:(n,h)=>handlers.set(n,h),registerCommand:()=>{},registerTool:()=>{},events:{on:()=>()=>{},emit:()=>{}},sendMessage:m=>messages.push(m),getAllTools:()=>[]});const ctx={cwd:f.root,hasUI:false,ui:{},sessionManager:{getSessionId:()=>f.root,getSessionFile:()=>undefined}};const key=__internals.contextKey(f.root,ctx);const before=()=>handlers.get('before_agent_start')({prompt:'inspect',systemPromptOptions:{sections:{}}},ctx);
  await before();assert.match(messages.at(-1).content,/No active task/);
  for(const input of [{toolName:'bash',command:'task.py current --json',run_in_background:false},{toolName:'bash',command:'task.py current --json',run_in_background:true},{toolName:'monitor',command:'task.py current --json'}]){
   const {toolName,...args}=input;await handlers.get('tool_call')({toolName,input:args},ctx);
@@ -101,7 +101,7 @@ test('task_error stays distinct from no_task and command tools scope/invalidate 
 
 test('unsupported deployed release injects no state and blocks command/role execution while WebSocket/non-Trellis reads are untouched',async t=>{
  const f=fixture(t);apply(plan(f.root,'Dev'));const file=join(f.root,'.trellis/.pi-trellis.json'),m=JSON.parse(readFileSync(file));m.runtimeReleaseId='wrong';writeFileSync(file,JSON.stringify(m));
- const handlers=new Map(),messages=[];trellis({on:(n,h)=>handlers.set(n,h),registerCommand:()=>{},registerTool:()=>{},events:{on:()=>()=>{},emit:()=>{}},sendMessage:m=>messages.push(m)});const ctx={cwd:f.root,hasUI:false,ui:{},sessionManager:{getSessionId:()=>f.root,getSessionFile:()=>undefined}};
+ const handlers=new Map(),messages=[];trellis({registerMessageRenderer:()=>{},on:(n,h)=>handlers.set(n,h),registerCommand:()=>{},registerTool:()=>{},events:{on:()=>()=>{},emit:()=>{}},sendMessage:m=>messages.push(m)});const ctx={cwd:f.root,hasUI:false,ui:{},sessionManager:{getSessionId:()=>f.root,getSessionFile:()=>undefined}};
  await handlers.get('before_agent_start')({prompt:'inspect',systemPromptOptions:{sections:{}}},ctx);assert.deepEqual(messages,[]);
  for(const tool of ['bash','monitor'])assert.equal((await handlers.get('tool_call')({toolName:tool,input:{command:'task.py deactivate'}},ctx)).block,true);
  assert.equal((await handlers.get('tool_call')({toolName:'subagent_run',input:{subagent_type:'trellis-implement',prompt:'work'}},ctx)).block,true);

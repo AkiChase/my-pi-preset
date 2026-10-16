@@ -180,7 +180,7 @@ test('binary skill assets are byte/hash/mode checked without text validation', t
 function commandHarness(t, root, script) {
  const commands = new Map(), notices = [], answers = [...script];
  let reloads = 0;
- registerInitCommand({ registerCommand: (name, spec) => commands.set(name, spec), sendMessage: () => {} }, async () => {});
+ registerInitCommand({ registerMessageRenderer:()=>{}, registerCommand: (name, spec) => commands.set(name, spec), sendMessage: () => {} }, async () => {});
  const next = () => { assert.ok(answers.length, 'unexpected dialog'); return answers.shift(); };
  const ctx = { cwd: root, hasUI: true, signal: undefined, isProjectTrusted: () => true, reload: async () => { reloads++; },
   ui: { select: async () => next(), input: async () => next(), notify: text => notices.push(text) } };
@@ -204,6 +204,6 @@ test('init and update complete without reloading; notices tell the user to /relo
 
 test('the extension registers no resources_discover skill injection', () => {
  const handlers = new Map();
- trellis({ events: { on: () => () => {}, emit: () => {} }, on: (n, h) => handlers.set(n, h), registerTool: () => {}, registerCommand: () => {}, sendMessage: () => {}, getAllTools: () => [] });
+ trellis({registerMessageRenderer:()=>{}, events: { on: () => () => {}, emit: () => {} }, on: (n, h) => handlers.set(n, h), registerTool: () => {}, registerCommand: () => {}, sendMessage: () => {}, getAllTools: () => [] });
  assert.ok(handlers.size > 0); assert.equal(handlers.has('resources_discover'), false);
 });

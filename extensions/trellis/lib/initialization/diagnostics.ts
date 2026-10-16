@@ -342,22 +342,83 @@ export function collectDiagnostics(scope: DiagnosticScope, options: { signal?: A
 	return result;
 }
 
-/** One bounded English report; normal files/hashes/config bodies are never printed. */
-export function formatDiagnostics(result: DiagnosticResult): string {
-	const issues = result.items.filter(i => i.status === "issue"), incomplete = result.items.filter(i => ["blocked", "skipped", "cancelled"].includes(i.status));
-	const passed = result.items.filter(i => i.status === "pass"), categories = [...new Set(passed.map(i => clean(i.category, 32)))];
-	const runtime = result.items.some(i => i.id === "python");
-	const title = result.items.some(i => i.status === "cancelled") ? "Cancelled" : issues.length ? "Issues found" : incomplete.length ? runtime ? "Checks completed · some capabilities unverified" : "Static checks completed · probes not completed" : runtime ? "Checks completed" : "Static checks completed";
-	const lines = [`Check project · ${title}`, `Project: ${clean(result.scope.executionRoot ?? result.scope.cwd, 1000)}`, "Scope: Trellis deployment in this project", `Completed ${runtime ? "bounded" : "static"} items: ${passed.length} (${clean(categories.join(", "), 256) || "none"})`, `Issues: ${issues.length}; not completed/not applicable: ${incomplete.length}`, ...passed.filter(i => i.id === "developer" || i.id === "project").map(i => clean(i.summary))];
-	const footer = "Read-only: no files were changed.";
-	let omitted = result.omitted;
-	const omittedCategories = new Set((result.omittedCategories ?? []).slice(0, 16).map(c => clean(c, 32)));
-	for (const item of [...issues, ...incomplete]) {
-		const block = [`\n[${item.status === "issue" ? item.severity === "warning" ? "Warning" : "Error" : item.status}] ${clean(item.summary)}`, ...item.evidence.map(v => `Location/evidence: ${clean(v)}`), ...(item.impact ? [`Impact: ${clean(item.impact)}`] : []), ...(item.advice ? [`Next: ${clean(item.advice)}`] : [])].join("\n");
-		if (Buffer.byteLength(lines.join("\n") + block + footer) > DIAGNOSTIC_LIMITS.report - 1024) { omitted++; omittedCategories.add(clean(item.category, 32)); continue; }
-		lines.push(block);
+/** Persist only bounded, sanitized presentation data, never collector facts or controllers. */
+export interface DiagnosticReportLine {
+	text: string;
+	tone: "text" | "accent" | "error" | "warning" | "success" | "muted";
+}
+export interface DiagnosticReport {
+	version: 1;
+	compact: DiagnosticReportLine[];
+	expanded: DiagnosticReportLine[];
+}
+export function buildDiagnosticReport(result: DiagnosticResult): DiagnosticReport {
+	const groups = [
+		{ label: "Error", plural: "Errors", icon: "✗", tone: "error", items: result.items.filter(i => i.status === "issue" && i.severity !== "warning") },
+		{ label: "Warning", plural: "Warnings", icon: "⚠", tone: "warning", items: result.items.filter(i => i.status === "issue" && i.severity === "warning") },
+		{ label: "Blocked", plural: "Blocked", icon: "⊘", tone: "warning", items: result.items.filter(i => i.status === "blocked") },
+		{ label: "Skipped", plural: "Skipped", icon: "—", tone: "muted", items: result.items.filter(i => i.status === "skipped") },
+		{ label: "Cancelled", plural: "Cancelled", icon: "—", tone: "muted", items: result.items.filter(i => i.status === "cancelled") },
+		{ label: "Passed", plural: "Passed", icon: "✓", tone: "success", items: result.items.filter(i => i.status === "pass") },
+	] as const;
+	const [errors, warnings, blocked, skipped, cancelled, passed] = groups;
+	const partial = blocked.items.length + skipped.items.length > 0;
+	const outcome = errors.items.length ? "Needs attention" : warnings.items.length ? "Warnings found" : "No errors found";
+	const title = `Check project · ${outcome}${cancelled.items.length ? " · Cancelled" : partial ? " · Verification incomplete" : ""}${result.omitted ? " · Results incomplete" : ""}`;
+	const tone = errors.items.length ? "error" : warnings.items.length || blocked.items.length ? "warning" : partial || cancelled.items.length || result.omitted ? "accent" : "success";
+	const header: DiagnosticReportLine[] = [
+		{ text: title, tone },
+		{ text: `${errors.icon} Errors ${errors.items.length}   ${warnings.icon} Warnings ${warnings.items.length}   ${passed.icon} Passed ${passed.items.length}`, tone: "text" },
+		{ text: `⊘ Blocked ${blocked.items.length}   — Skipped ${skipped.items.length}   — Cancelled ${cancelled.items.length}`, tone: "muted" },
+		{ text: `Project: ${clean(result.scope.executionRoot ?? result.scope.cwd, 1000)}`, tone: "muted" },
+		{ text: "Scope: Trellis deployment in this project", tone: "muted" },
+	];
+	const make = (expanded: boolean): DiagnosticReportLine[] => {
+		const lines = [...header];
+		let omitted = result.omitted, hidden = 0;
+		const categories = new Set((result.omittedCategories ?? []).slice(0, 16).map(c => clean(c, 32)));
+		let bytes = Buffer.byteLength(lines.map(l => l.text).join("\n"));
+		const append = (block: DiagnosticReportLine[]) => {
+			const size = Buffer.byteLength(block.map(l => l.text).join("\n")) + 1;
+			if (bytes + size > DIAGNOSTIC_LIMITS.report - 2048) return false;
+			lines.push(...block); bytes += size; return true;
+		};
+		for (const group of groups) {
+			if (!group.items.length) continue;
+			if (!expanded && group.label === "Passed") {
+				append([{ text: `\n✓ Passed: ${clean([...new Set(group.items.map(i => clean(i.category, 32)))].join(", "), 256)}`, tone: "success" }]);
+				continue;
+			}
+			append([{ text: `\n${group.plural}`, tone: group.tone }]);
+			for (const [index, item] of group.items.entries()) {
+				if (!expanded && index >= (group.label === "Error" || group.label === "Warning" ? 3 : 2)) { hidden++; continue; }
+				const block: DiagnosticReportLine[] = [{ text: `${group.icon} [${group.label}] ${clean(item.summary, expanded ? 500 : 180)}`, tone: group.tone }];
+				if (expanded && group.label !== "Passed") {
+					block.push(...item.evidence.slice(0, 12).map(v => ({ text: `  Location/evidence: ${clean(v)}`, tone: "muted" as const })));
+				}
+				if (expanded && item.impact) block.push({ text: `  Impact: ${clean(item.impact)}`, tone: "muted" });
+				if (item.advice && (expanded || group.label === "Error" || group.label === "Warning" || group.label === "Blocked")) block.push({ text: `  Next: ${clean(item.advice, expanded ? 500 : 180)}`, tone: "text" });
+				if (!append(block)) { omitted++; categories.add(clean(item.category, 32)); }
+			}
+		}
+		if (!expanded) lines.push({ text: `\nExpand for evidence and check details${hidden ? ` (${hidden} more items hidden)` : ""}.`, tone: "muted" });
+		if (omitted) {
+			lines[0] = { ...lines[0], text: lines[0].text.includes("Results incomplete") ? lines[0].text : `${lines[0].text} · Results incomplete`, tone: errors.items.length ? "error" : "warning" };
+			lines.push({ text: `\n${omitted} diagnostic item(s) omitted by the report budget; additional checks/details are not displayed. Omitted categories: ${clean([...categories].join(", "), 200) || "not recorded"}.`, tone: "warning" });
+		}
+		lines.push({ text: "\nRead-only: no files were changed.", tone: "muted" });
+		return lines;
+	};
+	const expanded = make(true), compact = make(false);
+	// Detail-budget omissions must remain visible before the user expands the message.
+	if (expanded[0].text.includes("Results incomplete") && !compact[0].text.includes("Results incomplete")) {
+		compact[0] = { ...expanded[0] };
+		compact.splice(compact.length - 1, 0, { text: "Some diagnostic details were omitted by the report budget; expand for the omission summary.", tone: "warning" });
 	}
-	if (omitted) lines.push(`\n${omitted} diagnostic item(s) omitted by the report budget; additional checks/details are not displayed. Omitted categories: ${clean([...omittedCategories].join(", "), 200) || "not recorded"}.`);
-	lines.push("\n" + footer);
-	return lines.join("\n");
+	return { version: 1, compact, expanded };
+}
+
+/** Bounded English fallback, without persisted ANSI colors. */
+export function formatDiagnostics(result: DiagnosticResult): string {
+	return buildDiagnosticReport(result).expanded.map(line => line.text).join("\n");
 }

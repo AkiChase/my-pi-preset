@@ -7,7 +7,8 @@ import { applyResourcePlan, read, resourcePlan, templatePlan, applyTemplatePlan,
 import { initializationRoot } from "../project-state.ts";
 import { inspect, plan, apply, checkedPath, packageResources, packageSkills, defaultTemplates, runtimeBaseline, verifyRuntime, validateUsername, SKILL_ROOT, type Inspection, type InitPlan } from "./engine.ts";
 import { runDiagnostics } from "./diagnostic-runtime.ts";
-import { collectDiagnostics, formatDiagnostics, type DiagnosticScope } from "./diagnostics.ts";
+import { collectDiagnostics, formatDiagnostics, buildDiagnosticReport, type DiagnosticScope } from "./diagnostics.ts";
+import { CHECK_REPORT_TYPE, registerDiagnosticReport } from "./diagnostic-report.ts";
 
 // Menu actions: verb-first, short, write actions before Check/Help/Cancel.
 export const ACTIONS = Object.freeze({
@@ -192,6 +193,7 @@ async function applyTemplates(ctx: ExtensionCommandContext, root: string, notify
 /** Optional parent lifecycle wrapper may suppress stale publication by returning undefined. */
 export type RunDiagnosticCheck = (ctx: ExtensionCommandContext, scope: DiagnosticScope, options: { signal?: AbortSignal }) => Promise<import("./diagnostics.ts").DiagnosticResult | undefined>;
 export function registerInitCommand(pi: ExtensionAPI, refresh: (ctx: ExtensionCommandContext, root: string) => Promise<void>, runCheck?: RunDiagnosticCheck): void {
+	registerDiagnosticReport(pi);
 	pi.registerCommand("trellis-init", {
 		description: "Initialize, update or check Pi Trellis in this project (menu, no arguments)",
 		handler: async (args, ctx) => {
@@ -211,7 +213,10 @@ export function registerInitCommand(pi: ExtensionAPI, refresh: (ctx: ExtensionCo
 					// Check inspects the project deployment only; no session or task identity is consulted.
 					const scope: DiagnosticScope = { cwd: ctx.cwd, isProjectTrusted: typeof ctx.isProjectTrusted === "function" && ctx.isProjectTrusted() };
 					const report = await (runCheck ? runCheck(ctx, scope, { signal: ctx.signal }) : runDiagnostics(scope, { signal: ctx.signal }));
-					if (report) notify(formatDiagnostics(report));
+					if (report) {
+						const details = buildDiagnosticReport(report);
+						pi.sendMessage({ customType: CHECK_REPORT_TYPE, content: details.expanded.map(line => line.text).join("\n"), details, display: true });
+					}
 					return;
 				}
 				if (!choice || !snapshot.operations.includes(choice)) return;

@@ -27,7 +27,7 @@ function setup(t) {
     put(`${dir}/implement.jsonl`, JSON.stringify({ file: `${dir}/prd.md` }));
   }
   const handlers = new Map(), messages = [], tools = new Map();
-  const pi = { events: { on: () => () => {}, emit: () => {} }, registerCommand: () => {}, registerTool: (tool) => tools.set(tool.name, tool), on: (name, handler) => handlers.set(name, handler), sendMessage: (message) => messages.push(message), getAllTools: () => [{ name: "subagent_run" }] };
+  const pi = { registerMessageRenderer: () => {}, events: { on: () => () => {}, emit: () => {} }, registerCommand: () => {}, registerTool: (tool) => tools.set(tool.name, tool), on: (name, handler) => handlers.set(name, handler), sendMessage: (message) => messages.push(message), getAllTools: () => [{ name: "subagent_run" }] };
   trellis(pi);
   const ctx = (name) => ({ cwd: root, hasUI: false, sessionManager: { getSessionId: () => name, getSessionFile: () => undefined }, ui: {} });
   const pointer = (context, task) => put(`.trellis/.runtime/sessions/${__internals.contextKey(root, context)}.json`, JSON.stringify({ current_task: `.trellis/tasks/${task}` }));
@@ -280,7 +280,7 @@ test('live source content/lifecycle changes do not cancel child authority or res
 
 test('linked checkout startup with missing marker cannot expose target/parent pointer',async t=>{
  const f=await managedChild(t,'valid-before-marker-loss');rmSync(join(f.child.cwd,'.trellis/.runtime/pi-trellis/binding.json'));
- const handlers=new Map(),messages=[];trellis({events:{on:()=>()=>{},emit:()=>{}},registerCommand:()=>{},registerTool:()=>{},on:(n,h)=>handlers.set(n,h),sendMessage:m=>messages.push(m)});
+ const handlers=new Map(),messages=[];trellis({registerMessageRenderer:()=>{},events:{on:()=>()=>{},emit:()=>{}},registerCommand:()=>{},registerTool:()=>{},on:(n,h)=>handlers.set(n,h),sendMessage:m=>messages.push(m)});
  const child={...f.child,sessionManager:{getSessionId:()=> 'missing-marker-child',getSessionFile:()=>undefined}};
  const oldKey=__internals.contextKey(child.cwd,child);mkdirSync(join(child.cwd,'.trellis/.runtime/sessions'),{recursive:true});const old=join(child.cwd,`.trellis/.runtime/sessions/${oldKey}.json`);writeFileSync(old,'{"current_task":".trellis/tasks/b"}');const bytes=readFileSync(old);
  await handlers.get('session_start')({},child);assert.notEqual(__internals.contextKey(child.cwd,child),oldKey);

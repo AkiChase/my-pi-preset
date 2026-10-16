@@ -13,7 +13,7 @@ function fixture(t, supported = false) {
  const put=(path,text)=>{mkdirSync(dirname(join(root,path)),{recursive:true});writeFileSync(join(root,path),text);};
  if(supported)apply(plan(root,'Fixture'));
  const handlers=new Map(),commands=new Map(),messages=[],notices=[];
- trellis({events:{on:()=>()=>{},emit:()=>{}},on:(n,h)=>handlers.set(n,h),registerTool:()=>{},registerCommand:(n,c)=>commands.set(n,c),sendMessage:m=>messages.push(m),getAllTools:()=>[{name:'subagent_run'}]});
+ trellis({registerMessageRenderer:()=>{},events:{on:()=>()=>{},emit:()=>{}},on:(n,h)=>handlers.set(n,h),registerTool:()=>{},registerCommand:(n,c)=>commands.set(n,c),sendMessage:m=>messages.push(m),getAllTools:()=>[{name:'subagent_run'}]});
  const ctx={cwd:root,hasUI:true,sessionManager:{getSessionId:()=>root,getSessionFile:()=>undefined},ui:{theme:{fg:(_c,s)=>s,bold:s=>s},setStatus:()=>{},setWidget:()=>{},notify:(s)=>notices.push(s)}};
  const call=(command,toolName='bash')=>handlers.get('tool_call')({toolName,input:{command}},ctx);
  return {root,put,handlers,commands,messages,notices,ctx,call};
