@@ -1,0 +1,3 @@
+{"file":".trellis/spec/development/index.md","reason":"Extension state, UI ownership and shared widget contract"}
+{"file":".trellis/spec/testing/index.md","reason":"Offline SDK and lifecycle regression requirements"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Session identity, side effects and cleanup review"}

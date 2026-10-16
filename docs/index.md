@@ -5,6 +5,7 @@
 ## 本仓库自带
 
 - [Session Name](extensions/session-name.md)
+- [Widget Display：内置信息统一展示](extensions/widget-display.md)
 - [Recap](extensions/recap.md)
 - [Task Composition：任务管理与共享面板](extensions/task-composition.md)
 - [Monitor](extensions/monitor.md)
