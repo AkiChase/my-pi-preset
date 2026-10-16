@@ -16,7 +16,7 @@ export function runToolGuidance(options: RunGuidanceOptions): string[] {
   - Use specialized agents for substantial independent work or broad exploration. Use direct tools for small work whose target is already known. Do not duplicate delegated investigation.
   - Give a self-contained prompt with the goal, relevant context, constraints, permission to edit or research only, and the expected result. Inspect actual changes and verification before reporting success; a delegated summary is not proof.
   - Accepted arguments by mode:
-    New: prompt, description, subagent_type; optional name, model, thinking, run_in_background, isolated, inherit_context${spawnExtras}.
+    New: prompt, description, subagent_type; optional ${options.nested ? "" : "name, "}model, thinking, run_in_background, isolated, inherit_context${spawnExtras}.
     Resume: prompt, resume${options.nested ? "" : "; optional run_in_background"}.
     Do not pass fields outside the selected mode. Required strings must be non-empty; description is a short, specific UI summary for new agents only.
   - Available permitted agent types:

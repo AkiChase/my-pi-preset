@@ -22,11 +22,12 @@ void it("foundation config ignores old names; real agent discovery retains proje
     writeFileSync(join(agentDir, "subagents.json"), '{"maxConcurrent":99}');
     writeFileSync(join(cwd, ".pi", "subagents.json"), '{"maxConcurrent":88}');
     assert.deepEqual(loadSettings(cwd), {});
-    writeFileSync(join(agentDir, "agent-tasks.json"), '{"maxConcurrent":3,"backgroundByDefault":true}');
+    writeFileSync(join(agentDir, "agent-tasks.json"), '{"maxConcurrent":3,"backgroundByDefault":true,"toolDescriptionMode":"custom"}');
     writeFileSync(join(cwd, ".pi", "agent-tasks.json"), '{"maxConcurrent":2}');
     assert.deepEqual(loadSettings(cwd), { maxConcurrent: 2, backgroundByDefault: true });
     assert.equal(saveSettings({ maxConcurrent: 4 }, cwd), true);
     assert.equal(JSON.parse(readFileSync(join(cwd, ".pi", "agent-tasks.json"), "utf8")).maxConcurrent, 4);
+    assert.equal(Object.hasOwn(JSON.parse(readFileSync(join(cwd, ".pi", "agent-tasks.json"), "utf8")), "toolDescriptionMode"), false);
     assert.equal(readFileSync(join(cwd, ".pi", "subagents.json"), "utf8"), '{"maxConcurrent":88}');
 
     writeFileSync(join(agentDir, "bg-tasks.json"), '{"timeoutMs":60000}');

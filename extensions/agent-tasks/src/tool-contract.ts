@@ -9,7 +9,7 @@ export function assertAgentToolArguments(value: unknown, capabilities: AgentTool
   const resume = Object.hasOwn(params, "resume");
   const allowed = resume
     ? ["prompt", "resume", ...(capabilities.nested ? [] : ["run_in_background"])]
-    : ["prompt", "description", "subagent_type", "name", "model", "thinking", "run_in_background", "isolated", "inherit_context",
+    : ["prompt", "description", "subagent_type", ...(capabilities.nested ? [] : ["name"]), "model", "thinking", "run_in_background", "isolated", "inherit_context",
       ...(capabilities.isolation ? ["isolation"] : []), ...(capabilities.scheduling ? ["schedule"] : [])];
   assertFields(params, allowed);
   assertNonEmptyString(params.prompt, "`prompt`");

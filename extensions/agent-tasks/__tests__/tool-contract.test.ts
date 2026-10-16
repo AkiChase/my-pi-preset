@@ -23,6 +23,7 @@ test("direct tool calls reject unknown, malformed and disabled fields", () => {
   const base = { prompt: "inspect", description: "inspect code", subagent_type: "Explore" };
   for (const extra of [{ typo: true }, { isolated: "false" }, { thinking: "hight" }, { name: "a b" }, { isolation: "remote" }, { model: " " }]) assert.throws(() => assertAgentToolArguments({ ...base, ...extra }, main));
   assert.throws(() => assertAgentToolArguments({ ...base, isolation: "off" }, { ...main, isolation: false }));
+  assert.throws(() => assertAgentToolArguments({ ...base, name: "unused" }, nested));
   assert.throws(() => assertAgentToolArguments({ ...base, schedule: "+10m" }, nested));
 });
 test("message admission validates the closed real-ID input shape", () => {

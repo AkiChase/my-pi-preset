@@ -30,6 +30,8 @@ Use the existing `description`, `promptSnippet` and `promptGuidelines` registrat
 
 When overriding a built-in tool, explicitly replace its description/snippet/guidelines after spreading the original definition, rather than appending incompatible instructions. Keep generic working rules separate. Current-interface guidance must not teach removed parameters or migration history; rejected legacy inputs belong in schema/runtime errors. Generate configuration-dependent defaults from actual configuration. Verify the registered definition against the installed SDK prompt assembler, including unrelated tool preservation and disabled/hidden tool omission; local strings alone do not prove the final context.
 
+Official Agent guidance has one mode only: remove alternate full/compact/custom settings and template reads rather than mapping legacy configuration. Keep script API facts in the workflow usage group, not a giant description. Verify registered top-level/nested mode tables and configured defaults together; nested spawn has no name parameter.
+
 ### Bash contract example
 
 1. **Scope/trigger:** overriding built-in execution semantics is a public request/response and system-guidance contract change.

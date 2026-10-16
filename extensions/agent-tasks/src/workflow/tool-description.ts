@@ -1,42 +1,6 @@
-/**
- * tool-description.ts — the model-facing description of the `subagent_workflow` tool.
- *
- * This is a deliberate port of Claude Code's `Workflow` tool description, not a
- * paraphrase of it. The rule the text is held to: **match Claude Code's wording
- * everywhere; deviate only in the specific clause where its sentence would be
- * false about pi, and keep that deviation minimal and in its voice.** Wording
- * parity is the point — a user who knows one tool should not have to relearn
- * the other, and the orchestration patterns below are load-bearing guidance
- * that gets used badly when compressed.
- *
- * Parts omitted because pi has no such feature: the `ultracode` opt-in, MCP
- * tools reached through `ToolSearch`, the `agent-<id>.jsonl` resume fallback,
- * and the `/config` workflow-size guideline.
- *
- * Clauses that had to deviate, each because Claude Code's is untrue here:
- *   - `schema` is pressure, not force — `toolChoice` is not plumbed through
- *     pi's `AgentSession`, so a child can decline and the call returns null.
- *   - `budget.total` is always null; pi has no token-target directive.
- *   - `parallel` propagates a fatal run error instead of folding it to null.
- *   - `effort` inherits the agent definition's level, then the parent's.
- *   - `isolation` removes the worktree on settle, changes kept on a branch.
- * Additions with no upstream counterpart: `gate`, `resume`, `effort: "minimal"`,
- * the saved-workflow directories, and the reject-unknown-options guarantee.
- *
- * Kept out of index.ts purely for size. `{{placeholder}}` tokens are rendered by
- * the same substitution pass the subagent_run tool's description uses, so a
- * user-authored override can interpolate the live agent roster.
- */
-
-/**
- * Rendered with `{{typeList}}` substituted. Keep the prose accurate to what the
- * runtime actually implements — documenting a global we do not ship is worse
- * than documenting nothing, because the script only fails once it is running.
- * `workflow-tool-description.test.ts` pins the parts that can drift: the
- * `agent()` option set, the `resume` exclusions, the effort levels, the caps,
- * and that every example here uses options the runtime actually accepts.
- */
-export const fullWorkflowToolDescription = `Execute a workflow script that orchestrates multiple subagents deterministically. Workflows run in the background — this tool returns immediately with an execution_id, and you are notified when the workflow completes. Use /agents → Workflows to watch live progress.
+/** Official workflow rules, including the supported script API and examples. */
+export function workflowToolGuidance(typeList: string): string[] {
+  const text = `Execute a workflow script that orchestrates multiple subagents deterministically. Workflows run in the background — this tool returns immediately with an execution_id, and you are notified when the workflow completes. Use /agents → Workflows to watch live progress.
 
 A workflow structures work across many agents — to be comprehensive (decompose and cover in parallel), to be confident (independent perspectives and adversarial checks before committing), or to take on scale one context can't hold (migrations, audits, broad sweeps). The script is where you encode that structure: what fans out, what verifies, what synthesizes.
 
@@ -80,12 +44,12 @@ The \`meta\` object must be a PURE LITERAL — no variables, function calls, spr
 
 Script body hooks:
 - agent(prompt: string, opts?: {label?: string, phase?: string, schema?: object, model?: string, effort?: string, isolation?: 'worktree', agentType?: string, gate?: string, resume?: string}): Promise<any> — spawn a subagent. Without schema, returns its final text as a string. With schema (a JSON Schema), the subagent is given a StructuredOutput tool built from it and agent() returns the validated object — no parsing needed. A payload that does not match is rejected back to the child, which corrects it; a child that never answers through the tool gets one more prompt and then fails, so the call returns null — filter after every schema stage. Returns null if the user skips the agent mid-run or the subagent dies on a terminal API error after retries (filter with .filter(Boolean)). opts.label overrides the display label. opts.phase explicitly assigns this agent to a progress group (use this inside pipeline()/parallel() stages to avoid races on the global phase() state — same phase string → same group box). opts.model overrides the model for this agent call. Default to omitting it — the agent inherits the main-loop model (the resolved session model), which is almost always correct. Only set it when you're highly confident a different tier fits the task; when unsure, omit. opts.effort overrides the reasoning effort for this agent call ('off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max') — omit to inherit the agent definition's own level, then the parent's; use 'low' for cheap mechanical stages and higher tiers only for the hardest verify/judge stages. opts.isolation: 'worktree' runs the agent in a fresh git worktree — EXPENSIVE (setup time + disk per agent), use ONLY when agents mutate files in parallel and would otherwise conflict; the worktree is removed when the agent settles, its changes preserved on a branch. opts.gate: '<command>' runs a shell command after the agent finishes and requires it to pass — a non-zero exit marks the agent failed and the command's output becomes the error; prefer gate: 'npm test' over asking another agent whether the code looks right. opts.resume: '<label>' continues the child that ran under that label instead of starting fresh, so an iterative loop keeps its context — it cannot be combined with agentType, model, effort, isolation, gate or schema. opts.agentType uses a custom subagent type instead of the default workflow subagent — resolved from the same registry as the subagent_run tool; composes with schema. Available types:
-{{typeList}}
+${typeList}
 - pipeline(items, stage1, stage2, ...): Promise<any[]> — run each item through all stages independently, NO barrier between stages. Item A can be in stage 3 while item B is still in stage 1. This is the DEFAULT for multi-stage work. Wall-clock = slowest single-item chain, not sum-of-slowest-per-stage. Every stage callback receives (prevResult, originalItem, index) — use originalItem/index in later stages to label work without threading context through stage 1's return value. A stage that throws drops that item to \`null\` and skips its remaining stages.
 - parallel(thunks: Array<() => Promise<any>>): Promise<any[]> — run tasks concurrently. This is a BARRIER: awaits all thunks before returning. A thunk that throws (or whose agent errors) resolves to \`null\` in the result array, so \`.filter(Boolean)\` before using the results; only a fatal run error — a cap breach, a nested workflow that could not load, or a library validation failure such as an unrecognised \`agent()\` option or an out-of-range \`effort\` — propagates instead of being folded into a null. Arguments are validated against the documented shape, so a typo fails the run naming the offending field instead of becoming a silent null branch. Use ONLY when you genuinely need all results together.
 - log(message: string): void — emit a progress message to the user (shown as a narrator line above the progress tree)
 - phase(title: string): void — start a new phase; subsequent agent() calls are grouped under this title in the progress display
-- args: any — the value passed as subagent_workflow's \`args\` input, verbatim (undefined if not provided). Pass arrays/objects as actual JSON values in the tool call, NOT as a JSON-encoded string — \`args: ["a.ts", "b.ts"]\`, not \`args: "[\\"a.ts\\", ...]"\` (a stringified list reaches the script as one string, so \`args.filter\`/\`args.map\` throw). Use this to parameterize named workflows — e.g. pass a research question, target path, or config object directly instead of via a side-channel file.
+- args: any — the value passed as subagent_workflow's \`args\` input, verbatim (undefined if not provided, including replay; previous args are not automatically inherited). Pass arrays/objects as actual JSON values in the tool call, NOT as a JSON-encoded string — \`args: ["a.ts", "b.ts"]\`, not \`args: "[\\"a.ts\\", ...]"\` (a stringified list reaches the script as one string, so \`args.filter\`/\`args.map\` throw). Use this to parameterize named workflows — e.g. pass a research question, target path, or config object directly instead of via a side-channel file.
 - budget: {total: number|null, spent(): number, remaining(): number} — \`budget.total\` is always null here: it comes from a token-target directive pi does not have, so guards like \`while (budget.total && budget.remaining() > 50_000) { ... }\` correctly do not fire rather than throwing on a missing global. \`budget.spent()\` returns output tokens spent by this run's agents. \`budget.remaining()\` returns \`Infinity\` with no target.
 - workflow(nameOrRef: string | {scriptPath: string}, args?: any): Promise<any> — run another workflow inline as a sub-step and return whatever it returns. Pass a name to invoke a saved workflow (same registry as {name: "..."}), or {scriptPath} to run a script file you Wrote earlier. The child shares this run's concurrency cap, agent counter, abort signal, and token budget — its agents appear under a "▸ name" group in /agents → Workflows and its tokens count toward budget.spent(). The args param becomes the child's \`args\` global. Nesting is one level only: workflow() inside a child throws. Throws on unknown name / unreadable scriptPath / child syntax error; catch to handle gracefully.
 
@@ -113,7 +77,7 @@ Smell test: if you wrote
   const c = await parallel(b.map(...))
 that middle transform doesn't need the barrier. Rewrite as a pipeline with the transform inside a stage. When in doubt: pipeline.
 
-Concurrent agent() calls are capped at min(16, available CPUs - 2) per workflow — excess calls queue and run as slots free up. You can still pass 100 items to parallel()/pipeline() and they all complete; only ~10 run at any moment. Total agent count across a workflow's lifetime is capped at 1000 — a runaway-loop backstop set far above any real workflow. A single parallel()/pipeline() call accepts at most 4096 items; passing more is an explicit error, not a silent truncation.
+Concurrent agent() calls are capped at max(1, min(16, available CPUs - 2)) per workflow — excess calls queue and run as slots free up. You can still pass 100 items to parallel()/pipeline() and they all complete; only ~10 run at any moment. Total agent count across a workflow's lifetime is capped at 1000 — a runaway-loop backstop set far above any real workflow. A single parallel()/pipeline() call accepts at most 4096 items; passing more is an explicit error, not a silent truncation.
 
 The canonical multi-stage pattern — pipeline by default, each dimension verifies as soon as its review completes:
   export const meta = {
@@ -200,3 +164,6 @@ Use this tool for multi-step orchestration where control flow should be determin
 ## Resume
 
 The tool result includes an execution_id. To resume after a pause, kill, or script edit, relaunch with subagent_workflow({scriptPath, resumeFromRunId}) — the longest unchanged prefix of agent() calls returns cached results instantly; the first edited/new call and everything after it runs live. Same script + same args → 100% cache hit. It is a prefix and not a lookup: a later call that still matches is not reused once an earlier one has changed. A journaled failure ends the prefix, so resuming a run that died at agent 5 retries exactly agent 5. Same session only, and the run must have finished — stop it from /agents → Workflows first. Before diagnosing why a completed workflow returned an empty or unexpected result, Read the run's \`<run id>.workflow.jsonl\` beside its script — it records each agent's actual return value; do not assume cached results are non-empty. Date.now()/Math.random()/new Date() are unavailable in scripts (they would break this) — stamp results after the workflow returns, or pass timestamps via args.`;
+
+  return ["Subagent_workflow usage:\n" + text.split("\n").map(line => "  " + line).join("\n")];
+}

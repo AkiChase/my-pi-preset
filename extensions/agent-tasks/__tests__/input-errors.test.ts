@@ -12,7 +12,12 @@ import assert from "node:assert/strict";
 import { it } from "node:test";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+const sdkEntry = fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"));
+const { buildSystemPrompt } = await import(pathToFileURL(join(dirname(sdkEntry), "core/system-prompt.js")).href) as {
+    buildSystemPrompt(options: { cwd: string; selectedTools: string[]; hiddenTools?: string[]; toolSnippets: Record<string, string>; toolGuidelines: Record<string, string[]> }): string;
+};
 import type { AgentSession, ExtensionAPI, ExtensionToolContext } from "@earendil-works/pi-coding-agent";
 import { validateToolArguments } from "@earendil-works/pi-ai";
 import { TaskCoordinator } from "../../task-ui/coordinator.ts";
@@ -43,6 +48,7 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
     const config = join(root, "agent");
     mkdirSync(cwd);
     mkdirSync(config);
+    if (settings.testTemplate) writeFileSync(join(config, "agent-tool-description.md"), "OLD_CUSTOM_TEMPLATE");
     if (settings.customAgent) {
         mkdirSync(join(config, "agents"));
         writeFileSync(join(config, "agents", "custom.md"), typeof settings.customAgent === "string" ? settings.customAgent : "---\nname: custom\ndescription: Offline agent\n---\nDo work.\n");
@@ -150,6 +156,28 @@ function hostError(parameters: unknown, args: unknown, name = "subagent_run"): E
         return err as Error;
     }
 }
+
+void it("actual registered Agent tools contribute one official SDK rule group and ignore old modes/templates", async () => {
+    for (const backgroundByDefault of [false, true]) {
+        const f = await factory({ backgroundByDefault, toolDescriptionMode: "custom", testTemplate: true, schedulingEnabled: false, worktreeIsolation: false });
+        try {
+            const definitions = [...f.tools.values()];
+            const snippets = Object.fromEntries(definitions.map(tool => [tool.name, tool.promptSnippet ?? ""]));
+            const guidelines = Object.fromEntries(definitions.map(tool => [tool.name, tool.promptGuidelines ?? []]));
+            const selectedTools = definitions.map(tool => tool.name);
+            const prompt = buildSystemPrompt({ cwd: f.cwd, selectedTools: [...selectedTools, "peer"], toolSnippets: { ...snippets, peer: "Peer index" }, toolGuidelines: { ...guidelines, peer: ["Peer guideline"] } });
+            for (const heading of ["Subagent_run usage:", "Subagent_message usage:", "Subagent_workflow usage:"]) assert.equal(prompt.split(heading).length - 1, 1);
+            assert.match(prompt, new RegExp(`execution defaults to ${backgroundByDefault ? "background" : "foreground"}`));
+            assert.match(prompt, /Peer index/); assert.match(prompt, /Peer guideline/);
+            assert.doesNotMatch(prompt, /OLD_CUSTOM_TEMPLATE|toolDescriptionMode|\{\{typeList\}\}/);
+            assert.ok(definitions.every(tool => tool.description.length < 150));
+            const props = Reflect.get(f.paramSchema("subagent_run"), "properties");
+            assert.equal(Object.hasOwn(props, "schedule"), false); assert.equal(Object.hasOwn(props, "isolation"), false);
+            const hidden = buildSystemPrompt({ cwd: f.cwd, selectedTools, hiddenTools: selectedTools, toolSnippets: snippets, toolGuidelines: guidelines });
+            assert.doesNotMatch(hidden, /Subagent_run usage:|Subagent_message usage:|Subagent_workflow usage:/);
+        } finally { await f.close(); }
+    }
+});
 
 void it("thinking is a closed enum in both the root and nested schemas", async () => {
     const f = await factory();
