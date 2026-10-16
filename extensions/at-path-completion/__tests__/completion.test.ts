@@ -29,6 +29,51 @@ for (const key of ['\t', '\r']) void it(`actual list ${JSON.stringify(key)} acce
     h.editor.handleInput('\x1b'); await pause(); assert.equal(h.editor.isShowingAutocomplete(), false); assert.equal(h.counts.query.length, 2);
   } finally { await h.close(); }
 });
+void it('stale attachment list acceptance preserves input and refreshes before accepting again', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  for (const key of ['\t', '\r']) {
+    const h = harness();
+    let enterQuery!: () => void, releaseQuery!: () => void;
+    const entered = new Promise<void>(resolve => { enterQuery = resolve; });
+    const blocked = new Promise<void>(resolve => { releaseQuery = resolve; });
+    let queries = 0;
+    const nextList = () => new Promise<void>(resolve => {
+      h.tui.requestRender = () => { if (h.editor.isShowingAutocomplete()) resolve(); };
+    });
+    try {
+      h.setSuggestions(async (lines, line, col) => {
+        const prefix = lines[line]!.slice(0, col);
+        queries++;
+        if (queries === 2) { enterQuery(); await blocked; }
+        return { prefix, items: [
+          { value: '@~/Downloads/', label: 'Downloads/' },
+          { value: '@~/Documents/', label: 'Documents/' },
+        ] };
+      });
+      h.install(); await h.start();
+      h.editor.setText('@~');
+      const initial = nextList(); h.editor.handleInput('\t'); await initial;
+      for (const char of '/Do') h.editor.handleInput(char);
+      t.mock.timers.tick(20); await entered;
+      const cursor = h.editor.getCursor(), changes = h.counts.change;
+      h.editor.handleInput(key);
+      assert.equal(h.editor.getText(), '@~/Do', JSON.stringify(key));
+      assert.deepEqual(h.editor.getCursor(), cursor);
+      assert.deepEqual(h.counts.submit, []);
+      // The native no-op acceptance still notifies onChange once, without modifying text.
+      assert.equal(h.counts.change, changes + 1);
+      const refreshed = nextList();
+      await Promise.resolve(); // Run the owned refresh microtask before advancing its debounce.
+      t.mock.timers.tick(20); releaseQuery(); await refreshed;
+      assert.equal(h.editor.getText(), '@~/Do');
+      assert.equal(queries, 3);
+      h.editor.handleInput(key);
+      assert.equal(h.editor.getText(), '@~/Downloads/');
+      assert.deepEqual(h.counts.submit, []);
+    } finally { releaseQuery(); await h.close(); }
+  }
+});
+
 void it('force Tab single-directory applies asynchronously then ordinary next query never auto-accepts', async () => {
   const h = harness();
   try { h.install(); await h.start(); h.editor.setText('@local'); h.editor.handleInput('\t'); await pause();
