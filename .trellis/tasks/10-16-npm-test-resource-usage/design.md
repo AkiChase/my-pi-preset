@@ -1,5 +1,24 @@
 # 生命周期测试精简审查
 
+## 第四批具体候选（只读诊断，待批准）
+
+完整读取 runtime-contracts、worktree-cli、preparation、worktree、resource-update、skill-deployment 及 Python cli/developer 实现。本轮仓库外插桩统计同步 spawnSync/execFileSync，只用于定位，不改测试代码。
+
+- runtime-contracts 整文件：19.98 s、CPU 18.40 s；同步 Python 193 次累计 15.38 s，Git 140 次累计 1.77 s。带 --test-isolation=none 的诊断运行非标准全量，不直接比较既有 wall。
+- worktree-cli 整文件：24.51 s、CPU 16.24 s；Python 100 次累计 23.25 s、Git 45 次累计 0.87 s。Python 计时包含其内部 Git/等待，不等同纯 Python CPU；异步 query 未计入此同步计数。
+
+**U1 worktree-cli:strict CLI help/operation arguments（约 28 个坏参数）**：每个变体调用一次部署 CLI，实际只测试 parser/value/Once 与 JSON 错误包装。改为 Python unittest 直接调用现有 cli.main(argv)，逐例捕获 stdout/stderr、断言非零/ok=false，并 mock manage.assert_not_called；Node 留 --help、prepare --help 和 1–2 个部署 CLI 坏参数基线。仓库外内存实验复用原全部参数变体：baseline 2.22 s、CPU 2.07 s，单进程 0.49 s、CPU 0.46 s，全选中用例 PASS。明确不再对每个坏参数证明部署启动器，保留 main 的真实错误包装及无执行断言。
+
+**U2 runtime-contracts:active rejects invalid identity/task/pointer 与 start invalid records**：所有命令执行相同 cmd_active/cmd_start，几十个输入变体每次加载完整 Python。把变体迁到 python unit test，直接调用真实 cmd_active/cmd_start、隔离环境和 cwd，逐例保留 pointer/task/hook marker 不变；Node 留有效 active/start/current/deactivate、一个坏 context key、一个坏 record 和外部路径/符号链接 CLI 接线。不能用纯 safe_segment 替代 cmd_active/start 的完整判断，也不能共享被污染 sys.modules 状态而不恢复。
+
+**U3 runtime-contracts:developer unsafe names/trimmed dot**：约 14 个拒绝变体改单进程调用 common.developer.init_developer 并检查 .developer/workspace 不存在；Node 留 Unicode/spaces 成功、重复 identity 保留、get_developer 环境覆盖拒绝基线。Python unit 当前仅 diagnostics developer_text 覆盖，不足以直接删除 init_developer 回归。
+
+**U4 resource-update.test.mjs:fixture**：4 个测试都 fresh apply(plan)，但测的是 update/repair，不是 init。改现有 copyRuntimeFixture(t,{user:'Dev'})，保留真实更新/repair、history、不支持 release/unknown 文件保护全部断言。小而确定，不引入新 helper。
+
+**U5 preparation.test.mjs 与 worktree.test.mjs**：各自每个 case 新 git init/commit（10/15 cases），但更多是状态/prepare/remove。可复用已提交的 source 模板，只复制 Git fixture；不缓存 create 本身，因为多个用例确实测试 create 对 staged/index、branch、路径、失败记录的行为。优先 source-template-only，暂不引入通用 managed fixture 框架。收益未实验，不能保证。
+
+建议第四批先 U1/U4 + U2/U3 的迁移，集中降低 Python 启动；U5 后置。无需再次跑模块发现列表，不改生产 runtime/哈希、不增加全局缓存。所有迁移后的 Python unit 保持由 python-worktree.test.mjs 默认全量入口 discover，用户要求单一全量入口不变。实验临时目录 /tmp/pi-test-native-audit-v15qfx，在结果记录后清理。
+
 ## 第三批具体诊断与建议（尚未批准实施）
 
 已完整读取 apply-template、worktree-cli、manifest-provenance、init-review、initialization 五个测试文件及 engine.ts 的 manifest/资源验证实现。用户要求给出具体有效结论，本轮用仓库外 registerHooks 对现有测试做内存变换实验，不修改仓库测试。
