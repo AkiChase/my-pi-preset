@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { canonicalPath } from "../lib/config.ts";
-import { readBinding, markerFile, bindingFile, acquireBindingLock, parseBinding } from "../lib/bindings.ts";
+import { readBinding, markerFile, bindingFile, acquireBindingLock, parseBinding, sameIdentity } from "../lib/bindings.ts";
 import { manageWorktree } from "./worktree-fixture.mjs";
 
 function fixture(t) {
@@ -174,7 +174,25 @@ test("binding storage symlink is not a trusted external task store", async (t) =
   await assert.rejects(f.run(), /symlink outside/);
 });
 
-test('host strict v2 binding schema rejects old descriptors and unknown combinations',async t=>{
- const f=fixture(t),b=(await f.run()).binding;assert.equal(b.version,2);assert.deepEqual(parseBinding(b),b);
+function bindingRecord() {
+ const root=canonicalPath(tmpdir());
+ return {version:2,bindingId:'fixture-id',taskDir:'.trellis/tasks/test',sourceRoot:root,
+  worktreePath:join(root,'binding-target'),repositoryIdentity:join(root,'binding-git'),
+  branch:'trellis/test',baseCommit:'a'.repeat(40),contextId:'fixture-context',
+  preparationState:'ready',createdAt:'2026-10-16T00:00:00Z'};
+}
+
+test('host strict v2 binding schema rejects old descriptors and unknown combinations',()=>{
+ const b=bindingRecord();assert.deepEqual(parseBinding(b),b);
  for(const bad of [{...b,version:1},{...b,preparedFiles:{}},{...b,materials:{}},{...b,unknown:true},{...b,branch:'bad\tbranch'}])assert.throws(()=>parseBinding(bad));
+});
+
+test('binding identity compares every immutable field, ignoring mutable preparation and error state',()=>{
+ const b=bindingRecord();assert.equal(sameIdentity(b,{...b}),true);
+ for(const field of ['version','bindingId','taskDir','sourceRoot','worktreePath','repositoryIdentity','branch','baseCommit','contextId','createdAt']) {
+  const changed={...b,[field]:field==='version'?3:b[field]+'-changed'};
+  assert.equal(sameIdentity(b,changed),false,field);
+  assert.equal(sameIdentity(changed,b),false,field);
+ }
+ assert.equal(sameIdentity(b,{...b,preparationState:'error',lastError:'failed publication'}),true);
 });
