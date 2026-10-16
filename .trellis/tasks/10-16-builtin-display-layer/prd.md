@@ -31,12 +31,12 @@ R6. 状态栏、header/footer、编辑器、消息与 overlay 不纳入本次统
 
 ## 验收标准
 
-- [ ] AC1/R1：aboveEditor 内部固定 Recap → Trellis；先后发布、更新、撤销不改变排序，无重复组件/空白占位。
-- [ ] AC2/R2,R5：三个消费者全部接入，原有业务、区域、主题/文本处理与非展示行为保持不变；更新不重建无关 slot。
-- [ ] AC3/R1,R5：共享 owner/session/activation生命周期明确；旧会话、迟到factory/setter/dispose或关闭handle不能覆盖/撤销新会话，清理幂等且隔离失败。
-- [ ] AC4/R3,R4：项目 dev/testing规范明确唯一owner、接入/slot/排序/清理与验证；生产入口检查可发现绕过统一层，索引links与spec discovery有效。
-- [ ] AC5/R6：第三方widget不被删除/重发；status/header/footer/editor/messages/overlay保持现有管理。
-- [ ] AC6：阶段focused自然退出、类型检查与受影响loader/consumer测试，最终pnpm check与git diff --check；独立review通过，记录首次失败及NOT_RUN限制。
+- [x] AC1/R1：aboveEditor 内部固定 Recap → Trellis；先后发布、更新、撤销不改变排序，无重复组件/空白占位。
+- [x] AC2/R2,R5：三个消费者全部接入，原有业务、区域、主题/文本处理与非展示行为保持不变；更新不重建无关 slot。
+- [x] AC3/R1,R5：共享 owner/session/activation生命周期明确；旧会话、迟到factory/setter/dispose或关闭handle不能覆盖/撤销新会话，清理幂等且隔离失败。
+- [x] AC4/R3,R4：项目 dev/testing规范明确唯一owner、接入/slot/排序/清理与验证；生产入口检查可发现绕过统一层，索引links与spec discovery有效。
+- [x] AC5/R6：第三方widget不被删除/重发；status/header/footer/editor/messages/overlay保持现有管理。
+- [x] AC6：阶段focused自然退出、类型检查与受影响loader/consumer测试，最终pnpm check与git diff --check；独立review通过，记录首次失败及NOT_RUN限制。
 
 ## 排除与限制
 

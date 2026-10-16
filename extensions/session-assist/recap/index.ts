@@ -1,3 +1,4 @@
+import { createWidgetClient } from "../../shared/widget-display/client.ts";
 import { performance } from "node:perf_hooks";
 import { getAgentDir, type ExtensionAPI, type ExtensionCommandContext, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
@@ -9,7 +10,6 @@ import { buildMaterial, type Material } from "../shared/material.ts";
 import { cleanText, OUTPUT_LIMIT, readRecap, RECAP_PROMPT } from "./output.ts";
 
 export const STATE_TYPE = "preset.recap.v1";
-export const WIDGET_KEY = "preset.recap";
 interface Stored { version: 1; text: string; material: string }
 interface Publication { token: number; ctx: ExtensionContext; value: Stored; valid: () => boolean }
 interface Window { token: number; since: number; attempted: boolean; material: string; restore: boolean }
@@ -20,6 +20,7 @@ const systemClock: RecapClock = { now: () => performance.now(), set: (callback, 
 
 /** All state belongs to this factory activation, never the imported module. */
 export default function registerRecap(pi: ExtensionAPI, dependencies: RecapDependencies = {}): void {
+    const widget = createWidgetClient(pi, "recap");
     const clock = dependencies.clock ?? systemClock;
     const directory = dependencies.directory ?? getAgentDir;
     let active = false;
@@ -56,7 +57,7 @@ export default function registerRecap(pi: ExtensionAPI, dependencies: RecapDepen
         const previous = widgetPublication;
         widgetPublication = undefined;
         if (previous) {
-            try { previous.ctx.ui.setWidget(WIDGET_KEY, undefined); } catch { /* Retired UI sinks cannot block cleanup. */ }
+            try { widget.set(previous.ctx, undefined); } catch { /* Retired UI sinks cannot block cleanup. */ }
             const newer = currentPublication();
             if (newer && newer.token > previous.token && newer.valid()) publish(newer);
         }
@@ -113,7 +114,16 @@ export default function registerRecap(pi: ExtensionAPI, dependencies: RecapDepen
     }
     function publish(publication: Publication): void {
         const { ctx, value } = publication;
-        try { ctx.ui.setWidget(WIDGET_KEY, (_tui, theme) => new Text(theme.fg("muted", `Recap: ${value.text}`), 0, 0), { placement: "aboveEditor" }); }
+        try {
+            const accepted = widget.set(ctx, (_tui, theme) => {
+                if (!publication.valid()) {
+                    if (widgetPublication === publication) hide();
+                    return new Text("", 0, 0);
+                }
+                return new Text(theme.fg("muted", `Recap: ${value.text}`), 0, 0);
+            });
+            if (!accepted && widgetPublication === publication) widgetPublication = undefined;
+        }
         catch { if (widgetPublication === publication) widgetPublication = undefined; }
         if (widgetPublication === publication && publication.valid()) return;
         const newer = widgetPublication;
@@ -123,7 +133,7 @@ export default function registerRecap(pi: ExtensionAPI, dependencies: RecapDepen
         } else {
             // hide() may already have cleared ownership before this setter's late installation.
             if (widgetPublication === publication || (newer === widgetPublication && newer && !newer.valid())) widgetPublication = undefined;
-            try { ctx.ui.setWidget(WIDGET_KEY, undefined); } catch { /* Best-effort rollback of our publication only. */ }
+            try { widget.set(ctx, undefined); } catch { /* Best-effort rollback of our publication only. */ }
             const replacement = currentPublication();
             if (replacement && replacement.token > publication.token && replacement.valid()) publish(replacement);
         }
@@ -345,7 +355,7 @@ export default function registerRecap(pi: ExtensionAPI, dependencies: RecapDepen
     pi.on("session_shutdown", () => {
         if (closed) return;
         closed = true; active = false; invalidate(); closeDialog(); context = undefined; sessionId = undefined; window = undefined;
-        tools.clear(); saved = undefined; compactPrevious = undefined;
+        tools.clear(); saved = undefined; compactPrevious = undefined; widget.dispose();
     });
     pi.registerCommand("recap", {
         description: "Generate and show a short work recap, or configure its model and automatic idle generation",

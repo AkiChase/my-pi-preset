@@ -2,6 +2,7 @@ import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
 
 export const CONNECT = "preset:widget-display:connect:v1";
+export const SESSION_START = "preset:widget-display:session-start:v1";
 export const SLOTS = {
     recap: { placement: "aboveEditor", order: 10 },
     trellis: { placement: "aboveEditor", order: 20 },

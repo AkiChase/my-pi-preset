@@ -7,7 +7,8 @@
  * Also registers process diagnostic commands; shared controls belong to composition.
  */
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { createWidgetClient } from "../shared/widget-display/client.ts";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { createBashToolDefinition } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences, truncateToWidth } from "@earendil-works/pi-tui";
 import type { MonitorNotificationPayload } from "./notify.ts";
@@ -47,6 +48,8 @@ export default function (pi: ExtensionAPI, options: ProcessTasksOptions = {}) {
     const coordinator = options.coordinator ?? new TaskCoordinator();
     const lifecycle = options.lifecycle ?? new TaskLifecycle(coordinator);
     const reg = new BackgroundRegistry(config, coordinator, uiLoad.config);
+    const hint = createWidgetClient(pi, "foreground_hint");
+    reg.hintPublisher = { set: (ctx, lines) => hint.set(ctx as ExtensionContext, lines), dispose: () => hint.dispose() };
     const source = createProcessTaskSource(reg);
     options.onManagement?.(createProcessManagement(reg, source));
     const unregisterSource = coordinator.registerSource(source);
@@ -142,7 +145,7 @@ export default function (pi: ExtensionAPI, options: ProcessTasksOptions = {}) {
         reg.totalStarted = reg.totalDurationMs = 0;
         reg.lastHintContent = undefined;
         // Foreground handoff hint is not the shared task footer.
-        ctx.ui?.setWidget("bg-hint", undefined);
+        reg.hintPublisher?.set(ctx, undefined);
         if (reg.closed) return;
         startRegistrySweep(reg);
         reg.nonInteractive = detectNonInteractive(

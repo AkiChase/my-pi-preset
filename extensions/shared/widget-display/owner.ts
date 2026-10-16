@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Text, type TUI } from "@earendil-works/pi-tui";
-import { CONNECT, SLOTS, type ConnectRequest, type Slot, type WidgetComponent, type WidgetContent, type WidgetHandle } from "./contracts.ts";
+import { CONNECT, SESSION_START, SLOTS, type ConnectRequest, type Slot, type WidgetComponent, type WidgetContent, type WidgetHandle } from "./contracts.ts";
 
 type Placement = "aboveEditor" | "belowEditor";
 const placements = ["aboveEditor", "belowEditor"] as const;
@@ -209,10 +209,16 @@ export default function registerWidgetDisplay(pi: ExtensionAPI): void {
         };
         try { request.accept(handle); } catch { handle.dispose(); }
     });
+    const offSession = pi.events.on(SESSION_START, (data: unknown) => {
+        if (closed || !data || typeof data !== "object") return;
+        const value = data as { version?: unknown; ctx?: ExtensionContext };
+        if (value.version !== 1 || !value.ctx?.sessionManager) return;
+        started = true; activate(value.ctx, true);
+    });
     const offStart = pi.on("session_start", (_event, ctx) => { started = true; activate(ctx, true); });
     pi.on("session_shutdown", () => {
         if (closed) return; closed = true;
         const previous = current; current = undefined;
-        offConnect(); offStart(); if (previous) clear(previous);
+        offConnect(); offSession(); offStart(); if (previous) clear(previous);
     });
 }

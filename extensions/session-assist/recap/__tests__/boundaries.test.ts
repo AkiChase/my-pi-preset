@@ -73,7 +73,7 @@ it("newer publication created during stale-install rollback is not removed by th
     const command = h.command(); await flush(); h.requests[0].resolve(reply("stale")); await command; await flush();
     assert.equal(typeof current, "function");
     if (typeof current === "function") {
-        const component = current({} as Parameters<typeof current>[0], { fg: (_color: string, text: string) => text } as Parameters<typeof current>[1]);
+        const component = current({ requestRender() {} } as unknown as Parameters<typeof current>[0], { fg: (_color: string, text: string) => text } as Parameters<typeof current>[1]);
         assert.match(component.render(120).join("\n"), /newer rollback owner/);
     }
 });
@@ -91,9 +91,8 @@ it("synchronously nested newer publication survives an outer setter's late insta
     const command = h.command(); await flush(); h.requests[0].resolve(reply("outer stale")); await command; await flush();
     assert.equal(typeof current, "function");
     if (typeof current === "function") {
-        const { Text } = await import("@earendil-works/pi-tui");
         // Execute the published factory using typed public callback parameters, not a duplicate Recap renderer.
-        const component = current({} as Parameters<typeof current>[0], { fg: (_color: string, text: string) => text } as Parameters<typeof current>[1]);
-        assert.ok(component instanceof Text); assert.match(component.render(120).join("\n"), /newer owned/);
+        const component = current({ requestRender() {} } as unknown as Parameters<typeof current>[0], { fg: (_color: string, text: string) => text } as Parameters<typeof current>[1]);
+        assert.match(component.render(120).join("\n"), /newer owned/);
     }
 });

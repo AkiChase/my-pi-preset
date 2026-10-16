@@ -27,9 +27,9 @@ function setup(t) {
     put(`${dir}/implement.jsonl`, JSON.stringify({ file: `${dir}/prd.md` }));
   }
   const handlers = new Map(), messages = [], tools = new Map();
-  const pi = { registerMessageRenderer: () => {}, events: { on: () => () => {}, emit: () => {} }, registerCommand: () => {}, registerTool: (tool) => tools.set(tool.name, tool), on: (name, handler) => handlers.set(name, handler), sendMessage: (message) => messages.push(message), getAllTools: () => [{ name: "subagent_run" }] };
+  const pi = { registerMessageRenderer: () => {}, events: { on: () => () => {}, emit: (name,request) => { if(name === "preset:widget-display:connect:v1") request.accept({set: content => { request.ctx.ui.setWidget?.("fixture",content); return true; }, dispose: () => {}}); } }, registerCommand: () => {}, registerTool: (tool) => tools.set(tool.name, tool), on: (name, handler) => { const previous=handlers.get(name); handlers.set(name, previous ? (...args) => { const old=previous(...args); const next=handler(...args); return Promise.all([old,next]).then(results=>results[1]); } : handler); return ()=>{}; }, sendMessage: (message) => messages.push(message), getAllTools: () => [{ name: "subagent_run" }] };
   trellis(pi);
-  const ctx = (name) => ({ cwd: root, hasUI: false, sessionManager: { getSessionId: () => name, getSessionFile: () => undefined }, ui: {} });
+  const ctx = (name) => ({ cwd: root, hasUI: false, mode: "print", sessionManager: { getSessionId: () => name, getSessionFile: () => undefined }, ui: {} });
   const pointer = (context, task) => put(`.trellis/.runtime/sessions/${__internals.contextKey(root, context)}.json`, JSON.stringify({ current_task: `.trellis/tasks/${task}` }));
   const call = (context, input, toolName = "subagent_run") => handlers.get("tool_call")({ toolName, toolCallId: "test", input }, context);
   return { root, put, ctx, pointer, call, handlers, messages, tools, pi };
@@ -47,7 +47,7 @@ for (const role of ['trellis-implement', 'trellis-check', 'trellis-research']) {
 
 test('startup detection uses subagent_run rather than removed launch alias', async t => {
   const f=setup(t),ctx=f.ctx('diagnostic'),notices=[];
-  ctx.hasUI=true;ctx.ui={notify:text=>notices.push(text)};
+  ctx.hasUI=true;ctx.mode="tui";ctx.ui={notify:text=>notices.push(text)};
   await f.handlers.get('session_start')({},ctx);assert.ok(!notices.some(text=>text.includes('未检测到 subagent_run')));
   const missing=setup(t),other=missing.ctx('missing');other.hasUI=true;other.ui={notify:text=>notices.push(text)};
   missing.pi.getAllTools=()=>[{name:'Agent'}];await missing.handlers.get('session_start')({},other);
@@ -147,7 +147,7 @@ for (const source of ['session-fallback:foreign', 'session:foreign', undefined])
   test(`foreign or missing CLI source (${source}) never enters task state or dispatch materials`, async t => {
     const f = setup(t), ctx = f.ctx('empty');
     const display = [];
-    ctx.hasUI = true;
+    ctx.hasUI = true; ctx.mode = "tui";
     ctx.ui = { theme: { fg: (_color,text) => text, bold: text => text }, setWidget: (_key,lines) => display.push(lines), setStatus: (_key,value) => display.push(value) };
     mockPython(t, f.root, args => args[0].endsWith('task.py') ? { stdout: JSON.stringify({current_task:{dir:'.trellis/tasks/b',status:'in_progress'},source}) } : undefined);
     await f.handlers.get('before_agent_start')({prompt:'inspect',systemPromptOptions:{sections:{}}},ctx);

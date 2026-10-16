@@ -1,3 +1,5 @@
+import { EventEmitter } from "node:events";
+import registerWidgetDisplay from "../../shared/widget-display/owner.ts";
 import { createRuntimeTaskFacade, registerRuntimeTaskTool, type RuntimeTaskCapability } from "../../runtime-tasks/facade.ts";
 /**
  * index.ts session lifecycle — Claude Code parity:
@@ -54,7 +56,9 @@ function makePi() {
     const messages: { customType: string }[] = [];
     const appendedEntries: unknown[] = [];
     const renderers = new Map<string, (message: unknown, options: unknown, theme: unknown) => { render: (width: number) => string[] }>();
+    const bus = new EventEmitter();
     const pi = {
+        events: { on(name: string, handler: (data: unknown) => void) { bus.on(name, handler); return () => { bus.off(name, handler); }; }, emit(name: string, data: unknown) { bus.emit(name, data); } },
         registerTool(def: CapturedTool) {
             tools.set(def.name, def);
         },
@@ -62,7 +66,9 @@ function makePi() {
         registerCommand() {},
         registerMessageRenderer(name: string, renderer: (message: unknown, options: unknown, theme: unknown) => { render: (width: number) => string[] }) { renderers.set(name, renderer); },
         on(event: string, handler: SessionHandler) {
-            handlers.set(event, handler);
+            const previous = handlers.get(event);
+            handlers.set(event, (value, ctx) => { const old = previous?.(value, ctx); const next = handler(value, ctx); return Promise.all([old, next]).then(() => {}); });
+            return () => {};
         },
         sendMessage(msg: { customType: string }) {
             messages.push(msg);
@@ -76,6 +82,7 @@ function makePi() {
 
 const uiCtx = {
     cwd: process.cwd(),
+    hasUI: false, mode: "print", sessionManager: { getSessionId: () => "fixture" },
     ui: {
         notify() {},
         setWidget() {},
@@ -87,6 +94,7 @@ const uiCtx = {
 function startExtension() {
     const h = makePi();
     const capabilities: RuntimeTaskCapability[] = [];
+    registerWidgetDisplay(h.pi as never);
     const backend = extension(h.pi as never, { onManagement: c => capabilities.push(c) });
     const facade = createRuntimeTaskFacade(capabilities);
     backend.lifecycle.onClose(facade.close);
@@ -100,7 +108,9 @@ void describe("session_start — registry is born empty (no revival)", () => {
         // If session_start still tried to restore state, it would consult the
         // session manager — make that throw to prove it's never touched.
         const ctx = {
+            hasUI: false, mode: "print",
             sessionManager: {
+                getSessionId: () => "fixture",
                 getEntries(): never {
                     throw new Error("session entries must not be consulted");
                 },
@@ -115,7 +125,7 @@ void describe("session_start — registry is born empty (no revival)", () => {
     });
     void it("session replacement stops old tasks and starts an empty registry", async () => {
         const h = startExtension();
-        await h.handlers.get("session_start")!({}, {});
+        await h.handlers.get("session_start")!({}, uiCtx);
         const bash = h.tools.get("bash")!;
         await bash.execute("switch-test", { command: WATCH_CMD, run_in_background: true }, undefined, undefined, uiCtx);
         assert.ok(liveMarkedProcesses() > 0);
@@ -125,7 +135,7 @@ void describe("session_start — registry is born empty (no revival)", () => {
         assert.equal(list.content[0].text, "No runtime tasks in this scope.");
         assert.equal(liveMarkedProcesses(), 0);
         assert.equal(h.messages.filter((m) => m.customType === EVENT.taskNotification).length, 0);
-        await h.handlers.get("session_shutdown")!({}, {});
+        await h.handlers.get("session_shutdown")!({}, uiCtx);
     });
 });
 
@@ -133,7 +143,7 @@ void describe("session_shutdown — kills running tasks on ANY reason", () => {
     for (const reason of ["quit", "reload"]) {
         void it(`reason "${reason}" kills running tasks silently`, async () => {
             const h = startExtension();
-            await h.handlers.get("session_start")!({}, {});
+            await h.handlers.get("session_start")!({}, uiCtx);
 
             // Start a real long-running background task.
             const bash = h.tools.get("bash")!;
@@ -148,7 +158,7 @@ void describe("session_shutdown — kills running tasks on ANY reason", () => {
             assert.ok(id && /^b[0-9a-z]{8}$/.test(id), `typed shell id, got: ${id}`);
             assert.ok(liveMarkedProcesses() > 0, "task process is running");
 
-            await h.handlers.get("session_shutdown")!({ reason }, {});
+            await h.handlers.get("session_shutdown")!({ reason }, uiCtx);
             await sleep(200); // let the SIGTERM land
 
             const jobs = h.tools.get("task_manage")!;

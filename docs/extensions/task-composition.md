@@ -2,6 +2,8 @@
 
 Task composition 把命令进程、Monitor、子 Agent 和 workflow 放进同一个任务面板。底栏按 `shell`、`monitor`、`agent`、`workflow` 显示活动和排队数量，前台任务也会计入；父任务及其子任务不会重复算作独立工作。没有活动或排队任务时，摘要隐藏。
 
+前台命令超过短暂等待窗口后，编辑器下方会显示命令、已运行时间和转后台快捷键提示；所有前台命令结束或转后台后提示消失。此提示通过内置 [Widget Display](widget-display.md) 展示，请保持它启用；任务底栏和 Task Panel 不受此展示开关影响。
+
 ## 常用入口
 
 | 命令／按键 | 用途 |

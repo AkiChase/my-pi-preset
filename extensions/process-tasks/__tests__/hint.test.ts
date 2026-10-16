@@ -25,8 +25,9 @@ interface WidgetCall {
     options?: { placement?: string };
 }
 
-function makeCtx(): { calls: WidgetCall[]; ctx: UiContext } {
+function makeCtx(reg: BackgroundRegistry): { calls: WidgetCall[]; ctx: UiContext } {
     const calls: WidgetCall[] = [];
+    reg.hintPublisher = { set(_ctx, content) { calls.push({ name: "foreground_hint", content: content ? [...content] : undefined, options: { placement: "belowEditor" } }); return true; }, dispose() {} };
     const ctx = {
         ui: {
             notify: () => {},
@@ -70,7 +71,7 @@ function reg(config: ProcessTasksConfig = DEFAULTS): BackgroundRegistry {
 void describe("background hint", () => {
     void it("names the command, its elapsed time, and the chord", () => {
         const r = reg();
-        const { calls, ctx } = makeCtx();
+        const { calls, ctx } = makeCtx(r);
         foreground(r, "t1", "npm run build");
         showBackgroundHint(r, ctx, "t1");
 
@@ -84,7 +85,7 @@ void describe("background hint", () => {
 
     void it("collapses a multi-line command onto one row", () => {
         const r = reg();
-        const { calls, ctx } = makeCtx();
+        const { calls, ctx } = makeCtx(r);
         foreground(r, "t1", "for f in *; do\n  echo $f\ndone");
         showBackgroundHint(r, ctx, "t1");
         assert.equal(calls[0]!.content?.length, 2, "one row plus the chord line");
@@ -92,7 +93,7 @@ void describe("background hint", () => {
 
     void it("lists every hinted command and pluralises the chord line", () => {
         const r = reg();
-        const { calls, ctx } = makeCtx();
+        const { calls, ctx } = makeCtx(r);
         foreground(r, "t1", "npm run build");
         foreground(r, "t2", "pytest -q");
         showBackgroundHint(r, ctx, "t1");
@@ -107,7 +108,7 @@ void describe("background hint", () => {
 
     void it("advertises the configured chord, not the default", () => {
         const r = new BackgroundRegistry(DEFAULTS, undefined, { ...UI_DEFAULTS, shortcutBackground: ["alt+b"] });
-        const { calls, ctx } = makeCtx();
+        const { calls, ctx } = makeCtx(r);
         foreground(r, "t1", "sleep 30");
         showBackgroundHint(r, ctx, "t1");
         // Advertising a key the user remapped away is worse than saying nothing.
@@ -116,7 +117,7 @@ void describe("background hint", () => {
 
     void it("falls back to /bg when the chord is unbound", () => {
         const r = new BackgroundRegistry(DEFAULTS, undefined, { ...UI_DEFAULTS, shortcutBackground: [] });
-        const { calls, ctx } = makeCtx();
+        const { calls, ctx } = makeCtx(r);
         foreground(r, "t1", "sleep 30");
         showBackgroundHint(r, ctx, "t1");
         assert.match(calls[0]!.content?.[1] ?? "", /^\(\/bg to run/);
@@ -124,7 +125,7 @@ void describe("background hint", () => {
 
     void it("stays up until the last parallel command is gone", () => {
         const r = reg();
-        const { calls, ctx } = makeCtx();
+        const { calls, ctx } = makeCtx(r);
         foreground(r, "t1", "a");
         foreground(r, "t2", "b");
         showBackgroundHint(r, ctx, "t1");
@@ -141,7 +142,7 @@ void describe("background hint", () => {
 
     void it("a repeated show does not rewrite an unchanged widget", () => {
         const r = reg();
-        const { calls, ctx } = makeCtx();
+        const { calls, ctx } = makeCtx(r);
         foreground(r, "t1", "a");
         showBackgroundHint(r, ctx, "t1");
         showBackgroundHint(r, ctx, "t1");
@@ -151,7 +152,7 @@ void describe("background hint", () => {
 
     void it("clear is a no-op when nothing is shown", () => {
         const r = reg();
-        const { calls, ctx } = makeCtx();
+        const { calls, ctx } = makeCtx(r);
         clearBackgroundHint(r, ctx, "nope");
         assert.equal(calls.length, 0);
     });
@@ -162,7 +163,7 @@ void describe("background hint", () => {
         // the hint below the editor for the rest of the session. Derived state
         // cannot do that — losing the slot IS losing the hint.
         const r = reg();
-        const { calls, ctx } = makeCtx();
+        const { calls, ctx } = makeCtx(r);
         foreground(r, "t1", "npm run build");
         showBackgroundHint(r, ctx, "t1");
         assert.notEqual(calls.at(-1)!.content, undefined);
@@ -174,11 +175,25 @@ void describe("background hint", () => {
 
     void it("ignores a slot that has not passed the quick window", () => {
         const r = reg();
-        const { calls, ctx } = makeCtx();
+        const { calls, ctx } = makeCtx(r);
         foreground(r, "t1", "echo hi");
         // No showBackgroundHint: a command that finishes inside two seconds
         // would otherwise flash a hint nobody can act on.
         renderBackgroundHint(r, ctx);
         assert.equal(calls.length, 0);
     });
+});
+
+it("a failed admission retries on the next derived render, while freeze retires the finite publisher", async () => {
+    const { createProcessLifecycleParticipant } = await import("../lifecycle.ts");
+    const r = reg(); const { calls, ctx } = makeCtx(r);
+    const publisher = r.hintPublisher!;
+    let attempts = 0, disposes = 0;
+    r.hintPublisher = { set(context, lines) { attempts++; if (attempts === 1) return false; return publisher.set(context, lines); }, dispose() { disposes++; } };
+    foreground(r, "retry", "build"); showBackgroundHint(r, ctx, "retry");
+    assert.equal(r.lastHintContent, undefined); renderBackgroundHint(r, ctx);
+    assert.equal(attempts, 2); assert.equal(calls.length, 1);
+    const lifecycle = createProcessLifecycleParticipant(r, () => {});
+    lifecycle.freeze(); lifecycle.freeze(); renderBackgroundHint(r, ctx);
+    assert.equal(disposes, 1); assert.equal(attempts, 2); assert.equal(r.hintPublisher, undefined);
 });

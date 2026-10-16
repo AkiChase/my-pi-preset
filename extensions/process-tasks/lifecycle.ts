@@ -31,6 +31,9 @@ export function createProcessLifecycleParticipant(reg: BackgroundRegistry, dispo
         name: "process-tasks",
         freeze() {
             reg.closed = true;
+            const hint = reg.hintPublisher; reg.hintPublisher = undefined;
+            reg.lastHintContent = undefined;
+            safely(() => hint?.dispose());
             reg.monitorNotifications.freeze();
             for (const job of reg.jobs.values()) markOutcomeSurfaced(job);
             reg.notificationRetries.clear();

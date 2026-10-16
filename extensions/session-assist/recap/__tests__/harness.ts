@@ -1,3 +1,7 @@
+import { EventEmitter } from "node:events";
+import registerWidgetDisplay from "../../../shared/widget-display/owner.ts";
+import type { TUI } from "@earendil-works/pi-tui";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -44,8 +48,10 @@ export function harness(t: TestContext, options: { initial?: boolean; config?: R
     let onAppend: (() => void) | undefined; let onWidget: (() => void) | undefined;
     const model: Model<"openai-responses"> = { provider: "fixture", id: "model", api: "openai-responses", name: "Fixture", baseUrl: "http://offline.invalid", reasoning: true,
         input: ["text"], contextWindow: 100000, maxTokens: 8192, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, thinkingLevelMap: { minimal: null, max: null, xhigh: null } };
+    const bus = new EventEmitter();
     const pi = {
-        on(name: string, handler: (event: ExtensionEvent, ctx: ExtensionContext) => unknown) { const list = handlers.get(name) ?? []; list.push(handler); handlers.set(name, list); return () => {}; },
+        events: { on(name: string, handler: (value: unknown) => void) { bus.on(name, handler); return () => { bus.off(name, handler); }; }, emit: (name: string, value: unknown) => { bus.emit(name, value); } },
+        on(name: string, handler: (event: ExtensionEvent, ctx: ExtensionContext) => unknown) { const list = handlers.get(name) ?? []; list.push(handler); handlers.set(name, list); return () => { const index = list.indexOf(handler); if (index >= 0) list.splice(index, 1); }; },
         registerCommand(name: string, command: RegisteredCommand) { commands.set(name, command); },
         appendEntry(name: string, data: unknown) { manager.appendCustomEntry(name, data); onAppend?.(); },
     } as unknown as ExtensionAPI;
@@ -60,11 +66,12 @@ export function harness(t: TestContext, options: { initial?: boolean; config?: R
     } as unknown as ExtensionContext["modelRegistry"];
     const ctx = { sessionManager: manager, model, modelRegistry: registry, mode: options.mode ?? "tui", hasUI: options.hasUI ?? true,
         isIdle: () => idle, hasPendingMessages: () => pending, waitForIdle: () => wait,
-        ui: { notify(text: string) { notices.push(text); }, setWidget(_key: string, content: unknown) { widgets.push(content); onWidget?.(); },
+        ui: { notify(text: string) { notices.push(text); }, setWidget(_key: string, content: unknown) { widgets.push(content); if (typeof content === "function") content({ requestRender() {} } as unknown as TUI, { fg: (_color: string, text: string) => text } as Theme); onWidget?.(); },
             select: async (title: string, options: string[]) => { menus.push({ title, options }); return await selections.shift(); }, input: async () => await inputs.shift() },
     } as unknown as ExtensionCommandContext;
+    registerWidgetDisplay(pi);
     register(pi, { clock, directory: () => directory });
-    const emit = async (name: string, event: Record<string, unknown> = {}) => { for (const handler of handlers.get(name) ?? []) await handler({ type: name, ...event } as ExtensionEvent, ctx); };
+    const emit = async (name: string, event: Record<string, unknown> = {}) => { for (const handler of [...(handlers.get(name) ?? [])]) await handler({ type: name, ...event } as ExtensionEvent, ctx); };
     t.after(async () => { await emit("session_shutdown"); await flush(); rmSync(directory, { recursive: true, force: true }); });
     return { directory, manager, clock, requests, notices, widgets, selections, inputs, menus, models, ctx, emit, model,
         start: () => emit("session_start"), command: (args = "") => commands.get("recap")!.handler(args, ctx),

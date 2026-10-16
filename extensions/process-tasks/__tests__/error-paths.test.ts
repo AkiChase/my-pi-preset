@@ -26,6 +26,7 @@ function harness(t: TestContext) {
     const tools = new Map<string, Tool>();
     const messages: unknown[] = [];
     const pi = { registerTool: (tool: Tool) => tools.set(tool.name, tool), sendMessage: (m: unknown) => messages.push(m) };
+    reg.hintPublisher = { set(ctx, content) { ctx.ui.setWidget("fixture-hint", content ? [...content] : undefined); return true; }, dispose() {} };
     const ctx = { cwd: dir, ui: { setWidget(_key: string, _content: unknown) {}, setStatus() {}, notify() {}, theme: { fg: (_: string, text: string) => text } } };
     registerBashTool(pi as never, reg, {} as never);
     registerManagementFixture(pi as never, reg);

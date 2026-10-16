@@ -125,7 +125,10 @@ export function makeHost(name) {
     getActiveTools() { return tools.map((tool) => tool.name); },
     setActiveTools() {},
     setAutocompleteProvider() {},
-    on(event, handler) { handlers.set(event, [...(handlers.get(event) ?? []), handler]); },
+    on(event, handler) {
+      const list = [...(handlers.get(event) ?? []), handler]; handlers.set(event, list);
+      return () => { const index = list.indexOf(handler); if (index >= 0) list.splice(index, 1); };
+    },
     registerCommand() {}, registerFlag() {}, registerMarkdownTransformer() {}, getFlag() {},
     registerToolRenderer() {}, registerMessageRenderer() {}, registerTool(tool) { tools.push(tool); }, registerShortcut(key, options) { shortcuts.set(key, options.handler); },
   };

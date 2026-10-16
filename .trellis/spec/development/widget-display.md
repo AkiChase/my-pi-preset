@@ -2,13 +2,15 @@
 
 ## Required owner and boundaries
 
-`extensions/widget-display.ts` loads the factory in `extensions/shared/widget-display/owner.ts`. The owner alone publishes the two preset host widgets, one per `aboveEditor`/`belowEditor` region. Built-in consumers use `createWidgetClient(pi, slot)` and must not call host `ctx.ui.setWidget` directly. Recap, Trellis and foreground hints are being migrated together; the owner does not manage status, header, footer, editor, messages or overlays.
+`extensions/widget-display.ts` loads the factory in `extensions/shared/widget-display/owner.ts`. The owner alone publishes the two preset host widgets, one per `aboveEditor`/`belowEditor` region. Built-in consumers use `createWidgetClient(pi, slot)` and must not call host `ctx.ui.setWidget` directly. Recap, Trellis and foreground hints all publish through this layer; the owner does not manage status, header, footer, editor, messages or overlays.
 
 Declare new built-in widgets in `contracts.ts`'s `SLOTS`: region and ordering belong to the central registry, not arbitrary consumer priority values. Recap precedes Trellis within the above-editor composite regardless of publication or refresh order. Foreground hints remain below the editor. Empty regions are removed; do not keep an invisible placeholder to manipulate host insertion order.
 
 ## Consumer contract
 
 Create one client per factory activation. Publish using the current `ExtensionContext`; use `undefined` to withdraw content and `dispose()` to retire the client. A boolean false means unavailable, retired or unsupported; never fall back to direct host widget publication. Consumers retain their own request/material/backend validity and must not publish stale results. Content can be text lines or a synchronous component factory; factories are TUI-only, RPC supports text lines, and print/JSON publishes nothing.
+
+The client's actual `session_start` handler performs a synchronous lifecycle handshake with the owner before consumer publication. This makes initial and later session publication independent of extension registration order. Arbitrary `set()` calls do not grant authority to switch the owner to a captured session.
 
 The session manager object and session ID jointly identify a session. Leases bind a slot to one consumer activation and owner generation. Cross-extension communication uses the public versioned event bus protocol with synchronous acknowledgement, not facade object identity or an import-time global UI singleton. Independent loader graphs and event buses must remain isolated. No unbounded queue when the owner is absent.
 
@@ -22,4 +24,4 @@ The composite's position relative to unintegrated third-party widgets still depe
 
 ## Checks
 
-See [testing guidelines](../testing/index.md). A production source-boundary test must reject direct host `setWidget` calls outside the shared owner after all consumers are migrated. The migration checkpoint and any temporary exceptions must be explicit, never imply that legacy consumers already comply.
+See [testing guidelines](../testing/index.md). `extensions/__tests__/widget-display-boundary.test.ts` rejects production direct host `setWidget` calls outside the shared owner and checks entry ownership. `widget-consumer-activation.test.ts` verifies both registration orders across initial and later sessions. All current consumers comply; new consumers must register a slot and use a client instead of adding exceptions.

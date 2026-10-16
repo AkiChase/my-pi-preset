@@ -14,10 +14,10 @@ function fixture(t,runtime=false) {
  const root=mkdtempSync(join(tmpdir(),'pi-project-activation-'));t.after(()=>rmSync(root,{recursive:true,force:true}));return root;
 }
 function harness(root) {
- const commands=new Map(),tools=new Map(),handlers=new Map(),messages=[],notices=[],display={};let subscriptions=0;
- trellis({registerMessageRenderer:()=>{},registerCommand:(n,c)=>commands.set(n,c),registerTool:t=>tools.set(t.name,t),events:{on:()=>{subscriptions++;return()=>{};},emit:()=>{}},on:(n,h)=>{const previous=handlers.get(n);handlers.set(n,previous?async(...args)=>{await previous(...args);await h(...args);}:h);},getAllTools:()=>[{name:'subagent_run'}],sendMessage:m=>messages.push(m)});
- const ctx={cwd:root,hasUI:true,sessionManager:{getSessionId:()=>root,getSessionFile:()=>undefined},ui:{theme:{fg:(_c,t)=>t,bold:t=>t},notify:t=>notices.push(t),setWidget:(_k,v)=>display.widget=v,setStatus:(_k,v)=>display.status=v}};
- return {commands,tools,handlers,messages,notices,display,ctx,get subscriptions(){return subscriptions;}};
+ const commands=new Map(),tools=new Map(),handlers=new Map(),messages=[],notices=[],display={},publications=[];let subscriptions=0;
+ trellis({registerMessageRenderer:()=>{},registerCommand:(n,c)=>commands.set(n,c),registerTool:t=>tools.set(t.name,t),events:{on:()=>{subscriptions++;return()=>{};},emit:(name,request)=>{if(name==='preset:widget-display:connect:v1')request.accept({set:content=>{publications.push(request.ctx);display.widget=content;return true;},dispose:()=>{display.widget=undefined;}});}},on:(n,h)=>{const previous=handlers.get(n);handlers.set(n,previous?async(...args)=>{await previous(...args);await h(...args);}:h);return()=>{};},getAllTools:()=>[{name:'subagent_run'}],sendMessage:m=>messages.push(m)});
+ const ctx={cwd:root,hasUI:true,mode:"tui",sessionManager:{getSessionId:()=>root,getSessionFile:()=>undefined},ui:{theme:{fg:(_c,t)=>t,bold:t=>t},notify:t=>notices.push(t),setWidget:(_k,v)=>display.widget=v,setStatus:(_k,v)=>display.status=v}};
+ return {commands,tools,handlers,messages,notices,display,publications,ctx,get subscriptions(){return subscriptions;}};
 }
 
 test('Trellis discovery stops at Git directory/file boundary and checks boundary Trellis first',t=>{
@@ -113,4 +113,32 @@ test('fresh runner cannot activate another project on session replacement withou
  assert.deepEqual([...h.commands.keys()],['trellis-init']);assert.equal(h.tools.size,0);assert.equal(h.subscriptions,0);assert.deepEqual(sections,{});assert.deepEqual(h.messages,[]);assert.equal(h.display.widget,undefined);assert.equal(h.display.status,undefined);
  assert.equal((await h.handlers.get('tool_call')({toolName:'subagent_run',input:{subagent_type:'trellis-check',prompt:'work'}},h.ctx))?.block,true);
  const reloaded=harness(b);await reloaded.handlers.get('session_start')({},reloaded.ctx);assert.ok(reloaded.commands.has('trellis-task-viewer'));assert.ok(reloaded.tools.has('trellis_dispatch'));
+});
+
+test('late startup and stale manager refresh cannot replace the current display generation',async t=>{
+ const root=fixture(t,true),h=harness(root);
+ const fresh={...h.ctx,sessionManager:{getSessionId:()=>root,getSessionFile:()=>undefined}};
+ let callbacks=[];
+ // Hold the first startup's public CLI result, preserving real initialized bytes.
+ const childProcess=await import('node:child_process');
+ const {syncBuiltinESMExports}=await import('node:module');
+ const original=childProcess.default.execFile;
+ childProcess.default.execFile=(executable,args,options,callback)=>{
+  if(options?.cwd===root && args[0].endsWith('get_context.py')) { callbacks.push(callback); return; }
+  return original(executable,args,options,callback);
+ };
+ syncBuiltinESMExports();
+ try {
+  const oldStart=h.handlers.get('session_start')({},h.ctx);
+  await new Promise(resolve=>setImmediate(resolve));
+  const freshStart=h.handlers.get('session_start')({},fresh);
+  await new Promise(resolve=>setImmediate(resolve));
+  for(const callback of callbacks)callback(null,'{}','');
+  await Promise.all([oldStart,freshStart]);
+  assert.equal(h.publications.at(-1),fresh);
+  assert.ok(!h.publications.includes(h.ctx),'late startup must not even attempt stale widget delivery');
+  const before=h.publications.length;
+  await h.handlers.get('agent_end')({},h.ctx);
+  assert.equal(h.publications.length,before,'stale manager cannot invalidate or publish a refresh');
+ } finally { childProcess.default.execFile=original;syncBuiltinESMExports();await h.handlers.get('session_shutdown')({},fresh); }
 });

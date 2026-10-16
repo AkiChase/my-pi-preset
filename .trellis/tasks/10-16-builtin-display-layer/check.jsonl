@@ -1,3 +1,4 @@
-{"file":".trellis/spec/development/index.md","reason":"Extension state, UI ownership and shared widget contract"}
-{"file":".trellis/spec/testing/index.md","reason":"Offline SDK and lifecycle regression requirements"}
-{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Session identity, side effects and cleanup review"}
+{"file":".trellis/spec/development/index.md","reason":"Project extension and UI lifecycle rules"}
+{"file":".trellis/spec/development/widget-display.md","reason":"Unified owner and consumer migration contract"}
+{"file":".trellis/spec/testing/index.md","reason":"Offline and lifecycle regression boundaries"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Identity, side effects and cleanup review"}

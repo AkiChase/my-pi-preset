@@ -6,26 +6,25 @@
 
 ## 执行与审查
 
-主会话直接实现，理解跨入口与消费者契约后控制修改范围；独立 trellis-check 审查共享 session/lifecycle、跨插件协议与消费者迁移。派发前 curate check.jsonl，仅引用真实 specs/任务研究材料并由 reviewer 完整读取源 PRD/design/implement。若独立审查不可用，报告阻塞，不将主自检称为独立审查。
+主会话完成S1直接实现与复核；S2消费者迁移及fixture调整委派 trellis-implement，主保留spec/任务集成与最终实际diff复核。独立 trellis-check 审查共享 session/lifecycle、跨插件协议与消费者迁移。派发前 curate check.jsonl，仅引用真实 specs/任务研究材料并由 reviewer 完整读取源 PRD/design/implement。若独立审查不可用，报告阻塞，不将主自检称为独立审查。
 
-## S1：共享 owner/API 与独立入口
+## S1：共享 owner/API 与独立入口（完成）
 
-- [ ] `extensions/widget-display.ts` 和 `extensions/shared/widget-display/` 实现唯一宿主发布 owner、区域组合、slot registry、同步 bus 协议与有限客户端 handle。
-- [ ] 聚焦测试覆盖排序不随发布/更新变化、文本/组件保留、空区域删除、无 owner、独立 runtime、相同 id 不同 manager、关闭/迟到、factory/setter/dispose 重入与异常清理。
-- [ ] 通过实际 SDK loader + fake UI sink 验证不同 pi.events facade 共享 underlying bus、reload订阅清理、客户端先后加载均可使用；不以模块缓存单例替代 cross-entry 证明。
-- [ ] 项目 `.trellis/spec/development/index.md` 必须写入强制 dev 规范（可链接有必要的新专题 spec）：唯一 owner、声明 slot/区域/排序、client 接入、session/activation fencing、撤销/清理职责、禁用消费者直接 setWidget、第三方边界；不能只写在 task design 或用户文档。
-- [ ] `.trellis/spec/testing/index.md` 写入入口检查及排序、身份、reload、重入/失败清理等验证要求，保持 development/testing 索引和 spec discovery 有效。S1先记录已实现shared契约，S2与全部消费者迁移一起更新最终约束。
-- [ ] 主自检与独立 review，focused natural-exit + typecheck/affected loader tests，通过后立即 scoped stage commit。
+- [x] `extensions/widget-display.ts` 和 `extensions/shared/widget-display/`：唯一宿主发布 owner、区域组合、slot registry、同步 bus 协议与有限客户端 handle。
+- [x] 聚焦测试：排序、内容保留、空区域删除、缺失 owner、独立 runtime、身份、关闭/迟到、重入与异常清理。
+- [x] actual SDK loader + fake UI sink：不同 facade 同 bus、不同 bus、两种加载顺序和runtime retirement/reload。
+- [x] 项目 development/topic/testing specs 的共享契约、入口文档与导航；S2将删除临时legacy例外。
+- [x] 独立review与main重跑：typecheck exit 0、focused 36/36自然退出、whitespace/links检查通过；checkpoint见执行记录。
 
 ## S2：全部消费者迁移与规范强制
 
-- [ ] Recap 的 publish/hide/rollback 接入 slot handle，保留现有 material/epoch fencing、主题 factory、迟到取消与保存行为。
-- [ ] Trellis refresh/clear 接入 slot；原有 status模式与无项目/unsupported/runtime 失败清理保持不变；Trellis 测试继续 fake pi 逻辑边界，不添加其真实终端/UI测试。
-- [ ] Process Tasks hint 的 show/diff/clear、session_start 与 lifecycle shutdown 全部接入；保留 belowEditor、foreground derivation与 shortcut展示。
-- [ ] 更新 consumer tests，新增实际 SDK fake UI 组合回归：Trellis先出现、Recap后出现仍排首，任意更新/撤销不漂移、不重建其他组件；第三方widget不清除。
-- [ ] 生产边界检查禁止共享owner外直接 setWidget；规范包含以后内置 widget 声明slot/使用client与清理职责。
-- [ ] 更新相关用户文档，明确编辑器区域固定排序与第三方限制。
-- [ ] 主审查actual diff + 独立 review + 聚焦回归 + full pnpm check，立即 scoped stage commit。
+- [x] Recap 的 publish/hide/rollback 接入 slot handle，保留现有 material/epoch fencing、主题 factory、迟到取消与保存行为。
+- [x] Trellis refresh/clear 接入 slot；原有 status模式与无项目/unsupported/runtime 失败清理保持不变；Trellis 测试继续 fake pi 逻辑边界，不添加其真实终端/UI测试。
+- [x] Process Tasks hint 的 show/diff/clear、session_start 与 lifecycle shutdown 全部接入；保留 belowEditor、foreground derivation与 shortcut展示。
+- [x] 更新 consumer tests，新增实际 SDK fake UI 组合回归：Trellis先出现、Recap后出现仍排首，任意更新/撤销不漂移、不重建其他组件；第三方widget不清除。
+- [x] 生产边界检查禁止共享owner外直接 setWidget；规范包含以后内置 widget 声明slot/使用client与清理职责。
+- [x] 更新相关用户文档，明确编辑器区域固定排序与第三方限制。
+- [x] 主审查actual diff + 独立 review + 聚焦回归 + full pnpm check，立即 scoped stage commit。
 
 ## 验证命令
 
@@ -49,7 +48,21 @@ S2：`node --test extensions/shared/widget-display/__tests__/*.test.ts extension
 - 独立 reviewer 完成并修复：串行宿主写入、双区域先关 admission、deferred factory/reentrant ack fencing、失败 mount rollback/retry、独立 loader graph/runtime 隔离。主已完整读取最终 owner/client/tests，确认仅修改授权共享代码。
 - 工具更新后旧 agent ID 在当前 scope 无法 retrieval；保留其已送达完成通知，不推测截断结果；main 依据实际文件重新验证。
 - main 最终 `pnpm typecheck` exit 0；focused 36/36 PASS 自然退出，exit 0；`git diff --check` exit 0。之前外部 bash-prompt SDK 引用错误已随其他会话修复消失，main未修改该文件。
-- S1 将提交共享owner、tests、基础spec与入口文档；消费者仍是明确S2迁移项。
+- S1 checkpoint `24f15e2`；提交后发现spec文件混入并行Bash规范hunks，用追加 `e710dd7` 分离并恢复对方内容为未提交状态，没有重写历史或丢弃并行工作。
+- S2迁移范围已派发 implement role，主不编辑消费者/fixture文件，只维护spec/任务材料。第一次派发因空implement.jsonl被拒（未启动agent），curate真实spec引用后成功派发。
+
+## S2 执行记录（已验证）
+
+- implement role完成三个消费者与测试fixture迁移，主读取actual product diff确认client activation scope、Recap factory有效性、Trellis刷新generation、hint freeze/display差分。
+- 实现角色验证：扩展focused 242/242自然退出，最终affected rerun 78/78、typecheck通过；full首次1565 tests中8失败（1 shared ordering、5 Trellisunsubscribe fixtures后修复、2全量fixture问题）。日志保留 `/tmp/widget-consumers.A5WCbd`，未提交。
+- main修复shared consumer-first second-session startup loss：真实session_start handler通过版本化bus同步activate owner，任意set不授予切换session权限。修正直接受影响的beautify mock on unsubscribe、agent host loading shutdown计数5。
+- main重跑shared/activation/boundary/Recap/process hint+activation/Trellis project activation：118/118自然退出，exit0。
+- 已派发S2独立review，允许只修授权widget/consumer/test/docs；主并行只维护spec/task，不重叠代码。
+- 独立review发现并修复Trellis stale manager刷新可推进generation/清除当前display的问题，补factory scoped manager/session identity fencing与late startup回归；actual SDK loader补两种顺序下initial/later session自动发布。
+- 独立focused 246/246、extra 25/25通过；最终独立 `pnpm check` 1567/1567 exit0。之前full第一次retained-child.test.ts的400 setImmediate启动等待在并行负载中到期；原fixture不改，单独复现与不重叠最终全量通过，失败保留 `/tmp/widget-review.boPwpr/final-full.log`。
+- main完整读final共享与消费者diff并核对review改动；主final focused 168/168自然退出、`pnpm check`类型与全量1567/1567、82 suites exit0。现有full forced-exit不替代focused自然退出。
+- `git diff --check`与spec links/discovery PASS；无独立lint script。testing spec历史dated logs/research冲突在主授权规范维护范围修正为implementation记录+仓库外raw+selected evidence。
+- 全部规范legacy例外已去除；S2准备即时提交，保留并行Bash spec hunks不纳入本提交。真实终端/线上质量NOT_RUN，无个人reload、install或push。
 
 ## 交付限制
 

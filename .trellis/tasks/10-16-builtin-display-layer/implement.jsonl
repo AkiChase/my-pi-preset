@@ -1,0 +1,3 @@
+{"file":".trellis/spec/development/index.md","reason":"Project extension lifecycle and UI ownership rules"}
+{"file":".trellis/spec/development/widget-display.md","reason":"Shared display client and slot migration contract"}
+{"file":".trellis/spec/testing/index.md","reason":"Required consumer lifecycle and fake/actual SDK test boundaries"}

@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { CONNECT, type ConnectRequest, type Slot, type WidgetContent, type WidgetHandle } from "./contracts.ts";
+import { CONNECT, SESSION_START, type ConnectRequest, type Slot, type WidgetContent, type WidgetHandle } from "./contracts.ts";
 
 /** One finite publisher per consumer activation. No session state is shared at import time. */
 export function createWidgetClient(pi: Pick<ExtensionAPI, "events" | "on">, slot: Slot) {
@@ -13,6 +13,8 @@ export function createWidgetClient(pi: Pick<ExtensionAPI, "events" | "on">, slot
     function disposeHandle(): void { const previous = handle; handle = undefined; release(previous); }
     const offStart = pi.on("session_start", (_event, ctx) => {
         if (closed) return;
+        // Only an actual lifecycle handler grants session activation, never an arbitrary set().
+        try { pi.events.emit(SESSION_START, { version: 1, ctx }); } catch { /* Missing/retired owner remains unavailable. */ }
         const id = ctx.sessionManager.getSessionId();
         if (manager !== ctx.sessionManager || sessionId !== id) {
             generation++; manager = ctx.sessionManager; sessionId = id; disposeHandle();

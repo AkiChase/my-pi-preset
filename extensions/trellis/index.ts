@@ -17,6 +17,7 @@
  * Dispatch validates source authority and hands paths/read obligations to roles.
  */
 
+import { createWidgetClient } from "../shared/widget-display/client.ts";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
@@ -88,7 +89,6 @@ const SECTION_OVERVIEW = "session-overview";
 const SECTION_WORKFLOW = "trellis-workflow";
 const STATE_MESSAGE_TYPE = "trellis-task-state";
 const STATUS_KEY = "trellis";
-const WIDGET_KEY = "trellis";
 const AGENT_PREFIX = "trellis-";
 const ACTIVE_TASK_MARKER = "Active task:";
 
@@ -856,38 +856,37 @@ async function sessionTask(current: Session): Promise<ActiveTask | undefined> {
  * Clear the unselected surface, or both when unsupported/disabled. The count
  * is reread on existing refresh events independently of active-task caches.
  */
-async function refreshDisplay(ctx: ExtensionContext, known?: Session): Promise<void> {
+async function refreshDisplay(widget: ReturnType<typeof createWidgetClient>, ctx: ExtensionContext, valid: () => boolean, known?: Session): Promise<void> {
 	try {
 		if (!ctx.hasUI) return;
 		const current = known ?? session(ctx);
 		if (!current || DISPLAY_MODE === "off") {
-			clearDisplay(ctx);
+			if (valid()) clearDisplay(widget, ctx);
 			return;
 		}
 
 		const task = await sessionTask(current);
+		if (!valid()) return;
 		requireRuntime(current.root);
 		const count = readUnfinishedTaskCount(current.root);
 		const theme = ctx.ui.theme as ExtensionTheme;
 		if (DISPLAY_MODE === "status") {
-			ctx.ui?.setWidget?.(WIDGET_KEY, undefined);
-			ctx.ui?.setStatus?.(STATUS_KEY, renderStatus(theme, task, count));
+			widget.set(ctx, undefined);
+			if (valid()) ctx.ui?.setStatus?.(STATUS_KEY, renderStatus(theme, task, count));
 			return;
 		}
 
 		ctx.ui?.setStatus?.(STATUS_KEY, undefined);
-		ctx.ui?.setWidget?.(WIDGET_KEY, renderWidget(theme, task, count), {
-			placement: "aboveEditor",
-		});
+		widget.set(ctx, renderWidget(theme, task, count));
 	} catch {
-		clearDisplay(ctx);
+		if (valid()) clearDisplay(widget, ctx);
 	}
 }
 
-function clearDisplay(ctx: ExtensionContext): void {
+function clearDisplay(widget: ReturnType<typeof createWidgetClient>, ctx: ExtensionContext): void {
 	try {
 		ctx.ui?.setStatus?.(STATUS_KEY, undefined);
-		ctx.ui?.setWidget?.(WIDGET_KEY, undefined);
+		widget.set(ctx, undefined);
 	} catch {
 		// The display is cosmetic. Never let it surface.
 	}
@@ -919,6 +918,12 @@ export const __internals = {
 };
 
 export default function (pi: ExtensionAPI): void {
+	const widget = createWidgetClient(pi, "trellis");
+	let displayGeneration = 0, displayClosed = false;
+	let displayManager: ExtensionContext["sessionManager"] | undefined, displaySessionId: string | undefined;
+	const ownsDisplay = (ctx: ExtensionContext) => !displayClosed && (!displayManager ||
+		(displayManager === ctx.sessionManager && displaySessionId === ctx.sessionManager.getSessionId()));
+	const clearProjectDisplay = (ctx: ExtensionContext) => { if (ownsDisplay(ctx)) clearDisplay(widget, ctx); };
 	// One extension instance publishes at most its latest Check. A newer Check,
 	// session replacement, or shutdown aborts the old run and suppresses its report.
 	let checkGeneration = 0, checkController: AbortController | undefined, checkClosed = false;
@@ -946,10 +951,14 @@ export default function (pi: ExtensionAPI): void {
 	let registeredRoot: string | undefined;
 	let startupCwd: string | undefined;
 	const refreshProjectDisplay = async (ctx: ExtensionContext, known?: Session) => {
+		if (!ownsDisplay(ctx)) return;
+		const generation = ++displayGeneration, id = ctx.sessionManager.getSessionId();
+		const valid = () => ownsDisplay(ctx) && generation === displayGeneration && ctx.sessionManager.getSessionId() === id;
+		if (!valid()) return;
 		try {
-			if ((registeredRoot && findRoot(ctx.cwd) !== registeredRoot) || (!registeredRoot && startupCwd !== undefined && ctx.cwd !== startupCwd)) { clearDisplay(ctx); return; }
-			await refreshDisplay(ctx, known);
-		} catch { clearDisplay(ctx); }
+			if ((registeredRoot && findRoot(ctx.cwd) !== registeredRoot) || (!registeredRoot && startupCwd !== undefined && ctx.cwd !== startupCwd)) { clearProjectDisplay(ctx); return; }
+			await refreshDisplay(widget, ctx, valid, known);
+		} catch { if (valid()) clearProjectDisplay(ctx); }
 	};
 	const registerProjectCapabilities = (root: string) => {
 		if (registeredRoot) return;
@@ -962,7 +971,7 @@ export default function (pi: ExtensionAPI): void {
 					requireRuntime(found);
 					const current = ctx ? session(ctx) : undefined;
 					return current?.root ?? found;
-				} catch (error) { clearDisplay(ctx); throw error; }
+				} catch (error) { clearProjectDisplay(ctx); throw error; }
 			},
 			currentTask: (root, ctx) => readCurrentTaskIdentity(root, session(ctx)?.key ?? contextKey(root, ctx)),
 		});
@@ -974,7 +983,7 @@ export default function (pi: ExtensionAPI): void {
 				const current = session(ctx);
 				if (current && roleBySession.has(current.identity)) throw new Error("Task roles must not recursively dispatch; return findings to main");
 				requireRuntime(registeredRoot!);
-			} catch (error) { clearDisplay(ctx); throw error; }
+			} catch (error) { clearProjectDisplay(ctx); throw error; }
 			return tool.execute(...args);
 		} });
 		registerDispatchTool(guardedPi, async (ctx) => {
@@ -987,22 +996,26 @@ export default function (pi: ExtensionAPI): void {
 	// ---- M1 / M4 / M2: session bootstrap -----------------------------------
 
 	pi.on("session_start", async (_event, ctx) => {
+		const startupGeneration = ++displayGeneration;
+		if (displayClosed) return;
+		displayManager = ctx.sessionManager; displaySessionId = ctx.sessionManager.getSessionId();
+		const startupValid = () => ownsDisplay(ctx) && displayGeneration === startupGeneration;
 		cancelCheck(); checkClosed = false;
 		startupCwd ??= ctx.cwd;
 		if (!registeredRoot && ctx.cwd !== startupCwd) {
-			clearDisplay(ctx);
+			clearProjectDisplay(ctx);
 			if (ctx.hasUI) ctx.ui.notify("Project changed; reload to activate Trellis in this project", "warning");
 			return;
 		}
 		let current: Session | undefined;
 		try { current = session(ctx); }
-		catch (error) { if (ctx.hasUI) ctx.ui.notify(runtimeDiagnostic(error), "error"); clearDisplay(ctx); return; }
+		catch (error) { if (ctx.hasUI) ctx.ui.notify(runtimeDiagnostic(error), "error"); clearProjectDisplay(ctx); return; }
 		if (!current) {
-			if (ctx.hasUI) clearDisplay(ctx);
+			if (ctx.hasUI) clearProjectDisplay(ctx);
 			return;
 		}
 		if (registeredRoot && registeredRoot !== current.executionRoot) {
-			clearDisplay(ctx);
+			clearProjectDisplay(ctx);
 			if (ctx.hasUI) ctx.ui.notify("Project changed; reload to activate Trellis in this project", "warning");
 			return;
 		}
@@ -1016,6 +1029,7 @@ export default function (pi: ExtensionAPI): void {
 				keyBySession.set(current.identity, `pi-child-${shortHash(current.identity)}`);
 				authorityErrors.set(current.identity, "Managed child awaits a complete verified source authority header; no target pointer fallback");
 				const native = await queryWorktree(current.executionRoot);
+				if (!startupValid()) return;
 				if (!native.local) {
 					// A source repository can also use a .git file (submodule or
 					// separate git-dir). Native source identity distinguishes it from
@@ -1032,15 +1046,17 @@ export default function (pi: ExtensionAPI): void {
 				}
 			}
 		} catch (error) {
+			if (!startupValid()) return;
 			keyBySession.set(current.identity, `pi-child-${shortHash(current.identity)}`);
 			authorityErrors.set(current.identity, `Managed startup authority failed: ${String(error)}; no pointer fallback`);
 			if (ctx.hasUI) ctx.ui.notify(runtimeDiagnostic(error), "error");
-			clearDisplay(ctx); return;
+			clearProjectDisplay(ctx); return;
 		}
 
 		// Behavioural version check: if the CLI contract moved, say so once
 		// instead of degrading silently.
 		const probe = await loadContext(current.root, current.key);
+		if (!startupValid()) return;
 		if (!probe && ctx.hasUI && !warnedBrokenCli) {
 			warnedBrokenCli = true;
 			ctx.ui?.notify?.(
@@ -1078,11 +1094,11 @@ export default function (pi: ExtensionAPI): void {
 			let identity: string | undefined;
 			try { const root = findRoot(ctx.cwd); if (root) identity = sessionIdentity(root, ctx); } catch { /* unsafe discovery grants no context */ }
 			if (identity && (authorityBySession.has(identity) || sourceRootBySession.has(identity))) pi.sendMessage({ customType: STATE_MESSAGE_TYPE, content: `Status: task_error\nTrellis context diagnostic: ${runtimeDiagnostic(error)}`, display: false });
-			clearDisplay(ctx); return;
+			clearProjectDisplay(ctx); return;
 		}
 		try {
 			let current = initial;
-			if (!current || (registeredRoot && current.executionRoot !== registeredRoot) || (!registeredRoot && startupCwd !== undefined && ctx.cwd !== startupCwd)) { clearDisplay(ctx); return; }
+			if (!current || (registeredRoot && current.executionRoot !== registeredRoot) || (!registeredRoot && startupCwd !== undefined && ctx.cwd !== startupCwd)) { clearProjectDisplay(ctx); return; }
 			const prompt = "prompt" in event ? event.prompt : "";
 			const facts = parseDispatchFacts(prompt);
 			if (!facts && /^Active task:/.test(prompt)) {
@@ -1153,7 +1169,7 @@ export default function (pi: ExtensionAPI): void {
 				lastStateSent.set(identity, content);
 				pi.sendMessage({ customType: STATE_MESSAGE_TYPE, content, display: false });
 			}
-			clearDisplay(ctx);
+			clearProjectDisplay(ctx);
 		}
 	});
 
@@ -1168,19 +1184,19 @@ export default function (pi: ExtensionAPI): void {
 		let root: string | undefined;
 		try { root = findRoot(ctx.cwd); }
 		catch (error) {
-			clearDisplay(ctx);
+			clearProjectDisplay(ctx);
 			if (trellisExecution) return { block: true, reason: `${runtimeDiagnostic(error)} No command or child was started.` };
 			return;
 		}
 		if ((registeredRoot && root !== registeredRoot) || (!registeredRoot && startupCwd !== undefined && ctx.cwd !== startupCwd)) {
-			clearDisplay(ctx);
+			clearProjectDisplay(ctx);
 			if (trellisExecution) return { block: true, reason: "Project changed; reload before Trellis execution. No command or child was started." };
 			return;
 		}
 		if (!root) return;
 		try { requireRuntime(root); }
 		catch (error) {
-			clearDisplay(ctx);
+			clearProjectDisplay(ctx);
 			if (trellisExecution) return { block: true, reason: `${runtimeDiagnostic(error)} No command or child was started.` };
 			return;
 		}
@@ -1266,7 +1282,7 @@ export default function (pi: ExtensionAPI): void {
 			}
 			await refreshProjectDisplay(ctx, current);
 		} catch {
-			clearDisplay(ctx);
+			clearProjectDisplay(ctx);
 		}
 	});
 
@@ -1278,7 +1294,8 @@ export default function (pi: ExtensionAPI): void {
 
 	pi.on("session_shutdown", (_event, ctx) => {
 		cancelCheck(); checkClosed = true;
-		clearDisplay(ctx);
+		displayClosed = true; displayGeneration++; widget.dispose();
+		clearDisplay(widget, ctx);
 		let root: string | undefined;
 		try { root = findRoot(ctx.cwd); } catch { return; }
 		if (!root) return;

@@ -13,6 +13,7 @@ it("actual host loader connects independent entry graphs in either order, isolat
         const consumerPath = join(directory, "consumer.ts");
         writeFileSync(consumerPath, `import {createWidgetClient} from ${JSON.stringify(clientPath)};
 export default pi => { const client=createWidgetClient(pi,"recap");
+pi.on("session_start", (_event,ctx)=>client.set(ctx,["startup"]));
 pi.events.on("fixture:publish", ({ctx,content,ack})=>ack(client.set(ctx,content)));
 pi.events.on("fixture:facade", ack=>ack(pi.events)); };`);
         const result = spawnSync(process.execPath, ["--input-type=module", "-e", `
@@ -30,6 +31,10 @@ pi.events.on("fixture:facade", ack=>ack(pi.events)); };`);
                 const manager=SessionManager.inMemory(process.cwd());const widgets=new Map();
                 const ctx={sessionManager:manager,hasUI:true,mode:"rpc",ui:{setWidget(k,v){if(v)widgets.set(k,v);else widgets.delete(k)}}};
                 for(const ext of loaded.extensions)for(const h of ext.handlers.get("session_start")??[])await h({},ctx);
+                assert.deepEqual([...widgets.values()],[["startup"]]);
+                ctx.sessionManager=SessionManager.inMemory(process.cwd());
+                for(const ext of loaded.extensions)for(const h of ext.handlers.get("session_start")??[])await h({},ctx);
+                assert.deepEqual([...widgets.values()],[["startup"]],"consumer-first later lifecycle handshake must publish synchronously");
                 let answer;bus.emit("fixture:publish",{ctx,content:["connected"],ack:v=>answer=v});
                 assert.equal(answer,true);assert.deepEqual([...widgets.values()],[["connected"]]);
                 const isolated=createEventBus(), isolatedRuntime=createExtensionRuntime();

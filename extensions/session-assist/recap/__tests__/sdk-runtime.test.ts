@@ -1,3 +1,5 @@
+import registerWidgetDisplay from "../../../shared/widget-display/owner.ts";
+import { createWidgetClient } from "../../../shared/widget-display/client.ts";
 import assert from "node:assert/strict";
 import { it, mock } from "node:test";
 import { mkdtempSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
@@ -47,7 +49,7 @@ async function sdkHarness(t: TestContext, options: { initial?: boolean; automati
     let ctx!: ExtensionContext;
     const events: { name: string; idle: boolean; aborted?: boolean }[] = [];
     const loader = new DefaultResourceLoader({ cwd: directory, agentDir: directory, settingsManager: settings, noExtensions: true, noSkills: true, noThemes: true, noPromptTemplates: true, noContextFiles: true,
-        extensionFactories: [pi => { register(pi, { clock, directory: () => directory });
+        extensionFactories: [registerWidgetDisplay, pi => { register(pi, { clock, directory: () => directory });
             const observe = (event: ExtensionEvent, context: ExtensionContext) => { ctx = context; events.push({ name: event.type, idle: context.isIdle(), aborted: "aborted" in event ? event.aborted : undefined }); };
             pi.on("session_start", observe); pi.on("input", observe); pi.on("before_agent_start", observe); pi.on("agent_start", observe);
             pi.on("agent_end", observe); pi.on("agent_settled", observe); pi.on("session_before_tree", observe); pi.on("session_tree", observe);
@@ -64,17 +66,21 @@ async function sdkHarness(t: TestContext, options: { initial?: boolean; automati
     const inputs: (string | undefined)[] = [];
     const titles: string[] = []; const placeholders: string[] = []; const menus: string[][] = [];
     let currentWidget: Component | undefined;
+    const mounted = new Map<string, Component>();
     let onWidget: (() => void) | undefined; let onDispose: (() => void) | undefined;
     const sinkTheme = { fg: (_color: string, text: string) => text } as unknown as Theme;
     const ui = { notify: (text: string) => { notices.push(text); }, select: async (title: string, options: string[]) => { titles.push(title); menus.push(options); return await selections.shift(); },
         input: async (_title: string, placeholder: string) => { placeholders.push(placeholder); return inputs.shift(); },
-        setWidget: (_key: string, content: Parameters<ExtensionUIContext["setWidget"]>[1]) => {
+        setWidget: (key: string, content: Parameters<ExtensionUIContext["setWidget"]>[1]) => {
             widgets.push(content);
             // Actual SDK TUI order: dispose/remove old, call content factory, then install replacement.
-            onDispose?.(); currentWidget = undefined;
+            const previous = mounted.get(key) as (Component & { dispose?(): void }) | undefined;
+            mounted.delete(key); previous?.dispose?.();
+            if (key === "preset.widgets.aboveEditor") { onDispose?.(); currentWidget = undefined; }
             let component: Component | undefined;
-            if (typeof content === "function") { component = content({} as TUI, sinkTheme); onWidget?.(); }
-            currentWidget = component;
+            if (typeof content === "function") { component = content({ requestRender() { onWidget?.(); } } as unknown as TUI, sinkTheme); onWidget?.(); }
+            if (component) mounted.set(key, component);
+            if (key === "preset.widgets.aboveEditor") currentWidget = component;
         } } as unknown as ExtensionUIContext;
     const commandContextActions = { waitForIdle: () => session.waitForIdle(),
         newSession: async () => { throw new Error("Unexpected command newSession"); }, fork: async () => { throw new Error("Unexpected command fork"); },
@@ -85,7 +91,7 @@ async function sdkHarness(t: TestContext, options: { initial?: boolean; automati
     const sessionRuntime = new AgentSessionRuntime(session, services, async () => { throw new Error("Unexpected session replacement"); });
     t.after(async () => { await sessionRuntime.dispose(); await flush(); rmSync(directory, { recursive: true, force: true }); });
     return { directory, clock, calls, recapStreams, manager, session, sessionRuntime, events, notices, widgets, selections, inputs, titles, placeholders, menus, get ctx() { return ctx; },
-        get currentWidget() { return currentWidget; }, setOnWidget(value: (() => void) | undefined) { onWidget = value; }, setOnDispose(value: (() => void) | undefined) { onDispose = value; },
+        mounted, get currentWidget() { return currentWidget; }, setOnWidget(value: (() => void) | undefined) { onWidget = value; }, setOnDispose(value: (() => void) | undefined) { onDispose = value; },
         setGate(value: Promise<void> | undefined) { mainGate = value; }, setException(value: Error | undefined) { recapException = value; }, setReason(value: AssistantMessage["stopReason"]) { mainReason = value; },
         finishRecap(index = recapStreams.length - 1, message = reply("Actual recap")) { const stream = recapStreams[index]; const value = { ...message, provider: "recap-sdk", model: "fixture" };
             if (value.stopReason === "stop") stream.push({ type: "done", reason: "stop", message: value }); else stream.push({ type: "error", reason: "error", error: value }); stream.end(value); },
@@ -204,7 +210,7 @@ it("actual SDK nextTurn asides are not current projection or public pending; nex
     h.finishRecap(0); await flush(); assert.equal(h.manager.getBranch().filter(e => e.type === "custom" && e.customType === STATE_TYPE).length, 1);
     await h.session.prompt("next normal"); await h.clock.tick(300000); assert.equal(h.recapStreams.length, 2); h.finishRecap(1); await flush();
 });
-it("actual SDK late factory/dispose publication is revoked after same-material handled input for new, restored and auto-cached display", async t => {
+it("actual SDK late factory/update publication is revoked after same-material handled input for new, restored and auto-cached display", async t => {
     for (const source of ["new", "restore", "auto"] as const) {
         const h = await sdkHarness(t, { initial: true, automatic: false, tui: true, extra: pi => pi.on("input", event => event.text === "handled" ? { action: "handled" } : undefined) });
         let identity = buildMaterial(h.manager, 32000).identity;
@@ -218,7 +224,7 @@ it("actual SDK late factory/dispose publication is revoked after same-material h
             const command = h.session.prompt("/recap"); await flush(); h.finishRecap(); await command;
         } else if (source === "restore") {
             const target = h.manager.getLeafId()!; h.manager.appendSessionInfo("neutral before restore");
-            await h.session.navigateTree(target); h.setOnDispose(inject); await h.clock.tick(0);
+            await h.session.navigateTree(target); h.setOnWidget(inject); await h.clock.tick(0);
         } else {
             h.selections.push("Toggle automatic"); await h.session.prompt("/recap config");
             await h.session.prompt("next normal window");
@@ -319,4 +325,34 @@ it("actual SDK sequential explicit refresh consumes new configured model while c
     h.finishRecap(1, reply("stale replaced")); h.finishRecap(2, reply("explicit latest")); await Promise.all([second, third]);
     const states = h.manager.getBranch().filter(entry => entry.type === "custom" && entry.customType === STATE_TYPE);
     assert.equal(states.length, 2); assert.match(h.notices.at(-1)!, /explicit latest/);
+});
+
+it("actual SDK Recap arriving after a peer slot keeps fixed order, peer identity and third-party widgets", async t => {
+    let peer!: ReturnType<typeof createWidgetClient>;
+    let creates = 0, disposes = 0;
+    const h = await sdkHarness(t, { initial: true, automatic: false, tui: true, extra: pi => {
+        peer = createWidgetClient(pi, "trellis");
+        pi.on("session_start", (_event, ctx) => {
+            peer.set(ctx, () => { creates++; return { render: () => ["Peer task"], invalidate() {}, dispose() { disposes++; } }; });
+        });
+    } });
+    const thirdParty = { render: () => ["external"], invalidate() {} };
+    const writes: string[] = [];
+    const original = h.ctx.ui.setWidget;
+    h.ctx.ui.setWidget = (key, content, options) => { writes.push(key); if (typeof content === "function") original(key, content, options); else original(key, content, options); };
+    h.ctx.ui.setWidget("external.widget", () => thirdParty);
+    writes.length = 0;
+    let command = h.session.prompt("/recap"); await flush(); h.finishRecap(0, reply("first recap")); await command;
+    assert.match(h.currentWidget!.render(120).join("\n"), /first recap[\s\S]*Peer task/);
+    assert.equal(creates, 1); assert.equal(disposes, 0);
+    command = h.session.prompt("/recap"); await flush(); h.finishRecap(1, reply("refreshed recap")); await command;
+    assert.match(h.currentWidget!.render(120).join("\n"), /refreshed recap[\s\S]*Peer task/);
+    assert.equal(creates, 1); assert.equal(disposes, 0);
+    peer.set(h.ctx, ["Updated task"]);
+    assert.match(h.currentWidget!.render(120).join("\n"), /refreshed recap[\s\S]*Updated task/);
+    peer.set(h.ctx, undefined);
+    assert.match(h.currentWidget!.render(120).join("\n"), /refreshed recap/);
+    assert.doesNotMatch(h.currentWidget!.render(120).join("\n"), /task/);
+    assert.deepEqual(writes, [], "updating slots never republishes the composite or external widgets");
+    assert.equal(h.mounted.get("external.widget"), thirdParty);
 });

@@ -18,8 +18,6 @@ import { PREVIEW_CHARS } from "./types.ts";
 import type { BackgroundRegistry } from "./state.ts";
 import { formatDuration, oneLine } from "./format.ts";
 
-const HINT_KEY = "bg-hint";
-
 /**
  * How to ask for a background hand-off. The chord is configurable and can be
  * unbound entirely, so the hint has to read it rather than hardcode it —
@@ -38,6 +36,7 @@ export function renderBackgroundHint(
     reg: BackgroundRegistry,
     ctx: UiContext
 ): void {
+    if (reg.closed) return;
     const rows: string[] = [];
     for (const slot of reg.foreground.values()) {
         // Only past the quick-completion window: a command that finishes in
@@ -55,7 +54,7 @@ export function renderBackgroundHint(
     if (rows.length === 0) {
         if (reg.lastHintContent !== undefined) {
             reg.lastHintContent = undefined;
-            ctx.ui.setWidget(HINT_KEY, undefined);
+            reg.hintPublisher?.set(ctx, undefined);
         }
         return;
     }
@@ -70,7 +69,7 @@ export function renderBackgroundHint(
     const content = lines.join("\n");
     if (content === reg.lastHintContent) return;
     reg.lastHintContent = content;
-    ctx.ui.setWidget(HINT_KEY, lines, { placement: "belowEditor" });
+    if (!reg.hintPublisher?.set(ctx, lines) && reg.lastHintContent === content) reg.lastHintContent = undefined;
 }
 
 /** Start hinting for one foreground command. Idempotent. */

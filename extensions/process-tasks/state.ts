@@ -8,10 +8,17 @@ import { MonitorNotifications } from "./monitor-notifications.ts";
 import { TaskCoordinator } from "../task-ui/coordinator.ts";
 import { DEFAULTS as UI_DEFAULTS, type TaskUIConfig } from "../task-ui/config.ts";
 import type { OwnedExecution } from "./spawn.ts";
-import type { Job, ForegroundSlot } from "./types.ts";
+import type { Job, ForegroundSlot, UiContext } from "./types.ts";
 import { DEFAULTS, type ProcessTasksConfig } from "./config.ts";
 
+export interface HintPublisher {
+    set(ctx: UiContext, lines: readonly string[] | undefined): boolean;
+    dispose(): void;
+}
+
 export class BackgroundRegistry {
+    /** Finite activation publisher; isolated backend fixtures may omit display. */
+    hintPublisher: HintPublisher | undefined;
     /** Resolved configuration for this session. Threaded with the registry
      *  because `reg` already reaches every tool and helper; the alternative —
      *  a module-level singleton read at import time — would make tests share

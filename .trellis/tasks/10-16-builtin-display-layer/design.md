@@ -33,3 +33,14 @@ slot 更新只重建其自身组件，其他 slot 的实例、状态和 focus �
 在 development/testing specs 记录内置 widget 的唯一发布 owner、slot registry、session fencing、接入步骤和验证约束。增加源码边界检查：所有生产宿主 setWidget 调用必须位于共享 owner 中；测试 fixture 的 setWidget mock 不受此限制。
 
 需要重点核查 owner 缺失、跨 facade 但共享 bus、多个独立 bus、runtime reload、不同 manager 同 sessionId、factory/setter/dispose 重入、sink 错误及原有 consumer fallback。跨模块生命周期契约变化需要独立 review。
+
+## S2 审查检查项
+
+- Consumer initial publication and later session switch must work with both owner-before-consumer and consumer-before-owner event registration order. S1 tested load-order connectivity initially, but owner admission rejects a different session until its own session_start; a consumer that publishes earlier can otherwise lose startup content. Resolve with a bounded, identity-fenced lifecycle handshake, not accepting arbitrary stale connect as session authority.
+- All production host setWidget calls must exist only in owner.ts; source-boundary enforcement must allow typed API references/mocks without allowing aliased host publication escape.
+- Recap's publication.valid checks continue to guard factory-time and show-time, not merely client entry admission; passive material change and same-material handled input still clear stale widget.
+- Preserve origin sink failure semantics: failed widget delivery must not erase saved recap or change execution result. Slot invalidation must not clear another consumer.
+- Process hints keep derived foreground state/diff behavior; freeze and session_start clean their display, including shutdown hook ordering across composition and shared owner.
+- Trellis fake-pi tests remain logic-only. Thread the client through factory-owned closures; no global mutable UI field added to existing module helpers.
+- Preserve existing tests' assertions after fixtures move to composite host widgets. Counting aggregate host writes no longer proves individual slot publications; assert semantic content/disposal instead.
+- Final tests cover third-party widget preservation, above/below isolation and fixed internal order; no claim of composite priority over third parties.

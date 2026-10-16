@@ -81,9 +81,9 @@ const assertChild = (result, rootExt, label) => {
   }
   assert.equal(ext.commands.has("agents"), false, `${label}: no root manager command`);
   for (const event of [...rootOnlyEvents, ...removedOverviewEvents]) assert.equal(ext.handlers.has(event), false, `${label}: no root manager ${event}`);
-  // Composition, appearance/highlighter and path continuation teardown; no separate agent shutdown.
-  assert.equal(rootExt.handlers.get("session_shutdown")?.length, 4);
-  assert.equal(ext.handlers.get("session_shutdown")?.length, 4);
+  // Composition, foreground widget client, appearance/highlighter and path continuation teardown.
+  assert.equal(rootExt.handlers.get("session_shutdown")?.length, 5);
+  assert.equal(ext.handlers.get("session_shutdown")?.length, 5);
   for (const event of ["session_start"]) {
     assert.equal(ext.handlers.get(event)?.length, rootExt.handlers.get(event)?.length - 1, `${label}: no agent ${event}`);
   }
