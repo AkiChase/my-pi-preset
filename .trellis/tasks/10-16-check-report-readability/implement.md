@@ -62,4 +62,6 @@ git diff --check
 
 ## 提交与清理
 
-stage 已验收，准备立即提交 scoped 产品、测试与本任务最小规划/验证材料（无 research/evidence 报告）。任务保持 in_progress 等用户体验验收；未授权 archive/push。
+stage 已验收并提交 `c36f6ee`（`feat(trellis): show structured themed Check reports in messages`）：产品、测试与本任务最小规划/验证材料，无 research/evidence 报告。首次提交前 staged diff 检查发现 implement.md 多余 EOF 空行，修复后提交成功，没有失败的 Git commit。
+
+所有本次进程已结束且原始材料已核实；已仅清理本次拥有的 `/tmp/trellis-report-UJJzGW/`，删除后不存在的检查通过，保留此处自包含验证记录。任务保持 in_progress 等用户体验验收；未授权 archive/push。
