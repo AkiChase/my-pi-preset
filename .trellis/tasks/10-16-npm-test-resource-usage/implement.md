@@ -107,6 +107,19 @@ N9候选（未批准）：child普通source session/header/key隔离用现有moc
 
 /tmp/pi-test-b5-qV005p 材料核对后清理；此前 /tmp/pi-test-critical-xMwjgJ 留存并行契约失败诊断，未解决范围外失败、不删所需材料。
 
+## 第六批（用户已批准实施）
+
+S16 N6/N8：dispatch custom role/target pointer、multiline prose、check snapshot 的 setup 与 invalid lease/Python decoder 的 seed dispatch 使用现有 stateFixture；保留实际role/文件/parser/snapshot/status及Python create拒绝。stateFixture只mock query-worktree，worktree.py仍真实。focused dispatch自然退出后立即提交。
+S17 N7：target-only identity三角色与stale spec/missing task合为一个真实source authority集成，单次dispatch覆盖目标坏identity+旧spec，然后移除目标task、真实query验证missing task不影响source；selected-role isolation与Python research无manifest回归不变。focused自然退出后提交。最后timed Trellis全组与typecheck；全量若在途工具契约仍失败，记录实际失败而不修范围外内容。仅dispatch测试和本任务材料，不修改生产Git/query或并发/glob，不派发/安装/归档。输出 /tmp/pi-test-b6-hx55Py。
+
+## 第六批结果
+
+S16 `40f8b25`：五类setup改stateFixture；首次focused exit1/34pass1fail，check snapshot当前被判stale：模板捕获后root校准不能重算真实sourceFingerprint。改仅该case以liveMaterials从当前副本捕获implement/check两次真实query，随后复用，不伪造指纹/不改status断言。rerun `node --test --test-concurrency=8 extensions/trellis/__tests__/dispatch.test.mjs` 35/35 PASS、自然退出40.02s、29.31CPU s。实际Python status及lease/decoder create preview仍真实。
+S17 `fcf40ca`：target identity与stale spec合一真实dispatch，missing target task仍用真实supported ready query检查fingerprint一致；减少三角色重复dispatch（selected role isolation/research回归仍真实）。focused34/34 PASS、自然退出37.94s/27.90CPU s。所有选中文件和stage diff检查通过，自审非独立代理。
+最终Node v24.14.1/既有SDK1.3.0/临时PI_CODING_AGENT_DIR与PI_SDK_DIR串行：`/usr/bin/time -l node --test --test-concurrency=8 --test-force-exit extensions/trellis/__tests__/*.test.mjs` exit0、460/460 PASS、0fail/cancelled/skipped；75.78s wall/338.71CPU s，dispatch63.72s、context51.58s（并行不可相加）。第三批69.91s/350.07CPU s，仅CPU观察稍低、wall未改善；第五/六批没有可比同环境全组baseline，不能声称全量加速已建立。
+`pnpm run typecheck` exit2：在途runtimeTaskTool/registerRuntimeTaskTool移除、RuntimeLaunchMetadata task_id/run_id类型不匹配等范围外契约错误。`/usr/bin/time -l npm test` exit1、1341tests/1299pass/42fail、68suites、0cancelled/skipped，88.67s/452.52CPU s；典型失败missing export registerRuntimeTaskTool/runtimeTaskTool、task_manage→agent_manage/process_manage与agent_id/execution_id变化。未修改这些文件，不把失败轮与第四批1543pass比较为有效性能收益。Trellis相关检查通过，但整个仓库交付仍受并行任务影响，任务保持in_progress。
+保留owned /tmp/pi-test-b6-hx55Py 完整日志用于未解决的集成失败诊断；旧 /tmp/pi-test-critical-xMwjgJ 也未清理。没有新安装/代理/生产变更/全量入口变更/归档。下一批应在测试成本更大的初始化/完整校验与重复source handler链路继续审查，当前未获新实施授权；不把此次仅减少约30次原生query当作资源问题已解决。
+
 ## 阶段与提交检查点
 
 1. **S1 调度与 GC 精简**：package test 并发 8、两处 Trellis 内层并发移除；删除三组 GC 用例和专用 driver；更新测试规范过时的 GC 要求。检查三组 editor/owner 和两组 Trellis 测试、静态配置/glob，然后提交。
