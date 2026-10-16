@@ -93,8 +93,14 @@ test('cooperative cancelled input and bounded formatter retain honest omission/r
  const report=formatDiagnostics({...r,items:Array.from({length:64},()=>item),omitted:2});assert.ok(Buffer.byteLength(report)<=DIAGNOSTIC_LIMITS.report);assert.match(report,/omitted by the report budget/);assert.match(report,/Read-only: no files were changed/);assert.doesNotMatch(report,/\x1b/);
 });
 
-for(const mutation of [m=>{m.schemaVersion=1;},m=>{delete m.files['.trellis/scripts/task.py'];},m=>{m.files['.trellis/scripts/evil.py']=m.files['.trellis/scripts/task.py'];delete m.files['.trellis/scripts/task.py'];},m=>{m.files['.trellis/scripts/task.py'].source='../victim';},m=>{m.templates['.trellis/workflow.md'].origin='preserved-project';m.templates['.trellis/workflow.md'].source={kind:'project-snapshot',revision:'/victim'};},m=>{m.extra=true;}])test('static manifest projection rejects strict engine provenance attack without authorizing execution',t=>{
- const f=fixture(t,true),manifest=JSON.parse(readFileSync(join(f.root,'.trellis/.pi-trellis.json')));mutation(manifest);f.put('.trellis/.pi-trellis.json',manifest);assert.throws(()=>verifyRuntime(f.root));const r=f.check();assert.equal(item(r,'manifest').status,'issue');assert.equal(item(r,'runtime-probe').status,'blocked');assert.equal(item(r,'inventory:runtime').status,'pass');
+test('static manifest projection rejects strict provenance attacks without authorizing execution',t=>{
+ const f=fixture(t,true),base=JSON.parse(readFileSync(join(f.root,'.trellis/.pi-trellis.json')));
+ // Runtime schema permutations are covered by manifest-provenance; this matrix
+ // exercises the independent static diagnostic projection on one restored fixture.
+ for(const mutation of [m=>{m.schemaVersion=1;},m=>{delete m.files['.trellis/scripts/task.py'];},m=>{m.files['.trellis/scripts/evil.py']=m.files['.trellis/scripts/task.py'];delete m.files['.trellis/scripts/task.py'];},m=>{m.files['.trellis/scripts/task.py'].source='../victim';},m=>{m.templates['.trellis/workflow.md'].origin='preserved-project';m.templates['.trellis/workflow.md'].source={kind:'project-snapshot',revision:'/victim'};},m=>{m.extra=true;}]) {
+  const manifest=structuredClone(base);mutation(manifest);f.put('.trellis/.pi-trellis.json',manifest);
+  const r=f.check();assert.equal(item(r,'manifest').status,'issue');assert.equal(item(r,'runtime-probe').status,'blocked');assert.equal(item(r,'inventory:runtime').status,'pass');
+ }
 });
 
 test('old release is distinct from missing/empty manifest and never grants current execution',t=>{

@@ -6,10 +6,11 @@ import { tmpdir, homedir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import trellis, { __internals } from '../index.ts';
+import { copyRuntimeFixture } from './runtime-fixture.mjs';
 import { inspect, plan, apply, validateUsername, usernameSlug, runtimeBaseline, verifyRuntime, digest } from '../lib/initialization/engine.ts';
 
-export function fixture(t) {
- const root=mkdtempSync(join(tmpdir(),'pi init space '));t.after(()=>rmSync(root,{recursive:true,force:true}));
+export function fixture(t, initialized=false) {
+ const root=initialized?copyRuntimeFixture(t,{user:'Dev'}):mkdtempSync(join(tmpdir(),'pi init space '));if(!initialized)t.after(()=>rmSync(root,{recursive:true,force:true}));
  const put=(p,value)=>{mkdirSync(dirname(join(root,p)),{recursive:true});writeFileSync(join(root,p),typeof value==='string'?value:JSON.stringify(value));};
  const snapshot=(directory=root)=>Object.fromEntries(readdirSync(directory,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name)).flatMap(e=>{const p=join(directory,e.name),rel=p.slice(root.length+1);return e.isDirectory()?[[rel,'directory'],...Object.entries(snapshot(p))]:[[rel,e.isSymbolicLink()?'symlink':`${lstatSync(p).mode&0o777}:${readFileSync(p).toString('base64')}`]];}));
  const run=(entry,args=[],key='test')=>spawnSync(process.env.TRELLIS_PYTHON||'python3',['-B',join(root,'.trellis/scripts',entry),...args],{cwd:root,env:{...process.env,PYTHONDONTWRITEBYTECODE:'1',TRELLIS_CONTEXT_ID:key},encoding:'utf8'});
@@ -75,7 +76,7 @@ test('interrupted publication preserves outputs and resumes only identical recor
 });
 
 test('manifest publication interruption is still incomplete and retryable; corrupted operation and lock are conservative',t=>{
- const f=fixture(t),p=plan(f.root,'Dev');assert.throws(()=>apply(p,{afterWrite:path=>{if(path==='.trellis/.pi-trellis.json')throw Error('after manifest');}}));assert.equal(inspect(f.root).state,'incomplete');assert.equal(apply(plan(f.root,'Dev')).state,'ready');
+ const f=fixture(t),p=plan(f.root,'Dev');assert.throws(()=>apply(p,{afterWrite:path=>{if(path==='.trellis/.pi-trellis.json')throw Error('after manifest');}}));assert.equal(inspect(f.root).state,'incomplete');assert.throws(()=>verifyRuntime(f.root),/incomplete|Interrupted/);assert.equal(apply(plan(f.root,'Dev')).state,'ready');
  const g=fixture(t),q=plan(g.root,'Dev');g.put('.trellis/.runtime/init.lock','external owner');const before=g.snapshot();assert.throws(()=>apply(q),/locked/);assert.deepEqual(g.snapshot(),before);
  g.put('.trellis/.runtime/init-operation.json','{}');assert.equal(inspect(g.root).state,'conflict');
 });
@@ -86,7 +87,7 @@ test('concurrent file changes after preview conflict before lock or writes; iden
 });
 
 test('task_error stays distinct from no_task and command tools scope/invalidate without touching WebSocket monitors',async t=>{
- const f=fixture(t);apply(plan(f.root,'Dev'));const handlers=new Map(),messages=[];trellis({registerMessageRenderer:()=>{},on:(n,h)=>handlers.set(n,h),registerCommand:()=>{},registerTool:()=>{},events:{on:()=>()=>{},emit:()=>{}},sendMessage:m=>messages.push(m),getAllTools:()=>[]});const ctx={cwd:f.root,hasUI:false,ui:{},sessionManager:{getSessionId:()=>f.root,getSessionFile:()=>undefined}};const key=__internals.contextKey(f.root,ctx);const before=()=>handlers.get('before_agent_start')({prompt:'inspect',systemPromptOptions:{sections:{}}},ctx);
+ const f=fixture(t,true);const handlers=new Map(),messages=[];trellis({registerMessageRenderer:()=>{},on:(n,h)=>handlers.set(n,h),registerCommand:()=>{},registerTool:()=>{},events:{on:()=>()=>{},emit:()=>{}},sendMessage:m=>messages.push(m),getAllTools:()=>[]});const ctx={cwd:f.root,hasUI:false,ui:{},sessionManager:{getSessionId:()=>f.root,getSessionFile:()=>undefined}};const key=__internals.contextKey(f.root,ctx);const before=()=>handlers.get('before_agent_start')({prompt:'inspect',systemPromptOptions:{sections:{}}},ctx);
  await before();assert.match(messages.at(-1).content,/No active task/);
  for(const input of [{toolName:'bash',command:'task.py current --json',run_in_background:false},{toolName:'bash',command:'task.py current --json',run_in_background:true},{toolName:'monitor',command:'task.py current --json'}]){
   const {toolName,...args}=input;await handlers.get('tool_call')({toolName,input:args},ctx);
@@ -100,7 +101,7 @@ test('task_error stays distinct from no_task and command tools scope/invalidate 
 });
 
 test('unsupported deployed release injects no state and blocks command/role execution while WebSocket/non-Trellis reads are untouched',async t=>{
- const f=fixture(t);apply(plan(f.root,'Dev'));const file=join(f.root,'.trellis/.pi-trellis.json'),m=JSON.parse(readFileSync(file));m.runtimeReleaseId='wrong';writeFileSync(file,JSON.stringify(m));
+ const f=fixture(t,true);const file=join(f.root,'.trellis/.pi-trellis.json'),m=JSON.parse(readFileSync(file));m.runtimeReleaseId='wrong';writeFileSync(file,JSON.stringify(m));
  const handlers=new Map(),messages=[];trellis({registerMessageRenderer:()=>{},on:(n,h)=>handlers.set(n,h),registerCommand:()=>{},registerTool:()=>{},events:{on:()=>()=>{},emit:()=>{}},sendMessage:m=>messages.push(m)});const ctx={cwd:f.root,hasUI:false,ui:{},sessionManager:{getSessionId:()=>f.root,getSessionFile:()=>undefined}};
  await handlers.get('before_agent_start')({prompt:'inspect',systemPromptOptions:{sections:{}}},ctx);assert.deepEqual(messages,[]);
  for(const tool of ['bash','monitor'])assert.equal((await handlers.get('tool_call')({toolName:tool,input:{command:'task.py deactivate'}},ctx)).block,true);

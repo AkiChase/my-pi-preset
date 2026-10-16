@@ -2,11 +2,12 @@ import './host-env.mjs';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, readdirSync, lstatSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import test from 'node:test';
+import test, { after } from 'node:test';
 import { plan, apply, inspect, digest, verifyRuntime } from '../lib/initialization/engine.ts';
 import { resourcePlan, applyResourcePlan } from '../lib/initialization/resources.ts';
-import { copyRuntimeFixture } from './runtime-fixture.mjs';
+import { copyRuntimeFixture, rehomeOperationRecord } from './runtime-fixture.mjs';
 
 function shape(root) {
  const put=(path,content)=>{mkdirSync(dirname(join(root,path)),{recursive:true});writeFileSync(join(root,path),content);};
@@ -21,10 +22,27 @@ function fresh(t) {
  return shape(root);
 }
 function rehash(p) { const {planHash,...body}=p; p.planHash=digest(JSON.stringify(body)); }
+let interruptedRoot;
+const templateCleanup=[];
+after(()=>templateCleanup.forEach(cleanup=>cleanup()));
+function interrupted(t) {
+ if(!interruptedRoot) {
+  const f=fresh({after:cleanup=>templateCleanup.push(cleanup)});
+  f.put('AGENTS.md','User instructions\n');
+  assert.throws(()=>apply(plan(f.root,'Dev'),{afterWrite:()=>{throw Error('interrupt');}}));
+  interruptedRoot=f.root;
+ }
+ const f=fresh(t);cpSync(interruptedRoot,f.root,{recursive:true});
+ rehomeOperationRecord(interruptedRoot,f.root);return f;
+}
+function joined(t) {
+ return shape(copyRuntimeFixture(t,{user:'Dev',key:'joined-review',prepare:root=>{
+  rmSync(join(root,'.trellis/.developer'));apply(plan(root,'Dev'));
+ }}));
+}
 for(const attack of ['unknown runtime','changed runtime','overwrite identity','overwrite history','root replacement','missing required output','manifest source','task hook field','array guards','unknown schema field']) {
  test(`forged incomplete operation cannot authorize ${attack}`,t=>{
-  const f=fresh(t);f.put('AGENTS.md','User instructions\n');const p=plan(f.root,'Dev');
-  assert.throws(()=>apply(p,{afterWrite:()=>{throw Error('interrupt');}}));
+  const f=interrupted(t);
   const file=join(f.root,'.trellis/.runtime/init-operation.json'),record=JSON.parse(readFileSync(file));const q=record.plan;
   const change=(kind,text)=>{const a=q.actions.find(a=>a.kind===kind);a.output=Buffer.from(text).toString('base64');return a;};
   if(attack==='unknown runtime') {const a=q.actions.find(a=>a.kind==='runtime');a.path='.trellis/scripts/custom.py';q.guards[a.path]=null;}
@@ -73,7 +91,7 @@ test('root suffix alone cannot replace user prefix or duplicate an owned block, 
 });
 test('onboarding reused records reject malformed canonical fields without changing user history',t=>{
  for(const change of [{name:'wrong'},{status:'invalid'},{children:'bad'},{title:null}]) {
-  const f=fixture(t);rmSync(join(f.root,'.trellis/.developer'));assert.equal(apply(plan(f.root,'Dev')).state,'ready');rmSync(join(f.root,'.trellis/.developer'));
+  const f=joined(t);rmSync(join(f.root,'.trellis/.developer'));
   const path='.trellis/tasks/00-join-dev/task.json',record=JSON.parse(readFileSync(join(f.root,path)));f.put(path,JSON.stringify({...record,...change}));const before=f.snapshot();assert.throws(()=>plan(f.root,'Dev'));assert.deepEqual(f.snapshot(),before);
  }
 });
@@ -82,10 +100,6 @@ test('all required outputs verify before manifest publication and completion; mi
  const f=fresh(t),p=plan(f.root,'Dev');
  assert.throws(()=>apply(p,{afterWrite:path=>{if(path.endsWith('/prd.md'))rmSync(join(f.root,'.trellis/workspace/Dev/journal-1.md'));}}));
  assert.equal(existsSync(join(f.root,'.trellis/.pi-trellis.json')),false);assert.equal(inspect(f.root).state,'incomplete');assert.equal(existsSync(join(f.root,p.task,'task.json')),true);
-});
-test('published manifest during an incomplete operation cannot authorize runtime execution',t=>{
- const f=fresh(t),p=plan(f.root,'Dev');assert.throws(()=>apply(p,{afterWrite:path=>{if(path==='.trellis/.pi-trellis.json')throw Error('interrupt');}}));
- assert.throws(()=>verifyRuntime(f.root),/incomplete|Interrupted/);assert.equal(apply(plan(f.root,'Dev')).state,'ready');
 });
 test('completed operation remains diagnostic after legitimate task edits; custom hooks are not managed overwrite authority',t=>{
  const f=fixture(t);f.put('.trellis/scripts/custom-hook.py','# user hook\n');f.put('.trellis/tasks/00-bootstrap-guidelines/task.json','{"status":"completed"}');assert.equal(inspect(f.root).state,'ready');assert.ok(verifyRuntime(f.root));assert.equal(readFileSync(join(f.root,'.trellis/scripts/custom-hook.py'),'utf8'),'# user hook\n');
