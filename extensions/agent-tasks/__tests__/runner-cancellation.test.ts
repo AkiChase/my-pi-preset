@@ -217,14 +217,19 @@ void it("actual runner structured retry remains cancelled after a first prompt a
   } finally { await f.close(); }
 });
 
-void it("actual resume setup subscription failure releases earlier subscription and abort listener without a prompt", async () => {
-  const f = fixture(), failure = new Error("resume event subscription failed");
+for (const resume of [false, true]) void it(`${resume ? "resume" : "new"} subscription setup failure cleans earlier listeners before prompting`, async () => {
+  const f = fixture(), failure = new Error("collector subscription failed");
   try {
-    const subscribe = f.session.subscribe.bind(f.session); let count = 0;
-    f.session.subscribe = listener => { if (++count === 2) throw failure; return subscribe(listener); };
-    await assert.rejects(resumeAgent(f.session, "no", { signal: f.controller.signal, onTurnEnd() {} }), error => error === failure);
+    const original = f.session.subscribe.bind(f.session); let subscriptions = 0;
+    f.session.subscribe = listener => { if (++subscriptions === 2) throw failure; return original(listener); };
+    const work = resume
+      ? resumeAgent(f.session, "no", { signal: f.controller.signal, onTurnEnd() {} })
+      : runAgent(f.ctx, "general-purpose", "no", f.options, f.deps);
+    await assert.rejects(work, error => error === failure);
     assert.equal(f.listeners.size, 0); assert.equal(f.calls.prompt, 0);
-    f.controller.abort(); assert.equal(f.calls.abort, 0, "forwarded abort listener was removed on setup failure");
+    assert.equal(f.calls.dispose, resume ? 0 : 1);
+    const aborts = f.calls.abort;
+    f.controller.abort(); assert.equal(f.calls.abort, aborts, "setup failure must unlink the parent abort listener");
   } finally { await f.close(); }
 });
 
@@ -459,64 +464,39 @@ void it("3B1 throwing subscription disposers cannot strand other subscriptions o
   }
 });
 
-void it("3B1 new subscription setup failure cleans the first subscription and partial session", async () => {
-  const f = fixture(), failure = new Error("collector subscription failed");
-  try {
-    const original = f.session.subscribe.bind(f.session); let subscriptions = 0;
-    f.session.subscribe = listener => { if (++subscriptions === 2) throw failure; return original(listener); };
-    await assert.rejects(runAgent(f.ctx, "general-purpose", "new", f.options, f.deps), error => error === failure);
-    assert.equal(f.listeners.size, 0); assert.equal(f.calls.dispose, 1); assert.equal(f.calls.prompt, 0);
-  } finally { await f.close(); }
-});
 
 function hookResource(f: ReturnType<typeof fixture>, fail = false) {
-  // This extension-owned interval is NOT released by AgentSession.dispose.
-  // Only the actual child session_shutdown boundary owns its release.
-  let resource: ReturnType<typeof setInterval> | undefined;
-  f.session.bindExtensions = async () => { f.calls.bind++; resource = setInterval(() => {}, 1_000); };
+  // Observe extension cleanup ownership without creating an OS timer.
+  let active = false;
+  f.session.bindExtensions = async () => { f.calls.bind++; active = true; };
   const emit = async () => {
     f.calls.shutdown++;
-    if (resource) clearInterval(resource);
-    resource = undefined;
+    active = false;
     if (fail) throw new Error("child shutdown failed");
   };
   // Generic SDK emit has private runtime events; this partial seam implements
   // only session_shutdown, the exact event exercised by actual runner teardown.
   Object.defineProperty(f.session, "extensionRunner", { value: { hasHandlers: () => true, emit }, configurable: true });
-  return { get active() { return resource !== undefined; }, release() { if (resource) clearInterval(resource); resource = undefined; } };
+  return { get active() { return active; }, release() { active = false; } };
 }
 
-void it("3B1 followup completed retained child releases extension resource before shutdown phase ends", async () => {
+for (const direct of [false, true]) void it(`completed child shutdown releases retained resources through ${direct ? "direct dispose" : "stop/drain"}`, async () => {
   const f = fixture(), resource = hookResource(f);
   const manager = new AgentManager(undefined, 1, undefined, undefined, undefined, {
     runAgent: (ctx, type, prompt, options) => runAgent(ctx, type, prompt, options, f.deps),
   });
   try {
-    const id = manager.spawn(f.pi, f.ctx, "general-purpose", "completed child", { description: "retained", isolated: true, workflowId: "active-owner" });
+    const id = manager.spawn(f.pi, f.ctx, "general-purpose", "completed", { description: "retained", isolated: true, workflowId: "active-owner" });
     manager.setOwnerRetention(() => true);
     await manager.waitForAll(); assert.equal(resource.active, true);
-    manager.freezeAdmission();
-    manager.stopForShutdown();
-    await manager.drainExecution();
-    const beforeDispose = { hooks: f.calls.shutdown, active: resource.active };
-    manager.sealHostEffects();
+    if (!direct) {
+      manager.freezeAdmission(); manager.stopForShutdown(); await manager.drainExecution();
+      assert.equal(f.calls.shutdown, 1); assert.equal(resource.active, false);
+      manager.sealHostEffects();
+    }
     const close = manager.dispose(); assert.equal(close, manager.dispose()); await close;
-    assert.equal(beforeDispose.hooks, 1, "completed retained child hook must execute within host-valid stop/drain");
-    assert.equal(beforeDispose.active, false); assert.equal(f.calls.dispose, 1);
-    assert.equal(manager.getRecord(id), undefined);
-  } finally { resource.release(); await manager.dispose(); await f.close(); }
-});
-
-void it("3B1 followup direct manager dispose runs completed child shutdown hook exactly once", async () => {
-  const f = fixture(), resource = hookResource(f);
-  const manager = new AgentManager(undefined, 1, undefined, undefined, undefined, {
-    runAgent: (ctx, type, prompt, options) => runAgent(ctx, type, prompt, options, f.deps),
-  });
-  try {
-    manager.spawn(f.pi, f.ctx, "general-purpose", "completed", { description: "direct", isolated: true });
-    await manager.waitForAll(); assert.equal(resource.active, true);
-    const close = manager.dispose(); assert.equal(close, manager.dispose()); await close;
-    assert.equal(f.calls.shutdown, 1); assert.equal(resource.active, false); assert.equal(f.calls.dispose, 1);
+    assert.equal(f.calls.shutdown, 1); assert.equal(resource.active, false);
+    assert.equal(f.calls.dispose, 1); assert.equal(manager.getRecord(id), undefined);
   } finally { resource.release(); await manager.dispose(); await f.close(); }
 });
 
