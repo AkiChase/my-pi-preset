@@ -6,7 +6,12 @@ export type Draw = (result: Result, theme: Theme, context: RenderContext, width:
 export interface Metadata { title?: string; suffix?: string; stats: string; secondary?: string }
 export type Describe = (result: Result | undefined, context: RenderContext) => Metadata;
 export function title(name: string, args: Args): string {
-  if (name === "bash") return clean(String(args.command ?? "")) + (args.timeout === undefined ? "" : `  timeout ${args.timeout}s`);
+  if (name === "bash") {
+    const mode = args.run_in_background === true ? "  background"
+      : args.background_after_seconds !== undefined ? `  background after ${args.background_after_seconds}s`
+      : args.timeout !== undefined ? `  timeout ${args.timeout}s` : "";
+    return clean(String(args.command ?? "")) + mode;
+  }
   if (name === "read") return clean(String(args.path ?? ""));
   return `${clean(String(args.pattern ?? ""))}${args.path ? ` in ${clean(String(args.path))}` : ""}`;
 }

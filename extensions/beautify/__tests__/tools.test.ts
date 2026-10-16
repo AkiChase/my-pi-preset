@@ -135,6 +135,8 @@ test("built-in tool identity precedes details across pending/results, expansion 
     }
     assert.match(plain(result(readRenderers(highlighter), "body", { path: "sample.ts", offset: 65 }, { expanded: false }).render(120).join("\n")), /^read  sample\.ts:65/);
     assert.match(plain(result(bashRenderers, "body", { command: "npm test", timeout: 5 }, { expanded: false }).render(120).join("\n")), /^bash  npm test  timeout 5s/);
+    assert.match(plain(result(bashRenderers, "body", { command: "npm test", background_after_seconds: 5 }, { expanded: false }).render(120).join("\n")), /^bash  npm test  background after 5s/);
+    assert.match(plain(result(bashRenderers, "body", { command: "npm test", run_in_background: true }, { expanded: false }).render(120).join("\n")), /^bash  npm test  background/);
     assert.match(plain(result(findRenderers, "a.ts", { pattern: "*.ts", path: "src" }, { expanded: false }).render(120).join("\n")), /^find  \*\.ts in src/);
   } finally { highlighter.dispose(); }
 });
