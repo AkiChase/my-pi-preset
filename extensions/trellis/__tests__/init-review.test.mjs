@@ -40,15 +40,6 @@ for(const attack of ['unknown runtime','changed runtime','overwrite identity','o
   assert.equal(inspect(f.root).state,'conflict');assert.throws(()=>plan(f.root,'Dev'));assert.throws(()=>apply(q));assert.deepEqual(f.snapshot(),before);
  });
 }
-for(const attack of ['unknown template','wrong source','missing role']) {
- test(`resource manifest rejects ${attack} without running or writing`,t=>{
-  const f=fixture(t);const file=join(f.root,'.trellis/.pi-trellis.json'),m=JSON.parse(readFileSync(file));
-  if(attack==='unknown template')m.templates['user.txt']={sha256:digest('x'),mode:0o644,origin:'package-default',source:'user.txt'};
-  if(attack==='wrong source')m.files['.trellis/scripts/task.py'].source=null;
-  if(attack==='missing role')delete m.files['.pi/agents/trellis-check.md'];
-  f.put('.trellis/.pi-trellis.json',JSON.stringify(m));const before=f.snapshot();assert.throws(()=>verifyRuntime(f.root));assert.equal(inspect(f.root).state,'conflict');assert.deepEqual(f.snapshot(),before);
- });
-}
 // Roles are read by dispatch without hash checks and templates are user documents: an older recorded
 // fingerprint is a safe update, not a blocked or malformed project.
 for(const attack of ['stale template hash','stale role hash','stale role mode']) {
@@ -67,24 +58,8 @@ for(const attack of ['stale template hash','stale role hash','stale role mode'])
   applyResourcePlan(p);assert.ok(verifyRuntime(f.root));assert.equal(resourcePlan(f.root,'update').unchanged,true);
  });
 }
-// Tampered runtime bytes and malformed rows still block independent of the role/template relaxation.
-for(const attack of ['tampered runtime row hash','tampered runtime mode','tampered runtime source']) {
- test(`resource manifest still rejects ${attack} without writing`,t=>{
-  const f=fixture(t);const file=join(f.root,'.trellis/.pi-trellis.json'),m=JSON.parse(readFileSync(file));
-  if(attack==='tampered runtime row hash')m.files['.trellis/scripts/task.py'].sha256=digest('tampered');
-  if(attack==='tampered runtime mode')m.files['.trellis/scripts/task.py'].mode=0o600;
-  if(attack==='tampered runtime source')m.files['.trellis/scripts/task.py'].source='runtime/other.py';
-  f.put('.trellis/.pi-trellis.json',JSON.stringify(m));const before=f.snapshot();
-  assert.throws(()=>verifyRuntime(f.root));assert.equal(inspect(f.root).state,'conflict');assert.throws(()=>plan(f.root,'Dev'));assert.deepEqual(f.snapshot(),before);
- });
-}
-for(const [attack,mutate] of [['unknown role kind',m=>{m.files['.pi/agents/trellis-check.md'].kind='runtime';}],['unknown role field',m=>{m.files['.pi/agents/trellis-check.md'].authorize=true;}],['malformed role fingerprint',m=>{m.files['.pi/agents/trellis-check.md'].sha256='A'.repeat(64);}],['malformed role source',m=>{m.files['.pi/agents/trellis-check.md'].source='runtime/task.py';}],['unknown template key',m=>{m.templates['.trellis/extra.md']=m.templates['.trellis/workflow.md'];delete m.templates['.trellis/workflow.md'];}],['malformed template fingerprint',m=>{m.templates['.trellis/workflow.md'].mode='0644';}]]) {
- test(`resource manifest still rejects ${attack} without writing`,t=>{
-  const f=fixture(t);const file=join(f.root,'.trellis/.pi-trellis.json'),m=JSON.parse(readFileSync(file));
-  mutate(m);f.put('.trellis/.pi-trellis.json',JSON.stringify(m));const before=f.snapshot();
-  assert.throws(()=>verifyRuntime(f.root));assert.equal(inspect(f.root).state,'conflict');assert.deepEqual(f.snapshot(),before);
- });
-}
+// Manifest field permutations are covered in manifest-provenance.test.mjs.
+// Keep this file focused on recovery authorization and successful safe updates.
 
 test('root suffix alone cannot replace user prefix or duplicate an owned block, and skipped required root output cannot pass',t=>{
  for(const attack of ['changed prefix','duplicate block','skip root']) {

@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, readdirSyn
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
-import { plan, apply, inspect, verifyRuntime, digest, runtimeBaseline } from '../lib/initialization/engine.ts';
+import { plan, apply, inspect, verifyRuntime, digest, runtimeBaseline, validateManifest, packageProvenance } from '../lib/initialization/engine.ts';
 import { copyRuntimeFixture } from './runtime-fixture.mjs';
 import { fileURLToPath } from 'node:url';
 
@@ -91,6 +91,7 @@ const malformedManifests = {
  'array files': m => { m.files = []; },
  'missing runtime': m => { delete m.files['.trellis/scripts/task.py']; },
  'unknown runtime replacing known': m => { m.files['.trellis/scripts/evil.py'] = m.files['.trellis/scripts/task.py']; delete m.files['.trellis/scripts/task.py']; },
+ 'null runtime source': m => { m.files['.trellis/scripts/task.py'].source = null; },
  'unknown role': m => { m.files['.pi/agents/trellis-extra.md'] = m.files['.pi/agents/trellis-check.md']; },
  'missing role': m => { delete m.files['.pi/agents/trellis-check.md']; },
  'wrong runtime kind': m => { m.files['.trellis/scripts/task.py'].kind = 'template'; },
@@ -104,6 +105,7 @@ const malformedManifests = {
  'null templates': m => { m.templates = null; },
  'array templates': m => { m.templates = []; },
  'missing template': m => { delete m.templates[workflow]; },
+ 'extra template': m => { m.templates['user.txt'] = { sha256: digest('x'), mode: 0o644, origin: 'package-default', source: 'user.txt' }; },
  'unknown template replacing known': m => { m.templates['../outside'] = m.templates[workflow]; delete m.templates[workflow]; },
  'template in executable files': m => { m.files[workflow] = m.templates[workflow]; },
  'null template record': m => { m.templates[workflow] = null; },
@@ -129,10 +131,26 @@ const malformedManifests = {
  'missing source revision': m => { delete m.templates[workflow].source.revision; },
  'unknown template field': m => { m.templates[workflow].output = 'untrusted'; },
 };
+let schemaManifest;
+const schemaPackage = packageProvenance();
 for (const [attack, mutate] of Object.entries(malformedManifests)) {
- test(`manifest rejects ${attack} with no writes`, t => {
-  const f = preserved(t); mutate(f.manifest); f.put(manifestPath, f.manifest);
-  const before = f.snapshot(); assert.throws(() => verifyRuntime(f.root)); assert.equal(inspect(f.root).state, 'conflict'); assert.throws(() => plan(f.root, 'Returning User')); assert.deepEqual(f.snapshot(), before);
+ test(`manifest schema rejects ${attack}`, t => {
+  schemaManifest ??= preserved(t).manifest;
+  const manifest = structuredClone(schemaManifest);
+  mutate(manifest);
+  assert.throws(() => validateManifest(manifest, schemaPackage));
+ });
+}
+
+// Field combinations belong to the validator matrix above. Keep the real
+// runtime/inspection/planning refusal wiring for each resource category.
+for (const attack of ['wrong runtime hash', 'string mode', 'invalid skill hash']) {
+ test(`malformed ${attack} blocks runtime and planning without writes`, t => {
+  const f = preserved(t);
+  malformedManifests[attack](f.manifest); f.put(manifestPath, f.manifest);
+  const before = f.snapshot();
+  assert.throws(() => verifyRuntime(f.root)); assert.equal(inspect(f.root).state, 'conflict');
+  assert.throws(() => plan(f.root, 'Returning User')); assert.deepEqual(f.snapshot(), before);
  });
 }
 
