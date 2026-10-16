@@ -4,6 +4,7 @@ import { projectIdentity } from "./memory/identity.ts";
 import { MemoryStore } from "./memory/store.ts";
 import { closed, registerMemoryTools } from "./memory/tools.ts";
 import { readEnabled } from "./memory/config.ts";
+import { registerMemoryCommand } from "./memory/command.ts";
 import { MEMORY_SECTION, buildMemoryPrompt, memoryDiagnostic, unavailableMemoryPrompt } from "./memory/prompt.ts";
 
 export default function memory(pi: ExtensionAPI): void {
@@ -19,8 +20,16 @@ export default function memory(pi: ExtensionAPI): void {
     assertActive();
     return { store: origin.store, assertActive };
   });
+  const commands = registerMemoryCommand(pi, cwd => {
+    const origin = state;
+    if (!origin || retired || origin.cwd !== cwd) return closed();
+    const assertActive = () => { if (retired || state !== origin || epoch !== origin.epoch) closed(); };
+    assertActive();
+    return { ...origin, assertActive };
+  });
   pi.on("session_start", async (_event, ctx) => {
     if (retired) return;
+    commands.close();
     state = undefined;
     const originEpoch = ++epoch;
     const assertActive = () => { if (retired || epoch !== originEpoch) closed(); };
@@ -50,5 +59,5 @@ export default function memory(pi: ExtensionAPI): void {
     if (retired || state !== origin || epoch !== origin.epoch) return;
     event.systemPromptOptions.sections[MEMORY_SECTION] = prompt;
   });
-  pi.on("session_shutdown", () => { retired = true; ++epoch; state = undefined; });
+  pi.on("session_shutdown", () => { retired = true; ++epoch; state = undefined; commands.close(); });
 }

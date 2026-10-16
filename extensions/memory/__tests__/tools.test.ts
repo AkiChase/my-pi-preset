@@ -15,6 +15,7 @@ it("actual registration exposes four TypeBox tools, errors are isError, lifecycl
   const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => unknown>();
   // Typed partial public registration seam, not a copied tool implementation or private registry.
   const pi = {
+    registerCommand() {},
     registerTool(tool: ToolDefinition) { tools.set(tool.name, tool); },
     on(name: string, handler: (event: unknown, ctx: ExtensionContext) => unknown) { handlers.set(name, handler); return () => { handlers.delete(name); }; },
   } as unknown as ExtensionAPI;
@@ -48,7 +49,7 @@ it("actual registration exposes four TypeBox tools, errors are isError, lifecycl
   await emit("session_start"); assert.equal((await call("memory_list", {})).isError, true);
   // Shutdown during asynchronous Git initialization never creates the new project directory.
   const lateHandlers = new Map<string, (event: unknown, ctx: ExtensionContext) => unknown>();
-  const latePi = { registerTool() {}, on(name: string, handler: (event: unknown, ctx: ExtensionContext) => unknown) { lateHandlers.set(name, handler); return () => {}; } } as unknown as ExtensionAPI;
+  const latePi = { registerCommand() {}, registerTool() {}, on(name: string, handler: (event: unknown, ctx: ExtensionContext) => unknown) { lateHandlers.set(name, handler); return () => {}; } } as unknown as ExtensionAPI;
   memory(latePi); const newCwd = join(root, "new-cwd"); fs.mkdirSync(newCwd);
   const start = lateHandlers.get("session_start")!({}, { cwd: newCwd } as ExtensionContext);
   lateHandlers.get("session_shutdown")!({}, ctx); await assert.rejects(Promise.resolve(start), /closed/);
@@ -62,6 +63,7 @@ it("startup config failure keeps all tools closed after config repair until a fr
   const tools = new Map<string, ToolDefinition>();
   const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => unknown>();
   const pi = {
+    registerCommand() {},
     registerTool(tool: ToolDefinition) { tools.set(tool.name, tool); },
     on(name: string, handler: (event: unknown, ctx: ExtensionContext) => unknown) { handlers.set(name, handler); return () => {}; },
   } as unknown as ExtensionAPI;

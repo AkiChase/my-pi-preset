@@ -198,7 +198,7 @@ it("actual SDK startup errors remain bounded and disabled still removes the diag
 function lifecycle(t: TestContext) {
   const f = fixture(t); isolate(t, f.agentDir);
   const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => unknown>();
-  const pi = { registerTool() {}, on(name: string, handler: (event: unknown, ctx: ExtensionContext) => unknown) { handlers.set(name, handler); return () => {}; } } as unknown as ExtensionAPI;
+  const pi = { registerCommand() {}, registerTool() {}, on(name: string, handler: (event: unknown, ctx: ExtensionContext) => unknown) { handlers.set(name, handler); return () => {}; } } as unknown as ExtensionAPI;
   memory(pi);
   const ctx = { cwd: f.project.root } as ExtensionContext;
   const emit = (name: string, context = ctx, event: unknown = {}) => handlers.get(name)!(event, context);

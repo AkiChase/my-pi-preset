@@ -1,6 +1,11 @@
-{"file":".trellis/spec/development/index.md","reason":"入口、存储安全、生命周期、并行修改与文档边界"}
-{"file":".trellis/spec/testing/index.md","reason":"隔离测试、真实host验证与自然退出证据"}
-{"file":".trellis/spec/guides/index.md","reason":"跨层与复用检查入口"}
-{"file":".trellis/tasks/10-14-replace-pi-memory/prd.md","reason":"需求、安全边界与逐项验收"}
-{"file":".trellis/tasks/10-14-replace-pi-memory/design.md","reason":"存储、预算、锁、工具和生命周期合同"}
-{"file":".trellis/tasks/10-14-replace-pi-memory/implement.md","reason":"阶段一范围、验证和提交限制"}
+{"file": ".trellis/spec/development/index.md", "reason": "公开UI、生命周期安全与并行修改保护"}
+{"file": ".trellis/spec/testing/index.md", "reason": "真实SDK/组件验证、隔离与自然退出证据"}
+{"file": ".trellis/spec/guides/index.md", "reason": "复用及跨层检查"}
+{"file": ".trellis/tasks/10-14-replace-pi-memory/prd.md", "reason": "阶段3面板与安全验收"}
+{"file": ".trellis/tasks/10-14-replace-pi-memory/design.md", "reason": "列表详情、dialog和禁用设计"}
+{"file": ".trellis/tasks/10-14-replace-pi-memory/implement.md", "reason": "阶段范围与验证"}
+{"file": ".trellis/tasks/10-14-replace-pi-memory/research/stage-3-ui-preflight.md", "reason": "主会话UI接线分析（getMarkdownTheme实际为无参数，见实现报告纠正）"}
+{"file": ".trellis/tasks/10-14-replace-pi-memory/evidence/stage-3-implementation.md", "reason": "最终实现、首失败与54/827自检，不代替独立审查"}
+{"file": "extensions/shared/scroll-panel/native-layout.ts", "reason": "共享布局合同：消费者不得绕过或手工回退"}
+{"file": "extensions/shared/scroll-panel/wheel.ts", "reason": "滚轮消费合同"}
+{"file": "extensions/trellis/lib/task-browser/component.ts", "reason": "同模块首消费者参考"}

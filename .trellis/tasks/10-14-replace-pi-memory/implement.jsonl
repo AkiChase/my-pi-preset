@@ -1,7 +1,11 @@
-{"file":".trellis/spec/development/index.md","reason":"公开SDK、factory/activation所有权与并行修改边界"}
-{"file":".trellis/spec/testing/index.md","reason":"真实SDK离线验证、自然退出和临时配置隔离"}
-{"file":".trellis/spec/guides/index.md","reason":"复用及跨层指南"}
-{"file":".trellis/tasks/10-14-replace-pi-memory/prd.md","reason":"阶段2 AC2/6/8与排除规则"}
-{"file":".trellis/tasks/10-14-replace-pi-memory/design.md","reason":"唯一project_memory section、fresh metadata与生命周期设计"}
-{"file":".trellis/tasks/10-14-replace-pi-memory/implement.md","reason":"按阶段实施与验证"}
-{"file":".trellis/tasks/10-14-replace-pi-memory/research/stage-2-sdk-preflight.md","reason":"主会话核实的真实SDK调用路径及精确文件变更"}
+{"file": ".trellis/spec/development/index.md", "reason": "共享基础模块/隔离内部兼容接入与并行保护"}
+{"file": ".trellis/spec/testing/index.md", "reason": "真实mounted-overlay/鼠标路由/自然退出/隔离"}
+{"file": ".trellis/spec/guides/index.md", "reason": "复用语义与跨层边界"}
+{"file": ".trellis/tasks/10-14-replace-pi-memory/prd.md", "reason": "只读Memory与批准内部layout风险"}
+{"file": ".trellis/tasks/10-14-replace-pi-memory/design.md", "reason": "当前第7节共享native-layout/wheel方案"}
+{"file": ".trellis/tasks/10-14-replace-pi-memory/implement.md", "reason": "用户批准继续Memory实践与阶段提交"}
+{"file": ".trellis/tasks/10-14-replace-pi-memory/evidence/stage-3-independent-review.md", "reason": "保留旧custom安装时序/UTF8安全修复，不复用旧UI验收"}
+{"file": ".trellis/tasks/10-14-replace-pi-memory/evidence/stage-3-readonly-implementation.md", "reason": "纯公开路径失败事实，接口决策已由内部适配授权解决"}
+{"file": "extensions/trellis/lib/task-browser/component.ts", "reason": "首个消费者参考：overlay原生布局/滚轮接线与拒绝打开"}
+{"file": "extensions/shared/scroll-panel/native-layout.ts", "reason": "阶段3必须接入的共享布局模块（含打包版宿主定位）"}
+{"file": "extensions/shared/scroll-panel/wheel.ts", "reason": "阶段3必须接入的公开wheel桥接"}

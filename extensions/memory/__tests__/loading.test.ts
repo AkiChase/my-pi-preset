@@ -15,5 +15,6 @@ it("installed Pi jiti loader loads the real entry once without factory storage o
   const loaded = await discoverAndLoadExtensions([path], project.root, agentDir);
   assert.deepEqual(loaded.errors, []); assert.equal(loaded.extensions.length, 1);
   assert.deepEqual([...loaded.extensions[0].tools.keys()], ["memory_read", "memory_list", "memory_write", "memory_forget"]);
+  assert.deepEqual([...loaded.extensions[0].commands.keys()], ["memory"]);
   assert.equal(existsSync(join(agentDir, "unused-agent")), false);
 });
