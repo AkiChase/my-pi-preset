@@ -52,3 +52,5 @@
 - `git diff --check` exit 0；Recap 文档本地链接与新增测试 whitespace 检查 PASS。没有单独 lint 脚本。
 - NOT_RUN：真实终端键盘/视觉体验、线上模型生成质量；真实 SDK 测试使用 fake UI sink，不宣称真实终端实测。没有个人 sync/reload、push 或 archive。
 - task material retention：仅保留 PRD、task.json 与空 role manifests；无研究附件或永久原始日志。临时日志在 main 检查后按本次目录范围清理，未清理其他会话或历史任务的材料。
+
+- 已验证阶段 checkpoint：`0c74dd9`（`feat(recap): select models and compatible thinking levels from menus`），仅包含以上产品文件及本任务最小规划材料。
