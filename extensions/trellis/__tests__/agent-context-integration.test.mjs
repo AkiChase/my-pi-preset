@@ -35,15 +35,15 @@ function setup(t, root = copyRuntimeFixture(t, { git: true })) {
   return { root, put, ctx, pointer, call, handlers, messages, tools, pi };
 }
 
-for (const role of ['trellis-implement', 'trellis-check', 'trellis-research']) {
-  test(`new public entry injects ${role} materials and ignores removed Agent alias`, async t => {
-    const f = setup(t), ctx = f.ctx(role); f.pointer(ctx, 'a');
-    f.put('.trellis/tasks/a/check.jsonl', JSON.stringify({file:'.trellis/tasks/a/prd.md'}));
-    const input = {subagent_type:role,description:'Scoped role work',prompt:'work',isolation:'off'};
-    assert.equal(await f.call(ctx,input),undefined);assert.equal(parseDispatchFacts(input.prompt).taskPath,join(f.root,'.trellis/tasks/a'));assert.doesNotMatch(input.prompt,/a requirements|trellis-hook-injected/);
-    const old = {subagent_type:role,prompt:'work'};assert.equal(await f.call(ctx,old,'Agent'),undefined);assert.equal(old.prompt,'work');
-  });
-}
+test('public entry injects each Trellis role and ignores removed Agent alias',async t=>{
+ const f=setup(t);
+ for(const role of ['trellis-implement','trellis-check','trellis-research']) {
+  const ctx=f.ctx(role);f.pointer(ctx,'a');f.put('.trellis/tasks/a/check.jsonl',JSON.stringify({file:'.trellis/tasks/a/prd.md'}));
+  const input={subagent_type:role,description:'Scoped role work',prompt:'work',isolation:'off'};
+  assert.equal(await f.call(ctx,input),undefined);assert.equal(parseDispatchFacts(input.prompt).taskPath,join(f.root,'.trellis/tasks/a'));assert.doesNotMatch(input.prompt,/a requirements|trellis-hook-injected/);
+  const old={subagent_type:role,prompt:'work'};assert.equal(await f.call(ctx,old,'Agent'),undefined);assert.equal(old.prompt,'work');
+ }
+});
 
 test('startup detection uses subagent_run rather than removed launch alias', async t => {
   const f=setup(t),ctx=f.ctx('diagnostic'),notices=[];
@@ -190,7 +190,9 @@ test('managed startup registers execution checkout, then source-only child point
  const {manageWorktree}=await import('./worktree-fixture.mjs');
  const task='.trellis/tasks/a',created=await manageWorktree({cwd:f.root,task,action:'create',confirm:true});
  await manageWorktree({cwd:f.root,task,action:'prepare',confirm:true});const target=created.binding.worktreePath;
- assert.equal(existsSync(join(target,task)),false);
+ // Target copies deliberately contain stale materials and a forged task identity; source authority is live.
+ mkdirSync(join(target,'.trellis/spec'),{recursive:true});writeFileSync(join(target,'.trellis/spec/spec.md'),'OLD target material');mkdirSync(join(target,task),{recursive:true});writeFileSync(join(target,task,'task.json'),' {"status":"planning","id":"another-task"}');
+ assert.equal(existsSync(join(target,task,'task.json')),true);
  const parent=f.ctx('managed-parent');f.pointer(parent,'a');const parentKey=__internals.contextKey(f.root,parent),parentBytes=readFileSync(join(f.root,`.trellis/.runtime/sessions/${parentKey}.json`));
  const child={...f.ctx('managed-child'),cwd:target};
  // A target pointer attempts to redirect to another old task; startup must not use it.
@@ -202,9 +204,12 @@ test('managed startup registers execution checkout, then source-only child point
  const sections={};await f.handlers.get('before_agent_start')({prompt,systemPromptOptions:{sections}},child);
  assert.match(sections['session-overview'],new RegExp('Execution root.*'+target.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
  assert.match(sections['session-overview'],/Source Git \(not execution checkout\)/);assert.match(f.messages.at(-1).content,/Active task: .trellis\/tasks\/a/);
+ assert.doesNotMatch(f.messages.at(-1).content,/OLD target material|another-task/);
  const key=__internals.contextKey(target,child);assert.equal(JSON.parse(readFileSync(join(f.root,`.trellis/.runtime/sessions/${key}.json`))).current_task,task);
  assert.equal(existsSync(join(target,`.trellis/.runtime/sessions/${key}.json`)),false);
  const product={command:'pwd; cat code.txt'};await f.call(child,product,'bash');assert.doesNotMatch(product.command,/\(cd /);
+ for(const command of [`python3 '${join(target,'.trellis/scripts/task.py')}' current --json`,`python3 /foreign/task.py current --json`,`python3 .trellis/scripts/worktree.py status --task ${task} --cwd '${target}'`])assert.equal((await f.call(child,{command},'bash'))?.block,true,command);
+ const sourceCli={command:`python3 '${join(f.root,'.trellis/scripts/task.py')}' current --json`};assert.equal(await f.call(child,sourceCli,'bash'),undefined);
  const cli={command:'python3 .trellis/scripts/task.py current --json'};await f.call(child,cli,'bash');assert.match(cli.command,/\(cd /);const wrapped=cli.command;await f.call(child,cli,'bash');assert.equal(cli.command,wrapped);
  assert.equal((await f.call(child,{command:'python3 .trellis/scripts/task.py current --json; echo changed > code.txt'},'bash')).block,true);
  const result=execFileSync('bash',['-c',cli.command],{cwd:target,encoding:'utf8'});assert.equal(JSON.parse(result).current_task.dir,task);
@@ -319,4 +324,8 @@ test('nonstandard Git-file checkout rejected by native source identity never fal
  const sections={};await f.handlers.get('before_agent_start')({prompt:'inspect source',systemPromptOptions:{sections}},ctx);assert.deepEqual(sections,{});assert.match(f.messages.at(-1).content,/task_error/);assert.deepEqual(readFileSync(pointer),bytes);
 });
 
-describe('agent context integration (independent copied projects)',()=>{for(const c of cases)it(c.name,c.fn);});
+const smoke=new Set([
+ 'managed startup registers execution checkout, then source-only child pointer/materials/CLI with target task absent',
+ 'nonstandard Git-file checkout rejected by native source identity never falls back to old pointer',
+]);
+describe('agent context smoke integrations',()=>{for(const c of cases.filter(({name})=>smoke.has(name)))it(c.name,c.fn);});

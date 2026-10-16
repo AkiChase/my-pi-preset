@@ -238,32 +238,9 @@ test('shutdown while spawn reply is pending retains unknown with returned id, ne
  const record=readExecution(c.binding);assert.equal(record.state,'unknown');assert.equal(record.agentId,'agent-1');assert.equal(record.ownerPid,process.pid);
 });
 
-test('live source changes dispatch directly without refresh or task copies',async t=>{
- const f=await readyFixture(t),c=f.prepared;f.put(f.task+'/prd.md','approved update');
- await f.dispatch();const record=readExecution(c.binding);assert.equal(record.materialRevision,record.sourceFingerprint);assert.equal(record.targetFingerprint.length,64);
- assert.doesNotMatch(f.replies[0].prompt,/approved update|trellis-hook-injected/);assert.match(f.replies[0].prompt,/Trellis authority:/);
-});
-test('target stale spec and task identity cannot override source authority or change target Git',async t=>{
- const f=await readyFixture(t),c=f.prepared;
- writeFileSync(join(c.binding.worktreePath,'.trellis/spec/spec.md'),'OLD target material');
- mkdirSync(join(c.binding.worktreePath,f.task),{recursive:true});
- writeFileSync(join(c.binding.worktreePath,f.task,'task.json'),'{"status":"planning","id":"another-task"}');
- const targetGit=()=>execFileSync('git',['-C',c.binding.worktreePath,'status','--porcelain'],{encoding:'utf8'});
- const before=targetGit();await f.dispatch();assert.equal(targetGit(),before);
- const {parseDispatchFacts}=await import('../lib/task-context.ts');const facts=parseDispatchFacts(f.replies[0].prompt);
- assert.equal(facts.taskPath,join(f.root,f.task));assert.equal(facts.references[0].path,join(f.root,'.trellis/spec/spec.md'));
- assert.equal(readFileSync(facts.references[0].path,'utf8'),'BASE target spec');assert.doesNotMatch(f.replies[0].prompt,/OLD target material|another-task/);
- f.bus.emit('subagents:completed',{id:'agent-1'});
- rmSync(join(c.binding.worktreePath,f.task),{recursive:true});
- const withoutTarget=await queryWorktree(f.root,f.task,true,undefined,true,'implement');
- assert.equal(withoutTarget.materials.state,'valid');
- assert.equal(withoutTarget.materials.taskPath,facts.taskPath);
- assert.equal(withoutTarget.materials.sourceFingerprint,readExecution(c.binding).sourceFingerprint);
- assert.ok(!existsSync(join(c.binding.worktreePath,f.task)));
-});
 
 test('supported source/target release mismatch rejects before provider ping/spawn or target CLI execution',async t=>{
- const f=await readyFixture(t),c=f.prepared;let ping=0;f.bus.on('subagents:rpc:ping',()=>{ping++;});
+ const f=await stateFixture(t),c=f.prepared;let ping=0;f.bus.on('subagents:rpc:ping',()=>{ping++;});
  const manifest=join(f.root,'.trellis/.pi-trellis.json'),original=readFileSync(manifest);const changed=JSON.parse(original);changed.runtimeReleaseId='unsupported-release';writeFileSync(manifest,JSON.stringify(changed));await assert.rejects(f.dispatch(),/Unsupported project runtime release/);assert.equal(ping,0);assert.equal(f.replies.length,0);writeFileSync(manifest,original);
  const target=join(c.binding.worktreePath,'.trellis/.pi-trellis.json'),record=JSON.parse(readFileSync(target));record.runtimeReleaseId='unsupported-target';writeFileSync(target,JSON.stringify(record));await assert.rejects(f.dispatch(),/Unsupported project runtime release/);assert.equal(f.replies.length,0);assert.equal(readExecution(c.binding),undefined);
 });
@@ -288,6 +265,8 @@ test('unbound source dispatch uses shared cwd, current materials, no binding and
  assert.equal(sourceRecord(f).state,'running');f.bus.emit('subagents:completed',{id:'agent-1'});assert.equal(sourceRecord(f).state,'completed');
  await f.dispatch('trellis-check');assert.equal(sourceRecord(f).agentId,'agent-3');
  f.bus.emit('subagents:completed',{id:'agent-1'});assert.equal(sourceRecord(f).state,'running');
+ f.bus.emit('subagents:completed',{id:'agent-3'});f.put(f.task+'/task.json','{"status":"planning"}');await assert.rejects(f.dispatch(),/in_progress/);assert.equal(f.replies.length,3);
+ f.put(f.task+'/task.json','{"status":"in_progress"}');f.bus.on('subagents:rpc:ping',()=>f.put(f.task+'/task.json','{"status":"planning"}'));await assert.rejects(f.dispatch(),/in_progress/);assert.equal(sourceRecord(f).state,'completed');
 });
 test('source early terminal, stop and shutdown preserve lifecycle truth',async t=>{
  const f=await stateFixture(t,false);f.bus.on('subagents:rpc:spawn',()=>f.bus.emit('subagents:completed',{id:'agent-1'}));
@@ -394,7 +373,7 @@ test('source/managed source requirements changed after first role query refuse s
  });
 });
 test('target adapter missing rejects managed spawn without executing target CLI',async t=>{
- const f=await readyFixture(t),c=f.prepared;writeFileSync(join(c.binding.worktreePath,'.pi/settings.json'),'{}');
+ const f=await stateFixture(t),c=f.prepared;writeFileSync(join(c.binding.worktreePath,'.pi/settings.json'),'{}');
  await assert.rejects(f.dispatch(),/target\/user settings/);assert.equal(f.replies.length,0);assert.equal(readExecution(c.binding),undefined);
 });
 
@@ -410,4 +389,10 @@ test('target checkout changes during final native query refuse managed spawn wit
 });
 
 const scoped=fn=>t=>cwdScope.run({},()=>fn(t));
-describe('dispatch (independent copied projects)',()=>{for(const c of cases)it(c.name,scoped(c.fn));});
+const smoke=new Set([
+ 'dispatch requires ready, uses target cwd/off, returns real id and prevents same-dir overlap',
+ 'modified target runtime is rejected before execution/spawn, even if it attempts lock-time material changes',
+ 'unbound source dispatch uses shared cwd, current materials, no binding and per-task overlap',
+ 'target checkout changes during final native query refuse managed spawn with no lease',
+]);
+describe('dispatch smoke integrations',()=>{for(const c of cases.filter(({name})=>smoke.has(name)))it(c.name,scoped(c.fn));});

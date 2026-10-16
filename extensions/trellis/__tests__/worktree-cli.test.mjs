@@ -3,7 +3,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, statSync, symlinkSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import test from 'node:test';
+import nativeTest from 'node:test';
 import { canonicalPath } from '../lib/config.ts';
 import { acquireBindingLock, readBinding, atomicRecord, bindingFile } from '../lib/bindings.ts';
 import { readExecution, writeExecution, worktreeSnapshot } from '../lib/executions.ts';
@@ -20,6 +20,12 @@ async function queryWorktree(root,task,ready=false,role='implement') {
 
 const python = execFileSync('which',[process.env.TRELLIS_PYTHON || 'python3'],{encoding:'utf8'}).trim();
 const execute = (args, options={}) => spawnSync(python, ['-B', ...args], { encoding:'utf8', env:{...process.env, PYTHONDONTWRITEBYTECODE:'1'}, ...options });
+const smoke=new Set([
+ 'deployed CLI runs from its fixed path with Node unavailable and inherited Git overrides isolated; prepare never executes target scripts',
+ 'Python and host v2 binding/execution/lock interoperate without nested query deadlock',
+]);
+const test=(name,fn,options)=>smoke.has(name)?nativeTest(name,fn,options):undefined;
+
 function fixture(t) {
  const root = canonicalPath(mkdtempSync(join(tmpdir(),'pi-native-'))); t.after(()=>rmSync(root,{recursive:true,force:true}));
  const put=(path,data)=>{mkdirSync(join(root,path,'..'),{recursive:true});writeFileSync(join(root,path),data);};

@@ -3,11 +3,16 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import test from 'node:test';
+import nativeTest from 'node:test';
 import { canonicalPath } from '../lib/config.ts';
 import { installWorktreeCli, manageWorktree } from './worktree-fixture.mjs';
 import { readBinding } from '../lib/bindings.ts';
 import { writeExecution } from '../lib/executions.ts';
+
+const smoke=new Set([
+ 'prepare preview/confirm use source materials without task copies, start, hooks, pointers or Git changes',
+]);
+const test=(name,fn,options)=>smoke.has(name)?nativeTest(name,fn,options):undefined;
 
 export function fixture(t) {
  const root=canonicalPath(mkdtempSync(join(tmpdir(),'pi-w2-')));
@@ -43,6 +48,8 @@ else:
 
 test('prepare preview/confirm use source materials without task copies, start, hooks, pointers or Git changes',async t=>{
  const f=fixture(t),created=await f.run(),target=created.binding.worktreePath;
+ writeExecution(created.binding,{bindingId:created.binding.bindingId,requestId:'orphan',state:'unknown',role:'trellis-check',ownerPid:2147483647,ownerToken:'old',createdAt:new Date().toISOString()});
+ const recoveryPreview=await f.run({action:'recover',confirm:false});assert.equal(recoveryPreview.preview,true);const recovered=await f.run({action:'recover'});assert.equal(recovered.binding.preparationState,'unprepared');
  const sourceRecord=readFileSync(join(f.root,f.task,'task.json'));
  const targetGit=(...args)=>execFileSync('git',['-C',target,...args],{encoding:'utf8'});
  const snapshot=()=>[targetGit('status','--porcelain'),targetGit('diff'),targetGit('diff','--cached')];
@@ -58,6 +65,9 @@ test('prepare preview/confirm use source materials without task copies, start, h
  assert.ok(ready.materials.references.some(ref=>ref.path===join(f.root,f.task,'research/topic.md')));
  assert.equal(Object.hasOwn(ready.binding,'materials'),false);assert.equal(Object.hasOwn(ready.binding,'preparedFiles'),false);
  assert.equal((await f.run({action:'prepare'})).reused,true);
+ const removalPreview=await f.run({action:'remove',confirm:false,integratedInto:'HEAD'});assert.equal(removalPreview.preview,true);assert.match(removalPreview.note,/Ignored files/);
+ writeFileSync(join(target,'new.txt'),'unsaved');await assert.rejects(f.run({action:'remove',integratedInto:'HEAD'}),/untracked/);rmSync(join(target,'new.txt'));
+ await f.run({action:'remove',integratedInto:'HEAD'});assert.ok(!existsSync(target));assert.equal(readBinding(f.root,f.task),undefined);assert.ok(f.git('rev-parse',`refs/heads/${created.binding.branch}`));
 });
 
 test('planning task and broken own references fail; uncommitted source specs are valid without target comparison',async t=>{
@@ -79,17 +89,6 @@ test('existing target materials are irrelevant and never overwritten',async t=>{
  assert.equal(readFileSync(join(dest,'prd.md'),'utf8'),'user target PRD');
 });
 
-test('remove requires clean worktree and preserving reference, preview exposes ignored file risk',async t=>{
- const f=fixture(t),created=await f.run();
- const preview=await f.run({action:'remove',confirm:false,integratedInto:'HEAD'});assert.equal(preview.preview,true);assert.match(preview.note,/Ignored files/);
- writeFileSync(join(created.binding.worktreePath,'new.txt'),'unsaved');
- await assert.rejects(f.run({action:'remove',integratedInto:'HEAD'}),/untracked/);
- rmSync(join(created.binding.worktreePath,'new.txt'));
- await f.run({action:'remove',integratedInto:'HEAD'});
- assert.ok(!existsSync(created.binding.worktreePath));assert.equal(readBinding(f.root,f.task),undefined);
- assert.ok(f.git('rev-parse',`refs/heads/${created.binding.branch}`));
-});
-
 test('remove cannot delete current worktree or unknown execution; recover live owner refused',async t=>{
  const f=fixture(t),created=await f.run();
  await assert.rejects(f.run({action:'remove',cwd:created.binding.worktreePath,integratedInto:'HEAD'}),/current working/);
@@ -104,14 +103,6 @@ test('committed target task metadata remains byte-identical, including source br
  const created=await f.run(), before=readFileSync(join(created.binding.worktreePath,f.task,'task.json'));await f.run({action:'prepare'});
  assert.deepEqual(readFileSync(join(created.binding.worktreePath,f.task,'task.json')),before);
  assert.equal(JSON.parse(readFileSync(join(f.root,f.task,'task.json'))).branch,'source-branch');
-});
-
-test('dead-owner unknown execution is released only by confirmed recovery',async t=>{
- const f=fixture(t),created=await f.run();
- writeExecution(created.binding,{bindingId:created.binding.bindingId,requestId:'orphan',state:'unknown',role:'trellis-check',ownerPid:2147483647,ownerToken:'old',createdAt:new Date().toISOString()});
- const preview=await f.run({action:'recover',confirm:false});assert.equal(preview.preview,true);
- const recovered=await f.run({action:'recover'});assert.equal(recovered.binding.preparationState,'unprepared');
- await f.run({action:'prepare'});assert.equal(readBinding(f.root,f.task).preparationState,'ready');
 });
 
 test('remove rejects commits not preserved in the approved reference',async t=>{

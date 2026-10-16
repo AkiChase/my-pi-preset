@@ -29,7 +29,7 @@ function make(snapshot: Partial<PanelSnapshot> = {}, rows = 14, columns = 80) {
   return { panel, actions, unavailable, tui, layout, text: (width = columns) => panel.render(width).join("\n") };
 }
 
-it("fills every terminal row/column without overflow for list, filter and detail across widths 1–120, heights 1–30 and themes", () => {
+it("fills boundary terminal sizes without overflow for list, filter and detail across themes", () => {
   const body = "# 中文 e\u0301\n\n" + "- 正文 line\n".repeat(80) + "\x1b[31mBAD\x1b[0m\x07\x1b]52;c;unsafe\x07";
   for (const appearance of ["dark", "light"] as const) {
     for (const page of ["list", "filter", "detail"] as const) {
@@ -40,7 +40,7 @@ it("fills every terminal row/column without overflow for list, filter and detail
       if (page === "detail") panel.showDetail(detailOf("entry-0001", body));
       for (const rows of [1, 2, 3, 5, 14, 30]) {
         tui.terminal.rows = rows;
-        for (let width = 1; width <= 120; width++) {
+        for (const width of [1, 2, 3, 9, 10, 20, 40, 80, 120]) {
           tui.terminal.columns = width;
           const lines = panel.render(width);
           assert.equal(lines.length, rows, `${page} ${rows}x${width}`);

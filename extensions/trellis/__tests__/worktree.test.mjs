@@ -3,10 +3,18 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, symlinkSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import test from "node:test";
+import nativeTest from "node:test";
 import { canonicalPath } from "../lib/config.ts";
 import { readBinding, markerFile, bindingFile, acquireBindingLock, parseBinding, sameIdentity } from "../lib/bindings.ts";
 import { manageWorktree } from "./worktree-fixture.mjs";
+
+const smoke=new Set([
+ "preview has pinned full base and no mutations; create persists matching markers but not ready",
+ "unignored directory/runtime, existing path/branch and unsafe tasks fail without overwrite",
+ "host strict v2 binding schema rejects old descriptors and unknown combinations",
+ "binding identity compares every immutable field, ignoring mutable preparation and error state",
+]);
+const test=(name,fn,options)=>smoke.has(name)?nativeTest(name,fn,options):undefined;
 
 function fixture(t) {
   const cwd = mkdtempSync(join(tmpdir(), "pi-w1-"));
@@ -33,17 +41,6 @@ test("preview has pinned full base and no mutations; create persists matching ma
   assert.match(preview.plan.baseCommit, /^[a-f0-9]{40}$/);
   assert.ok(!existsSync(join(f.root, ".worktree")));
   assert.ok(!existsSync(join(f.root, ".trellis/.runtime")));
-  const created = await f.run();
-  assert.equal(created.binding.preparationState, "unprepared");
-  assert.equal(created.binding.worktreePath, join(f.root, ".worktree/10-12-test"));
-  assert.equal(readFileSync(join(created.binding.worktreePath, "code.txt"), "utf8"), "committed code\n");
-  assert.ok(!existsSync(join(created.binding.worktreePath, f.task, "task.json")), "W1 must not copy task materials");
-  assert.deepEqual(JSON.parse(readFileSync(markerFile(created.binding.worktreePath))), readBinding(f.root, f.task));
-  assert.equal(created.binding.repositoryIdentity, canonicalPath(join(f.root, ".git")));
-});
-
-test("creation preserves source staged/unstaged/untracked contents and index", async (t) => {
-  const f = fixture(t);
   f.put("code.txt", "staged source\n"); f.git("add", "code.txt");
   f.put("code.txt", "unstaged source\n"); f.put("new.txt", "untracked source\n");
   const snapshot = () => JSON.stringify([f.git("diff", "--cached"), f.git("diff"), f.git("status", "--porcelain"), readFileSync(join(f.root, "new.txt"), "utf8")]);
@@ -52,6 +49,12 @@ test("creation preserves source staged/unstaged/untracked contents and index", a
   assert.equal(snapshot(), before);
   assert.deepEqual(readFileSync(join(f.root, ".git/index")), indexBefore);
   assert.ok(!existsSync(join(created.binding.worktreePath, "new.txt")));
+  assert.equal(created.binding.preparationState, "unprepared");
+  assert.equal(created.binding.worktreePath, join(f.root, ".worktree/10-12-test"));
+  assert.equal(readFileSync(join(created.binding.worktreePath, "code.txt"), "utf8"), "committed code\n");
+  assert.ok(!existsSync(join(created.binding.worktreePath, f.task, "task.json")), "W1 must not copy task materials");
+  assert.deepEqual(JSON.parse(readFileSync(markerFile(created.binding.worktreePath))), readBinding(f.root, f.task));
+  assert.equal(created.binding.repositoryIdentity, canonicalPath(join(f.root, ".git")));
 });
 
 test("repeated create/status reuse absolute binding even after invalid configuration", async (t) => {

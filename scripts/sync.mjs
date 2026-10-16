@@ -190,7 +190,7 @@ function unsetPath(root, segments) {
 // replaced whole. `emptyObjectsAreLeaves` is on for the machine's file, where a
 // leftover empty section is something prune should clean up, and off for the
 // manifest, where `"retry": {}` declares nothing.
-function leafEntries(root, { emptyObjectsAreLeaves }) {
+export function leafEntries(root, { emptyObjectsAreLeaves }) {
   const entries = [];
   const walk = (node, prefix) => {
     for (const [key, value] of Object.entries(node)) {
@@ -492,7 +492,7 @@ function readInstalled() {
   return entries;
 }
 
-function buildPackagePlan(desired, installed, prune, conflicts, selfMode) {
+export function buildPackagePlan(desired, installed, prune, conflicts, selfMode) {
   const steps = [];
   const claimed = new Set();
   const switchedSources = new Set();
@@ -611,12 +611,12 @@ function render(value) {
 
 // keybindings.json accepts a single key or a list, so "ctrl+r" and ["ctrl+r"]
 // mean the same thing. Compare normalized, write what the manifest says.
-function normalizeKeybinding(value) {
+export function normalizeKeybinding(value) {
   if (value === null || value === undefined) return value;
   return Array.isArray(value) ? value : [value];
 }
 
-function buildConfigPlan({ domain, declared, current, preserve, prune, protectedTopKeys = new Set(), equals = deepEqual, flat = false, targetPrefix = "" }) {
+export function buildConfigPlan({ domain, declared, current, preserve, prune, protectedTopKeys = new Set(), equals = deepEqual, flat = false, targetPrefix = "" }) {
   const steps = [];
   const declaredPaths = declared.map((entry) => entry.path);
 
@@ -799,8 +799,9 @@ function expandBarePrune(argv) {
   });
 }
 
+export function main(argv = process.argv.slice(2)) {
 const { values } = parseArgs({
-  args: expandBarePrune(process.argv.slice(2)),
+  args: expandBarePrune(argv),
   options: {
     manifest: { type: "string" },
     dev: { type: "boolean", default: false },
@@ -1008,3 +1009,6 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.error(`Done. ${totalSteps} step(s) applied. Run /reload in pi, or restart it, to pick up changes.`);
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

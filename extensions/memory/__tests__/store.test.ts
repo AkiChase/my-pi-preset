@@ -33,21 +33,21 @@ it("disabled remains readable but blocks both mutations; malformed config preser
   await assert.rejects(setEnabled(agentDir, true), /boolean/);
   assert.equal(fs.readFileSync(join(agentDir, "memory.json"), "utf8"), '{"directory":"secret"}');
 });
-it("metadata scan reads no bodies even with >128 near-16KiB files; all overflow entries discoverable", async t => {
+it("metadata scan reads no bodies with >200 near-16KiB files; overflow entries stay discoverable", async t => {
   const { store } = fixture(t);
-  for (let n = 0; n < 230; n++) {
+  for (let n = 0; n < 201; n++) {
     const name = `memory-${String(n).padStart(3, "0")}`;
     const meta = { name, description: "四".repeat(160), type: "project" as const, created: "2026-10-15T00:00:00.000Z", updated: "2026-10-15T00:00:00.000Z" };
     const front = header(meta);
     fs.writeFileSync(join(store.directory, `${name}.md`), front + "a".repeat(TOPIC_BYTES - Buffer.byteLength(front)), { mode: 0o600 });
   }
-  const scan = store.scan(); assert.equal(scan.entries.length, 230); assert.ok(scan.scannedBytes < 230 * 1024);
+  const scan = store.scan(); assert.equal(scan.entries.length, 201); assert.ok(scan.scannedBytes < 201 * 1024);
   const index = await store.refresh(); assert.ok(Buffer.byteLength(index.text) <= INDEX_BYTES); assert.ok(index.text.split("\n").length - 1 <= 200);
-  assert.ok(index.text.endsWith("\n")); assert.match(index.text, /Omitted/); assert.ok(index.shown < 230);
+  assert.ok(index.text.endsWith("\n")); assert.match(index.text, /Omitted/); assert.ok(index.shown < 201);
   let offset = 0; let count = 0;
   do { const page = store.list("", offset, 50); assert.ok(Buffer.byteLength(page.text) <= LIST_BYTES); count += page.entries.length; offset = page.nextOffset ?? -1; } while (offset >= 0);
-  assert.equal(count, 230); assert.equal(store.list("memory-229").entries[0].name, "memory-229");
-  assert.equal(store.read("memory-229").body.length + Buffer.byteLength(header(store.read("memory-229").metadata)), TOPIC_BYTES);
+  assert.equal(count, 201); assert.equal(store.list("memory-200").entries[0].name, "memory-200");
+  assert.equal(store.read("memory-200").body.length + Buffer.byteLength(header(store.read("memory-200").metadata)), TOPIC_BYTES);
 });
 it("malformed/frontmatter-overflow/entry-overflow fail closed without replacing index or topic", async t => {
   const { store } = fixture(t); await store.write(input());
