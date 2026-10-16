@@ -666,3 +666,35 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Status
 
 [OK] **Completed**
+
+
+## Session 22: Recap 配置菜单化完成与归档
+<!-- trellis-session: v=2 fp=b4a359bc5f3ce4de -->
+
+**Date**: 2026-10-16
+**Task**: Recap 配置菜单化完成与归档
+**Branch**: `main`
+
+### Summary
+
+模型选择菜单与模型支持的 thinking 档位联动配置已完成并归档；发现 Recap/Trellis 展示顺序受宿主 widget 写入时机影响，另开统一展示层任务。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0c74dd9` | feat(recap): select models and compatible thinking levels from menus |
+| `edaeefc` | chore(task): record recap menu checkpoint |
+| `28b954c` | chore(task): archive 10-16-recap-config-menu |
+
+### Testing
+
+- [OK] 最终 focused 73/73 自然退出；pnpm check 类型检查及全量 1514/1514 通过；新增 SDK 用例首次 xhigh 预期错误已修正并重跑。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 独立规划内置插件统一展示层，目标 Recap 位于 Trellis 上方；未验证真实终端视觉或线上模型质量。
