@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 25
+- **Total Sessions**: 26
 - **Last Active**: 2026-10-16
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~801 | Active |
+| `journal-1.md` | ~837 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 26 | 2026-10-16 | 修复 @ 路径补全过期候选并收尾 | `fce686b`, `dbc5751` | `main` |
 | 25 | 2026-10-16 | 内置 widget 统一展示层完成 | `24f15e2`, `e710dd7`, `8841a56`, `61e8032`, `47503d6`, `aadfb14` | `main` |
 | 24 | 2026-10-16 | Bash 工具契约规范化与最终验证 | `dab5ee3`, `5e47ef8`, `feb01d1` | `main` |
 | 23 | 2026-10-16 | Memory 收尾：内置文档、替换 pi-memory、清理与归档 | `dd4b881`, `effb05f`, `f59c66c`, `309c259`, `1277c28` | `main` |

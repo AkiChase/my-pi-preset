@@ -799,3 +799,39 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Next Steps
 
 - 真实终端视觉与线上模型质量未实测；未执行个人reload/install/push。第三方widget相对整个组合的顺序不受控制。
+
+
+## Session 26: 修复 @ 路径补全过期候选并收尾
+<!-- trellis-session: v=2 fp=0e703c45da2526c5 -->
+
+**Date**: 2026-10-16
+**Task**: 修复 @ 路径补全过期候选并收尾
+**Branch**: `main`
+
+### Summary
+
+接受旧候选前校验文本和光标快照，阻止 @~/@~/Downloads/ 重复前缀；过期接受保留输入并刷新。用户接受后归档独立轻量任务，未启动 Agent，未修改其他任务。
+
+### Main Changes
+
+- 复用原目录续补调度保护；新增一条 mock timers 与 Promise 握手的 Tab/Enter 回归，无新增固定等待或子进程。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `fce686b` | fix(at-path-completion): reject stale attachment candidates before applying |
+| `dbc5751` | docs(trellis): record stale completion fix checkpoint |
+
+### Testing
+
+- [OK] 修复前回归明确失败、修复后通过；路径补全 60/60 自然退出。
+- [OK] 本轮 typecheck 退出 2（范围外 tool-waits 两处 TS2322）；单次全量退出 1，1518/1536 通过、18 失败；失败与未跑真实终端限制保存在归档 PRD，不宣称整仓通过。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 其他任务负责整仓契约整合；诊断日志因未解决失败保留于 /tmp/at-path-stale.LG8Neq/，未清理。
