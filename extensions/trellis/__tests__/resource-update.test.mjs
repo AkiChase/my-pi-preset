@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, unlinkSync, writeFileSync, readFileSync } from 'node:fs';
+import { unlinkSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import test from 'node:test';
-import { plan, apply, verifyRuntime, digest } from '../lib/initialization/engine.ts';
+import { verifyRuntime, digest } from '../lib/initialization/engine.ts';
 import { resourcePlan, applyResourcePlan, resourceStatus } from '../lib/initialization/resources.ts';
-function fixture(t){const root=mkdtempSync(join(tmpdir(),'pi-resource-update-'));t.after(()=>rmSync(root,{recursive:true,force:true}));apply(plan(root,'Dev'));return root;}
+import { copyRuntimeFixture } from './runtime-fixture.mjs';
+function fixture(t){return copyRuntimeFixture(t,{user:'Dev'});}
 test('resource status describes files and repair restores missing runtime without changing history',t=>{
  const root=fixture(t),identity=readFileSync(join(root,'.trellis/.developer')),history=readFileSync(join(root,'.trellis/workspace/Dev/index.md'));
  unlinkSync(join(root,'.trellis/scripts/task.py'));
