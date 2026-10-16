@@ -3,22 +3,22 @@ import assert from "node:assert/strict";
 import {execFileSync} from "node:child_process";
 import {queryWorktree,requireMaterials} from "../lib/worktree-query.ts";
 import {assembleDispatchPrompt,parseDispatchFacts} from "../lib/task-context.ts";
-import { existsSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, realpathSync, renameSync, symlinkSync } from "node:fs";
+import { cpSync, readdirSync, existsSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, realpathSync, renameSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, it } from "node:test";
+import { describe, it, after } from "node:test";
 
 // Each case owns an independent copied project (copyRuntimeFixture).
 // Cases run serially; the root test runner owns file-level concurrency.
 const cases = [];
 const test = (name, fn) => cases.push({ name, fn });
 import trellis, { __internals } from "../index.ts";
-import { copyRuntimeFixture, mockPython } from "./runtime-fixture.mjs";
+import { copyRuntimeFixture, mockPython, rehomeOperationRecord } from "./runtime-fixture.mjs";
+import { readBinding } from '../lib/bindings.ts';
 import { INJECTED_MARKER } from "../lib/task-context.ts";
 
-function setup(t) {
-  // Shared initialized Git project, copied per case (see runtime-fixture.mjs).
-  const root = copyRuntimeFixture(t, { git: true });
+function setup(t, root = copyRuntimeFixture(t, { git: true })) {
+  // Every case owns its project; prepared managed cases supply a rebased copy.
   const put = (path, content) => { mkdirSync(join(root, path, ".."), { recursive: true }); writeFileSync(join(root, path), content); };
   for (const name of ["a", "b"]) {
     const dir = `.trellis/tasks/${name}`;
@@ -225,12 +225,38 @@ test('forged external source header and incomplete header fence child without to
  }
 });
 
+let preparedChild;
+const templateCleanup=[];
+after(()=>{for(const cleanup of templateCleanup)cleanup();});
+async function preparedChildRoot() {
+ return preparedChild??=(async()=>{
+  const f=setup({after:cleanup=>templateCleanup.push(cleanup)});
+  f.put('.gitignore','/.worktree/\n/.trellis/.runtime/\n/.pi/\n');f.put('code.txt','product');
+  const git=(...args)=>execFileSync('git',['-C',f.root,...args],{encoding:'utf8'});
+  git('add','.');git('-c','user.name=Fixture','-c','user.email=fixture@example.invalid','-c','commit.gpgsign=false','commit','-qm','baseline');
+  const {manageWorktree}=await import('./worktree-fixture.mjs');
+  await manageWorktree({cwd:f.root,task:'.trellis/tasks/a',action:'create',confirm:true});
+  await manageWorktree({cwd:f.root,task:'.trellis/tasks/a',action:'prepare',confirm:true});
+  return f.root;
+ })();
+}
+function copyPreparedChild(t, from) {
+ const root=realpathSync(mkdtempSync(join(tmpdir(),'pi-context-managed-')));
+ t.after(()=>rmSync(root,{recursive:true,force:true}));
+ cpSync(from,root,{recursive:true});rehomeOperationRecord(from,root);
+ // Only these runtime/Git records embed the old source path. Product/task
+ // content and runtime hashes are unchanged; native queries still validate it.
+ const files=['.worktree/a/.git','.worktree/a/.trellis/.runtime/pi-trellis/binding.json'];
+ for(const name of readdirSync(join(root,'.git/worktrees')))files.push(`.git/worktrees/${name}/gitdir`);
+ for(const name of readdirSync(join(root,'.trellis/.runtime/pi-trellis/bindings')))files.push(`.trellis/.runtime/pi-trellis/bindings/${name}`);
+ const escape=path=>JSON.stringify(path).slice(1,-1);
+ for(const file of files)writeFileSync(join(root,file),readFileSync(join(root,file),'utf8').replaceAll(escape(from),escape(root)));
+ return root;
+}
 async function managedChild(t, name) {
- const f=setup(t);f.put('.gitignore','/.worktree/\n/.trellis/.runtime/\n/.pi/\n');f.put('code.txt','product');
- const git=(...args)=>execFileSync('git',['-C',f.root,...args],{encoding:'utf8'});
- git('add','.');git('-c','user.name=Fixture','-c','user.email=fixture@example.invalid','-c','commit.gpgsign=false','commit','-qm','baseline');
- const {manageWorktree}=await import('./worktree-fixture.mjs');const task='.trellis/tasks/a';
- const {binding}=await manageWorktree({cwd:f.root,task,action:'create',confirm:true});await manageWorktree({cwd:f.root,task,action:'prepare',confirm:true});
+ const f=setup(t,copyPreparedChild(t,await preparedChildRoot()));
+ const task='.trellis/tasks/a',binding=readBinding(f.root,task);
+ assert.equal(binding.sourceRoot,f.root);assert.equal(binding.preparationState,'ready');
  const child={...f.ctx(name),cwd:binding.worktreePath};await f.handlers.get('session_start')({},child);
  const materials=requireMaterials(await queryWorktree(child.cwd,task,false,undefined,false,'implement'));
  const prompt=assembleDispatchPrompt({prompt:'work',contextId:binding.contextId,role:'trellis-implement',materials,executionRoot:child.cwd});
