@@ -1,6 +1,22 @@
 # 生命周期测试精简审查
 
-## 第四批具体候选（只读诊断，待批准）
+## 第七批候选：初始化/校验成本审查（只读，待批准）
+
+完整读取 initialization.test.mjs、init-review.test.mjs、init-diagnostics.test.mjs 与 engine.ts inspect/validatePlan/readOperation/recheck/apply。owned /tmp/pi-test-init-audit-0b7bHS 内存插桩：首次signature匹配packageResources失败，三个文件未加载（exit1），收窄计数边界后rerun76/76 PASS、自然退出31.14s/56.34CPU s。initialization plan50/apply24/validatePlan101/recheck1415、Python200次约15.47s、lstat152万次4.15s、普通readFile903.86MiB、operation3097.51MiB；init-review plan41/apply36/validatePlan114/recheck432、Python190次15.78s、operation954.70MiB；diagnostics只一次真正初始化，verifyRuntime39次、operation251.54MiB。读取是Node逻辑读取量，不含Python/copy、非物理磁盘吞吐；统计嵌套fs只计顶层以免双计，测试guards会替换探针影响部分计数。
+
+根因：apply每发布一个action就recheck全体guards，并save完整含base64输出的plan；完成record又由readOperation反复validatePlan，重读package内容/启动Python skeleton。单次完整初始化本身重复成本高；不在本测试任务改生产算法，也不能用probe假结果掩盖验证。
+
+I1 init-review十种forged incomplete operation：生成同一个真实first-write中断基线一次，复制小partial目录/record、校准root重算planHash，各case独立篡改；inspect/plan/apply拒绝与全目录no-write仍真实。内存实验10/10 PASS：baseline6.28s/6.13CPU s→template3.26s/3.22CPU s。明确仅~3s，非主要资源问题解决。
+I2 root-prefix/duplicate/skip三变体及forged-root-attributes使用带对应AGENTS输入的一次中断模板，而非各次plan+apply。不同原始root输入不可错误共用一模板；无新通用framework。
+I3 onboarding malformed records四变体：目前每次复制initialized项目后运行一轮真实identity apply建立join；改一次真实join模板，各次copy/删developer/改字段；保留真实plan拒绝+history不变。减少三次identity apply。
+I4 initialization中只测host handler的task_error/unsupported release，改用已有copyRuntimeFixture，不测fresh apply；其余需要观察fresh init中断/完整发布的保留。这只是两次full apply减少。
+I5 删除明确重复的published manifest interruption：init-review的published manifest不能执行/可以retry与initialization的manifest interruption整合成一组（保留verifyRuntime拒绝，实际重试一次，不跑两次full apply）。root bytes/exact block两组先集中保留一个真实发布，其余appendBlock/journalAttributes已有公开函数可纯Buffer测试，若碰到生产plan collision路径不能全部替代。
+I6 diagnostics六个strict manifest mutation不应该每变体copyRuntimeFixture+verifyRuntime再collect；verifyRuntime拒绝由manifest-provenance字段矩阵负责，这里只保留collect静态投影拒绝，六变体一个独立fixture恢复manifest。其目标是第二套诊断parser接线，不应直接删除所有变体。
+
+建议I1/I3/I4/I5/I6作为一批；不要宣称此批可到二三十秒。最大长期成本在数十次full apply固有O(actions*guards)；测试侧只有减少full初始化回归组合数量/保留小型代表端到端，才能明显降成本。若期待更大幅收益，需要另行批准更强的集成删减或生产初始化算法改动，不能在此只读/测试授权内越界。
+
+
+## 第四批具体候选（历史规划）
 
 完整读取 runtime-contracts、worktree-cli、preparation、worktree、resource-update、skill-deployment 及 Python cli/developer 实现。本轮仓库外插桩统计同步 spawnSync/execFileSync，只用于定位，不改测试代码。
 
