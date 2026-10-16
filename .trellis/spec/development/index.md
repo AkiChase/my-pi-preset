@@ -23,23 +23,6 @@ Preserve vendor originals, exact baselines, licenses and intentional local devia
 - Scope mutable state to a factory activation or operation, not import-time singletons. Capture asynchronous origin identity and recheck after awaits and before side effects. Gate optional integrations by capability/environment, isolate sink failures and preserve ordinary behavior when absent.
 - Reuse the actual owner only when semantics match; similar parsing or state shapes do not establish shared invariants. An explicitly authorized internal compatibility seam must remain narrow, guarded and actual-host regression-tested; record its maintenance contract in specs, not a user implementation manual. Never silently widen it or modify the SDK.
 
-## Tool Usage Guidance
-
-Use the existing `description`, `promptSnippet` and `promptGuidelines` registration fields, not a second system-prompt assembler. `promptSnippet` is the short tools index; `promptGuidelines` owns model-facing usage in rules. Group a tool's guidance into one multiline `<tool name> usage:` entry with indented semantic bullets and one examples subsection. Cover relevant defaults/modes, argument dependencies/exclusions, result semantics and tool coordination; do not force irrelevant sections onto simple tools. Schema descriptions still carry field meaning, units, bounds and applicability. Validate combinations before effects.
-
-When overriding a built-in tool, explicitly replace its description/snippet/guidelines after spreading the original definition, rather than appending incompatible instructions. Keep generic working rules separate. Current-interface guidance must not teach removed parameters or migration history; rejected legacy inputs belong in schema/runtime errors. Generate configuration-dependent defaults from actual configuration. Verify the registered definition against the installed SDK prompt assembler, including unrelated tool preservation and disabled/hidden tool omission; local strings alone do not prove the final context.
-
-### Bash contract example
-
-1. **Scope/trigger:** overriding built-in execution semantics is a public request/response and system-guidance contract change.
-2. **Signature:** `bash({ command: string, description?: string, run_in_background?: boolean, background_after_seconds?: number })`.
-3. **Contract:** interactive foreground waits for the configured threshold (`timeoutMs`, environment `PROCESS_TASKS_TIMEOUT_MS`) then detaches without replacing execution identity or terminating the process. Immediate background skips foreground waiting. Non-interactive foreground waits to completion. The inherited structured result still uses `exit_code: 0` as a running placeholder; launch identity is not proof of success. Completed foreground results are inline; background completion is notified unless consumed, with existing stop/session fencing preserved.
-4. **Validation/error matrix:** unknown or removed fields → reject before spawn; explicit threshold non-finite, <=0 or >2147483.647 → reject; threshold with immediate background → reject; explicit threshold in non-interactive mode → reject; blocked fixed sleep waits → existing guard. Error feedback, not prompt migration prose, owns removed-field recovery.
-5. **Cases:** base `{command:"git status --short"}`; good `{command:"npm test",run_in_background:true}` or interactive `{command:"npm test",background_after_seconds:10}`; bad both mode fields, removed `timeout`/`notify`, or explicit threshold in print mode.
-6. **Tests:** actual host schemas and direct admission assert zero jobs on refusal; threshold detach asserts live original PID and later natural success; non-interactive completion exceeds default threshold without a notification; registered prompt replaces inherited guidance and preserves peers. See [testing](../testing/index.md).
-7. **Wrong vs correct:** wrong: treat a foreground waiting threshold as a kill deadline or interpret launch `exit_code:0` as success. Correct: detach at threshold, retain task identity, and wait/read the final result to determine success.
-
-
 ## Lifecycle and Resource Ownership
 
 Factories may load without sessions: start long-lived processes, watchers, sockets and timers only in the owning session/command/tool. Every process, listener, timer, worker, dialog and pending callback needs a cleanup owner; `unref()` is not disposal.
