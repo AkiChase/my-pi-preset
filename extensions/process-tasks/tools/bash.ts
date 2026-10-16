@@ -5,7 +5,7 @@
  *   - run_in_background=true spawns immediately and returns a job handle
  *   - foreground commands race completion against backgrounding
  *   - a 2s quick-completion window delays only progress UI, never explicit detach
- *   - Ctrl+Shift+B (manual) or the timeout timer move a command to background
+ *   - Ctrl+Shift+B (manual) or the foreground waiting timer move a command to background
  */
 
 import type {
@@ -18,8 +18,6 @@ import {
     type BashToolDetails,
 } from "@earendil-works/pi-coding-agent";
 import { launchMetadata, launchText, type RuntimeLaunchMetadata } from "../../runtime-tasks/launch.ts";
-import { isTerminalStatus } from "../types.ts";
-import { appendFileSync } from "node:fs";
 import { constants as osConstants } from "node:os";
 import type { BackgroundRegistry } from "../state.ts";
 import {
@@ -43,7 +41,6 @@ import {
     assertJobSlot,
     detectBlockedSleep,
     SLEEP_WAIT_GUIDANCE,
-    isAutoBackgroundAllowed,
     isBlankCommand,
     requireExistingCwd,
     startBackgroundJob,
@@ -52,7 +49,7 @@ import {
 import { markOutcomeSurfaced } from "../notify.ts";
 import { processTaskIdentity } from "../source.ts";
 import { textBlock } from "../format.ts";
-import { bashParamSchema, MAX_TIMEOUT_SECONDS } from "./bash-params.ts";
+import { bashParamSchema, MAX_BACKGROUND_AFTER_SECONDS } from "./bash-params.ts";
 
 /** UI context + cwd is all this tool needs from the host context. */
 type LaunchDetails = BashToolDetails & { runtimeLaunch: RuntimeLaunchMetadata };
@@ -103,49 +100,44 @@ export function registerBashTool(
     pi.registerTool<ReturnType<typeof bashParamSchema>, LaunchDetails | undefined>({
         ...originalBash,
         name: "bash",
-        description:
-            `Run a bash command. Long-running commands auto-background after ` +
-            `${Math.round(reg.config.timeoutMs / 1000)}s. ` +
-            "Set run_in_background=true to start in background immediately. " +
-            "Use /bg to manually background a running command.",
-        promptSnippet:
-            "Run shell commands; long-running commands auto-background or use run_in_background=true",
+        description: "Run finite shell commands in the foreground or background. The foreground waiting threshold does not terminate execution.",
+        promptSnippet: "Run finite shell commands in the foreground or background",
         promptGuidelines: [
-            "Use bash with run_in_background=true when a command is expected to run for a long time.",
-            "run_in_background is for ONE notification (the command exits when done). For per-event streaming (watching logs, polling an API, file changes), use the monitor tool instead.",
-            "Never `sleep N` to wait for something — the job lingers for the full sleep. Wait on a background job with task_manage action='wait', watch with the monitor tool, or poll with an `until` loop that exits when ready.",
-            "Check background job status with task_manage action='list'.",
-            "Read background output with task_manage action='output'.",
+            `Bash usage:
+  - Use bash for finite shell commands. Use monitor for ongoing event streams or per-event notifications.
+  - Commands run in the foreground by default. Keep short commands in the foreground. Set run_in_background=true to start in the background immediately.
+  - In interactive mode, background_after_seconds controls how long to wait before backgrounding a still-running command (default: ${reg.config.timeoutMs / 1000}s). It does not terminate the command. Do not combine it with run_in_background=true. Use /bg to release a current wait without stopping execution.
+  - In non-interactive mode, foreground commands wait until completion; background_after_seconds is not supported. Background tasks remain session-owned and are stopped when the session closes.
+  - Foreground completion returns a tool result; background completion sends a notification automatically unless its final result has already been delivered. Do not poll list/status merely to detect completion.
+  - A background launch result means started, not successfully completed. Keep the returned task_id and run_id. Use task_manage status/output/wait/stop to inspect, read, await, or stop the bash task; do not include task_type in these targeted calls. task_manage also manages monitor, subagent, and workflow tasks.
+  - Never use sleep merely to wait for a task. Use task_manage action="wait", or a condition loop that exits when ready.
+  - Examples:
+    Foreground: {"command":"git status --short","description":"Inspect working tree"}
+    Immediate background: {"command":"npm test","run_in_background":true,"description":"Run tests"}
+    Background after 10s (interactive): {"command":"npm test","background_after_seconds":10,"description":"Run tests"}`,
         ],
         parameters: bashParamSchema(reg.config),
 
         async execute(toolCallId, params, signal, onUpdate, ctx) {
             const p = params as {
                 command: string;
-                timeout?: number;
+                background_after_seconds?: number;
                 run_in_background?: boolean;
                 description?: string;
-                notify?: boolean;
             };
             const bashCtx = ctx as BashCtx;
-
             for (const key of Object.keys(p)) {
-                if (!["command", "timeout", "run_in_background", "description", "notify"].includes(key)) {
-                    throw new Error(`Unknown bash parameter '${key}'. Accepted fields: command, timeout, run_in_background, description, notify.`);
+                if (!["command", "background_after_seconds", "run_in_background", "description"].includes(key)) {
+                    const correction = key === "timeout" ? " Use background_after_seconds for the interactive foreground waiting period, not an execution deadline."
+                        : key === "notify" ? " Background completion is reported automatically." : "";
+                    throw new Error(`Unknown bash parameter '${key}'. Accepted fields: command, background_after_seconds, run_in_background, description.${correction}`);
                 }
             }
-            if (p.notify !== undefined && p.run_in_background !== true) throw new Error("notify requires run_in_background=true");
-            // The host already rejects these against the schema above; repeating the
-            // check keeps a direct `execute()` (tests, SDK callers that bypass
-            // validation) from reaching `setTimeout` with an out-of-range delay.
-            if (p.timeout !== undefined && (!Number.isFinite(p.timeout) || p.timeout <= 0)) {
-                throw new Error(`timeout must be a finite number of seconds greater than 0, got ${String(p.timeout)}.`);
-            }
-            if (p.timeout !== undefined && p.timeout > MAX_TIMEOUT_SECONDS) {
-                throw new Error(
-                    `timeout must not exceed ${MAX_TIMEOUT_SECONDS} seconds, got ${p.timeout}. ` +
-                    "A larger value overflows the millisecond timer and would fire immediately."
-                );
+            if (p.background_after_seconds !== undefined) {
+                if (!Number.isFinite(p.background_after_seconds) || p.background_after_seconds <= 0 || p.background_after_seconds > MAX_BACKGROUND_AFTER_SECONDS)
+                    throw new Error(`background_after_seconds must be finite, greater than 0 and must not exceed ${MAX_BACKGROUND_AFTER_SECONDS} seconds.`);
+                if (p.run_in_background === true) throw new Error("background_after_seconds cannot be combined with run_in_background=true.");
+                if (reg.nonInteractive) throw new Error("background_after_seconds is unsupported in non-interactive mode; omit it to wait until completion.");
             }
             if (isBlankCommand(p.command)) throw new Error("Command is empty.");
             requireExistingCwd(bashCtx.cwd);
@@ -163,8 +155,6 @@ export function registerBashTool(
                     toolCallId,
                     command: p.command,
                     name: p.description,
-                    notify: p.notify,
-                    timeout: p.timeout,
                     cwd: bashCtx.cwd,
                     reg,
                     pi,
@@ -177,7 +167,7 @@ export function registerBashTool(
                 toolCallId,
                 command: p.command,
                 name: p.description,
-                timeoutMs: p.timeout ? p.timeout * 1000 : reg.config.timeoutMs,
+                backgroundAfterMs: (p.background_after_seconds ?? reg.config.timeoutMs / 1000) * 1000,
                 signal,
                 onUpdate,
                 ctx: bashCtx,
@@ -194,14 +184,14 @@ async function runForeground(args: {
     toolCallId: string;
     command: string;
     name?: string;
-    timeoutMs: number;
+    backgroundAfterMs: number;
     signal: AbortSignal | undefined;
     onUpdate: AgentToolUpdateCallback<LaunchDetails | undefined> | undefined;
     ctx: BashCtx;
     reg: BackgroundRegistry;
     pi: ExtensionAPI;
 }): Promise<AgentToolResult<LaunchDetails | undefined>> {
-    const { toolCallId, command, timeoutMs, signal, onUpdate, ctx, reg, pi } =
+    const { toolCallId, command, backgroundAfterMs, signal, onUpdate, ctx, reg, pi } =
         args;
     const id = newJobId("shell", reg);
     const logPath = logPathFor(reg, id);
@@ -262,23 +252,10 @@ async function runForeground(args: {
         });
         renderSidebar(reg, ctx);
 
-        // Timeout timer.
-        if (!lease.settled) timeoutTimer = setTimeout(() => {
-            if (reg.nonInteractive) return;
-            if (!reg.foreground.has(toolCallId)) return;
-            if (!isAutoBackgroundAllowed(command)) {
-                // Not eligible for auto-background (e.g. `sleep`) — kill it, but
-                // leave a marker in the log first so the model can tell a timeout
-                // kill apart from a normal failure (Claude Code prepends
-                // "Command timed out after {duration}" to the output).
-                try {
-                    appendFileSync(logPath, `Command timed out after ${Math.round(timeoutMs / 1000)}s\n`);
-                } catch { /* best-effort — the kill below still happens */ }
-                spawned.execution.stop();
-                return;
-            }
-            requestPause("timeout");
-        }, timeoutMs);
+        // The waiting threshold only detaches, never terminates execution.
+        if (!lease.settled && !reg.nonInteractive) timeoutTimer = setTimeout(() => {
+            if (reg.foreground.has(toolCallId)) requestPause("timeout");
+        }, backgroundAfterMs);
         timeoutTimer?.unref();
 
         // Foreground completion (quick or normal): read output, surface errors.
@@ -396,8 +373,6 @@ async function spawnBackground(args: {
     toolCallId: string;
     command: string;
     name?: string;
-    notify?: boolean;
-    timeout?: number;
     cwd: string;
     reg: BackgroundRegistry;
     pi: ExtensionAPI;
@@ -423,17 +398,7 @@ async function spawnBackground(args: {
     job.stop = () => spawned.execution.stop();
     add(args.reg, job);
     try {
-        const owner = startBackgroundJob({ reg: args.reg, pi: args.pi, ctx: args.ctx, job, exit: spawned.exit, execution: spawned.execution, notification: args.notify === false ? "suppressed" : "auto" });
-        if (args.timeout !== undefined) {
-            const timer = setTimeout(() => {
-                if (isTerminalStatus(job.status) || args.reg.nonInteractive || isAutoBackgroundAllowed(args.command)) return;
-                try { appendFileSync(logPath, `Command timed out after ${args.timeout}s\n`); } catch { /* best effort marker */ }
-                spawned.execution.stop();
-            }, args.timeout * 1000);
-            timer.unref();
-            owner.signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
-            if (owner.signal.aborted) clearTimeout(timer);
-        }
+        startBackgroundJob({ reg: args.reg, pi: args.pi, ctx: args.ctx, job, exit: spawned.exit, execution: spawned.execution });
     } catch (error) {
         // No handle was returned: setup failure must not leave an owned process
         // or completion/stall hooks alive. Preserve the log and original error.

@@ -105,7 +105,7 @@ for (const different of [false, true]) test(`actual retained child composite res
     await until(() => f.calls.length === 5);
     for (const forbidden of [parent, sibling, b.task_id]) assert.equal(meta(await f.call(session, "task_manage", { action: "output", task_id: forbidden })).error_code, "not_found");
     assert.equal(meta(await f.call(siblingSession, "task_manage", { action: "stop", task_id: a.task_id })).error_code, "not_found");
-    const local = launch(await f.call(session, "bash", { command: "printf CHILD_LOCAL", run_in_background: true, notify: false }));
+    const local = launch(await f.call(session, "bash", { command: "printf CHILD_LOCAL", run_in_background: true }));
     assert.match(text(await f.call(session, "task_manage", { action: "wait", task_id: local.task_id })), /CHILD_LOCAL/);
     assert.equal(meta(await f.call(siblingSession, "task_manage", { action: "output", task_id: local.task_id })).error_code, "not_found");
     f.onComplete(record => { if (record.id === a.task_id && record.runId === "1") f.manager.resumeRun(a.task_id, "nested resumed"); });
@@ -164,7 +164,7 @@ for (const mode of ["noExtensions", "excluded", "deny", "isolated", "nestedOff",
     if (["noExtensions", "excluded", "deny", "isolated"].includes(mode)) assert.equal(names.includes("bash"), false, "no local process capability revival");
     if (!nested) {
       if (mode === "nestedOff") {
-        const local = launch(await f.call(session, "bash", { command: "printf NESTED_OFF", run_in_background: true, notify: false }));
+        const local = launch(await f.call(session, "bash", { command: "printf NESTED_OFF", run_in_background: true }));
         assert.match(text(await f.call(session, "task_manage", { action: "wait", task_id: local.task_id })), /NESTED_OFF/);
       }
       return;

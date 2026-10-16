@@ -143,11 +143,10 @@ test("foreground execution error survives a failing final source publication", a
     assert.equal(h.messages.length, 0);
 });
 
-for (const notify of [true, false]) {
-    test(`bash explicit background notify=${notify} setup failure silently stops the spawned process and preserves original error`, async t => {
+test("bash explicit background setup failure silently stops the spawned process and preserves original error", async t => {
         const timers = trackTimers(t);
         const h = harness(t);
-        const failure = new Error(`bash notify=${notify} publication unavailable`);
+        const failure = new Error("bash publication unavailable");
         let statusCalls = 0;
         let controller: AbortController | undefined;
         let done: Promise<void> | undefined;
@@ -157,7 +156,7 @@ for (const notify of [true, false]) {
             statusCalls++; controller = [...h.reg.jobAborts.values()][0];
             done = [...h.reg.jobs.values()][0]?.donePromise; throw failure;
         });
-        const params = { command: "tail -f /dev/null", run_in_background: true, timeout: 60, notify };
+        const params = { command: "tail -f /dev/null", run_in_background: true };
         await assert.rejects(h.tools.get("bash")!.execute("setup", params, undefined, undefined, h.ctx), error => error === failure);
         const job = [...h.reg.jobs.values()][0]!;
         assert.equal(statusCalls, 1, "failure must occur on the initial render after lifecycle wiring");
@@ -173,12 +172,11 @@ for (const notify of [true, false]) {
         assert.equal(timers.size, 0);
         assert.equal(typeof readFileSync(job.logPath, "utf8"), "string");
         await tick(); t.mock.timers.tick(120_000);
-        assert.equal(h.messages.length, 0, "late exit/timeout must not emit completion notices");
+        assert.equal(h.messages.length, 0, "late exit must not emit completion notices");
         assert.equal(getStats(h.reg).totalStarted, 1);
         assert.equal(getStats(h.reg).killed, 1);
         assert.equal(getStats(h.reg).running, 0);
-    });
-}
+});
 
 for (const mode of ["wait", "terminal", "sibling-cancel"] as const) {
     test(`jobs ${mode} returns a consumed inline outcome even when the completion toast throws`, async t => {

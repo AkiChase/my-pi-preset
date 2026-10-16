@@ -173,7 +173,7 @@ export function startBackgroundJob(args: {
  *
  *   - "auto" (default): completeJob sends it on exit.
  *   - "self": the caller sends its own stream-specific summary.
- *   - "suppressed": `bash run_in_background: true, notify: false` — never sent.
+ *   - "suppressed": internal callers that already own terminal delivery.
  *
  * Notification ownership does not affect retention: all terminal records stay
  * for ten minutes, whether or not their outcome reached the agent.
@@ -342,16 +342,6 @@ export function requireExistingCwd(cwd: string): void {
 /** True for whitespace-only commands. bash silently passes empty commands, so reject them explicitly. */
 export function isBlankCommand(command: string): boolean {
     return command.trim().length === 0;
-}
-
-/**
- * True when the command is eligible for auto-backgrounding. Rejects commands
- * like `sleep` where backgrounding is pointless.
- */
-const DISALLOWED_AUTO_BACKGROUND = new Set(["sleep"]);
-export function isAutoBackgroundAllowed(command: string): boolean {
-    const base = command.trim().split(/\s+/)[0] ?? "";
-    return !DISALLOWED_AUTO_BACKGROUND.has(base);
 }
 
 /**

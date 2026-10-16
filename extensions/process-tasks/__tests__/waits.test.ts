@@ -120,10 +120,10 @@ void it("genuine launch signal and source silent stop retain final logs and rele
     } finally { await h.cleanup(); }
 });
 
-void it("bash timeout retains auto-background behavior inside the quick window", async () => {
+void it("bash waiting threshold retains auto-background behavior inside the quick window", async () => {
     const h = harness();
     try {
-        const result = await h.tools.get("bash")!.execute("timeout", { command: "tail -f /dev/null", timeout: 0.05 }, undefined, undefined, h.ctx);
+        const result = await h.tools.get("bash")!.execute("threshold", { command: "tail -f /dev/null", background_after_seconds: 0.05 }, undefined, undefined, h.ctx);
         assert.match(result.content[0]!.text!, /\nCommand running in background/);
         assert.equal(h.source.list()[0]!.executionMode, "background");
         assert.equal(h.reg.totalStarted, 1);

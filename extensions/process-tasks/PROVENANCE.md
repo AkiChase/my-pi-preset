@@ -48,6 +48,13 @@ The files in this directory started as a one-time copy of the `src/` tree of
 - wait 复用 shared retrieval lease，取消／解除只结束等待；monitor wait 等整个监听终态，事件通知仍归原 owner。停止报告请求与观察状态，不以 terminal 元数据代替实际 OS drain。未知／过期身份不恢复执行；关闭先封 facade 再停止后端。
 - 维护边界与新回归入口：`extensions/runtime-tasks/__tests__/`、本目录既有 lifecycle／monitor／waits 回归。新验收证据属于 owning task research；前文旧名称／计数保留为历史来源说明。
 
+## Bash 工具契约规范化
+
+- 模型参数使用 `background_after_seconds` 表示交互前台等待后转后台，不再公开 `timeout`、`notify`；未知/移除字段在启动前拒绝，不提供兼容映射。立即后台不能同时指定前台阈值。
+- 阈值不终止命令，删除 sleep 特殊计时终止路径；固定等待 guard、主动取消、stop 和会话关闭清理保留。非交互前台默认等完成，显式阈值报错。配置 `timeoutMs` 与环境变量保持现有名称与优先级。
+- 后台完成自动通知，保留结果已交付的防重复、主动停止的静默和旧会话 fence。前台完成直接返回工具结果。
+- 使用官方注册字段，简介进入 tools、一个多行 `Bash usage:` 指导进入 rules，覆盖原生指导而不是叠加；示例集中一项。共同编写与验证约束见开发/测试 spec。
+
 ## This is a fork, not a vendored dependency
 
 There is no sync path back to upstream, and that is deliberate: the point of the copy

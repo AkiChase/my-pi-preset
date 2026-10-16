@@ -18,7 +18,7 @@ import { createBashToolDefinition } from "@earendil-works/pi-coding-agent";
 import { BackgroundRegistry } from "../state.ts";
 import { DEFAULTS } from "../config.ts";
 import { registerBashTool } from "../tools/bash.ts";
-import { MAX_TIMEOUT_SECONDS, bashParamSchema } from "../tools/bash-params.ts";
+import { MAX_BACKGROUND_AFTER_SECONDS, bashParamSchema } from "../tools/bash-params.ts";
 import { killProcessTree, processExists } from "../spawn.ts";
 import { terminateJobSilently } from "../lifecycle.ts";
 import type { Job } from "../types.ts";
@@ -107,9 +107,8 @@ void describe("bash parameter schema — host validation", () => {
         const { tool } = harness();
         for (const args of [
             { command: "true" },
-            { command: "true", timeout: 30 },
+            { command: "true", background_after_seconds: 30 },
             { command: "true", run_in_background: true },
-            { command: "true", run_in_background: true, notify: false },
             { command: "true", description: "why" },
         ]) {
             assert.doesNotThrow(() => hostValidate(tool, args), `rejected ${JSON.stringify(args)}`);
@@ -119,28 +118,28 @@ void describe("bash parameter schema — host validation", () => {
     it("rejects a misspelled optional field instead of silently ignoring it", () => {
         const { tool } = harness();
         // The defect this closes: with an open object the typo passed validation
-        // and the command ran with the *configured* timeout, so the model's
+        // and the command ran with the *configured* background_after_seconds, so the model's
         // intent was discarded without a word.
         const err = hostError(tool, { command: "true", timeuot: 1 });
         assert.ok(err, "the typo must be rejected");
         assert.match(err.message, /timeuot/);
     });
 
-    it("rejects each documented way of getting timeout wrong, naming the field", () => {
+    it("rejects each documented way of getting background_after_seconds wrong, naming the field", () => {
         const { tool } = harness();
-        for (const timeout of [0, -1, 1.5e300]) {
-            const err = hostError(tool, { command: "true", timeout });
-            assert.ok(err, `timeout=${timeout} must be rejected`);
-            assert.match(err.message, /timeout/);
+        for (const background_after_seconds of [0, -1, 1.5e300]) {
+            const err = hostError(tool, { command: "true", background_after_seconds });
+            assert.ok(err, `background_after_seconds=${background_after_seconds} must be rejected`);
+            assert.match(err.message, /background_after_seconds/);
         }
     });
 
-    it("accepts the built-in tool's maximum timeout and rejects one second more", () => {
+    it("accepts the built-in tool's maximum background_after_seconds and rejects one second more", () => {
         const { tool } = harness();
-        assert.doesNotThrow(() => hostValidate(tool, { command: "true", timeout: MAX_TIMEOUT_SECONDS }));
+        assert.doesNotThrow(() => hostValidate(tool, { command: "true", background_after_seconds: MAX_BACKGROUND_AFTER_SECONDS }));
         // Above the built-in's `MAX_TIMEOUT_MS`, `setTimeout` wraps and the timer
         // fires immediately: a request to wait half an hour would return at once.
-        assert.throws(() => hostValidate(tool, { command: "true", timeout: MAX_TIMEOUT_SECONDS + 1 }));
+        assert.throws(() => hostValidate(tool, { command: "true", background_after_seconds: MAX_BACKGROUND_AFTER_SECONDS + 1 }));
     });
 
     it("requires command and reports its absence by field name", () => {
@@ -173,24 +172,44 @@ void describe("bash parameter schema — host validation", () => {
         }
     });
 
-    it("quotes the configured timeout default in the timeout description", () => {
+    it("quotes the configured background_after_seconds default in the background_after_seconds description", () => {
         const schema = JSON.parse(JSON.stringify(bashParamSchema({ ...DEFAULTS, timeoutMs: 5_000 }))) as {
             properties: Record<string, { description?: string }>;
         };
-        assert.match(schema.properties.timeout!.description!, /default: 5\b/);
+        assert.match(schema.properties.background_after_seconds!.description!, /default: 5\b/);
+    });
+
+    it("advertises its defaults in the schema, and the host never fills them", () => {
+        const { tool } = harness();
+        const schema = JSON.parse(JSON.stringify(tool.parameters)) as {
+            properties: Record<string, { default?: unknown }>;
+        };
+        // `default` is model-facing documentation only: the host's Value.Convert
+        // does not apply it, so execute() must keep applying the real threshold.
+        assert.equal(schema.properties.run_in_background!.default, false);
+        assert.equal(schema.properties.background_after_seconds!.default, DEFAULTS.timeoutMs / 1000);
+        assert.deepEqual(hostValidate(tool, { command: "true" }), { command: "true" });
+
+        const configured = JSON.parse(JSON.stringify(bashParamSchema({ ...DEFAULTS, timeoutMs: 5_000 }))) as {
+            properties: Record<string, { default?: unknown }>;
+        };
+        assert.equal(configured.properties.background_after_seconds!.default, 5);
+        // A configured threshold can never advertise a default its own maximum
+        // rejects; NUMERIC_BOUNDS caps timeoutMs at 24h, far below the ceiling.
+        assert.ok((configured.properties.background_after_seconds!.default as number) <= MAX_BACKGROUND_AFTER_SECONDS);
     });
 });
 
 void describe("bash runtime checks — defense in depth behind the schema", () => {
-    it("rejects an out-of-range timeout even when execute() is called directly", async () => {
+    it("rejects an out-of-range background_after_seconds even when execute() is called directly", async () => {
         const h = harness();
         // A direct SDK/codemode caller can bypass the host validator; the check
         // must not live only in the schema.
         await assert.rejects(
-            () => h.tool.execute("dl", { command: "true", timeout: MAX_TIMEOUT_SECONDS + 1 }, undefined, undefined, h.ctx),
+            () => h.tool.execute("dl", { command: "true", background_after_seconds: MAX_BACKGROUND_AFTER_SECONDS + 1 }, undefined, undefined, h.ctx),
             /must not exceed/
         );
-        assert.equal(h.reg.totalStarted, 0, "a rejected timeout must not start a job");
+        assert.equal(h.reg.totalStarted, 0, "a rejected background_after_seconds must not start a job");
         assert.equal(h.reg.jobs.size, 0);
     });
 
@@ -200,11 +219,11 @@ void describe("bash runtime checks — defense in depth behind the schema", () =
         assert.equal(h.reg.totalStarted, 0);
     });
 
-    it("rejects notify without run_in_background, explaining the dependency", async () => {
+    it("rejects removed notify before spawn", async () => {
         const h = harness();
         await assert.rejects(
             () => h.tool.execute("n", { command: "true", notify: true }, undefined, undefined, h.ctx),
-            /notify requires run_in_background=true/
+            /Unknown bash parameter 'notify'/
         );
         assert.equal(h.reg.jobs.size, 0);
     });

@@ -1,56 +1,51 @@
 /**
- * Shared bash parameter schema (TypeBox) used by the overridden `bash` tool.
- *
- * A function rather than a constant because two of the descriptions quote
- * configured values (the timeout default and the log directory) — a stale
- * literal there would be a lie told directly to the model.
+ * Shared bash parameter schema for the foreground/background execution contract.
+ * Descriptions quote the effective configuration rather than stale defaults.
  */
 
 import { Type } from "@earendil-works/pi-ai";
 import type { ProcessTasksConfig } from "../config.ts";
 
-/**
- * Largest accepted `timeout`, in seconds — the built-in bash tool's own limit
- * (`MAX_TIMEOUT_MS / 1000`). Above it the millisecond delay this override hands
- * to `setTimeout` exceeds Node's 2^31-1 timer range, so the timer fires almost
- * immediately and a request for a long wait silently becomes a short one.
- * Rejecting a value the built-in also rejects keeps the two tools consistent.
- */
-export const MAX_TIMEOUT_SECONDS = 2_147_483.647;
+/** Maximum foreground wait in seconds without overflowing Node's timer range. */
+export const MAX_BACKGROUND_AFTER_SECONDS = 2_147_483.647;
 
 /**
  * Parameter schema for the overridden `bash` tool.
  *
- * A function rather than a constant because two of the descriptions quote
- * configured values (the timeout default and the log directory) — a stale
- * literal there would be a lie told directly to the model.
- *
- * `additionalProperties: false` is deliberate: a misspelled optional field is
- * otherwise accepted and silently ignored, so `{"command":"…","timeuot":1}`
- * would run with the configured timeout instead of erroring. The host validates
- * this before `execute` runs and reports the field path.
+ * The schema describes each field; execute also rejects mode-dependent
+ * combinations before spawning. Unknown fields must not silently discard intent.
  */
 export function bashParamSchema(config: ProcessTasksConfig) {
+    /** The configured foreground threshold in the seconds unit the model sends.
+     *  Quoted by both the description and the advertised `default` so they
+     *  cannot drift apart. */
+    const defaultThresholdSeconds = config.timeoutMs / 1000;
     return Type.Object(
         {
             command: Type.String({ description: "Shell command to run" }),
-            timeout: Type.Optional(
+            background_after_seconds: Type.Optional(
                 Type.Number({
+                    // Model-facing only: the host's `Value.Convert` never fills a
+                    // `default`, so execute() still applies the real threshold and
+                    // still rejects an out-of-range explicit one.
+                    default: defaultThresholdSeconds,
                     exclusiveMinimum: 0,
-                    maximum: MAX_TIMEOUT_SECONDS,
+                    maximum: MAX_BACKGROUND_AFTER_SECONDS,
                     description:
-                        `Timeout in seconds, greater than 0 (default: ${Math.round(config.timeoutMs / 1000)}). ` +
-                        `Maximum ${MAX_TIMEOUT_SECONDS} seconds.`,
+                        `Interactive foreground waiting period in seconds before backgrounding (default: ${defaultThresholdSeconds}). ` +
+                        `Does not terminate execution. Greater than 0, maximum ${MAX_BACKGROUND_AFTER_SECONDS}. ` +
+                        "Unsupported in non-interactive mode; omit when run_in_background=true.",
                 })
             ),
             run_in_background: Type.Optional(
                 Type.Boolean({
+                    // Omitted means foreground; execute() reads it as false.
+                    default: false,
                     description:
-                        "Set to true to run this command in the background immediately. " +
+                        "Set to true to run this command in the background immediately; omit background_after_seconds. " +
                         `Output is saved to ${config.logDir}/<jobId>.log.`,
                 })
             ),
-            notify: Type.Optional(Type.Boolean({ description: "Completion notification (default true); only valid with run_in_background=true" })),
             description: Type.Optional(
                 Type.String({ description: "Short description of what this command does" })
             ),

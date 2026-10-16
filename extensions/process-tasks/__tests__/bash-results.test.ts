@@ -89,11 +89,11 @@ void describe("bash tool — Claude Code tool-result strings", () => {
         );
     });
 
-    void it("timeout auto-background returns the same generic CC string", async () => {
+    void it("waiting threshold auto-background returns the same generic CC string", async () => {
         const { tool, reg, ctx } = harness();
         const res = await tool.execute(
             "t3",
-            { command: "tail -f /dev/null", timeout: 1 },
+            { command: "tail -f /dev/null", background_after_seconds: 1 },
             undefined,
             undefined,
             ctx
@@ -106,18 +106,14 @@ void describe("bash tool — Claude Code tool-result strings", () => {
         );
     });
 
-    void it("timeout kill (auto-background not allowed) appends 'Command timed out after Ns' to the log", async () => {
-        const { tool, ctx } = harness();
-        // `sleep` is excluded from auto-backgrounding, and a float duration
-        // slips past the blocked-sleep guard — so this hits the kill path.
-        const res = await tool.execute(
-            "t4",
-            { command: "sleep 1.5", timeout: 1 },
-            undefined,
-            undefined,
-            ctx
-        );
-        assert.match(res.content[0].text, /Command timed out after 1s/);
+    void it("allowed sleep backgrounds without a termination marker", async () => {
+        const { tool, reg, ctx } = harness();
+        const res = await tool.execute("t4", { command: "sleep 0.2", background_after_seconds: 0.01 }, undefined, undefined, ctx);
+        const job = onlyJob(reg);
+        spawnedPids.push(job.pid);
+        assert.match(res.content[0].text, /Command running in background/);
+        await reg.executions.get(job)!.done;
+        assert.equal(job.status, "completed");
     });
 
     void it("an external signal death is reported as killed ('was stopped'), never completed", async () => {

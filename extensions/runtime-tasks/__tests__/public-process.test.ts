@@ -12,7 +12,7 @@ const text = (result: { content: { text?: string }[] }) => result.content.map(bl
 const identity = (result: unknown) => (result as { details: { runtimeLaunch: RuntimeLaunchMetadata } }).details.runtimeLaunch;
 const metadata = (result: unknown) => (result as { details: RuntimeTaskDetails }).details.runtimeTask;
 
-test("registered bash identity survives foreground completion, explicit background and early detach; notify is explicit-background-only", async () => {
+test("registered bash identity survives foreground completion, explicit background and early detach", async () => {
   const dir = mkdtempSync(join(tmpdir(), "runtime-launch-contract-")), f = processActivation(dir);
   try {
     assert.deepEqual([...f.tools.keys()].sort(), ["bash", "monitor", "task_manage"]);
@@ -22,16 +22,12 @@ test("registered bash identity survives foreground completion, explicit backgrou
     assert.equal(fg.mode, "foreground"); assert.equal(f.reg.jobs.get(fg.task_id)?.status, "completed");
     assert.match(text(await f.execute("task_manage", { action: "output", task_id: fg.task_id })), /foreground/);
 
-    for (const params of [{ command: "printf forbidden", notify: false }, { command: "printf forbidden", run_in_background: false, notify: true }]) {
-      const before = f.reg.totalStarted;
-      await assert.rejects(f.execute("bash", params), /notify requires run_in_background=true/);
-      assert.equal(f.reg.totalStarted, before);
-    }
-    for (const command of ["printf suppressed", "printf failed; exit 7"]) {
-      const background = await f.execute("bash", { command, run_in_background: true, notify: false });
+    for (const command of ["printf completed", "printf failed; exit 7"]) {
+      const beforeMessages = f.messages.length;
+      const background = await f.execute("bash", { command, run_in_background: true });
       const bg = identity(background); assert.ok(isLaunchMetadata(bg)); assert.equal(bg.mode, "background");
       await until(() => ["completed", "failed"].includes(f.reg.jobs.get(bg.task_id)!.status));
-      assert.equal(f.messages.length, 0, "notify:false suppresses both success and failure notifications");
+      assert.equal(f.messages.length, beforeMessages + 1, "background success and failure each notify automatically");
       const result = await f.execute("task_manage", { action: "output", task_id: bg.task_id });
       assert.ok(isRuntimeTaskMetadata(metadata(result))); assert.equal(metadata(result).task_id, bg.task_id);
     }
@@ -51,15 +47,18 @@ test("registered bash identity survives foreground completion, explicit backgrou
 test("registered process manager retains search counts/context, byte pages and cumulative stats while rejecting cross-type fields", async () => {
   const dir = mkdtempSync(join(tmpdir(), "runtime-process-actions-")), f = processActivation(dir);
   try {
-    const launched = await f.execute("bash", { command: "printf log", run_in_background: true, notify: false });
+    const launched = await f.execute("bash", { command: "printf log", run_in_background: true });
     const id = identity(launched).task_id;
     await until(() => f.reg.jobs.get(id)?.status === "completed");
     const job = f.reg.jobs.get(id)!;
     const body = Array.from({ length: 30 }, (_, n) => `needle 中文 ${n}`).join("\n") + "\n";
     writeFileSync(job.logPath, body);
+    // Simulate an unconsumed terminal outcome to keep search's non-consuming
+    // contract observable even though normal background completion now notifies.
+    delete job.outcomeSurfaced;
     const search = await f.execute("task_manage", { action: "search", task_id: id, pattern: "NEEDLE", ignore_case: true, context: 1 });
     assert.equal(metadata(search).count, 30); assert.match(text(search), /and 10 more/); assert.match(text(search), /:1: needle 中文 0/);
-    assert.match(text(search), /:2- needle 中文 1/); assert.notEqual(job.outcomeSurfaced, true);
+    assert.match(text(search), /:2- needle 中文 1/); assert.notEqual(job.outcomeSurfaced, true, "search does not consume a terminal outcome");
     let offset = 0, size = Buffer.byteLength(body);
     while (offset < size) {
       const page = await f.execute("task_manage", { action: "output", task_id: id, offset, limit: 7 });

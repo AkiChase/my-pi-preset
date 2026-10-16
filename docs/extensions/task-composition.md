@@ -45,11 +45,13 @@ Task composition 把命令进程、Monitor、子 Agent 和 workflow 放进同一
 
 | 工具 | 常用参数及行为 |
 | --- | --- |
-| `bash` | `command` 执行命令；`run_in_background: true` 直接后台；`timeout` 单位为秒，交互模式下长命令默认 120 秒后转后台；`description` 是简短说明；直接后台时可用 `notify: false` 关闭完成通知 |
+| `bash` | `command` 执行有限命令；默认前台等待，`run_in_background: true` 立即后台；`background_after_seconds` 是交互模式前台等待后转后台的秒数，不是终止期限，不能与立即后台组合；`description` 是简短说明 |
 | `task_manage` | `action` 选 `list`、`status`、`output`、`wait`、`stop`、`search` 或 `stats`，统一管理 Bash、Monitor、子 Agent 和 workflow |
 | `monitor` | 持续观察命令或 WebSocket，详见 [Monitor](monitor.md) |
 
-不要把 Bash 的 `timeout` 当作所有命令的强制终止期限：普通长命令到时转后台，直接后台运行的命令也不会因为这个参数统一到时停止；非交互运行不做自动超时转后台。想给观察设置总截止，用 Monitor 的 `timeout_ms`。
+交互模式下，前台命令默认等待 120 秒后转后台，可用 `background_after_seconds` 设置正数秒数（允许小数，最大 `2147483.647`）。这个阈值只解除前台等待，命令继续运行，不会终止命令。非交互模式默认等前台命令完成，显式传入该参数会在启动前报错。立即后台无需等待阈值。
+
+前台完成通过工具结果返回；后台完成自动通知，最终结果已被读取或等待取得时不会重复通知。后台启动结果只表示已启动，不代表命令成功完成。后台任务仍属于当前会话，会话关闭时停止。想给持续观察设置总截止，用 Monitor 的 `timeout_ms`。
 
 单独的 `sleep N` 等固定等待可能被拒绝。等已有任务完成用 `task_manage` 的 `wait`；等某个条件应让检查循环在条件满足时退出，而不是先睡很久。
 
@@ -121,7 +123,7 @@ Bash／Monitor 的 `output` 默认读尾页，`offset: 0` 从头读，`limit` �
 
 | 键 | 默认值 | 用途 |
 | --- | --- | --- |
-| `timeoutMs` | `120000` | 前台命令自动转后台的等待时间 |
+| `timeoutMs` | `120000` | 交互模式前台命令自动转后台的默认等待时间，不是运行期限 |
 | `logDir` | `"/tmp/pi-bg"` | 日志目录，支持开头的 `~` |
 | `maxConcurrentJobs` | `16` | 同时运行的进程任务上限，前台和 Monitor 也占用 |
 | `maxLogBytes` | `104857600` | 周期检查日志，超量时停止任务；不是硬写入上限 |
