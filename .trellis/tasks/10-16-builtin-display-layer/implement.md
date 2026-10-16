@@ -64,6 +64,9 @@ S2：`node --test extensions/shared/widget-display/__tests__/*.test.ts extension
 - `git diff --check`与spec links/discovery PASS；无独立lint script。testing spec历史dated logs/research冲突在主授权规范维护范围修正为implementation记录+仓库外raw+selected evidence。
 - 全部规范legacy例外已去除；S2准备即时提交，保留并行Bash spec hunks不纳入本提交。真实终端/线上质量NOT_RUN，无个人reload、install或push。
 
+- S2 checkpoint `8841a56`（`feat(widget-display): migrate all built-in widgets to stable slots`），包括全部消费者、聚焦/loader/源边界测试及最终dev/testing规范。main staged diff逐项核对只包含widget hunk；另一会话Bash规范已独立提交，保留其内容不删除。
+- 本任务实施两阶段完成，暂保持active/in_progress等待用户验收与归档授权；未运行真实终端或线上模型。临时raw main/implement/check目录已在检查完失败/重跑关系后安全清理（仅本次owned目录），无repo原始日志。
+
 ## 交付限制
 
 真实终端视觉、键盘、resize/theme交互与线上生成质量若未运行须明确 NOT_RUN。组合内部稳定排序不等于控制未接入第三方 widgets。缺失共享 owner 不静默 fallback；用户需保持新内置入口加载（manifest与文档说明）。
