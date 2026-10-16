@@ -88,6 +88,13 @@ describe("package.json pi.extensions", () => {
     assert.equal(Object.hasOwn(preset.files, "pi-recap.json"), false);
   });
 
+  it("loads Memory as a built-in extension and removes the external pi-memory package", () => {
+    assert.equal(declaredExtensions().filter(path => path === "extensions/memory.ts").length, 1);
+    assert.ok(preset.conflicts.includes("npm:pi-memory"));
+    assert.equal(Object.hasOwn(preset.packages, "npm:pi-memory"), false);
+    assert.equal(Object.hasOwn(manifest, "tools"), false);
+  });
+
   it("loads Trellis once through its thin entry and replaces the standalone pi-trellis package", () => {
     assert.equal(declaredExtensions().filter(path => path === "extensions/trellis.ts").length, 1);
     assert.equal(declaredExtensions().some(path => path.startsWith("extensions/trellis/")), false);

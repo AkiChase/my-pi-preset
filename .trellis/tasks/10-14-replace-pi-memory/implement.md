@@ -60,12 +60,19 @@
 - 历史遗留：`research/*.log`、`evidence/*.log` 与探针 `.mjs` 是此前写入任务目录的原始输出，按工作流不应保留在任务目录；未获授权不移动或删除，本次也不提交。
 
 ## 4. 配置/文档/独立检查（AC8/9）
-- [ ] pi-preset.json移除npm:pi-memory并加入conflicts，merge也能卸载；不安装pi-claude-memory。
-- [ ] 更新manifest/discovery tests，通过实际Pi resource loader验证旧pi-memory/pi-claude-memory同名工具冲突诊断，README给出移除旧包与重启说明；不额外实现registry或加载顺序抢占。
-- [ ] README overview/第三方/自带扩展/配置/容量与清理说明更新；合并并行hunks。规范新增仅本任务实际证据，不大改无关spec。
-- [ ] 更新本任务research验证证据/边界。主会话检查实际diff。
-- [ ] 独立check按PRD逐项复核，允许任务内自修但不碰本机状态；主会话复核check实际修复。
-- [ ] 隔离PTY冒烟另说明：installedCLI+临时HOME/agentDir/session/cwd，scripted local provider，直接-e本checkout，不install/reload个人实例。记录regular/fullscreen全屏列表详情/返回/resize/quit恢复提示，验证Fullscreen真实滚轮和上下边界不穿透、Regular键盘/滚动条且不强开mouse；不再验证已移除dialog，不把fakeprovider当真实自主记忆质量。
+- [x] pi-preset.json移除npm:pi-memory并加入conflicts，merge也能卸载；不安装pi-claude-memory。
+- [x] 更新manifest/discovery tests，通过实际Pi resource loader验证旧pi-memory/pi-claude-memory同名工具冲突诊断，README给出移除旧包与重启说明；不额外实现registry或加载顺序抢占。
+- [x] README overview/第三方/自带扩展/配置/容量与清理说明更新；合并并行hunks。规范新增仅本任务实际证据，不大改无关spec。
+- [x] 更新本任务验证证据/边界（记录于下方完成记录，不另写research）。主会话检查实际diff。
+- [x] 独立check按PRD逐项复核，允许任务内自修但不碰本机状态；主会话复核check实际修复。
+- [x] （面板代码本阶段未改，沿用阶段3 Pi 1.3.0 真实 tmux 验证）隔离PTY冒烟另说明：installedCLI+临时HOME/agentDir/session/cwd，scripted local provider，直接-e本checkout，不install/reload个人实例。记录regular/fullscreen全屏列表详情/返回/resize/quit恢复提示，验证Fullscreen真实滚轮和上下边界不穿透、Regular键盘/滚动条且不强开mouse；不再验证已移除dialog，不把fakeprovider当真实自主记忆质量。
+
+### 阶段4完成记录（2026-10-16）
+- 改动：`pi-preset.json`（packages 删 `npm:pi-memory`，conflicts 加入）；`scripts/pi-manifest.test.mjs` 新增断言；`extensions/memory/__tests__/loading.test.ts` 新增同名工具冲突回归；新增 `docs/extensions/memory.md`，删除 `docs/packages/memory.md`，README/`docs/index.md` 把 Memory 移入自带列表并加迁移说明（含容量上限）。
+- 宿主事实（Pi 1.3.0，已读源码并以测试固定）：`DefaultResourceLoader.addExtensionConflictDiagnostics`（`core/resource-loader.js:583`）对同名工具给后加载者记 `Tool "<name>" conflicts with <path>` 错误，两扩展都保留；`ExtensionRunner.getAllRegisteredTools()` 先注册者胜。纯 `discoverAndLoadExtensions` 不做此检测。
+- 失败事实：主会话初稿只查了 runner/loader，误判“无诊断”，README 与测试按此写成；独立审查（agent 427e523a）指出并改为经 `DefaultResourceLoader` 断言 4 条冲突错误、README 改为如实描述启动报错。审查另修正文档 5 处（面板不能删除、`/memory list` 仅前 20 条、项目按 Git common dir 实际路径识别、索引 200 行约 197 条并补 `memory_list` 分页上限、手改 memory.json 下一轮生效）；主会话复核源码后接受，并补“全屏模式下”滚轮限定。
+- 验证：初稿 focused 74/74、`pnpm check` 1525/1525（审查前）；审查后 `node --test scripts/pi-manifest.test.mjs extensions/memory/__tests__/*.test.ts` 73/73、`pnpm -s typecheck` 0；审查者反向验证：重加 packages 或移出 conflicts 时新清单测试失败（9/1），调换加载顺序时冲突测试失败。
+- 未验证：真实已安装 CLI 启动时冲突横幅的显示；真实 npm `pi-memory` 包（以同名工具替身代替）。
 
 ## 验证命令
 从项目根使用现有installedSDK+临时配置：

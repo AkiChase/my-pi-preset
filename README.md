@@ -60,6 +60,7 @@ PI_BIN=/path/to/pi ./install.sh
 | [SSE Normalize](docs/extensions/sse-normalize.md) | 规整 SSE 响应换行，减少特定流解析错误。 |
 | [Blocked Signal](docs/extensions/blocked-signal.md) | 在受支持的终端宿主中提示正在等待用户回答。 |
 | [Trellis](docs/extensions/trellis.md) | 按任务推进开发：先规划、经批准再分阶段实施检查，验收后归档。 |
+| [Memory](docs/extensions/memory.md) | 记住项目偏好、约定与参考资料，按需读取。 |
 
 Monitor 属于 Task Composition，不是额外顶层入口；Agent、进程和共享面板的说明统一收在 Task composition 文档中。
 
@@ -70,10 +71,17 @@ Monitor 属于 Task Composition，不是额外顶层入口；Agent、进程和�
 | [pi-cache-optimizer](docs/packages/cache-optimizer.md) | 优化提示缓存并显示命中统计。 |
 | [pi-input-history](docs/packages/input-history.md) | 跨会话浏览输入历史，并用 `Alt+R` 搜索。 |
 | [pi-web-access](docs/packages/web-access.md) | 提供网页搜索、内容抓取及结果分页读取。 |
-| [pi-memory](docs/packages/memory.md) | 保存跨会话记忆、日志和便签，并提供检索。 |
 | [rpiv-ask-user-question](docs/packages/ask-user-question.md) | 让模型通过选项问卷澄清需求。 |
 
 第三方包由 Pi 安装，本仓库不修改其代码。清单目前使用 `latest`，实际功能以安装版本为准。清单中的 `conflicts` 用于防止功能重复加载，同步时会移除这些冲突来源。
+
+### 从 pi-memory 迁移到内置 Memory
+
+本预设以前安装外部的 `pi-memory` 包，现在改用自带的 [Memory](docs/extensions/memory.md)。清单已把它从 `packages` 移到 `conflicts`，同步时会移除，即使使用默认 merge 模式也一样。
+
+两个插件都以 `memory_read`、`memory_write` 这类名字注册工具。如果旧的 `pi-memory` 还装着，Pi 启动时会提示 `Tool "memory_write" conflicts with ...` 这类扩展错误，两边仍都会加载，同名工具取先注册的一方，实际由哪一边提供取决于加载顺序。执行同步卸载、再重启 Pi 之后即可确定只会加载内置实现。
+
+内置 Memory 只用 `~/.pi/agent/memory.json` 保存开关，你的记忆放在 `~/.pi/agent/memory/projects/<项目>/`。旧插件写在同一个 `memory` 目录下的 `MEMORY.md`、`SCRATCHPAD.md`、`daily/` 和 `recovery/` 不会被自动转换，也不会被本预设自动删除，两者互不干扰。需要保留的内容请先自行复制；确认不再需要后，由你手动删除。
 
 ## 同步与更新
 

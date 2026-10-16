@@ -4,7 +4,6 @@
     "npm:pi-cache-optimizer": "latest",
     "npm:pi-input-history": "latest",
     "npm:pi-web-access": "latest",
-    "npm:pi-memory": "latest",
     "npm:@juicesharp/rpiv-ask-user-question": "latest"
   },
   "conflicts": [
@@ -13,7 +12,8 @@
     "npm:@tintinweb/pi-subagents",
     "npm:pi-session-name",
     "npm:@tifan/pi-recap",
-    "git:github.com/AkiChase/pi-trellis"
+    "git:github.com/AkiChase/pi-trellis",
+    "npm:pi-memory"
   ],
   "settings": {
     "npmCommand": ["pnpm"],

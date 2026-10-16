@@ -9,3 +9,5 @@
 {"file": "extensions/shared/scroll-panel/native-layout.ts", "reason": "共享布局合同：消费者不得绕过或手工回退"}
 {"file": "extensions/shared/scroll-panel/wheel.ts", "reason": "滚轮消费合同"}
 {"file": "extensions/trellis/lib/task-browser/component.ts", "reason": "同模块首消费者参考"}
+{"file": "scripts/sync.mjs", "reason": "conflicts 解析与移除语义，本阶段清单变更的依据"}
+{"file": "docs/extensions/recap.md", "reason": "自带扩展文档的既有结构与篇幅基准"}
