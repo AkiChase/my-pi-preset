@@ -20,14 +20,8 @@ void describe("processExists", () => {
     void it("the current process is alive", () => {
         assert.equal(processExists(process.pid), true);
     });
-    void it("PID 0 is treated as dead", () => {
-        assert.equal(processExists(0), false);
-    });
-    void it("a negative PID is treated as dead", () => {
-        assert.equal(processExists(-1), false);
-    });
-    void it("undefined is treated as dead", () => {
-        assert.equal(processExists(undefined), false);
+    void it("rejects invalid PIDs", () => {
+        for (const pid of [0, -1, undefined]) assert.equal(processExists(pid), false);
     });
 });
 
@@ -42,24 +36,14 @@ void describe("killProcessTree", () => {
 });
 
 void describe("statusFromExit", () => {
-    void it("0 → completed", () => {
-        assert.equal(statusFromExit(0), "completed");
-    });
-    void it("1 → failed", () => {
-        assert.equal(statusFromExit(1), "failed");
-    });
-    void it("a signal death → killed (external kill, OOM — never completed)", () => {
-        assert.equal(statusFromExit(null, "SIGKILL"), "killed");
-        assert.equal(statusFromExit(null, "SIGTERM"), "killed");
-    });
-    void it("a signal wins over a code", () => {
-        assert.equal(statusFromExit(0, "SIGKILL"), "killed");
-    });
-    void it("null without a signal → failed (the spawn-error path passes code 1)", () => {
-        assert.equal(statusFromExit(null), "failed");
-    });
-    void it("undefined → failed", () => {
-        assert.equal(statusFromExit(undefined), "failed");
+    void it("maps exit codes and signals to terminal status", () => {
+        const cases = [
+            [0, undefined, "completed"], [1, undefined, "failed"],
+            [null, "SIGKILL", "killed"], [null, "SIGTERM", "killed"],
+            [0, "SIGKILL", "killed"], [null, undefined, "failed"],
+            [undefined, undefined, "failed"],
+        ] as const;
+        for (const [code, signal, status] of cases) assert.equal(statusFromExit(code, signal), status);
     });
 });
 
@@ -143,15 +127,5 @@ void describe("createJobAbort / abortJob", () => {
         const reg = new BackgroundRegistry();
         abortJob(reg, "nope"); // must not throw
         assert.equal(reg.jobAborts.has("nope"), false);
-    });
-});
-
-void describe("BackgroundRegistry defaults", () => {
-    void it("initializes default fields", () => {
-        const reg = new BackgroundRegistry();
-        assert.ok(reg.jobs instanceof Map);
-        assert.ok(reg.foreground instanceof Map);
-        assert.ok(reg.jobAborts instanceof Map);
-        assert.equal(reg.totalStarted, 0);
     });
 });

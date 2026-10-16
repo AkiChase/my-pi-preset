@@ -109,6 +109,7 @@ void it("genuine launch signal and source silent stop retain final logs and rele
             else assert.equal(h.source.stop(processTaskIdentity(job.id)), true);
             await result;
             assert.equal(job.status, "killed");
+            assert.equal(processExists(job.pid), false, "abort/stop must end the original process");
             assert.equal(h.reg.jobs.get(job.id), job);
             assert.match(readFileSync(job.logPath, "utf8"), /before-kill/);
             assert.equal(h.reg.jobAborts.size, 0);

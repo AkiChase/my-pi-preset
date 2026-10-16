@@ -1,127 +1,73 @@
-// src/__tests__/spawn.test.ts
-import { describe, test } from "node:test";
+import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync, unlinkSync, mkdirSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawnWithFileOutput, killProcessTree, processExists } from "../spawn.ts";
 
-// Will import from spawn.ts once created
-// import { spawnWithFileOutput, killProcessTree, processExists } from "../spawn.ts";
+function fixture(t: import("node:test").TestContext) {
+    const dir = mkdtempSync(join(tmpdir(), "pi-spawn-test-"));
+    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    return { cwd: dir, logPath: join(dir, "output.log") };
+}
 
-const testDir = join(tmpdir(), `pi-bg-test-${process.pid}`);
+async function ready(logPath: string) {
+    const deadline = Date.now() + 3_000;
+    while (!readFileSync(logPath, "utf8").includes("ready")) {
+        assert.ok(Date.now() < deadline, "child did not signal readiness");
+        await new Promise(resolve => setTimeout(resolve, 5));
+    }
+}
 
-describe("spawnWithFileOutput", () => {
-    test("captures stdout to log file", async () => {
-        const { spawnWithFileOutput } = await import("../spawn.ts");
-        mkdirSync(testDir, { recursive: true });
-        const logPath = join(testDir, "test-stdout.log");
-        const result = spawnWithFileOutput({
-            command: 'echo "hello world"',
-            cwd: process.cwd(),
-            logPath,
-        });
-        assert.ok(result.pid > 0);
-        const { code } = await result.exit;
-        assert.equal(code, 0);
-        const output = readFileSync(logPath, "utf-8");
-        assert.ok(output.includes("hello world"));
-        unlinkSync(logPath);
-    });
-
-    test("captures stderr to same log file", async () => {
-        const { spawnWithFileOutput } = await import("../spawn.ts");
-        mkdirSync(testDir, { recursive: true });
-        const logPath = join(testDir, "test-stderr.log");
-        const result = spawnWithFileOutput({
-            command: 'echo "err msg" >&2',
-            cwd: process.cwd(),
-            logPath,
-        });
-        const { code } = await result.exit;
-        assert.equal(code, 0);
-        const output = readFileSync(logPath, "utf-8");
-        assert.ok(output.includes("err msg"));
-        unlinkSync(logPath);
-    });
-
-    test("returns non-zero exit code on failure", async () => {
-        const { spawnWithFileOutput } = await import("../spawn.ts");
-        mkdirSync(testDir, { recursive: true });
-        const logPath = join(testDir, "test-fail.log");
-        const result = spawnWithFileOutput({
-            command: "exit 42",
-            cwd: process.cwd(),
-            logPath,
-        });
-        const { code } = await result.exit;
-        assert.equal(code, 42);
-        try { unlinkSync(logPath); } catch {}
-    });
-
-    test("respects AbortSignal", async () => {
-        const { spawnWithFileOutput } = await import("../spawn.ts");
-        mkdirSync(testDir, { recursive: true });
-        const logPath = join(testDir, "test-abort.log");
-        const ac = new AbortController();
-        const result = spawnWithFileOutput({
-            command: "sleep 60",
-            cwd: process.cwd(),
-            logPath,
-            signal: ac.signal,
-        });
-        // Give process time to start
-        await new Promise((r) => setTimeout(r, 200));
-        ac.abort();
-        const { code, signal } = await result.exit;
-        // Killed process: a signal death, or at least a non-zero code.
-        assert.ok(signal !== null || code !== 0);
-        try { unlinkSync(logPath); } catch {}
-    });
-
-    test("resolves when the shell exits even if a grandchild holds the fds", async () => {
-        const { spawnWithFileOutput, killProcessTree } = await import("../spawn.ts");
-        mkdirSync(testDir, { recursive: true });
-        const logPath = join(testDir, "test-grandchild.log");
-        // The shell daemonizes a child that inherits the log fd — with 'close'
-        // this would hang for 30s; with 'exit' it resolves as soon as the
-        // shell itself exits.
-        const result = spawnWithFileOutput({
-            command: "sleep 30 & echo started",
-            cwd: process.cwd(),
-            logPath,
-        });
-        try {
-            const raced = await Promise.race([
-                result.exit,
-                new Promise<null>((r) => setTimeout(() => r(null), 3_000)),
-            ]);
-            assert.ok(raced !== null, "exit promise must resolve promptly, not after the grandchild");
-            assert.equal(raced.code, 0);
-        } finally {
-            // Clean up the lingering grandchild.
-            killProcessTree(result.pid, "SIGKILL");
-        }
-        try { unlinkSync(logPath); } catch {}
-    });
+test("captures both output streams and preserves the nonzero exit code", async t => {
+    const paths = fixture(t);
+    const result = spawnWithFileOutput({ ...paths, command: "printf stdout; printf stderr >&2; exit 42" });
+    assert.ok(result.pid > 0);
+    assert.equal((await result.exit).code, 42);
+    const output = readFileSync(paths.logPath, "utf8");
+    assert.ok(output.includes("stdout"));
+    assert.ok(output.includes("stderr"));
 });
 
-describe("killProcessTree", () => {
-    test("kills a running process", async () => {
-        const { spawnWithFileOutput, killProcessTree, processExists } = await import("../spawn.ts");
-        mkdirSync(testDir, { recursive: true });
-        const logPath = join(testDir, "test-kill.log");
-        const result = spawnWithFileOutput({
-            command: "sleep 60",
-            cwd: process.cwd(),
-            logPath,
-        });
-        await new Promise((r) => setTimeout(r, 200));
-        assert.ok(processExists(result.pid));
+test("AbortSignal stops the ready child", { timeout: 5_000 }, async t => {
+    const paths = fixture(t), controller = new AbortController();
+    const result = spawnWithFileOutput({ ...paths, command: "printf ready; exec sleep 60", signal: controller.signal });
+    try {
+        await ready(paths.logPath);
+        controller.abort();
+        const { code, signal } = await result.execution.done;
+        assert.ok(signal !== null || code !== 0);
+        assert.equal(processExists(result.pid), false);
+    } finally { result.execution.stop(); await result.execution.done; }
+});
+
+test("shell exit resolves while a grandchild still holds the output fd", { timeout: 5_000 }, async t => {
+    const paths = fixture(t);
+    const result = spawnWithFileOutput({ ...paths, command: "sleep 30 & printf ready" });
+    let timer: NodeJS.Timeout | undefined;
+    try {
+        const exit = await Promise.race([
+            result.exit,
+            new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), 3_000); }),
+        ]);
+        assert.notEqual(exit, null, "must not wait for the grandchild to exit");
+        assert.equal(exit!.code, 0);
+    } finally {
+        clearTimeout(timer);
+        // The group still belongs to this fixture even after its leader exits.
+        try { process.kill(-result.pid, "SIGKILL"); } catch { /* group already gone */ }
+        await result.execution.done;
+    }
+});
+
+test("killProcessTree stops a ready process", { timeout: 5_000 }, async t => {
+    const paths = fixture(t);
+    const result = spawnWithFileOutput({ ...paths, command: "printf ready; exec sleep 60" });
+    try {
+        await ready(paths.logPath);
+        assert.equal(processExists(result.pid), true);
         killProcessTree(result.pid);
-        await result.exit;
-        // After exit, process should be gone (give OS a moment)
-        await new Promise((r) => setTimeout(r, 100));
-        assert.ok(!processExists(result.pid));
-        try { unlinkSync(logPath); } catch {}
-    });
+        await result.execution.done;
+        assert.equal(processExists(result.pid), false);
+    } finally { result.execution.stop(); await result.execution.done; }
 });
