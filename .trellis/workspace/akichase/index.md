@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 23
+- **Total Sessions**: 24
 - **Last Active**: 2026-10-16
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~734 | Active |
+| `journal-1.md` | ~766 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 24 | 2026-10-16 | Bash 工具契约规范化与最终验证 | `dab5ee3`, `5e47ef8`, `feb01d1` | `main` |
 | 23 | 2026-10-16 | Memory 收尾：内置文档、替换 pi-memory、清理与归档 | `dd4b881`, `effb05f`, `f59c66c`, `309c259`, `1277c28` | `main` |
 | 22 | 2026-10-16 | Recap 配置菜单化完成与归档 | `0c74dd9`, `edaeefc`, `28b954c` | `main` |
 | 21 | 2026-10-16 | Check project 英文结构化与主题配色 | `c36f6ee`, `a5e91e3`, `5257413` | `main` |

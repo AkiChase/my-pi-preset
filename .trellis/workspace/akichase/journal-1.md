@@ -732,3 +732,35 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Next Steps
 
 - push 并重新同步 Pi 安装
+
+
+## Session 24: Bash 工具契约规范化与最终验证
+<!-- trellis-session: v=2 fp=f5289f5f76038906 -->
+
+**Date**: 2026-10-16
+**Task**: Bash 工具契约规范化与最终验证
+**Branch**: `main`
+
+### Summary
+
+明确 background_after_seconds，移除 notify；官方 tools 简介/rules 分组规范和显示适配已完成。独立复核通过，524 自然退出和1566全套测试通过，任务已归档。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `dab5ee3` | feat(bash): rename the waiting threshold to background_after_seconds and drop notify |
+| `5e47ef8` | fix(bash): align display metadata and document tool usage contracts |
+| `feb01d1` | chore: keep parallel widget spec updates outside bash stage |
+
+### Testing
+
+- [OK] 自然退出524/524 PASS；pnpm check类型检查及1566/1566 PASS；独立46/46 PASS
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 其他工具后续按共同接入规范改造
