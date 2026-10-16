@@ -83,9 +83,10 @@ async function readyFixture(t) {
  return Object.assign(f,{prepared:{binding}});
 }
 const queryTemplates=new Map();
-// Only RPC/state tests use captured native facts. Files, locks, snapshots and
-// execution records remain real; drift/security tests never call this helper.
-async function stateFixture(t, managed=true) {
+// RPC/state and CLI setup tests use captured native facts. Files, locks,
+// snapshots, status and management commands remain real; tests of query drift
+// and source authority never use this helper.
+async function stateFixture(t, managed=true, { liveMaterials=false }={}) {
  const template=managed?await preparedTemplate():sourceTemplate();
  const f=managed?await readyFixture(t):await fixture(t);
  const capture=async(task,role)=>{
@@ -95,7 +96,9 @@ async function stateFixture(t, managed=true) {
   return queryTemplates.get(key).replaceAll(escape(template),escape(f.root));
  };
  const plain=await capture(), selected=await capture(TASK);
- const roles={};for(const role of ['implement','check'])roles[role]=await capture(TASK,role);
+ const roles={};for(const role of ['implement','check'])roles[role]=liveMaterials
+  ? JSON.stringify(await queryWorktree(f.root,TASK,false,undefined,false,role))
+  : await capture(TASK,role);
  let queries=0;
  mockPython(t,f.root,args=>{
   if(!args.some(arg=>arg.endsWith('/query-worktree.py')))return;
@@ -150,7 +153,7 @@ test('early completed event before RPC reply cannot leave a stale running lease'
 });
 
 test('check snapshot becomes stale after manual change; terminal event releases directory but never marks acceptance',async t=>{
- const f=await readyFixture(t),c=f.prepared;
+ const f=await stateFixture(t,true,{liveMaterials:true}),c=f.prepared;
  await f.dispatch('trellis-check');f.bus.emit('subagents:completed',{id:'agent-1'});
  const current=await f.run({action:'status'});assert.match(current.note,/current snapshot/);
  writeFileSync(join(c.binding.worktreePath,'code.txt'),'manual change');
@@ -165,7 +168,7 @@ test('shutdown retains unknown lease instead of claiming a running child stopped
 });
 
 test('target pointer is not authoritative; incompatible custom role still rejects without spawn',async t=>{
- const f=await readyFixture(t),c=f.prepared;
+ const f=await stateFixture(t),c=f.prepared;
  f.put('.pi/agents/trellis-implement.md','---\nname: trellis-implement\nisolation: worktree\n---\n');
  await assert.rejects(f.dispatch(),/conflicts/);assert.equal(f.replies.length,0);
  f.put('.pi/agents/trellis-implement.md','---\nname: trellis-implement\ntools: read, write, edit, bash, find, grep\nextensions: true\nisolation: off\n---\nRole\n');
@@ -264,8 +267,8 @@ test('supported source/target release mismatch rejects before provider ping/spaw
  const target=join(c.binding.worktreePath,'.trellis/.pi-trellis.json'),record=JSON.parse(readFileSync(target));record.runtimeReleaseId='unsupported-target';writeFileSync(target,JSON.stringify(record));await assert.rejects(f.dispatch(),/Unsupported project runtime release/);assert.equal(f.replies.length,0);assert.equal(readExecution(c.binding),undefined);
 });
 
-test('valid multiline dispatch prose retains exact lines on supported real runtime',async t=>{
- const f=await readyFixture(t),c=f.prepared;await f.call({agent:'trellis-implement',prompt:'First line\n\tSecond line'});assert.match(f.replies[0].prompt,/First line\n\tSecond line/);assert.equal(readExecution(c.binding).agentId,'agent-1');
+test('valid multiline dispatch prose retains exact lines through the registered tool',async t=>{
+ const f=await stateFixture(t),c=f.prepared;await f.call({agent:'trellis-implement',prompt:'First line\n\tSecond line'});assert.match(f.replies[0].prompt,/First line\n\tSecond line/);assert.equal(readExecution(c.binding).agentId,'agent-1');
 });
 
 // Git's repository identity is fixed per fixture; resolve it once instead of on every record read.
@@ -326,7 +329,7 @@ test('provider ping introducing a binding never switches an unbound dispatch sil
 });
 
 test('invalid source execution blocks Python create before mutation and preserves record',async t=>{
- const f=await fixture(t);await f.dispatch();const r=sourceRecord(f);f.bus.emit('subagents:completed',{id:'agent-1'});
+ const f=await stateFixture(t,false);await f.dispatch();const r=sourceRecord(f);f.bus.emit('subagents:completed',{id:'agent-1'});
  const name=new URL('../lib/source-executions.ts',import.meta.url);const {sourceExecutionFile}=await import(name.href);const file=sourceExecutionFile(r);
  for(const raw of ['null',JSON.stringify({...r,ownerPid:0}),JSON.stringify({...r,version:true}),JSON.stringify({...r,taskDir:'.trellis/tasks/wrong'})]) {
   writeFileSync(file,raw);await assert.rejects(f.run({confirm:false}));assert.equal(readFileSync(file,'utf8'),raw);assert.equal(readBinding(f.root,f.task),undefined);
@@ -358,7 +361,7 @@ test('source shutdown queues under reservation lock without overwriting a newer 
  await new Promise(resolve=>setTimeout(resolve,60));assert.equal(sourceRecord(f).requestId,'new-request');assert.equal(sourceRecord(f).state,'running');
 });
 test('Python source decoder matches UTF16 astral and escaped surrogate bounds',async t=>{
- const f=await fixture(t);await f.dispatch();const r=sourceRecord(f);f.bus.emit('subagents:completed',{id:'agent-1'});
+ const f=await stateFixture(t,false);await f.dispatch();const r=sourceRecord(f);f.bus.emit('subagents:completed',{id:'agent-1'});
  const {sourceExecutionFile,readSourceExecution}=await import('../lib/source-executions.ts');const file=sourceExecutionFile(r);
  for(const value of ['😀'.repeat(129),'\ud800'.repeat(257)]) {
   writeFileSync(file,JSON.stringify({...r,state:'completed',requestId:value}));assert.throws(()=>readSourceExecution(r));await assert.rejects(f.run({confirm:false}),/identifier/);
