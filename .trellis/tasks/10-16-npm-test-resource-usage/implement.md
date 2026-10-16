@@ -59,6 +59,22 @@ Node v24.14.1、10 可用核、既有 SDK、每组临时 agent-dir。12 个模�
 
 原始日志、每组命令/采样、临时 driver 在 owned `/tmp/pi-test-modules-xFAq9i/`，本轮完成无未诊断测试失败，可按 owned 范围清理。未改产品代码，没有安装/真实 provider/终端执行；采样是诊断，不证明自然退出（模块运行保留全量 force-exit）。下一批优化范围尚未批准。
 
+## 第三批（用户已批准实施）
+
+S8：T1/T2，将 50 个 manifest schema 变体集中到纯 validateManifest，保留 runtime/template/skill 三类 malformed manifest 的 verifyRuntime/inspect/plan 无写入集成；删除 init-review 重复字段矩阵，保留独有 recovery 与 safe update。focused 两文件自然退出后提交。
+S9：T3/T5，apply-template 改用现有 initialized copy fixture；initialization/manifest 两处 snapshot 提到循环外，全部原业务断言保留。focused 三文件后提交。
+S10：T4，readiness 六种输入复用一次 unprepared worktree，各次真实 prepare 失败均检查记录/target 不变。focused worktree-cli 后提交。
+S11：串行 Trellis timed suite、typecheck 和 full npm test；保留原日志于 owned /tmp/pi-test-b3-WL4YqR，记录失败/重跑/CPU 与墙钟。主会话实施、自审，不派发，无安装/生产变更/归档。
+
+## 第三批验收结果
+
+- S8 commit `ff2167c`：50 schema 变体改纯 validateManifest，增加 null runtime source/extra template 两种集中覆盖；保留 runtime/template/skill 三组真实链路拒绝。移除 init-review 12 个重复集成用例，集中新增 5 项（2 字段 + 3 集成），净减少 7 测试。focused 85/85 PASS、exit 0，自然退出 20.47 s。
+- S9 commit `ab71833`：apply-template 的约 22 次 fresh initialization 改一次模板构建/独立复制；两处 O(N²) snapshot 提到循环外。focused 100/100 PASS、exit 0，自然退出 27.64 s。
+- S10 commit `5a0de56`：六个 readiness 变体共用一次 create，每次真实 prepare 拒绝新增 binding 文件 byte-for-byte 不变断言；移除无用 imports。focused worktree-cli 15/15 PASS、exit 0，自然退出 26.29 s。
+- S11：现有 Node v24.14.1/SDK 1.3.0、临时 agent-dir。`/usr/bin/time -l node --test --test-concurrency=8 --test-force-exit extensions/trellis/__tests__/*.test.mjs` exit 0，全部通过、无 fail/cancelled/skipped；wall 69.91 s，user 214.58 s、sys 135.49 s，CPU 350.07 s。此前相同并发模块观察 wall 85.67 s、CPU 421.20 s；本次分别少 15.76 s（18.4%）和 71.13 CPU s（16.9%），不同运行环境/缓存非严格 A/B，仅陈述观察差。
+- `pnpm run typecheck` exit 0；`/usr/bin/time -l npm test` exit 0、1543/1543 PASS、78 suites、无 fail/cancelled/skipped。wall 90.38 s，user 307.88 s、sys 165.20 s，CPU 473.08 s。第二批 full wall 106.91 s、CPU 539.69 s，观察减少 16.53 s（15.5%）、66.61 CPU s（12.3%）。CPU平均仍约 5.23 核，没有采样真实峰值，不声称满载解决。
+- 保留所有批准范围内 schema 变体及模板/prepare 业务断言；明确减少逐字段完整 inspect/plan 重复覆盖，不修改生产实现、不改并发/glob、不安装。self-review 与各阶段 `git diff --check` PASS；无测试 FAIL。日志位于 owned `/tmp/pi-test-b3-WL4YqR`，结果已核对后清理；其他会话文件不纳入提交。任务继续 in_progress、不归档。
+
 ## 阶段与提交检查点
 
 1. **S1 调度与 GC 精简**：package test 并发 8、两处 Trellis 内层并发移除；删除三组 GC 用例和专用 driver；更新测试规范过时的 GC 要求。检查三组 editor/owner 和两组 Trellis 测试、静态配置/glob，然后提交。
