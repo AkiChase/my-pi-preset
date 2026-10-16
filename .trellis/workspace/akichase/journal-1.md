@@ -835,3 +835,34 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Next Steps
 
 - 其他任务负责整仓契约整合；诊断日志因未解决失败保留于 /tmp/at-path-stale.LG8Neq/，未清理。
+
+
+## Session 27: 运行任务工具拆分与 Monitor 契约收尾
+<!-- trellis-session: v=2 fp=91e8ce1c31b62a9d -->
+
+**Date**: 2026-10-16
+**Task**: 运行任务工具拆分与 Monitor 契约收尾
+**Branch**: `main`
+
+### Summary
+
+完成 process_manage/agent_manage 拆分、执行句柄及公共标题迁移，规范 Monitor 输入和成组指导；用户验收后归档，保留并行改动。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `af02794` | feat(tasks): split process and agent management with execution handles |
+| `79a60fc` | feat(monitor): document grouped usage and validate direct inputs |
+
+### Testing
+
+- [OK] 最终 pnpm check 类型通过，1539/1539 PASS；自然退出 S1 635/635、S2 490/490 PASS。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 评估 subagent_run、subagent_message、subagent_workflow 的整体参数、成组说明和返回契约；尚未批准下一任务实施。

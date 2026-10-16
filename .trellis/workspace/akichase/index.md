@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 26
+- **Total Sessions**: 27
 - **Last Active**: 2026-10-16
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~837 | Active |
+| `journal-1.md` | ~868 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 27 | 2026-10-16 | 运行任务工具拆分与 Monitor 契约收尾 | `af02794`, `79a60fc` | `main` |
 | 26 | 2026-10-16 | 修复 @ 路径补全过期候选并收尾 | `fce686b`, `dbc5751` | `main` |
 | 25 | 2026-10-16 | 内置 widget 统一展示层完成 | `24f15e2`, `e710dd7`, `8841a56`, `61e8032`, `47503d6`, `aadfb14` | `main` |
 | 24 | 2026-10-16 | Bash 工具契约规范化与最终验证 | `dab5ee3`, `5e47ef8`, `feb01d1` | `main` |
