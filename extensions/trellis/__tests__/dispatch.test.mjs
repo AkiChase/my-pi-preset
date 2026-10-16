@@ -243,22 +243,23 @@ test('live source changes dispatch directly without refresh or task copies',asyn
  await f.dispatch();const record=readExecution(c.binding);assert.equal(record.materialRevision,record.sourceFingerprint);assert.equal(record.targetFingerprint.length,64);
  assert.doesNotMatch(f.replies[0].prompt,/approved update|trellis-hook-injected/);assert.match(f.replies[0].prompt,/Trellis authority:/);
 });
-test('target stale spec and missing task are ignored, source paths remain authoritative and target Git is unchanged',async t=>{
+test('target stale spec and task identity cannot override source authority or change target Git',async t=>{
  const f=await readyFixture(t),c=f.prepared;
  writeFileSync(join(c.binding.worktreePath,'.trellis/spec/spec.md'),'OLD target material');
- rmSync(join(c.binding.worktreePath,f.task),{recursive:true,force:true});
+ mkdirSync(join(c.binding.worktreePath,f.task),{recursive:true});
+ writeFileSync(join(c.binding.worktreePath,f.task,'task.json'),'{"status":"planning","id":"another-task"}');
  const targetGit=()=>execFileSync('git',['-C',c.binding.worktreePath,'status','--porcelain'],{encoding:'utf8'});
  const before=targetGit();await f.dispatch();assert.equal(targetGit(),before);
  const {parseDispatchFacts}=await import('../lib/task-context.ts');const facts=parseDispatchFacts(f.replies[0].prompt);
  assert.equal(facts.taskPath,join(f.root,f.task));assert.equal(facts.references[0].path,join(f.root,'.trellis/spec/spec.md'));
- assert.equal(readFileSync(facts.references[0].path,'utf8'),'BASE target spec');assert.doesNotMatch(f.replies[0].prompt,/OLD target material/);
-});
-
-test('target-only task identity cannot override source for any managed role',async t=>{
- const f=await readyFixture(t),c=f.prepared;
- mkdirSync(join(c.binding.worktreePath,f.task),{recursive:true});writeFileSync(join(c.binding.worktreePath,f.task,'task.json'),'{"status":"planning","id":"another-task"}');
- for(const role of ['trellis-implement','trellis-check','trellis-research']){await f.dispatch(role);f.bus.emit('subagents:completed',{id:'agent-'+f.replies.length});}
- assert.equal(f.replies.length,3);
+ assert.equal(readFileSync(facts.references[0].path,'utf8'),'BASE target spec');assert.doesNotMatch(f.replies[0].prompt,/OLD target material|another-task/);
+ f.bus.emit('subagents:completed',{id:'agent-1'});
+ rmSync(join(c.binding.worktreePath,f.task),{recursive:true});
+ const withoutTarget=await queryWorktree(f.root,f.task,true,undefined,true,'implement');
+ assert.equal(withoutTarget.materials.state,'valid');
+ assert.equal(withoutTarget.materials.taskPath,facts.taskPath);
+ assert.equal(withoutTarget.materials.sourceFingerprint,readExecution(c.binding).sourceFingerprint);
+ assert.ok(!existsSync(join(c.binding.worktreePath,f.task)));
 });
 
 test('supported source/target release mismatch rejects before provider ping/spawn or target CLI execution',async t=>{
