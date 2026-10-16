@@ -3,6 +3,8 @@ import type { TaskView } from "../task-ui/types.ts";
 
 export const TASK_TYPES = ["bash", "monitor", "subagent", "workflow"] as const;
 export const TASK_ACTIONS = ["list", "status", "output", "wait", "stop", "search", "stats"] as const;
+/** Only these own searchable logs; the schema and the target check share it. */
+export const TASK_LOG_TYPES = ["bash", "monitor"] as const;
 export type RuntimeTaskType = typeof TASK_TYPES[number];
 export type RuntimeTaskAction = typeof TASK_ACTIONS[number];
 export interface RuntimeTaskParams {

@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isRuntimeTaskMetadata, taskResult, validateRuntimeTaskParams, validateTargetOptions } from "../contracts.ts";
+import { validateToolArguments } from "@earendil-works/pi-ai";
+import { TASK_ACTIONS, isRuntimeTaskMetadata, taskResult, validateRuntimeTaskParams, validateTargetOptions, type RuntimeTaskAction } from "../contracts.ts";
 import { createRuntimeTaskFacade, runtimeTaskTool, type RuntimeTaskCapability } from "../facade.ts";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { TaskView } from "../../task-ui/types.ts";
@@ -34,27 +35,69 @@ test("offset/limit/context must be integers when the host validator is bypassed"
   assert.equal(validateRuntimeTaskParams({ action: "output", task_id: "x", offset: 0, limit: 1 }), undefined);
 });
 
-test("the registered task_manage schema is closed and rejects fractional values", () => {
+/** Field sets the model-visible union exposes per action, mirroring `allowed`. */
+const actionFields: Record<RuntimeTaskAction, readonly string[]> = {
+  list: ["action", "task_type"], status: ["action", "task_id", "run_id"],
+  output: ["action", "task_id", "run_id", "offset", "limit", "verbose"],
+  wait: ["action", "task_id", "run_id", "limit", "verbose"],
+  stop: ["action", "task_id", "run_id"],
+  search: ["action", "task_id", "run_id", "task_type", "pattern", "ignore_case", "context"],
+  stats: ["action", "task_type"],
+};
+/** A targeted action cannot omit task_id; a global search may omit it. */
+const requiredFields: Record<RuntimeTaskAction, readonly string[]> = {
+  list: ["action"], status: ["action", "task_id"], output: ["action", "task_id"],
+  wait: ["action", "task_id"], stop: ["action", "task_id"], search: ["action", "pattern"], stats: ["action"],
+};
+
+test("the registered task_manage schema is a closed per-action union", () => {
   const capability: RuntimeTaskCapability = {
     list: () => [],
     execute: async () => taskResult("x", { action: "output" }),
   };
   const tool = runtimeTaskTool(createRuntimeTaskFacade([capability]));
   const schema = JSON.parse(JSON.stringify(tool.parameters)) as {
-    additionalProperties?: unknown;
-    properties: Record<string, { type?: unknown; minimum?: unknown; multipleOf?: unknown; description?: unknown }>;
+    anyOf: { required?: string[]; additionalProperties?: unknown; properties: Record<string, { const?: unknown; type?: unknown; minimum?: unknown; multipleOf?: unknown; description?: unknown }> }[];
   };
-  // Closed so a typo like `limt` cannot reach the facade as a silently ignored key.
-  assert.equal(schema.additionalProperties, false);
-  for (const key of ["offset", "limit", "context"]) {
+  const branches = new Map(schema.anyOf.map(branch => [String(branch.properties.action!.const), branch]));
+  assert.deepEqual([...branches.keys()].sort(), [...TASK_ACTIONS].sort());
+  for (const [action, fields] of Object.entries(actionFields)) {
+    const branch = branches.get(action)!;
+    // Closed per branch, so a typo like `limt` cannot reach the facade as a
+    // silently ignored key even though the union shares one top level.
+    assert.equal(branch.additionalProperties, false, `${action} branch must be closed`);
+    // A `list` caller is no longer shown `pattern`/`verbose`, and a targeted
+    // action cannot omit its task_id.
+    assert.deepEqual(Object.keys(branch.properties).sort(), [...fields].sort(), `${action} fields`);
+    assert.deepEqual(branch.required, requiredFields[action as RuntimeTaskAction], `${action} required`);
+  }
+  const paged = branches.get("output")!.properties;
+  for (const key of ["offset", "limit"]) {
     // Type.Integer triggers host truncation; number + multipleOf preserves the
     // original fraction until validation rejects it.
-    assert.equal(schema.properties[key]!.type, "number");
-    assert.equal(schema.properties[key]!.multipleOf, 1);
-    assert.equal(typeof schema.properties[key]!.description, "string");
+    assert.equal(paged[key]!.type, "number");
+    assert.equal(paged[key]!.multipleOf, 1);
+    assert.equal(typeof paged[key]!.description, "string");
   }
-  assert.equal(schema.properties.limit!.minimum, 1, "limit 0 would return nothing to a caller that asked for output");
-  assert.equal(schema.properties.offset!.minimum, 0);
+  assert.equal(paged.limit!.minimum, 1, "limit 0 would return nothing to a caller that asked for output");
+  assert.equal(paged.offset!.minimum, 0);
+  const context = branches.get("search")!.properties.context!;
+  assert.equal(context.type, "number");
+  assert.equal(context.multipleOf, 1);
+  assert.equal(context.minimum, 0);
+});
+
+test("the union schema refuses fields an action does not accept", () => {
+  const tool = runtimeTaskTool(createRuntimeTaskFacade([{ list: () => [], execute: async () => taskResult("x", { action: "output" }) }]));
+  const validate = (args: Record<string, unknown>) => validateToolArguments(tool, { type: "toolCall", id: "call", name: tool.name, arguments: args } as never);
+  for (const args of [
+    { action: "list", pattern: "x" }, { action: "list", verbose: false }, { action: "stats", task_id: "x" },
+    { action: "status", task_id: "x", offset: 0 }, { action: "output", task_id: "x", pattern: "x" },
+    { action: "wait" }, { action: "search" }, { action: "stop" }, { action: "search", pattern: "x", task_type: "subagent" },
+  ]) assert.throws(() => validate(args), error => error instanceof Error && /additional properties|required propert/.test(error.message), JSON.stringify(args));
+  assert.deepEqual(validate({ action: "list" }), { action: "list" });
+  assert.deepEqual(validate({ action: "output", task_id: "x", offset: 0, limit: 1, verbose: false }), { action: "output", task_id: "x", offset: 0, limit: 1, verbose: false });
+  assert.deepEqual(validate({ action: "search", pattern: "x", task_type: "monitor", context: 2, ignore_case: true }), { action: "search", pattern: "x", task_type: "monitor", context: 2, ignore_case: true });
 });
 
 test("versioned public metadata rejects foreign envelopes and invalid ranges", () => {
