@@ -62,11 +62,11 @@ async function sdkHarness(t: TestContext, options: { initial?: boolean; automati
     const notices: string[] = []; const widgets: unknown[] = [];
     const selections: (string | undefined | Promise<string | undefined>)[] = [];
     const inputs: (string | undefined)[] = [];
-    const titles: string[] = []; const placeholders: string[] = [];
+    const titles: string[] = []; const placeholders: string[] = []; const menus: string[][] = [];
     let currentWidget: Component | undefined;
     let onWidget: (() => void) | undefined; let onDispose: (() => void) | undefined;
     const sinkTheme = { fg: (_color: string, text: string) => text } as unknown as Theme;
-    const ui = { notify: (text: string) => { notices.push(text); }, select: async (title: string) => { titles.push(title); return await selections.shift(); },
+    const ui = { notify: (text: string) => { notices.push(text); }, select: async (title: string, options: string[]) => { titles.push(title); menus.push(options); return await selections.shift(); },
         input: async (_title: string, placeholder: string) => { placeholders.push(placeholder); return inputs.shift(); },
         setWidget: (_key: string, content: Parameters<ExtensionUIContext["setWidget"]>[1]) => {
             widgets.push(content);
@@ -84,7 +84,7 @@ async function sdkHarness(t: TestContext, options: { initial?: boolean; automati
     const services = { cwd: directory, agentDir: directory, modelRuntime: runtime, settingsManager: settings, resourceLoader: loader, diagnostics: [] };
     const sessionRuntime = new AgentSessionRuntime(session, services, async () => { throw new Error("Unexpected session replacement"); });
     t.after(async () => { await sessionRuntime.dispose(); await flush(); rmSync(directory, { recursive: true, force: true }); });
-    return { directory, clock, calls, recapStreams, manager, session, sessionRuntime, events, notices, widgets, selections, inputs, titles, placeholders, get ctx() { return ctx; },
+    return { directory, clock, calls, recapStreams, manager, session, sessionRuntime, events, notices, widgets, selections, inputs, titles, placeholders, menus, get ctx() { return ctx; },
         get currentWidget() { return currentWidget; }, setOnWidget(value: (() => void) | undefined) { onWidget = value; }, setOnDispose(value: (() => void) | undefined) { onDispose = value; },
         setGate(value: Promise<void> | undefined) { mainGate = value; }, setException(value: Error | undefined) { recapException = value; }, setReason(value: AssistantMessage["stopReason"]) { mainReason = value; },
         finishRecap(index = recapStreams.length - 1, message = reply("Actual recap")) { const stream = recapStreams[index]; const value = { ...message, provider: "recap-sdk", model: "fixture" };
@@ -265,14 +265,14 @@ it("actual SDK namespace context_edit invalidates in-flight result and qualified
     h.finishRecap(); await command;
     assert.equal(h.manager.getBranch().filter(entry => entry.type === "custom" && entry.customType === STATE_TYPE).length, 0);
 });
-it("actual SDK config titles/issues/placeholders are single-line bounded and invalid model controls never reach requests", async t => {
+it("actual SDK config titles/issues/model labels are single-line bounded and invalid model controls never reach requests", async t => {
     const h = await sdkHarness(t, { initial: true, automatic: false, rpc: true, config: { model: "recap-sdk/fixture\x1b]0;unsafe\x07\u202e" } });
     await h.session.prompt("/recap config"); await h.session.prompt("/recap"); assert.equal(h.recapStreams.length, 0);
     const long = "recap-sdk/" + "😀".repeat(1000);
     writeFileSync(join(h.directory, "recap.json"), JSON.stringify({ model: long, thinking: "off", automatic: false }));
-    h.selections.push("Set model"); h.inputs.push(undefined); await h.session.prompt("/recap config");
-    for (const text of [...h.titles, ...h.placeholders]) { assert.doesNotMatch(text, /[\x00-\x1f\x7f-\x9f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u); assert.ok(Array.from(text).length <= 800); }
-    assert.ok(Array.from(h.placeholders.at(-1)!).length <= 160); assert.match(h.placeholders.at(-1)!, /…$/);
+    h.selections.push("Set model", undefined); await h.session.prompt("/recap config");
+    for (const text of [...h.titles, ...h.menus.flat()]) { assert.doesNotMatch(text, /[\x00-\x1f\x7f-\x9f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u); assert.ok(Array.from(text).length <= 800); }
+    assert.equal(h.placeholders.length, 0); assert.match(h.titles.at(-2)!, /…/);
     assert.equal(JSON.parse(readFileSync(join(h.directory, "recap.json"), "utf8")).model, long);
 });
 it("actual SDK EISDIR append leaves history intact but unconfirmed recap cannot be restored or auto-reused in this activation", async t => {
@@ -295,10 +295,25 @@ it("actual SDK EISDIR append leaves history intact but unconfirmed recap cannot 
     const manual = h.session.prompt("/recap"); await flush(); assert.equal(h.recapStreams.length, 3); h.finishRecap(2, reply("confirmed refresh")); await manual;
     assert.match(h.currentWidget!.render(120).join("\n"), /confirmed refresh/);
 });
+it("actual SDK model menu links missing thinking atomically and filters supported levels", async t => {
+    const h = await sdkHarness(t, { rpc: true, automatic: false, config: { thinking: null, unknown: true } });
+    const path = join(h.directory, "recap.json"); const before = readFileSync(path, "utf8");
+    const selection = deferred<string | undefined>();
+    h.selections.push("Set model", "2. recap-sdk/next", selection.promise);
+    const command = h.session.prompt("/recap config"); await flush();
+    assert.deepEqual(h.menus[1], ["1. recap-sdk/fixture", "2. recap-sdk/next"]);
+    assert.deepEqual(h.menus[2], ["off", "low", "medium", "high"]);
+    assert.equal(readFileSync(path, "utf8"), before); assert.equal(h.placeholders.length, 0);
+    selection.resolve("off"); await command;
+    assert.deepEqual(JSON.parse(readFileSync(path, "utf8")), { model: "recap-sdk/next", thinking: "off", automatic: false, unknown: true });
+    await h.session.prompt("goal"); const manual = h.session.prompt("/recap"); await flush();
+    assert.equal(h.calls.at(-1)!.model, "next"); assert.equal(h.calls.at(-1)!.options?.reasoning, undefined); h.finishRecap(); await manual;
+});
+
 it("actual SDK sequential explicit refresh consumes new configured model while concurrent commands fence older request", async t => {
     const h = await sdkHarness(t, { initial: true, automatic: false, rpc: true });
     const first = h.session.prompt("/recap"); await flush(); h.finishRecap(); await first;
-    h.selections.push("Set model"); h.inputs.push("recap-sdk/next"); await h.session.prompt("/recap config");
+    h.selections.push("Set model", "2. recap-sdk/next"); await h.session.prompt("/recap config");
     const second = h.session.prompt("/recap"); await flush(); assert.equal(h.calls.at(-1)!.model, "next");
     const third = h.session.prompt("/recap"); await flush(); assert.equal(h.recapStreams.length, 3); assert.equal(h.calls.filter(call => call.kind === "recap")[1].options?.signal?.aborted, true);
     h.finishRecap(1, reply("stale replaced")); h.finishRecap(2, reply("explicit latest")); await Promise.all([second, third]);

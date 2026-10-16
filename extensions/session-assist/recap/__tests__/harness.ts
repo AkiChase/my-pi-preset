@@ -35,6 +35,7 @@ export function harness(t: TestContext, options: { initial?: boolean; config?: R
     const clock = new FakeClock();
     const notices: string[] = [];
     const widgets: (unknown | undefined)[] = [];
+    const menus: { title: string; options: string[] }[] = [];
     const selections: (string | undefined | Promise<string | undefined>)[] = [];
     const inputs: (string | undefined | Promise<string | undefined>)[] = [];
     const requests: { context: { systemPrompt?: string; messages: UserMessage[] }; options: { reasoning?: string; signal?: AbortSignal; timeoutMs?: number }; resolve: (value: AssistantMessage) => void; reject: (error: Error) => void }[] = [];
@@ -48,8 +49,10 @@ export function harness(t: TestContext, options: { initial?: boolean; config?: R
         registerCommand(name: string, command: RegisteredCommand) { commands.set(name, command); },
         appendEntry(name: string, data: unknown) { manager.appendCustomEntry(name, data); onAppend?.(); },
     } as unknown as ExtensionAPI;
+    const models = [model];
     const registry = {
-        find(provider: string, id: string) { return available && provider === model.provider && id === model.id ? model : undefined; },
+        getAvailable() { return available && auth ? models : []; },
+        find(provider: string, id: string) { return available ? models.find(model => provider === model.provider && id === model.id) : undefined; },
         hasConfiguredAuth() { return auth; },
         streamSimple(_model: unknown, context: { systemPrompt?: string; messages: UserMessage[] }, options: { signal?: AbortSignal; reasoning?: string; timeoutMs?: number }) {
             const d = deferred<AssistantMessage>(); requests.push({ context, options, resolve: d.resolve, reject: d.reject }); return { result: () => d.promise };
@@ -58,12 +61,12 @@ export function harness(t: TestContext, options: { initial?: boolean; config?: R
     const ctx = { sessionManager: manager, model, modelRegistry: registry, mode: options.mode ?? "tui", hasUI: options.hasUI ?? true,
         isIdle: () => idle, hasPendingMessages: () => pending, waitForIdle: () => wait,
         ui: { notify(text: string) { notices.push(text); }, setWidget(_key: string, content: unknown) { widgets.push(content); onWidget?.(); },
-            select: async () => await selections.shift(), input: async () => await inputs.shift() },
+            select: async (title: string, options: string[]) => { menus.push({ title, options }); return await selections.shift(); }, input: async () => await inputs.shift() },
     } as unknown as ExtensionCommandContext;
     register(pi, { clock, directory: () => directory });
     const emit = async (name: string, event: Record<string, unknown> = {}) => { for (const handler of handlers.get(name) ?? []) await handler({ type: name, ...event } as ExtensionEvent, ctx); };
     t.after(async () => { await emit("session_shutdown"); await flush(); rmSync(directory, { recursive: true, force: true }); });
-    return { directory, manager, clock, requests, notices, widgets, selections, inputs, ctx, emit, model,
+    return { directory, manager, clock, requests, notices, widgets, selections, inputs, menus, models, ctx, emit, model,
         start: () => emit("session_start"), command: (args = "") => commands.get("recap")!.handler(args, ctx),
         async user(text = "修复目标") { await emit("input", { text, source: "interactive" }); manager.appendMessage({ role: "user", content: text, timestamp: 1 }); },
         async run() { idle = false; await emit("before_agent_start"); await emit("agent_start"); },

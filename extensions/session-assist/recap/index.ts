@@ -3,7 +3,8 @@ import { getAgentDir, type ExtensionAPI, type ExtensionCommandContext, type Exte
 import { Text } from "@earendil-works/pi-tui";
 import { failureDetail } from "../shared/errors.ts";
 import { generateText, RequestCancelled } from "../shared/request.ts";
-import { DEFAULTS, loadConfig, resolveModel, saveConfig, THINKING_LEVELS, type ConfigState, type RecapConfig } from "./config.ts";
+import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
+import { DEFAULTS, loadConfig, parseConfig, resolveModel, saveConfig, type ConfigState, type RecapConfig } from "./config.ts";
 import { buildMaterial, type Material } from "../shared/material.ts";
 import { cleanText, OUTPUT_LIMIT, readRecap, RECAP_PROMPT } from "./output.ts";
 
@@ -262,18 +263,43 @@ export default function registerRecap(pi: ExtensionAPI, dependencies: RecapDepen
             const choice = await ctx.ui.select(display(`Recap (model ${display(c.model ?? "missing")}, thinking ${display(c.thinking ?? "missing")}, automatic ${display(c.automatic)}, idle ${display(c.idleMinutes)}m, budget ${display(c.maxContextChars)})${issues.length ? ` — ${issues.map(issue => display(issue)).join("; ")}` : ""}`, 800),
                 ["Set model", "Set thinking", "Toggle automatic", "Set idle minutes", "Set context budget"], { signal: controller.signal });
             if (!choice || !admitted()) return;
+            if (!["Set model", "Set thinking", "Toggle automatic", "Set idle minutes", "Set context budget"].includes(choice)) throw new Error("Unknown Recap configuration choice");
             const patch: Partial<RecapConfig> = {};
             if (choice === "Toggle automatic") patch.automatic = !c.automatic;
-            else if (choice === "Set thinking") {
-                const raw = await ctx.ui.select("Explicit Recap thinking level", THINKING_LEVELS, { signal: controller.signal });
-                if (!raw || !admitted()) return;
-                patch.thinking = raw as RecapConfig["thinking"];
+            else if (choice === "Set model" || choice === "Set thinking") {
+                const models = ctx.modelRegistry.getAvailable().filter(model => model.input.includes("text") &&
+                    ctx.modelRegistry.hasConfiguredAuth(model) && parseConfig({ model: `${model.provider}/${model.id}`, thinking: "off" }).config.model)
+                    .sort((a, b) => `${a.provider}/${a.id}`.localeCompare(`${b.provider}/${b.id}`));
+                let selected = models.find(model => `${model.provider}/${model.id}` === c.model);
+                if (choice === "Set model") {
+                    if (!models.length) { notify(ctx, "No authenticated text models available for Recap; configure a provider first. File unchanged.", "warning"); return; }
+                    // Numbered, bounded labels remain unique even when long identifiers are truncated.
+                    const labels = models.map((model, index) => `${index + 1}. ${display(`${model.provider}/${model.id}`, 760)}`);
+                    const raw = await ctx.ui.select("Recap model (authenticated text models)", labels, { signal: controller.signal });
+                    if (raw === undefined || !admitted()) return;
+                    const index = labels.indexOf(raw);
+                    if (index < 0) throw new Error("Unknown Recap model selection");
+                    selected = models[index];
+                    patch.model = `${selected.provider}/${selected.id}`;
+                }
+                if (!selected) { notify(ctx, "Select an available Recap model with Set model before choosing thinking. File unchanged.", "warning"); return; }
+                const levels = getSupportedThinkingLevels(selected);
+                if (choice === "Set thinking" || c.thinking === undefined || !levels.includes(c.thinking)) {
+                    const raw = await ctx.ui.select(display(`Recap thinking for ${selected.provider}/${selected.id}`, 800), levels, { signal: controller.signal });
+                    if (raw === undefined || !admitted()) return;
+                    const level = levels.find(level => level === raw);
+                    if (level === undefined) throw new Error("Unsupported Recap thinking selection");
+                    patch.thinking = level;
+                }
+                // Registry/auth may change while the dialog is open. Never save an unavailable selection.
+                const resolved = resolveModel(parseConfig({ ...c, ...patch }), ctx.modelRegistry);
+                if (!resolved.model.input.includes("text")) throw new Error("Recap model no longer supports text input");
             } else {
-                const key = choice === "Set model" ? "model" : choice === "Set idle minutes" ? "idleMinutes" : "maxContextChars";
-                const raw = await ctx.ui.input(key === "model" ? "Recap model (provider/model-id)" : key === "idleMinutes" ? "Idle minutes (0.01–1440)" : "Context characters (256–1000000)", display(c[key] ?? ""), { signal: controller.signal });
+                const key = choice === "Set idle minutes" ? "idleMinutes" : "maxContextChars";
+                const raw = await ctx.ui.input(key === "idleMinutes" ? "Idle minutes (0.01–1440)" : "Context characters (256–1000000)", display(c[key]), { signal: controller.signal });
                 if (raw === undefined || !admitted()) return;
                 if (!raw.trim()) throw new Error(`${key} cannot be empty`);
-                if (key === "model") patch.model = raw; else patch[key] = Number(raw);
+                patch[key] = Number(raw);
             }
             if (!admitted()) return;
             config = saveConfig(patch, directory(), admitted);
