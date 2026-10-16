@@ -45,6 +45,7 @@
 
 ## 实施与验证记录
 
+- 阶段提交：`fce686b`（`fix(at-path-completion): reject stale attachment candidates before applying`），仅包含两处代码/测试及本 PRD；其他并行修改未暂存或提交。
 - 主会话实施并自审，仅修改 `extensions/at-path-completion/provider.ts` 与现有 `completion.test.ts`。无 Agent、SDK 修改或新测试入口。
 - 候选 WeakMap 增加查询文本/光标快照；只有当前 lease 记录的 attachment 候选接受前校验，其他 provider 委托不变。拒绝过期候选返回原文本/光标，复用从既有目录续补提取的 `scheduleSuggestions()`；它完整保留 pending identity、generation、焦点/overlay、文本/光标和列表关闭校验。
 - 正常接受不比较 generation，避免把 Tab 本身视为过期。原生 no-op 接受仍通知一次 onChange，回归显式确认文本/光标不变、没有 submit；不改写 SDK undo 状态。
