@@ -764,3 +764,38 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Next Steps
 
 - 其他工具后续按共同接入规范改造
+
+
+## Session 25: 内置 widget 统一展示层完成
+<!-- trellis-session: v=2 fp=536715eab51ccb4a -->
+
+**Date**: 2026-10-16
+**Task**: 内置 widget 统一展示层完成
+**Branch**: `main`
+
+### Summary
+
+共享展示owner完成，Recap/Trellis/转后台提示全部迁移，内部slot稳定排序；项目dev/testing规范已按用户要求精简。两阶段独立检查后提交，任务已验收归档。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `24f15e2` | feat(widget-display): add session-scoped shared widget owner |
+| `e710dd7` | chore: separate parallel bash spec changes from widget stage |
+| `8841a56` | feat(widget-display): migrate all built-in widgets to stable slots |
+| `61e8032` | chore(task): record widget migration verification checkpoint |
+| `47503d6` | docs(spec): simplify shared widget integration rules |
+| `aadfb14` | chore(task): archive 10-16-builtin-display-layer |
+
+### Testing
+
+- [OK] 最终main focused 168/168自然退出；pnpm check类型与全量1567/1567通过；独立review通过。保留首次fixture/启动顺序/并发启动等待失败与重跑事实。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 真实终端视觉与线上模型质量未实测；未执行个人reload/install/push。第三方widget相对整个组合的顺序不受控制。
