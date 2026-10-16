@@ -606,3 +606,25 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 - 邻仓 tests/task-browser-ui.test.mjs:870 的 SIGKILL 需另行定性（疑似环境/宿主，非本次改动）
 - pi-trellis 迁入本仓时需带上提交 596955a
 - NOT_RUN：在线模型质量、真实 PTY、个人配置写与 install/sync/reload
+
+
+## Session 20: 将 pi-trellis 内置到预设
+<!-- trellis-session: v=2 fp=82bd111e8315284e -->
+
+**Date**: 2026-10-16
+**Task**: 将 pi-trellis 内置到预设
+**Branch**: `main`
+
+### Summary
+
+把独立 pi-trellis 迁入 extensions/trellis/；/trellis-init 将 9 个技能部署到项目 .pi/skills（schema 3 manifest，不自动 reload，运行时检查只严格校验脚本）；抽出共享 extensions/shared/scroll-panel（布局加载与滚轮）；用户文档与英文开发规范定稿。tmux 真机实测发现任务浏览器在打包版 Pi CLI 中无法定位 pi-tui，已修复并实测通过；修正测试继承宿主 TRELLIS_CONTEXT_ID 的隔离问题。pnpm check 1507/1507。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9b09a6a` | fix(shared): load native layout under the bundled Pi CLI; isolate Trellis tests from host context |
+
+### Status
+
+[OK] **Completed**
