@@ -88,6 +88,25 @@ S13 commit `5a253d6`：active/start/developer 输入矩阵迁真实 Python handl
 S14 Node v24.14.1/SDK 1.3.0、临时 agent-dir，`pnpm run typecheck` exit 0；`/usr/bin/time -l npm test` exit 0、1543/1543 PASS、78 suites、0 fail/cancelled/skipped。wall 84.78 s、user 297.21 s、sys 162.77 s，CPU 459.98 s。第三批 full 90.38 s、CPU 473.08 s，本次观察少 5.60 s/13.10 CPU s；不同轮次非严格 A/B，平均仍约 5.43 核，不声称 CPU 峰值/满载解决。
 所有阶段 self-review 与 git diff --check PASS，无生产 runtime/哈希/接口变化，不安装/派发/归档。Python unit 默认通过 python-worktree.test.mjs 进入同一全量入口，无新测试分层。未发生测试 FAIL；迁移时一处 JS 文本拼写在执行测试前检查修正，不属于产品失败。owned 日志 /tmp/pi-test-b4-CkSCGD 在最终核对后清理，其他会话变更未提交。
 
+## 第五批（用户已批准实施；完成后继续只读审查下一批）
+
+S15：agent-context-integration identity 五字段逐例真实集成降为 bindingId 一个代表；worktree.test 增加直接 sameIdentity 全部 immutable 字段/双方比较与 mutable 状态不影响断言，parseBinding schema 使用构造记录，不 git init/create。仅改这两个测试和本任务材料；真实 Git/index/删除/symlink 安全集成不变。主会话直接实施和自审，不派发；focused 自然退出后立即提交。然后审 dispatch 重复原生 query 的实际目标，不自动扩大实施范围。
+
+此前 owned /tmp/pi-test-critical-xMwjgJ 两次全量诊断 exit 1（80.84/84.78 s）：1345 tests、42 fail，工具返回 task_id/run_id→agent_id/execution_id 及 task_manage→agent_manage/process_manage 断言不匹配；第二次恢复 PI_SDK_DIR 后仍复现，对应其他任务的在途契约修改，不按环境问题掩盖、不修复范围外文件。Trellis 全部通过。同期两套件插桩 63/63 PASS：dispatch query-worktree 157 次/30.54 s，context 93 次/22.23 s；Node readFile 444.28/825.20 MiB，0.71/1.09 s（不含 Python/Git/copy，非物理吞吐），复制 3.10/0.86 s。identity 五字段内存实验 baseline 14.36 s/9.82 CPU s、只留 bindingId 4.65 s/3.69 CPU s，均 PASS，但不是最终 coverage 替代验收。S15 输出 /tmp/pi-test-b5-qV005p。
+
+## 第五批结果与下一批诊断
+
+S15 `ccbbb73`：identity 五字段集成→bindingId 一个真实 child 替换 + sameIdentity 十个 immutable 字段双向对象断言，mutable state/lastError 不影响；schema test 不再创建 Git。`/usr/bin/time -l node --test --test-concurrency=8 extensions/trellis/__tests__/agent-context-integration.test.mjs extensions/trellis/__tests__/worktree.test.mjs` 临时 agent-dir、exit 0、40/40 PASS、无 fail/skipped/cancelled，自然退出 25.21 s/26.36 CPU s。选中文件 diff 和 staged diff check PASS；全仓 diff check 报范围外 extensions/runtime-tasks/facade.ts EOF 空行，未修改。未重跑在途工具契约的全量/typecheck，不声称全量验收。
+
+下一批只读证据：完整读取 subagent-rpc.ts，成功 managed dispatch 本身需 six query subprocess（plain、task、两轮 supportedRelease 各额外 plain+role），单 query 又派生多个 Git。仓库外 TRELLIS_PYTHON wrapper 追踪 subprocess.run：首次 wrapper 不支持 -B -c，初始化探针失败、35/35 FAIL（夹具连锁失败）；修正为 -c passthrough 后 rerun 35/35 PASS，自然退出 37.02 s。成功轮与首轮 trace 中 query 合计174次、16.49 s，其中945次Git/13.89 s，rev-parse 542次/8.10 s、worktree 271次/4.03 s、check-ignore与ls-files各66次/约0.9 s。计时包含等待，非纯CPU；比此前157次多，是拦截了同步调用与capture，不与此前直接相减。主要放大在每次原生查询重复 Git 身份，不是Python启动本身或Node文件读取。
+
+N6候选（未批准）：dispatch 的 custom-role/target-pointer、multiline prose 两项用现有 stateFixture；真实role文件检查/target pointer 文件/产品query parser保持，固定原生facts意味着不再证明原生query忽略target pointer。已有target task absent/source authority真实基线保留。内存对照两项 baseline5.19s/4.31CPU s→optimized3.36s/3.08CPU s，均2/2 PASS，包括首次capture成本；整suite可摊薄capture但收益不保证。
+N7候选（未批准）：将 target-only task identity 三角色重复dispatch 与 target stale spec/missing task 无Git改动合成一个真实source-authority集成；角色隔离由 selected-role isolation 回归负责，research无manifest由Python source_materials unit负责。不保留每个角色重跑six queries的重复接线，明确减少集成组合覆盖。
+N8候选（未批准）：check snapshot case 用stateFixture产生真实execution/finalSnapshot，仅保留native status当前→修改→stale验证；不是mock snapshot/status。Python decoder与invalid lease矩阵的seed dispatch用stateFixture(t,false)，其后实际Python拒绝/无写入保持真实。降低无关setup dispatch成本而不模拟所测CLI。
+N9候选（未批准）：child普通source session/header/key隔离用现有mockPython与真实一次envelope捕获，保留managed replacement/symlink/target-runtime/source-drift端到端；需要逐个读完整source handler边界与测试后才给清单。暂不改生产query的重复Git，也不盲目整套memfs。
+
+/tmp/pi-test-b5-qV005p 材料核对后清理；此前 /tmp/pi-test-critical-xMwjgJ 留存并行契约失败诊断，未解决范围外失败、不删所需材料。
+
 ## 阶段与提交检查点
 
 1. **S1 调度与 GC 精简**：package test 并发 8、两处 Trellis 内层并发移除；删除三组 GC 用例和专用 driver；更新测试规范过时的 GC 要求。检查三组 editor/owner 和两组 Trellis 测试、静态配置/glob，然后提交。
