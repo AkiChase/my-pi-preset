@@ -6,11 +6,11 @@
 
 ## 单一可验证阶段与提交点
 
-- [ ] 实施前完整重读 relevant source/callers/tests，检查 staged/unstaged/untracked 平行改动；目前相关产品文件没有 `git status --short extensions/trellis` 输出。
-- [ ] 在 diagnostics owner 中增加一致的分类/排序、紧凑/详细有界报告快照与英文 outcome；不改变采集和执行权限。
-- [ ] 注册主题化 custom message renderer，并仅将菜单 Check 改为 display=true 消息发布。
-- [ ] 补齐状态组合、紧凑/展开、遗漏/清理、消息回退及发布回归；保持既有 read-only 和 lifecycle 检查。
-- [ ] 自审实际 diff，执行下述检查并记录结果/首次失败原因；检查通过后立即作该阶段的 scoped 本地提交，不推送、不归档。
+- [x] 实施前完整重读 relevant source/callers/tests，检查 staged/unstaged/untracked 平行改动；实施前相关产品文件没有 `git status --short extensions/trellis` 输出。
+- [x] 在 diagnostics owner 中增加一致的分类/排序、紧凑/详细有界报告快照与英文 outcome；不改变采集和执行权限。
+- [x] 注册主题化 custom message renderer，并仅将菜单 Check 改为 display=true 消息发布。
+- [x] 补齐状态组合、紧凑/展开、遗漏/清理、消息回退及发布回归；保持既有 read-only 和 lifecycle 检查。
+- [x] 自审实际 diff，执行下述检查并记录结果/首次失败原因；检查通过后已作 scoped 本地提交，未推送。
 
 ## 检查命令
 
@@ -31,7 +31,7 @@ git diff --check
 
 ## 执行记录
 
-实施已完成：六类状态分组、英文 outcome、有界 compact/expanded 快照、消息区 theme renderer、纯文本回退及命令发布；检查结果及提交点待记录。
+实施已完成：六类状态分组、英文 outcome、有界 compact/expanded 快照、消息区 theme renderer、纯文本回退及命令发布；检查结果及提交点见下文。
 
 首次失败事实：
 - 首轮 focused 诊断测试 56/57 通过，唯一失败为旧标题 `Checks completed` 断言；实际 consumer/provenance 检查成功。仅更新新标题预期，保留只读/安全断言。
@@ -64,4 +64,4 @@ git diff --check
 
 stage 已验收并提交 `c36f6ee`（`feat(trellis): show structured themed Check reports in messages`）：产品、测试与本任务最小规划/验证材料，无 research/evidence 报告。首次提交前 staged diff 检查发现 implement.md 多余 EOF 空行，修复后提交成功，没有失败的 Git commit。
 
-所有本次进程已结束且原始材料已核实；已仅清理本次拥有的 `/tmp/trellis-report-UJJzGW/`，删除后不存在的检查通过，保留此处自包含验证记录。任务保持 in_progress 等用户体验验收；未授权 archive/push。
+所有本次进程已结束且原始材料已核实；已仅清理本次拥有的 `/tmp/trellis-report-UJJzGW/`，删除后不存在的检查通过，保留此处自包含验证记录。用户在交付后明确要求“收尾吧”，已接受本次工作并授权归档和 journal 记录。视觉验证限制保持不变，不推送、不部署。本任务直接在 main 完成且从未使用 PR/独立 feature branch；保留真实 branch/base_branch 元数据，归档使用 CLI 明确支持的 `--skip-branch-validation`（非 PR 任务），不伪造分支。
