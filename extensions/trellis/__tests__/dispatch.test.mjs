@@ -13,6 +13,8 @@ import { readExecution } from '../lib/executions.ts';
 import { apply, plan } from '../lib/initialization/engine.ts';
 import { readSourceExecution } from '../lib/source-executions.ts';
 import { readBinding } from '../lib/bindings.ts';
+import { queryWorktree } from '../lib/worktree-query.ts';
+import { mockPython } from './runtime-fixture.mjs';
 
 // Build the initialized Git/Trellis project once and copy it per case.
 // Cases run serially; the root test runner owns file-level concurrency.
@@ -80,6 +82,34 @@ async function readyFixture(t) {
  const binding=readBinding(f.root,f.task);assert.equal(binding.preparationState,'ready');assert.equal(binding.sourceRoot,f.root);
  return Object.assign(f,{prepared:{binding}});
 }
+const queryTemplates=new Map();
+// Only RPC/state tests use captured native facts. Files, locks, snapshots and
+// execution records remain real; drift/security tests never call this helper.
+async function stateFixture(t, managed=true) {
+ const template=managed?await preparedTemplate():sourceTemplate();
+ const f=managed?await readyFixture(t):await fixture(t);
+ const capture=async(task,role)=>{
+  const key=`${managed}:${task??''}:${role??''}`;
+  if(!queryTemplates.has(key))queryTemplates.set(key,JSON.stringify(await queryWorktree(template,task,false,undefined,false,role)));
+  const escape=path=>JSON.stringify(path).slice(1,-1);
+  return queryTemplates.get(key).replaceAll(escape(template),escape(f.root));
+ };
+ const plain=await capture(), selected=await capture(TASK);
+ const roles={};for(const role of ['implement','check'])roles[role]=await capture(TASK,role);
+ let queries=0;
+ mockPython(t,f.root,args=>{
+  if(!args.some(arg=>arg.endsWith('/query-worktree.py')))return;
+  queries++;
+  const role=args.includes('--role')?args[args.indexOf('--role')+1]:undefined;
+  const task=args.includes('--task')?args[args.indexOf('--task')+1]:undefined;
+  assert.ok(task===undefined||task===TASK,'state fixture cannot simulate another task');
+  assert.ok(role===undefined||Object.hasOwn(roles,role),'unexpected material role');
+  return {stdout:role?roles[role]:task?selected:plain};
+ });
+ t.after(()=>assert.ok(queries>0,'state test must exercise the query boundary'));
+ return f;
+}
+
 function project(t,scope,root) {
  scope.cwd=root;t.after(()=>rm(root,{recursive:true,force:true}));
  const put=(path,data)=>{mkdirSync(join(root,path,'..'),{recursive:true});writeFileSync(join(root,path),data);};
@@ -114,7 +144,7 @@ test('dispatch requires ready, uses target cwd/off, returns real id and prevents
 });
 
 test('early completed event before RPC reply cannot leave a stale running lease',async t=>{
- const f=await readyFixture(t),c=f.prepared;
+ const f=await stateFixture(t),c=f.prepared;
  f.bus.on('subagents:rpc:spawn',()=>f.bus.emit('subagents:completed',{id:'agent-1'}));
  await f.dispatch();assert.equal(readExecution(c.binding).state,'completed');
 });
@@ -128,7 +158,7 @@ test('check snapshot becomes stale after manual change; terminal event releases 
 });
 
 test('shutdown retains unknown lease instead of claiming a running child stopped',async t=>{
- const f=await readyFixture(t),c=f.prepared;
+ const f=await stateFixture(t),c=f.prepared;
  await f.dispatch();f.handlers.get('session_shutdown')();
  assert.equal(readExecution(c.binding).state,'unknown');
  await assert.rejects(f.dispatch(),/shut down/);
@@ -146,7 +176,7 @@ test('target pointer is not authoritative; incompatible custom role still reject
 
 
 test('dispatch old call shape/optional empty task works; stop requires no agent/prompt and waits for terminal evidence',async t=>{
- const f=await readyFixture(t),c=f.prepared;
+ const f=await stateFixture(t),c=f.prepared;
  const first=await f.call({action:'',task:'',agent:'trellis-implement',prompt:'old shape'});assert.equal(first.details.agentId,'agent-1');
  let stopped;
  f.bus.on('subagents:rpc:stop',params=>{stopped=params;f.bus.emit('subagents:rpc:stop:reply:'+params.requestId,{success:true});});
@@ -166,7 +196,7 @@ test('host rechecks selected source role after ping; invalid source spawns zero'
 });
 
 test('failed/unknown provider stop retains lease; source task and actual host cwd/config remain required',async t=>{
- const f=await readyFixture(t),c=f.prepared;
+ const f=await stateFixture(t),c=f.prepared;
  await assert.rejects(f.call({action:'stop'}),/No known agent id/);
  f.put('.pi/settings.json','{}');await assert.rejects(f.dispatch(),/Persist/);assert.equal(f.replies.length,0);
  f.put('.pi/settings.json',JSON.stringify({extensions:[new URL('../../trellis.ts',import.meta.url).pathname]}));
@@ -179,7 +209,7 @@ test('failed/unknown provider stop retains lease; source task and actual host cw
 
 
 test('spawn failure remains unknown with long-lived host owner instead of releasing ambiguous child',async t=>{
- const f=await readyFixture(t),c=f.prepared;f.failSpawn('ambiguous spawn failed');
+ const f=await stateFixture(t),c=f.prepared;f.failSpawn('ambiguous spawn failed');
  await assert.rejects(f.dispatch(),/ambiguous spawn/);const record=readExecution(c.binding);assert.equal(record.state,'unknown');assert.equal(record.ownerPid,process.pid);assert.equal(record.agentId,undefined);
  await assert.rejects(f.run({action:'recover'}),/still alive/);assert.equal(readExecution(c.binding).state,'unknown');
 });
@@ -199,7 +229,7 @@ print(json.dumps({'current_task':json.loads(p.read_text()),'source':'session:'+o
 });
 
 test('shutdown while spawn reply is pending retains unknown with returned id, never revives running lease',async t=>{
- const f=await readyFixture(t),c=f.prepared;
+ const f=await stateFixture(t),c=f.prepared;
  f.bus.on('subagents:rpc:spawn',()=>f.handlers.get('session_shutdown')());
  await assert.rejects(f.dispatch(),/shut down during spawn/);
  const record=readExecution(c.binding);assert.equal(record.state,'unknown');assert.equal(record.agentId,'agent-1');assert.equal(record.ownerPid,process.pid);
@@ -256,7 +286,7 @@ test('unbound source dispatch uses shared cwd, current materials, no binding and
  f.bus.emit('subagents:completed',{id:'agent-1'});assert.equal(sourceRecord(f).state,'running');
 });
 test('source early terminal, stop and shutdown preserve lifecycle truth',async t=>{
- const f=await fixture(t);f.bus.on('subagents:rpc:spawn',()=>f.bus.emit('subagents:completed',{id:'agent-1'}));
+ const f=await stateFixture(t,false);f.bus.on('subagents:rpc:spawn',()=>f.bus.emit('subagents:completed',{id:'agent-1'}));
  await f.dispatch();assert.equal(sourceRecord(f).state,'completed');
  await f.dispatch();f.bus.on('subagents:rpc:stop',({requestId})=>f.bus.emit('subagents:rpc:stop:reply:'+requestId,{success:true}));
  await f.call({action:'stop'});assert.equal(sourceRecord(f).state,'running');
@@ -268,15 +298,15 @@ test('source dispatch status and lock-time binding changes reject before spawn',
  await assert.rejects(f.dispatch(),/in_progress/);assert.equal(sourceRecord(f),undefined);
 });
 test('source ambiguous startup and shutdown during reply retain unknown',async t=>{
- const f=await fixture(t);f.failSpawn('ambiguous source spawn');await assert.rejects(f.dispatch(),/ambiguous/);assert.equal(sourceRecord(f).state,'unknown');await assert.rejects(f.dispatch(),/running\/unknown/);
+ const f=await stateFixture(t,false);f.failSpawn('ambiguous source spawn');await assert.rejects(f.dispatch(),/ambiguous/);assert.equal(sourceRecord(f).state,'unknown');await assert.rejects(f.dispatch(),/running\/unknown/);
 });
 test('source shutdown inside spawn retains returned real id without reviving lease',async t=>{
- const f=await fixture(t);f.bus.on('subagents:rpc:spawn',()=>f.handlers.get('session_shutdown')());await assert.rejects(f.dispatch(),/shut down during spawn/);
+ const f=await stateFixture(t,false);f.bus.on('subagents:rpc:spawn',()=>f.handlers.get('session_shutdown')());await assert.rejects(f.dispatch(),/shut down during spawn/);
  assert.equal(sourceRecord(f).state,'unknown');assert.equal(sourceRecord(f).agentId,'agent-1');
 });
 
 test('new host can request source stop and reconcile terminal evidence from disk',async t=>{
- const f=await fixture(t);await f.dispatch();f.handlers.get('session_shutdown')();assert.equal(sourceRecord(f).state,'unknown');
+ const f=await stateFixture(t,false);await f.dispatch();f.handlers.get('session_shutdown')();assert.equal(sourceRecord(f).state,'unknown');
  const tools=new Map();registerDispatchTool({events:f.bus,on:()=>{},registerTool:tool=>tools.set(tool.name,tool)},async()=>f.task);
  f.bus.on('subagents:rpc:stop',({requestId,agentId})=>{assert.equal(agentId,'agent-1');f.bus.emit('subagents:rpc:stop:reply:'+requestId,{success:true});});
  await tools.get('trellis_dispatch').execute('new',{action:'stop'},undefined,undefined,{cwd:f.root});assert.equal(sourceRecord(f).state,'unknown');
@@ -304,7 +334,7 @@ test('invalid source execution blocks Python create before mutation and preserve
 });
 
 test('terminal before new host first call reconciles cached evidence despite corrupt neighbor',async t=>{
- const f=await fixture(t);await f.dispatch();f.handlers.get('session_shutdown')();
+ const f=await stateFixture(t,false);await f.dispatch();f.handlers.get('session_shutdown')();
  const tools=new Map();registerDispatchTool({events:f.bus,on:()=>{},registerTool:tool=>tools.set(tool.name,tool)},async()=>f.task);
  f.put('.trellis/.runtime/pi-trellis/source-executions/'+ '0'.repeat(64)+'.json','null');
  f.bus.emit('subagents:completed',{id:'agent-1'});
@@ -313,7 +343,7 @@ test('terminal before new host first call reconciles cached evidence despite cor
  const result=await tools.get('trellis_dispatch').execute('next',{agent:'trellis-check',prompt:'check'},undefined,undefined,{cwd:f.root});assert.equal(result.details.agentId,'agent-2');
 });
 test('source terminal queues under reservation lock and cannot overwrite a newer request',async t=>{
- const f=await fixture(t);await f.dispatch();const record=sourceRecord(f);
+ const f=await stateFixture(t,false);await f.dispatch();const record=sourceRecord(f);
  const {acquireBindingLock}=await import('../lib/bindings.ts');const {writeSourceExecution}=await import('../lib/source-executions.ts');
  const release=acquireBindingLock(f.root);
  f.bus.emit('subagents:completed',{id:'agent-1'});assert.equal(sourceRecord(f).state,'running');
@@ -322,7 +352,7 @@ test('source terminal queues under reservation lock and cannot overwrite a newer
  await new Promise(resolve=>setTimeout(resolve,60));assert.equal(sourceRecord(f).requestId,'new-request');assert.equal(sourceRecord(f).state,'running');
 });
 test('source shutdown queues under reservation lock without overwriting a newer request',async t=>{
- const f=await fixture(t);await f.dispatch();const record=sourceRecord(f);
+ const f=await stateFixture(t,false);await f.dispatch();const record=sourceRecord(f);
  const {acquireBindingLock}=await import('../lib/bindings.ts');const {writeSourceExecution}=await import('../lib/source-executions.ts');const release=acquireBindingLock(f.root);
  f.handlers.get('session_shutdown')();writeSourceExecution({...record,state:'completed'});writeSourceExecution({...record,requestId:'new-request',agentId:'new-agent',state:'running'});release();
  await new Promise(resolve=>setTimeout(resolve,60));assert.equal(sourceRecord(f).requestId,'new-request');assert.equal(sourceRecord(f).state,'running');
