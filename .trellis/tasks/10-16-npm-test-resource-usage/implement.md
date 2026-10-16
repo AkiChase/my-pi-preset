@@ -75,6 +75,19 @@ S11：串行 Trellis timed suite、typecheck 和 full npm test；保留原日志
 - `pnpm run typecheck` exit 0；`/usr/bin/time -l npm test` exit 0、1543/1543 PASS、78 suites、无 fail/cancelled/skipped。wall 90.38 s，user 307.88 s、sys 165.20 s，CPU 473.08 s。第二批 full wall 106.91 s、CPU 539.69 s，观察减少 16.53 s（15.5%）、66.61 CPU s（12.3%）。CPU平均仍约 5.23 核，没有采样真实峰值，不声称满载解决。
 - 保留所有批准范围内 schema 变体及模板/prepare 业务断言；明确减少逐字段完整 inspect/plan 重复覆盖，不修改生产实现、不改并发/glob、不安装。self-review 与各阶段 `git diff --check` PASS；无测试 FAIL。日志位于 owned `/tmp/pi-test-b3-WL4YqR`，结果已核对后清理；其他会话文件不纳入提交。任务继续 in_progress、不归档。
 
+## 第四批（用户已批准实施）
+
+S12 U1/U4：CLI bad-argument 矩阵迁入现有 Python discovery，直接 main(argv) 并断言 manage 未调用；Node 保留 help 与两个错误启动基线。resource-update 复用现有 copyRuntimeFixture。focused Python/CLI/update 后提交。
+S13 U2/U3：非法 active/start identity/record/pointer 和 developer 名称变体迁入 Python unittest，隔离 cwd/env、调用真实 handlers、检查文件/hook 不变；Node 保留真实成功 lifecycle 与坏输入/外部路径/symlink代表基线。focused Python/runtime-contracts 后提交。
+S14：定向自然退出、typecheck、timed 全量串行验收；仓库外 owned /tmp/pi-test-b4-CkSCGD。生产 runtime/哈希/接口不变，无新分层入口，不派发、不安装，任务不归档。
+
+## 第四批验收结果
+
+S12 commit `126e890`：CLI 参数变体迁 Python main(argv)，每次检查 JSON/非零/管理未调用；Node 留 help+两个坏参数部署接线，resource-update 复用初始化模板。focused python-worktree/worktree-cli/resource-update 20/20 PASS、exit 0，自然退出 21.66 s。
+S13 commit `5a253d6`：active/start/developer 输入矩阵迁真实 Python handler 单进程测试，隔离 cwd/env、保留文件与 hooks 保护；Node 留代表变体/成功/外部路径/符号链接。Python unittest discover 37/37 PASS、exit 0、0.366 s；Node python-worktree+runtime-contracts 27/27 PASS、exit 0、自然退出 17.90 s。完整 variant 列表保留，Node 顶层测试数不变，Python discovery 新增 5 tests。
+S14 Node v24.14.1/SDK 1.3.0、临时 agent-dir，`pnpm run typecheck` exit 0；`/usr/bin/time -l npm test` exit 0、1543/1543 PASS、78 suites、0 fail/cancelled/skipped。wall 84.78 s、user 297.21 s、sys 162.77 s，CPU 459.98 s。第三批 full 90.38 s、CPU 473.08 s，本次观察少 5.60 s/13.10 CPU s；不同轮次非严格 A/B，平均仍约 5.43 核，不声称 CPU 峰值/满载解决。
+所有阶段 self-review 与 git diff --check PASS，无生产 runtime/哈希/接口变化，不安装/派发/归档。Python unit 默认通过 python-worktree.test.mjs 进入同一全量入口，无新测试分层。未发生测试 FAIL；迁移时一处 JS 文本拼写在执行测试前检查修正，不属于产品失败。owned 日志 /tmp/pi-test-b4-CkSCGD 在最终核对后清理，其他会话变更未提交。
+
 ## 阶段与提交检查点
 
 1. **S1 调度与 GC 精简**：package test 并发 8、两处 Trellis 内层并发移除；删除三组 GC 用例和专用 driver；更新测试规范过时的 GC 要求。检查三组 editor/owner 和两组 Trellis 测试、静态配置/glob，然后提交。
