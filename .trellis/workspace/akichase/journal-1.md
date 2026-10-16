@@ -623,6 +623,11 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 
 | Hash | Message |
 |------|---------|
+| `84f2335` | docs(trellis): add draft user guide for built-in Trellis |
+| `5776855` | feat(trellis): migrate Trellis into the preset as a built-in extension |
+| `7241df1` | feat(trellis): deploy skills into projects during initialization |
+| `c0c1cff` | refactor(shared): extract native scroll layout and wheel helpers |
+| `bc24fa8` | docs(trellis): ship built-in plugin docs and resource ownership rules |
 | `9b09a6a` | fix(shared): load native layout under the bundled Pi CLI; isolate Trellis tests from host context |
 
 ### Status
