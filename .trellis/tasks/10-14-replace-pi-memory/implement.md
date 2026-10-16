@@ -88,12 +88,17 @@ PI_SDK_DIR="$sdk_dir" PI_CODING_AGENT_DIR="$agent_dir" pnpm check
 ## 5. 本机应用与旧历史清理（有副作用，AC9）
 阶段1–4形成可独立验收的代码交付；本节形成迁移验收。代码完成不等于AC9完成，本机迁移未完成时保持任务未完全验收，不归档。
 代码与独立check通过后单独主会话执行，不派给普通checker：
-- [ ] 再出精确操作清单：个人settings旧包源、目标新入口来源、pi-memory数据条目、确认独占索引残留；不使用全量sync/update改变其他包。
-- [ ] 再核用户批准本机应用动作，不自动reload。卸载通过公开Pi包命令，仅npm:pi-memory；新入口加载按选定来源，不静默install发布版覆盖并行本地代码。
+- [x] 再出精确操作清单：个人settings旧包源、目标新入口来源、pi-memory数据条目、确认独占索引残留；不使用全量sync/update改变其他包。
+- [x] 再核用户批准本机应用动作，不自动reload。卸载通过公开Pi包命令，仅npm:pi-memory；新入口加载按选定来源，不静默install发布版覆盖并行本地代码。
 - [ ] 当前factory仍加载旧pi-memory时不能最终删历史后宣称完成；安排不加载旧包的下一次会话执行清理并确认恢复提示。用户若不重启，明确“代码/配置完成、旧数据删除待重启”，task不当作完全验收。
-- [ ] 在旧插件不再加载后核lstat/归属/清单，只删除根MEMORY.md/SCRATCHPAD.md/daily/recovery中确认旧数据；不递归删memory根、不碰projects/未知条目/symlink。
-- [ ] qmd当前不可用/default目录不存在；执行时若发现共享索引只清已确认独占pi-memory collection，不卸qmd、不删整个数据库。
+- [x] 在旧插件不再加载后核lstat/归属/清单，只删除根MEMORY.md/SCRATCHPAD.md/daily/recovery中确认旧数据；不递归删memory根、不碰projects/未知条目/symlink。
+- [x] qmd当前不可用/default目录不存在；执行时若发现共享索引只清已确认独占pi-memory collection，不卸qmd、不删整个数据库。
 - [ ] 验证旧数据不会重新生成、工具只注册新实现、projects与其他个人配置/Claude/Pi/Trellis保持不变。
+
+### 阶段5执行记录（2026-10-16 10:41）
+- 核查（只读）：`~/.pi/agent/settings.json` packages 已不含 `npm:pi-memory`（此前同步已移除，本次未运行 sync/update/install）；残留仅 pnpm 内部 `npm/node_modules/.ignored/pi-memory` 与 `.pnpm/pi-memory@0.4.2_*`。旧数据：`memory/MEMORY.md` 48K、`memory/daily/` 5 个 `YYYY-MM-DD.md`（10-12…10-16，最后写入 10-16 05:00）、`memory/recovery/` 空；无 `SCRATCHPAD.md`、无 symlink、无未知条目；qmd 未安装、无缓存。
+- 用户以问卷逐项确认后删除上述四项（文件 `rm`、daily `rm -rf`、recovery `rmdir`、两处 pnpm 残留）；删除前再核非 symlink 与 daily 文件名格式。删除后 `memory/` 仅剩 `projects/`（3 个项目目录，未动）。
+- 未完成：本会话启动时是否仍加载旧包无法在会话内证实；需在下一次新会话中确认 `memory/` 下不再出现 `MEMORY.md`/`daily/`，且仅内置 Memory 注册 `memory_*` 工具，之后勾选剩余两项并验收 AC9。
 
 ## 回滚与风险
 - 实现阶段回滚仅本任务hunks，不能git reset/checkout整树。原数据删除前不得偷偷复制正文到恢复库；用户明确清理意味着数据删除不可恢复，清单保留元信息不保留记忆内容。
