@@ -71,8 +71,9 @@ test('preserved clone identity setup/retry retains exact provenance and all proj
  assert.ok(p.actions.every(a => ['identity', 'workspace', 'task'].includes(a.kind)));
  assert.throws(() => apply(p, { afterWrite: () => { throw Error('interrupted identity'); } }), /interrupted/);
  assert.equal(inspect(f.root).state, 'incomplete'); assert.equal(apply(plan(f.root, 'Returning User')).state, 'ready');
- for (const [path, value] of Object.entries(before)) if (path !== '.trellis/.runtime/init-operation.json') assert.equal(f.snapshot()[path], value, path);
- assert.equal(f.snapshot()[missingIndex], undefined);
+ const after = f.snapshot();
+ for (const [path, value] of Object.entries(before)) if (path !== '.trellis/.runtime/init-operation.json') assert.equal(after[path], value, path);
+ assert.equal(after[missingIndex], undefined);
  assert.deepEqual(verifyRuntime(f.root).templates, f.manifest.templates);
  const ready = f.snapshot(); assert.equal(plan(f.root, 'Returning User'), undefined); assert.deepEqual(f.snapshot(), ready);
 });

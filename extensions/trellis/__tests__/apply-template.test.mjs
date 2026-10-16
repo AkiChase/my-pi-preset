@@ -7,8 +7,9 @@ import { tmpdir } from 'node:os';
 import test from 'node:test';
 import { plan, apply, digest, defaultTemplates, verifyRuntime, packageRoot } from '../lib/initialization/engine.ts';
 import { templatePlan, applyTemplatePlan, resourcePlan, applyResourcePlan } from '../lib/initialization/resources.ts';
+import { copyRuntimeFixture } from './runtime-fixture.mjs';
 function fixture(t) {
- const root=mkdtempSync(join(tmpdir(),'pi-template-'));t.after(()=>rmSync(root,{recursive:true,force:true}));apply(plan(root,'Dev'));
+ const root=copyRuntimeFixture(t,{user:'Dev'});
  const put=(p,s)=>{mkdirSync(dirname(join(root,p)),{recursive:true});writeFileSync(join(root,p),s);};
  const snapshot=(dir=root)=>Object.fromEntries(readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name)).flatMap(e=>{const p=join(dir,e.name),rel=p.slice(root.length+1);return e.isDirectory()?[[rel,'directory'],...Object.entries(snapshot(p))]:[[rel,e.isSymbolicLink()?'symlink':`${lstatSync(p).mode&0o777}:${readFileSync(p).toString('base64')}`]];}));
  return {root,put,snapshot};

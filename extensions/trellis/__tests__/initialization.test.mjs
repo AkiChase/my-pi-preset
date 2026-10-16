@@ -32,7 +32,7 @@ test('fresh inspect and complete plan are read-only; apply publishes exact relea
 test('supported clone restores historical workspace and creates join without rewriting runtime or user content; repeat no-op',t=>{
  const f=fixture(t);apply(plan(f.root,'Returning User'));rmSync(join(f.root,'.trellis/.developer'));f.put('.trellis/workspace/Returning User/journal-1.md','history\r\n');f.put('.trellis/workspace/Returning User/index.md','custom index');f.put('.trellis/config.yaml','custom config');f.put('.trellis/workflow.md','custom workflow');
  const before=f.snapshot(),p=plan(f.root,'Returning User');assert.equal(p.operation,'identity');assert.ok(p.workspaceReused);assert.match(p.task,/00-join-returning-user$/);assert.ok(p.actions.every(a=>['identity','workspace','task'].includes(a.kind)));apply(p);
- for(const [path,value] of Object.entries(before))if(path!=='.trellis/.runtime/init-operation.json')assert.equal(f.snapshot()[path],value,path);
+ const after=f.snapshot();for(const [path,value] of Object.entries(before))if(path!=='.trellis/.runtime/init-operation.json')assert.equal(after[path],value,path);
  assert.equal(plan(f.root,'Returning User'),undefined);
  rmSync(join(f.root,'.trellis/.developer'));const reused=plan(f.root,'Returning User');assert.ok(reused.taskReused);apply(reused);
  rmSync(join(f.root,'.trellis/.developer'));mkdirSync(join(f.root,'.trellis/tasks/archive/2000-01'),{recursive:true});cpSync(join(f.root,p.task),join(f.root,'.trellis/tasks/archive/2000-01',p.task.split('/').at(-1)),{recursive:true});rmSync(join(f.root,p.task),{recursive:true});assert.equal(plan(f.root,'Returning User').taskReused,false);
