@@ -133,6 +133,25 @@ void describe("monitor parameter schema", () => {
         assert.equal(h.reg.jobs.size, 0);
     });
 
+    it("rejects unknown and malformed direct arguments before any job admission", async () => {
+        const h = harness();
+        for (const params of [null, [], { command: "true", description: "x", typo: 1 },
+            { command: 7, description: "x" }, { ws: [], description: "x" },
+            { ws: { url: "ws://x", typo: true }, description: "x" },
+            { ws: { url: "ws://x", protocols: [7] }, description: "x" }]) {
+            await assert.rejects(h.tool.execute("bad", params, undefined, undefined, h.ctx));
+        }
+        assert.equal(h.reg.jobs.size, 0); assert.equal(h.reg.totalStarted, 0);
+    });
+
+    it("host rejects non-positive times and preserves valid fractional values", () => {
+        const { tool } = harness();
+        for (const key of ["timeout_ms", "wake_absent_ms"]) {
+            for (const value of [0, -1]) assert.ok(hostError(tool, { command: "true", description: "x", [key]: value }));
+            assert.equal(hostError(tool, { command: "true", description: "x", [key]: 0.5 }), undefined);
+        }
+    });
+
     it("quotes the offending value for an invalid wake/timeout", async () => {
         const h = harness();
         await assert.rejects(

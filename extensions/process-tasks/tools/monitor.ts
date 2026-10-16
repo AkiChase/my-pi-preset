@@ -32,21 +32,21 @@ export function registerMonitorTool(pi: ExtensionAPI, reg: BackgroundRegistry): 
     pi.registerTool({
         name: "monitor",
         label: "monitor",
-        description:
-            "Watch a command or WebSocket with visible, agent-waking batched notifications. " +
-            "Command stdout and stderr are collected together; complete lines are activity. " +
-            "Monitors share one notification cadence (default 30s); first/timely events batch within 200ms (or a smaller configured interval). " +
-            "No implicit timeout; the main command exit ends observation.",
-        promptSnippet: "Watch event streams with batched notifications and optional silence reminders",
+        description: "Start a command or WebSocket observation task with batched event notifications.",
+        promptSnippet: "Observe event streams; manage the returned task through process_manage",
         promptGuidelines: [
-            "For one result when done, use bash run_in_background with a loop that exits; use monitor for event streams.",
-            "Both stdout and stderr are received. command | grep filters stdout only; command 2>&1 | grep filters both streams.",
-            "Flush pipeline stages per line: grep --line-buffered, awk fflush(). A partial command line does not wake the agent.",
-            "Silence is not success. Optional wake_absent_ms reminds once per silence; recovery is timely (within 200ms) and the watch continues.",
-            "No timeout unless timeout_ms is provided. Stop session-length watches via process_manage action='stop'; explicit stop sends no final notification.",
-            "Give a specific description. Read the log for output omitted by bounded previews. stderr content alone is not failure.",
-            "Oversized batches include an omitted-source count and local JSONL manifest path; read it for source metadata/log paths. Manifest save failures are explicit, not automatic retries.",
-            "WebSocket messages, including empty messages, count as activity; progress is batched, not one notification per line.",
+            `Monitor usage:
+  - Use monitor for ongoing event streams and updates; use bash for a finite command or a condition loop that exits with one final result. process_manage manages both tools' tasks.
+  - Provide exactly one source: command or ws. ws requires url and optional protocols in preference order. Provide a specific non-empty description, shown on every notification.
+  - timeout_ms is an optional finite positive total observation deadline in milliseconds; omitted means no deadline. wake_absent_ms is an independent finite positive silence threshold: remind once per silent period, keep observing, and notify when events resume. Silence is not completion or success.
+  - Startup returns task_id and the log path, not a completed result. Events arrive as batched notifications. Use process_manage output/search for logs, wait for observation to end, or stop to end it. Cancelling/releasing wait does not stop observation. Session closure stops owned tasks.
+  - stdout and stderr are both observed; complete lines count as activity, partial lines do not wake the agent. stderr text alone is not failure. command | grep filters stdout only; command 2>&1 | grep filters both. Flush pipeline stages per line with grep --line-buffered or awk fflush().
+  - WebSocket messages, including empty messages, count as activity. Notifications are batched, not one per message/line. Monitors share a ${reg.config.monitorFlushMs}ms cadence; first/timely events batch within min(200ms, configured interval). A zero interval sends source-callback batches without this delay.
+  - Observation ends when the main command/source ends or fails, or the deadline is reached. It does not wait for descendant output after the main shell exits. Terminal reason and pending output are combined; explicit stop/session shutdown is silent, and an already reported result is not notified again.
+  - Notifications are bounded previews. Read omitted output through process_manage or its log path. Oversized batches expose omitted-source counts and a JSONL manifest of source/log metadata; read it to locate omitted sources. Manifest failures are explicit, not automatic retries.
+  - Examples:
+    Command: {"command":"tail -f ./service.log | grep --line-buffered READY","description":"Service readiness events","wake_absent_ms":60000,"timeout_ms":600000}
+    WebSocket: {"ws":{"url":"wss://example.com/events"},"description":"Service events","timeout_ms":600000}`,
         ],
         // Closed at both levels. A misspelled `wake_absent_ms` (say `wake_abscent_ms`)
         // otherwise passed validation and the watch silently ran without the
@@ -70,21 +70,30 @@ export function registerMonitorTool(pi: ExtensionAPI, reg: BackgroundRegistry): 
             ),
             description: Type.String({ description: "Specific description, shown on every notification." }),
             timeout_ms: Type.Optional(
-                Type.Number({ description: "Optional finite positive total deadline in milliseconds. Omitted means no deadline." })
+                Type.Number({ exclusiveMinimum: 0, description: "Optional finite positive total deadline in milliseconds. Omitted means no deadline." })
             ),
             wake_absent_ms: Type.Optional(
-                Type.Number({ description: "Optional finite positive event-arrival silence threshold in milliseconds; remind once, keep watching." })
+                Type.Number({ exclusiveMinimum: 0, description: "Optional finite positive event-arrival silence threshold in milliseconds; remind once, keep watching." })
             ),
         }, { additionalProperties: false }),
 
         async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+            if (!params || typeof params !== "object" || Array.isArray(params)) throw new Error("Monitor arguments must be an object.");
+            for (const key of Object.keys(params)) {
+                if (!["command", "ws", "description", "timeout_ms", "wake_absent_ms"].includes(key)) throw new Error(`Unknown monitor parameter '${key}'.`);
+            }
             const p = params as MonitorParams;
             const mctx = ctx as MonitorCtx;
 
+            if (p.command !== undefined && typeof p.command !== "string") throw new Error("command must be a string.");
+            if (p.ws !== undefined) {
+                if (!p.ws || typeof p.ws !== "object" || Array.isArray(p.ws)) throw new Error("ws must be an object with url and optional protocols.");
+                for (const key of Object.keys(p.ws)) if (!["url", "protocols"].includes(key)) throw new Error(`Unknown ws parameter '${key}'.`);
+                if (p.ws.protocols !== undefined && (!Array.isArray(p.ws.protocols) || p.ws.protocols.some(protocol => typeof protocol !== "string"))) throw new Error("ws.protocols must be an array of strings.");
+            }
             // --- Validation: command XOR ws -------------------------------
             // The dependency is a cross-field rule, so it stays a runtime check
-            // rather than turning the schema into `oneOf` (which the host's strict
-            // schema mode rejects). "Provided" is judged by the raw value: a caller
+            // rather than duplicating object variants in a provider-facing schema. "Provided" is judged by the raw value: a caller
             // that sends `command: ""` meant to pass a command, and saying "provide
             // either" is more useful than a blank-command message about the other
             // source.
