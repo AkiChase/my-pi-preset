@@ -698,3 +698,37 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Next Steps
 
 - 独立规划内置插件统一展示层，目标 Recap 位于 Trellis 上方；未验证真实终端视觉或线上模型质量。
+
+
+## Session 23: Memory 收尾：内置文档、替换 pi-memory、清理与归档
+<!-- trellis-session: v=2 fp=d9cfc3c81dba29ae -->
+
+**Date**: 2026-10-16
+**Task**: Memory 收尾：内置文档、替换 pi-memory、清理与归档
+**Branch**: `main`
+
+### Summary
+
+阶段3只读面板、阶段4 conflicts/文档/冲突回归测试（独立审查纠正同名工具诊断事实）、阶段5删除旧 pi-memory 数据与 pnpm 残留，删除任务目录 52 个原始日志，任务归档。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `dd4b881` | feat(memory): read-only fullscreen /memory browser on the shared scroll panel |
+| `effb05f` | feat(memory): ship Memory as built-in, replace pi-memory via conflicts, add user docs |
+| `f59c66c` | chore(memory): record stage 5 local cleanup of old pi-memory data |
+| `309c259` | chore(memory): close stage 5 and drop raw task logs |
+| `1277c28` | chore(task): archive 10-14-replace-pi-memory |
+
+### Testing
+
+- [OK] focused 73/73; pnpm check 1525/1525（审查修订前）; typecheck 0
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- push 并重新同步 Pi 安装
