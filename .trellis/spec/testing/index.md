@@ -86,9 +86,7 @@ Full natural-exit integration may use `node --test "extensions/**/__tests__/*.te
 
 ## Shared Widget Display Checks
 
-Use `node --test extensions/shared/widget-display/__tests__/*.test.ts scripts/pi-manifest.test.mjs` under temporary agent-dir/existing-SDK isolation without forced exit. Verify actual public bus facades from separate loaded extensions, both load orders, absent owner, independent buses, duplicate leases, manager identity plus session ID, update/withdraw ordering, empty-region removal, RPC text-only and print no-op behavior. Exercise synchronous setter/factory/dispose reentry, late shutdown/session changes, sink exceptions, exact-once disposal and subscription release. Fake UI sinks do not prove real terminal appearance.
-
-Preserve unrelated slot component identity across updates; test narrow/wide Unicode rendering, padding and invalidation. Consumer migration must rerun Recap lifecycle/SDK boundaries, Process Tasks hint/activation/lifecycle and Trellis fake-pi logic tests. Enforce production host `setWidget` calls only inside the shared owner using `extensions/__tests__/widget-display-boundary.test.ts`; there are no consumer exceptions. Run `widget-consumer-activation.test.ts` for both registration orders across initial and later session starts; arbitrary captured-context publication must remain fenced. See [the development contract](../development/widget-display.md).
+Run `node --test extensions/shared/widget-display/__tests__/*.test.ts extensions/__tests__/widget-*.test.ts scripts/pi-manifest.test.mjs` under the isolation rules above. Also run affected consumer tests when changing their integration. The boundary test enforces the [shared widget contract](../development/widget-display.md); detailed scenarios belong in test code. Fake UI sinks do not establish real terminal appearance.
 
 ## Reporting and Documentation Gates
 

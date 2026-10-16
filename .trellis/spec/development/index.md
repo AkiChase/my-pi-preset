@@ -50,7 +50,7 @@ Cancel owned execution and verify actual exit. Bound shutdown waits and report n
 
 ## Editor, UI and Rendering
 
-Built-in editor-region widgets must follow [Shared Widget Display](widget-display.md): register a central slot and use its session-scoped client, never publish host widgets directly. The dedicated owner controls composite ordering and cleanup. Status/header/footer/editor/messages/overlays retain their separate owners; unintegrated third-party widget ordering is not controlled. Recap, Trellis and foreground hints all use this owner; the production source-boundary regression rejects any bypass.
+Built-in editor-region widgets must follow [Shared Widget Display](widget-display.md): declare a central slot and publish through its client, never call host `setWidget` directly. Keep ordering and content ownership within this layer; other UI surfaces and third-party widgets retain their existing owners.
 
 Prefer public `ctx.ui` dialogs and host components; terminal-only screens require TUI mode, not merely dialog-capable RPC. Bind each custom instance to one interaction and finish through its completion callback; do not nest replacement dialogs or manually hide SDK-owned interactions.
 
