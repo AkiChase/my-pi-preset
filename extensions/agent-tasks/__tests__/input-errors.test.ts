@@ -273,6 +273,18 @@ void it("configuration retains boolean and isolation precedence and discloses fa
     assert.match(note, /requested false, effective true/); assert.match(note, /requested "worktree", effective "off"/);
 });
 
+void it("registered workflow rejects sources, removed fields and unsafe args before execution", async () => {
+    const f = await factory();
+    const script = "export const meta = { name: 'x', description: 'x' }; return args;";
+    try {
+        for (const params of [{}, { script, name: "x" }, { scriptPath: "missing", script }, { script: "" }, { script, title: "x" }, { script, description: "x" }, { script, args: { x: undefined } }, { script: script + "\u0000" }, { script: "bad meta" }]) {
+            const result = await f.execute("subagent_workflow", params);
+            assert.equal(result.isError, true);
+            assert.equal(f.coordinator.list().length, 0); assert.equal(f.calls.length, 0);
+        }
+    } finally { await f.close(); }
+});
+
 void it("all five registered fixed schemas reject unknown fields through the host validator", async () => {
     const f = await factory();
     try {

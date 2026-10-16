@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assertAgentToolArguments, assertMessageToolArguments } from "../src/tool-contract.ts";
+import { assertAgentToolArguments, assertMessageToolArguments, assertWorkflowToolArguments } from "../src/tool-contract.ts";
+test("workflow tool sources are exclusive and replay preserves optional source", () => {
+  assert.doesNotThrow(() => assertWorkflowToolArguments({ script: "return args", args: { x: 1 } }));
+  assert.doesNotThrow(() => assertWorkflowToolArguments({ resumeFromRunId: "wf_abcdef" }));
+  assert.doesNotThrow(() => assertWorkflowToolArguments({ resumeFromRunId: "wf_abcdef", name: "review" }));
+  for (const value of [{}, { script: "x", name: "review" }, { scriptPath: "x", name: "review" }, { script: "" }, { name: null }, { script: "x", title: "ignored" }, { script: "x", description: "ignored" }, { resumeFromRunId: "" }]) assert.throws(() => assertWorkflowToolArguments(value));
+});
 const main = { nested: false, isolation: true, scheduling: true };
 const nested = { ...main, nested: true, scheduling: false };
 test("tool admission separates spawn and resume without ignored parameters", () => {

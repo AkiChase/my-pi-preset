@@ -177,16 +177,19 @@ function isWorkflowFile(path: string): boolean {
 /**
  * Resolve which source a `subagent_workflow` call runs.
  *
- * `scriptPath` wins over `script`, which wins over `name` — Claude Code's
- * order — and at least one is required: a call with none is a mistake worth
- * naming rather than an empty run. Lives beside {@link resolveWorkflowSource}
- * because that is the function it defers to once precedence is settled, so the
- * two cannot disagree about what a reference means.
+ * Exactly one source is required. The tool validates replay-without-source
+ * before passing the previous saved path here; script-internal reference
+ * resolution retains its own contract.
  */
 export function resolveWorkflowScript(
   params: { script?: string; scriptPath?: string; name?: string },
   cwd: string,
 ): { ok: true; script: string; scriptPath?: string } | { ok: false; message: string } {
+  const sources = ["script", "scriptPath", "name"] as const;
+  const supplied = sources.filter(field => Object.hasOwn(params, field));
+  if (supplied.length !== 1) return { ok: false, message: "Provide exactly one of script, scriptPath or name." };
+  const field = supplied[0]!;
+  if (typeof params[field] !== "string" || !params[field]!.trim()) return { ok: false, message: `${field} must be a non-empty string.` };
   const path = params.scriptPath?.trim();
   if (path !== undefined && path !== "") {
     const resolved = resolveWorkflowSource({ scriptPath: path }, cwd);
@@ -211,7 +214,7 @@ export function resolveWorkflowScript(
     ok: false,
     message:
       "Provide `script` (inline source), `scriptPath` (a file to read), or `name` (a saved workflow). " +
-      "`scriptPath` takes precedence, then `script`, then `name`." +
+      "Sources are mutually exclusive." +
       (known.length > 0 ? ` Saved workflows: ${known.join(", ")}.` : ""),
   };
 }

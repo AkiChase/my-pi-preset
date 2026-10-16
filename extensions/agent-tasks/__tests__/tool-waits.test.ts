@@ -1084,9 +1084,10 @@ void it("actual workflow launcher and management return full answers, failed sta
     const results = await Promise.all([f.execute("agent_manage", { action: "wait", execution_id: id}), f.execute("agent_manage", { action: "wait", execution_id: id})]);
     assert.ok(results.every(result => text(result).includes("answer".repeat(5000))));
     await pause(260); assert.equal(f.notices.length, 0, "retrieval consumes held workflow notification");
-    const bad = await launch("return args;", { value: 1n });
-    const failed = await f.execute("agent_manage", { action: "wait", execution_id: bad});
-    assert.equal((failed.details as import("../../runtime-tasks/tools.ts").ManagementDetails).runtimeManagement.raw_status, "failed"); assert.match(text(failed), /args|JSON/i);
+    const count = f.coordinator.list().length;
+    const failed = await f.execute("subagent_workflow", { script: script("return args;"), args: { value: 1n } });
+    assert.equal(failed.isError, true); assert.match(text(failed), /args|BigInt/i);
+    assert.equal(f.coordinator.list().length, count, "invalid args must not create a workflow execution");
     const invalid = await f.execute("agent_manage", { action: "output", execution_id: id, limit: 2 });
     assert.equal((invalid as { isError?: boolean }).isError, true);
   } finally { await f.close(); }

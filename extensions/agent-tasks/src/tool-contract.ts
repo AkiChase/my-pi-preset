@@ -28,6 +28,18 @@ export function assertAgentToolArguments(value: unknown, capabilities: AgentTool
   if (Object.hasOwn(params, "schedule") && params.inherit_context === true) throw new Error("Cannot combine schedule with inherit_context.");
 }
 
+export function assertWorkflowToolArguments(value: unknown): asserts value is Record<string, unknown> {
+  const params = assertObject(value);
+  assertFields(params, ["script", "scriptPath", "name", "args", "resumeFromRunId"]);
+  const sources = ["script", "scriptPath", "name"].filter(field => Object.hasOwn(params, field));
+  if (sources.length > 1 || (sources.length === 0 && !Object.hasOwn(params, "resumeFromRunId"))) throw new Error("Provide exactly one of script, scriptPath or name; replay may omit the source.");
+  for (const field of sources) assertNonEmptyString(params[field], `\`${field}\``);
+  if (Object.hasOwn(params, "resumeFromRunId")) {
+    assertNonEmptyString(params.resumeFromRunId, "`resumeFromRunId`");
+    if (!/^wf_[a-z0-9-]{6,}$/.test(String(params.resumeFromRunId))) throw new Error("resumeFromRunId must be a workflow execution ID.");
+  }
+}
+
 export function assertMessageToolArguments(value: unknown): asserts value is Record<string, unknown> {
   const params = assertObject(value);
   assertFields(params, ["agent_id", "message"]);

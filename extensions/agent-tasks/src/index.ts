@@ -79,13 +79,13 @@ import { createWorkflowHost } from "./workflow/host.ts";
 import { appendJournal, readJournal, type WorkflowJournalEntry } from "./workflow/journal.ts";
 import { extractMeta, type WorkflowMeta, workflowCallName } from "./workflow/meta.ts";
 import { elapsedMs } from "./workflow/progress.ts";
-import { runWorkflow } from "./workflow/runtime.ts";
+import { runWorkflow, validateScript, assertBoundarySafe } from "./workflow/runtime.ts";
 import { resolveWorkflowScript } from "./workflow/saved.ts";
 import { completeWorkflowTask, createWorkflowTask, failWorkflowTask, formatWorkflowNotification, resolveResumeTarget, updateWorkflowProgressBatch, type WorkflowTask, workflowResultText, workflowRunId } from "./workflow/task.ts";
 import { fullWorkflowToolDescription } from "./workflow/tool-description.ts";
 import { isWorktreeIsolationEnabled, setWorktreeIsolationEnabled } from "./worktree.ts";
 import { runToolGuidance, messageToolGuidance } from "./tool-guidance.ts";
-import { assertAgentToolArguments, assertMessageToolArguments } from "./tool-contract.ts";
+import { assertAgentToolArguments, assertMessageToolArguments, assertWorkflowToolArguments } from "./tool-contract.ts";
 import { assertNonEmptyString, assertSpawnInput, normalizeAgentDescription, parseSpawnOptions } from "./spawn-input.ts";
 import { escapeXml } from "./xml.ts";
 
@@ -2571,13 +2571,13 @@ Terse command-style prompts produce shallow, generic work.
       scriptPath: Type.Optional(
         Type.String({
           description:
-            "Path to a workflow script file, absolute or relative to the project. Takes precedence over `script` — this is how you re-run an edited workflow.",
+            "Workflow script file path; mutually exclusive with script and name.",
         }),
       ),
       name: Type.Optional(
         Type.String({
           description:
-            "Name of a saved workflow — `<name>.js` in .pi/workflows/, .agents/workflows/ or the user's agent dir. Lowest precedence: `scriptPath` and `script` both win over it.",
+            "Saved workflow name; mutually exclusive with script and scriptPath. Looked up in project .pi/workflows, .agents/workflows and the user's workflow directory.",
         }),
       ),
       args: Type.Optional(
@@ -2592,16 +2592,7 @@ Terse command-style prompts produce shallow, generic work.
             "Run id of an earlier workflow in this session. Its unchanged leading agent() calls return their recorded results instantly; the first changed or failed call, and everything after it, runs live. Same script and args means nothing re-runs.",
         }),
       ),
-      // Accepted and ignored, as in Claude Code. Models reach for them because
-      // every other tool has them, and a hard schema rejection would cost a
-      // whole turn to re-emit a script that was already correct. The `meta`
-      // block is the one place a workflow is named.
-      title: Type.Optional(
-        Type.String({ description: "Ignored — set the workflow title in the script's `meta` block." }),
-      ),
-      description: Type.Optional(
-        Type.String({ description: "Ignored — set the workflow description in the script's `meta` block." }),
-      ),
+
     }, { additionalProperties: false }),
 
     renderCall(args, theme, context) {
@@ -2635,6 +2626,8 @@ Terse command-style prompts produce shallow, generic work.
 
     execute: async (toolCallId, params, _signal, _onUpdate, ctx) => {
       assertActive();
+      try { assertWorkflowToolArguments(params); assertBoundarySafe(params.args, "args"); }
+      catch (err) { return errorResult(err instanceof Error ? err.message : String(err)); }
       const resumeFrom = resolveResumeTarget(params.resumeFromRunId, workflowTasks);
       if (resumeFrom !== undefined && !resumeFrom.ok) return errorResult(resumeFrom.message);
 
@@ -2655,9 +2648,9 @@ Terse command-style prompts produce shallow, generic work.
       // that failed a second later would just cost a turn.
       let meta: WorkflowMeta;
       try {
-        meta = extractMeta(resolved.script).meta;
+        meta = validateScript(resolved.script).meta;
       } catch (err) {
-        return textResult(err instanceof Error ? err.message : String(err));
+        return errorResult(err instanceof Error ? err.message : String(err));
       }
 
       const runId = workflowRunId();
