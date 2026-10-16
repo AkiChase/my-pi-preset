@@ -6,6 +6,22 @@
 
 现有业务行为不变，删除 GC/忙循环专项覆盖，其余通过合并/减重保留断言。不修改 SDK。保留单一全量入口，不新增测试分层。
 
+## 第二批（用户已批准实施）
+
+- S5：dispatch 的 13 个纯 RPC/state 用例使用 stateFixture；按 source/managed 从真实模板捕获 plain/task/implement/check 四类 query envelope，校准临时 root，由已有 mockPython 返回。产品 parser、Git snapshot、runtime 校验、文件/锁/execution 读写保持真实。role/task 之外请求拒绝；native drift、安全和 Python 互通用例不使用该 helper。完整 dispatch focused 后提交。
+- S6：agent context 的 managedChild 复用一次真实 create/prepare 模板，复制后校准 Git links/marker/binding/初始化记录；target 缺 task 的专门集成仍保留原创建流程。复制目录及状态独立，真实 source query 和 binding/symlink/runtime 检查不 mock。两个变更文件自然退出 focused 后提交。
+- S7：typecheck/full npm test 串行验收，记录 time 累计 CPU 和墙钟。使用新 owned 仓库外临时目录，不安装，不改生产接口。之前 full 102.92 s 是参考观察，机器负载不同不能当严格 A/B。保持任务 in_progress，下一轮另确认。
+
+## 第二批验收记录
+
+- S5 已完成，commit `f4b9bad`：13 个 RPC/state 用例切换 captured native query seam；只作用这组 fixture，不模拟其他 CLI。focused `node --test --test-concurrency=8 extensions/trellis/__tests__/dispatch.test.mjs`：35/35 PASS、exit 0、自然退出 41.45 s。
+- S6 已完成，commit `ac2ea7a`：7 个 managedChild 用例共享一次 create/prepare 模板，按用例复制校准 Git/初始化/binding/marker 记录；所有动态身份、symlink、runtime/query 仍真实。focused 两个变更文件：63/63 PASS、exit 0、自然退出 43.22 s；dispatch 42.52 s、agent context 33.75 s（并行，不能相加）。
+- S7 已完成：现有 Node v24.14.1/SDK 1.3.0/临时 agent-dir，`pnpm run typecheck` exit 0；`/usr/bin/time -l npm test` exit 0、1550/1550 PASS、78 suites、无 fail/cancelled/skipped。全量 106.91 s、user 349.22 s、sys 190.47 s，平均累计约 5.05 核；maximum resident set size 600129536 bytes，不是进程树同时 RSS。
+- 全量 reporter dispatch 72.45 s、agent context 60.82 s、sync 18.69 s。相比第一批 full 102.92 s，本轮墙钟没有改善，累计 CPU 547.19→539.69 s 小幅减少但非受控 A/B、不可归因。无峰值采样，不能宣称满载已解决。
+- 检查：两阶段 diff 自审、`git diff --check` PASS；不改生产实现、不删除测试、不改变发现范围/并发。未出现测试 FAIL；本 task 材料单独提交，其他会话未提交变更保留。空 implement/check manifests 是不派发代理的刻意配置，不声称 task validate 完整通过。
+- 原始日志位于本轮 owned `/tmp/pi-test-resource-b2-tYcpP1`，验收后清理本目录。无需持久化原始日志，以上记录独立于临时路径。
+- 第二批完成，继续复用任务，不归档。下一轮目前仅候选：实际资源占用仍主要由大量原生集成/初始化校验叠加造成，需审查其覆盖重复和进程树峰值，不能继续只凭单文件耗时猜测。
+
 ## 阶段与提交检查点
 
 1. **S1 调度与 GC 精简**：package test 并发 8、两处 Trellis 内层并发移除；删除三组 GC 用例和专用 driver；更新测试规范过时的 GC 要求。检查三组 editor/owner 和两组 Trellis 测试、静态配置/glob，然后提交。
