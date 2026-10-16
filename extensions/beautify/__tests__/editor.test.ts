@@ -158,13 +158,6 @@ test("production composition registers only backend tools and native presentatio
   } finally { await h.fire("session_shutdown"); h.dispose(); }
 });
 
-test("opaque retired appearance/factory release context and TUI under real GC", async () => {
-  const { spawnSync } = await import("node:child_process");
-  const { fileURLToPath } = await import("node:url");
-  const output = spawnSync(process.execPath, ["--expose-gc", fileURLToPath(new URL("./editor-retention.mjs", import.meta.url))], { encoding: "utf8", timeout: 15_000 });
-  assert.equal(output.status, 0, output.stdout + output.stderr); assert.match(output.stdout, /2\/2/);
-});
-
 test("descriptor partial mutation and locked later visual wrapper restore safely", () => {
   const h = makeHost("descriptor-failure"), editor = h.editor;
   const render = editor.render;

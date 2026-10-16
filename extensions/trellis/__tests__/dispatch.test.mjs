@@ -14,12 +14,9 @@ import { apply, plan } from '../lib/initialization/engine.ts';
 import { readSourceExecution } from '../lib/source-executions.ts';
 import { readBinding } from '../lib/bindings.ts';
 
-// Speed: the initialized Git/Trellis project is built once and copied per case
-// (each case still owns an independent root, Git repository and runtime state),
-// and cases run concurrently. Dispatch checks the host process cwd, so each case
-// sees its own root through an async-context-scoped process.cwd(); the real
-// process cwd stays on a neutral empty directory. mockPython routes by root,
-// so execFile-mocking cases also run concurrently.
+// Build the initialized Git/Trellis project once and copy it per case.
+// Cases run serially; the root test runner owns file-level concurrency.
+// Keep the scoped cwd and mock routing so each case owns its project state.
 const cases=[];
 const test=(name,fn)=>cases.push({name,fn});
 const cwdScope=new AsyncLocalStorage();
@@ -379,4 +376,4 @@ test('target checkout changes during final native query refuse managed spawn wit
 });
 
 const scoped=fn=>t=>cwdScope.run({},()=>fn(t));
-describe('dispatch (independent copied projects, concurrent)',{concurrency:10},()=>{for(const c of cases)it(c.name,scoped(c.fn));});
+describe('dispatch (independent copied projects)',()=>{for(const c of cases)it(c.name,scoped(c.fn));});

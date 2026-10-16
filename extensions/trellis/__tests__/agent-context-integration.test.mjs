@@ -8,8 +8,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-// Speed: each case owns an independent copied project (copyRuntimeFixture) and
-// the handlers read ctx.cwd, never process.cwd, so cases run concurrently.
+// Each case owns an independent copied project (copyRuntimeFixture).
+// Cases run serially; the root test runner owns file-level concurrency.
 const cases = [];
 const test = (name, fn) => cases.push({ name, fn });
 import trellis, { __internals } from "../index.ts";
@@ -298,4 +298,4 @@ test('nonstandard Git-file checkout rejected by native source identity never fal
  const sections={};await f.handlers.get('before_agent_start')({prompt:'inspect source',systemPromptOptions:{sections}},ctx);assert.deepEqual(sections,{});assert.match(f.messages.at(-1).content,/task_error/);assert.deepEqual(readFileSync(pointer),bytes);
 });
 
-describe('agent context integration (independent copied projects, concurrent)',{concurrency:10},()=>{for(const c of cases)it(c.name,c.fn);});
+describe('agent context integration (independent copied projects)',()=>{for(const c of cases)it(c.name,c.fn);});

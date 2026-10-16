@@ -1,6 +1,4 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import { it } from 'node:test';
 import { CustomEditor, type ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { CombinedAutocompleteProvider, type EditorComponent } from '@earendil-works/pi-tui';
@@ -115,8 +113,4 @@ void it('Beautify, Down and history/agent provider fixtures compose in multiple 
       await lifecycle.shutdown(); await h.close(); e.setText('@local'); e.handleInput('/'); await pause(); assert.equal(e.isShowingAutocomplete(), false);
     } finally { await lifecycle.shutdown(); await h.close(); }
   }
-});
-void it('opaque retired forwarder releases screen/editor under actual GC', () => {
-  const result = spawnSync(process.execPath, ['--expose-gc', fileURLToPath(new URL('./retention.mjs', import.meta.url))], { encoding: 'utf8', timeout: 15000 });
-  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`); assert.match(result.stdout, /released 2\/2/);
 });

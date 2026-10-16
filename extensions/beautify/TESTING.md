@@ -33,7 +33,7 @@ rm -rf "$agent_dir"
 - 实际 Read definition.execute 使用公开 ReadOperations seam，检查参数／execute／guidelines／content／details／structuredContent 保留、只读一次；实际 host imageComponents 检查图片由宿主绘制一次。
 - codeToANSI 使用真实 Shiki one-dark-pro；cache/异步竞态的高成本等待用局部 typed Colorize seam，仍运行真实 Highlighter 与 ReadDrawing。覆盖未知／超限／失败一次诊断、LRU 项数／字符预算、内容／宽度／折叠／关闭竞态和宿主 invalidate 的 ANSI 持续显示。
 - editor harness 调用 actual InteractiveMode setter/reset、CustomEditor/TuiMainScreen；history 为独立 fixture，验证两个历史顺序、两个 Down 顺序及禁用 Down、cold/new/reload、搜索接受／取消、同实例 cursor/undo/history draft/paste/autocomplete/IME marker 与 callbacks/actions。
-- unsupported descriptor、partial host mount/focus 失败检查实际容器／focus／可继续输入；后来的 padding/factory/opaque wrapper 保留；独立 `--expose-gc` 子进程确认 appearance/factory 不保留旧 ctx/TUI，原 Down GC 回归继续执行。
+- unsupported descriptor、partial host mount/focus 失败检查实际容器／focus／可继续输入；后来的 padding/factory/opaque wrapper 保留。GC 专项回收测试已移除，保留功能性关闭与委托回归。
 - 独立审查补回旧 editor 安全矩阵中的 later getter/setter/physical-padding 所有权、padding 写后抛错、handoff 中途 descriptor 失败、重复 captured factory 的单一活跃装饰、Alt+R older/newer/branch priority、later border wrapper/nondelegating render。新增非有限 padding 与物理 padding 接管不吃原文缩进的回归。
 - notice 精确匹配 SDK 1.2.0 的数字/size/续读或组合 search 限制格式，保留文件尾空行；未知或嵌入代码中的同形文本不剥离。工具折叠标题把物理换行显式显示为 `\\n`，展开仍提供原文分行。
 

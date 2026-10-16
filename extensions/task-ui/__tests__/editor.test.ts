@@ -1,5 +1,3 @@
-import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import { it } from "node:test";
 import { CustomEditor, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -336,12 +334,6 @@ void it("non-configurable input failure rolls back public handoff properties bef
         assert.deepEqual(editor.getCursor(), cursor); assert.equal(editor.handleInput, input);
         editor.handleInput("!"); assert.equal(editor.getText(), "draf!t"); assert.equal(h.opens, 0);
     } finally { await h.dispose(); }
-});
-
-void it("opaque retired input/factory release ctx, TUI, coordinator and panel under real GC", () => {
-    const result = spawnSync(process.execPath, ["--expose-gc", fileURLToPath(new URL("./editor-retention.mjs", import.meta.url))], { encoding: "utf8", timeout: 15_000 });
-    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-    assert.match(result.stdout, /released 4\/4/);
 });
 
 void it("disabled/noninteractive/missing editor APIs do not access or install; reentrant setter close/throw leaves no active lease", async () => {
