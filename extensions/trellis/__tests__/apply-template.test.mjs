@@ -5,7 +5,7 @@ import { syncBuiltinESMExports } from 'node:module';
 import { join, dirname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
-import { plan, apply, digest, defaultTemplates, verifyRuntime, packageRoot } from '../lib/initialization/engine.ts';
+import { digest, defaultTemplates, verifyRuntime, packageRoot } from '../lib/initialization/engine.ts';
 import { templatePlan, applyTemplatePlan, resourcePlan, applyResourcePlan } from '../lib/initialization/resources.ts';
 import { copyRuntimeFixture } from './runtime-fixture.mjs';
 function fixture(t) {

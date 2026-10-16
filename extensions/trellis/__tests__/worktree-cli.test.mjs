@@ -92,12 +92,19 @@ test('Python and host v2 binding/execution/lock interoperate without nested quer
 
 test('readiness rejects empty/seed JSONL, invalid UTF-8/NUL, escaped/symlinked/directory refs and preserves target',t=>{
  const cases=[['',/No valid/],['{"reason":"seed"}',/No valid/],['{"file":"../../outside"}',/leaves|traversal/],['{"file":".trellis/tasks/native/research"}',/declare type/],['{"file":".trellis/tasks/native/research/binary"}',/UTF|utf|Binary/],['{"file":".trellis/tasks/native/research/link"}',/Symlink/]];
+ const f=fixture(t);
+ f.put(f.task+'/research/binary',Buffer.from([0xff,0x00]));f.put('external-file','outside');
+ const link=join(f.root,f.task,'research/link');symlinkSync(join(f.root,'external-file'),link);
+ const b=f.ok('create',['--confirm']).binding;
  for(const [manifest,expected] of cases){
-  const f=fixture(t);f.put(f.task+'/research/binary',Buffer.from([0xff,0x00]));f.put('external-file','outside');symlinkSync(join(f.root,'external-file'),join(f.root,f.task,'research/link'));
-  // Only the explicit top-level source task-store route allows external material.
-  if(expected.source==='Symlink'){rmSync(join(f.root,f.task,'research/link'));symlinkSync('/etc/hosts',join(f.root,f.task,'research/link'));}
-  f.put(f.task+'/implement.jsonl',manifest);const b=f.ok('create',['--confirm']).binding;
-  const r=f.run('prepare',['--confirm']);assert.notEqual(r.status,0);assert.match(r.stderr,expected);assert.ok(!existsSync(join(b.worktreePath,f.task)));assert.equal(readBinding(f.root,f.task).preparationState,'unprepared');
+  // Every failed prepare must leave the same unprepared binding untouched.
+  // Restore the input link before changing only this variant's manifest.
+  rmSync(link);symlinkSync(expected.source==='Symlink'?'/etc/hosts':join(f.root,'external-file'),link);
+  f.put(f.task+'/implement.jsonl',manifest);
+  const before=readFileSync(bindingFile(f.root,f.task));
+  const r=f.run('prepare',['--confirm']);assert.notEqual(r.status,0);assert.match(r.stderr,expected);
+  assert.deepEqual(readFileSync(bindingFile(f.root,f.task)),before);
+  assert.ok(!existsSync(join(b.worktreePath,f.task)));assert.equal(readBinding(f.root,f.task).preparationState,'unprepared');
  }
 });
 
