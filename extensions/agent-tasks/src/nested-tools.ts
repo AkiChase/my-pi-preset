@@ -19,7 +19,8 @@ import {
 import { loadCustomAgents } from "./custom-agents.ts";
 import { formatInvocationOverrideNote, isolationParam, resolveAgentInvocationConfig, thinkingParam } from "./invocation-config.ts";
 import { describeModel, resolveModel } from "./model-resolver.ts";
-import { assertNonEmptyString, assertResumeOptions } from "./spawn-input.ts";
+import { runToolGuidance, messageToolGuidance } from "./tool-guidance.ts";
+import { assertAgentToolArguments, assertMessageToolArguments } from "./tool-contract.ts";
 import { checkModelScope } from "./model-scope.ts";
 import {
   createOutputFilePath,
@@ -168,10 +169,12 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
     description:
       "Launch a child-safe nested subagent for bounded delegated work. " +
       "Only use agent types allowed by this parent agent; nesting is depth-limited.",
+    promptSnippet: "Start or resume an owned nested agent",
+    promptGuidelines: runToolGuidance({ nested: true, backgroundByDefault: false, isolation: isWorktreeIsolationEnabled(), scheduling: false, agentTypes: availableIn(loadRegistry()).join(", ") || "none" }),
     parameters: Type.Object({
       prompt: Type.String({ description: "Self-contained task for the nested agent." }),
-      description: Type.String({ description: "Short 3-5 word task description." }),
-      subagent_type: Type.String({ description: `Allowed nested agent type. Available: ${availableIn(loadRegistry()).join(", ") || "none"}.` }),
+      description: Type.Optional(Type.String({ description: "Required for new agents only: short task description." })),
+      subagent_type: Type.Optional(Type.String({ description: `Required for new agents only. Allowed types: ${availableIn(loadRegistry()).join(", ") || "none"}.` })),
       model: Type.Optional(Type.String({ description: "Optional provider/model override." })),
       // Same enum as the top-level tool, from the same source: a typo here would
       // otherwise be cast straight to a ThinkingLevel and quietly do nothing.
@@ -181,16 +184,14 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
           description: "Defaults to false for nested spawns — the call blocks and returns the child's result inline. Set true only for work you will collect later with agent_manage; a detached child is stopped when you finish.",
         }),
       ),
-      resume: Type.Optional(Type.String({ description: "Resume a nested agent owned by this parent." })),
+      resume: Type.Optional(Type.String({ description: "Real agent_id of a finished owned child; only resume and prompt are accepted, and execution waits inline." })),
       isolated: Type.Optional(Type.Boolean()),
       inherit_context: Type.Optional(Type.Boolean()),
       ...isolationParam(isWorktreeIsolationEnabled()),
     }, { additionalProperties: false }),
     execute: async (_toolCallId, params, signal, _onUpdate, ctx) => {
       try {
-        assertNonEmptyString(params.prompt, "`prompt`");
-        assertNonEmptyString(params.description, "`description`");
-        assertResumeOptions(params);
+        assertAgentToolArguments(params, { nested: true, isolation: isWorktreeIsolationEnabled(), scheduling: false });
       } catch (err) {
         return errorResult(err instanceof Error ? err.message : String(err));
       }
@@ -199,11 +200,12 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
         if (!ownsRecord(existing, context.parentAgentId)) {
           return textResult(`Nested agent not found or not owned by this parent: "${params.resume}".`, true);
         }
+        if (existing.status === "running" || existing.status === "queued") return errorResult("Nested agent is still active; wait or send a message instead.");
         const resumed = await context.manager.resume(params.resume, params.prompt, signal);
         return resumed
           ? (() => {
             const identity = launchMetadata("subagent", resumed.id, resumed.runId ?? "1", "foreground");
-            return { ...textResult(`${launchText(identity)}\n${formatInvocationOverrideNote(resumed.invocation)}${formatRecord(resumed, "inline")}`, resumed.status === "error"), details: { runtimeLaunch: identity } };
+            return { ...textResult(`${launchText(identity)}\n${formatRecord(resumed, "inline")}`, resumed.status === "error"), details: { runtimeLaunch: identity } };
           })()
           : textResult(`Failed to resume nested agent "${params.resume}".`, true);
       }
@@ -217,7 +219,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
 
       // Reloaded per call so new agent files are picked up without a restart.
       const registry = loadRegistry();
-      const rawType = params.subagent_type;
+      const rawType = params.subagent_type!;
       // Strict resolve, never the fallback policy: a project-level
       // `fallbackSubagent` must not hand a nested caller an agent its allowlist
       // never named. The list stays allowlist-filtered so a typo can't enumerate
@@ -286,6 +288,10 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
         thinking: invocation.thinking,
         requestedThinking: invocation.overridden?.thinking,
         requestedModel: askedModel,
+        requestedRunInBackground: invocation.overridden?.runInBackground,
+        requestedInheritContext: invocation.overridden?.inheritContext,
+        requestedIsolated: invocation.overridden?.isolated,
+        requestedIsolation: invocation.overridden?.isolation,
         maxTurns: invocation.maxTurns,
         isolated: invocation.isolated,
         inheritContext: invocation.inheritContext,
@@ -295,7 +301,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
       const overrideNoteFor = (record: AgentRecord | undefined) =>
         formatInvocationOverrideNote(record?.invocation ?? agentInvocation);
       const options: NestedSpawnOptions = {
-        description: params.description,
+        description: params.description!,
         model,
         maxTurns: invocation.maxTurns,
         isolated: invocation.isolated,
@@ -400,12 +406,14 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
     name: NESTED_TOOL_NAMES[1],
     label: "subagent_message",
     description: "Send guidance to a running nested agent owned by this parent.",
+    promptSnippet: "Send additional guidance to a running owned child",
+    promptGuidelines: messageToolGuidance(),
     parameters: Type.Object({
       agent_id: Type.String(),
       message: Type.String({ minLength: 1, description: "Non-blank guidance for the running nested agent." }),
     }, { additionalProperties: false }),
     execute: async (_toolCallId, params) => {
-      try { assertNonEmptyString(params.message, "`message`"); }
+      try { assertMessageToolArguments(params); }
       catch (err) { return errorResult(err instanceof Error ? err.message : String(err)); }
       const record = context.manager.getRecord(params.agent_id);
       if (!ownsRecord(record, context.parentAgentId) || record.status !== "running") {
@@ -416,14 +424,14 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
       if (!record.session) {
         if (!record.pendingSteers) record.pendingSteers = [];
         record.pendingSteers.push(params.message);
-        return textResult(`Steering message queued for nested agent ${params.agent_id}.`);
+        return textResult(`Steering message queued for nested agent ${params.agent_id}; processing is not confirmed.`);
       }
       try {
         await record.session.steer(params.message);
       } catch (err) {
         return textResult(`Failed to steer nested agent: ${err instanceof Error ? err.message : String(err)}`, true);
       }
-      return textResult(`Steering message sent to nested agent ${params.agent_id}.`);
+      return textResult(`Steering message sent to nested agent ${params.agent_id}; reading or processing is not confirmed.`);
     },
   });
 

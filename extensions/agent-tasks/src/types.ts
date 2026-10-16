@@ -293,6 +293,10 @@ export interface AgentInvocation {
    */
   requestedThinking?: EffectiveThinkingLevel;
   /** The caller's `model` parameter, as written, when an agent file's pin won. */
+  requestedRunInBackground?: boolean;
+  requestedInheritContext?: boolean;
+  requestedIsolated?: boolean;
+  requestedIsolation?: IsolationMode;
   requestedModel?: string;
   maxTurns?: number;
   isolated?: boolean;

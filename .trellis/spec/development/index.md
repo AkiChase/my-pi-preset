@@ -40,6 +40,10 @@ When overriding a built-in tool, explicitly replace its description/snippet/guid
 7. **Wrong vs correct:** wrong: treat a foreground waiting threshold as a kill deadline or interpret launch `exit_code:0` as success. Correct: detach at threshold, retain task identity, and wait/read the final result to determine success.
 
 
+### Agent tool invocation modes
+
+`subagent_run` uses a flat closed schema with mode-specific admission: new agents require prompt/description/subagent_type; resume accepts prompt/resume and top-level optional run_in_background only. Nested resume is foreground and rejects the mode field even when false. Validate raw shape, unknown/disabled fields and mode dependencies before execution effects. Internal spawn/RPC contracts are not model-tool contracts. `subagent_message` uses real agent IDs only; @handle input routing remains independent. A refused resume is an error, while queued/sent messaging is successful admission, not acknowledgment of processing. Agent-file settings remain authoritative; disclose overridden explicit model/thinking/mode/context/tool-isolation/worktree requests without changing ownership or model-scope policy.
+
 ## Split Runtime Management
 
 - `process_manage` handles bash/monitor with task_id; `agent_manage` handles subagent/workflow with execution_id. Do not register task_manage aliases or map old tool configuration. Keep action schemas flat and closed; action-field/type checks run before backend effects.

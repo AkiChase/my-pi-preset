@@ -84,7 +84,9 @@ import { resolveWorkflowScript } from "./workflow/saved.ts";
 import { completeWorkflowTask, createWorkflowTask, failWorkflowTask, formatWorkflowNotification, resolveResumeTarget, updateWorkflowProgressBatch, type WorkflowTask, workflowResultText, workflowRunId } from "./workflow/task.ts";
 import { fullWorkflowToolDescription } from "./workflow/tool-description.ts";
 import { isWorktreeIsolationEnabled, setWorktreeIsolationEnabled } from "./worktree.ts";
-import { assertNonEmptyString, assertResumeOptions, assertSpawnInput, normalizeAgentDescription, parseSpawnOptions } from "./spawn-input.ts";
+import { runToolGuidance, messageToolGuidance } from "./tool-guidance.ts";
+import { assertAgentToolArguments, assertMessageToolArguments } from "./tool-contract.ts";
+import { assertNonEmptyString, assertSpawnInput, normalizeAgentDescription, parseSpawnOptions } from "./spawn-input.ts";
 import { escapeXml } from "./xml.ts";
 
 // ---- Shared helpers ----
@@ -103,10 +105,8 @@ function textResult(msg: string, details?: AgentDetails) {
  * steering failure or a crashed run reads exactly like a normal completion, and
  * a caller that branches on success takes the wrong branch.
  *
- * Deliberately not used for every non-ideal outcome: "agent is still running,
- * wait or steer instead", a queued steer, or a detached background hand-off are
- * successful calls whose text happens to be advisory. Marking those as errors
- * would train the caller to retry work that is already underway.
+ * Queued messages and detached hand-offs are successful admission, not proof
+ * of completion. A refused resume is an error because no new run was started.
  */
 function errorResult(msg: string, details?: AgentDetails) {
   return { ...textResult(msg, details), isError: true };
@@ -1580,14 +1580,16 @@ Notes:
 - The result is not shown to the user — summarize it for them. Verify an agent's claimed code changes before reporting work done.
 - resume continues a previous agent by ID; subagent_message messages a running one.${isolationCompactGuideline}`;
 
-  const fullAgentToolDescription = `Launch a new agent to handle complex, multi-step tasks autonomously. Each agent type has specific capabilities and tools available to it.
+  const fullAgentToolDescription = `Start or resume an autonomous agent. For resume, provide only resume, prompt and optional run_in_background; do not repeat new-agent fields.
+
+Launch a new agent to handle complex, multi-step tasks autonomously. Each agent type has specific capabilities and tools available to it.
 
 Available agent types and the tools they have access to:
 ${buildTypeListText()}
 
 Custom agents can be defined in .pi/agents/<name>.md (project) or ${getAgentDir()}/agents/<name>.md (global) — they are picked up automatically. Project-level agents override global ones. Creating a .md file with the same name as a default agent overrides it.
 
-When using the subagent_run tool, specify a subagent_type parameter to select which agent type to use.
+When creating a new agent, specify subagent_type. When resuming, omit subagent_type and retain the stored type.
 
 ## When not to use
 
@@ -1595,11 +1597,11 @@ If the target is already known, use a direct tool — \`read\` for a known path,
 
 ## Usage notes
 
-- Always include a short (3-5 word) description summarizing what the agent will do (shown in UI).
+- For new agents, include a short (3-5 word) description summarizing the task. For resume, omit description.
 - When you launch multiple agents for independent work, send them in a single message with multiple tool uses so they run concurrently. If the user specifies that they want you to run agents "in parallel", you MUST send a single message with multiple subagent_run tool use content blocks.
 - When the agent is done, it returns a single message back to you. The result is not visible to the user — to show the user, send a text message with a concise summary.
 - Trust but verify: an agent's summary describes what it intended to do, not necessarily what it did. When an agent writes or edits code, check the actual changes before reporting the work as done.
-- Agents run in the background by default. When an agent runs in the background, you will be automatically notified when it completes — do NOT sleep, poll, or proactively check on its progress. Continue with other work or respond to the user instead.
+- Background execution follows the configured default and Agent-file pins. A background agent notifies on completion; foreground waits inline.
 - **Foreground vs background**: Pass \`run_in_background: false\` only when your very next action depends on the agent's result and nothing else could usefully happen while it runs — e.g., a research agent whose finding gates the edit you're about to make. Otherwise let it run in the background (the default) — this includes fire-and-forget work, independent investigations, and anything where the user might hand you something else in the meantime. Wanting the result "next" is not enough on its own.
 - **Don't race**: after launching a background agent, you know nothing about its results. Never fabricate or predict them in any format — not as prose, summary, or structured output. The completion notification arrives in a later turn; it is never something you write yourself. If the user asks before it lands, say the agent is still running — give status, not a guess.
 - Use resume with an agent ID to continue a previous agent's work. A new (non-resume) subagent_run call starts a fresh agent with no memory of prior runs, so the prompt must be self-contained.
@@ -1679,28 +1681,23 @@ Terse command-style prompts produce shallow, generic work.
     label: "subagent_run",
     description: agentToolDescription,
     promptSnippet: "Launch autonomous sub-agents for complex multi-step tasks",
-    promptGuidelines: [
-      "Use subagent_run with specialized agents when the task matches an agent type's description. Subagents are valuable for parallelizing independent queries or for protecting the main context window from excessive results, but should not be used excessively when not needed. Importantly, avoid duplicating work that subagents are already doing — if you delegate research to a subagent, do not also perform the same searches yourself.",
-      "For broad codebase exploration or research, spawn subagent_run with an appropriate subagent_type (e.g. Explore). Otherwise use direct tools (read, grep, find) when the target is already known.",
-      "When an agent runs in the background, you will be notified on completion — do not poll or sleep waiting for it. Continue with other work instead.",
-      "Trust but verify: an agent's summary describes intent, not outcome. When an agent writes or edits code, check the actual changes before reporting work as done.",
-    ],
+    promptGuidelines: runToolGuidance({ nested: false, backgroundByDefault: getBackgroundByDefault(), isolation: isWorktreeIsolationEnabled(), scheduling: isSchedulingEnabled(), agentTypes: buildTypeListText() }),
     parameters: Type.Object({
       prompt: Type.String({
         description: "The task for the agent to perform.",
       }),
-      description: Type.String({
-        description: "A short (3-5 word) description of the task (shown in UI).",
-      }),
+      description: Type.Optional(Type.String({
+        description: "Required for new agents: a short, specific task description. Not accepted with resume.",
+      })),
       name: Type.Optional(
         Type.String({
           description:
-            'Optional memorable name for this agent, e.g. "auth-audit", so it can be addressed as `@name` at the prompt and by subagent_message. Use its returned execution_id with agent_manage. Names accept letters, digits, `_` and `-`. Worth setting when several agents of the same type run at once; omit for one-off work. The agent stays reachable by its type either way.',
+            'Optional name for a new agent, usable as @name in the input box. Tool messaging/resume uses the real agent_id; execution management uses execution_id. Not accepted with resume.',
         }),
       ),
-      subagent_type: Type.String({
-        description: `The type of specialized agent to use. Available types: ${getAvailableTypes().join(", ")}. Custom agents from .pi/agents/*.md (project) or ${getAgentDir()}/agents/*.md (global) are also available.`,
-      }),
+      subagent_type: Type.Optional(Type.String({
+        description: `Required for new agents only. Available types: ${getAvailableTypes().join(", ")}.`,
+      })),
       model: Type.Optional(
         Type.String({
           description:
@@ -1710,12 +1707,12 @@ Terse command-style prompts produce shallow, generic work.
       ...thinkingParam(),
       run_in_background: Type.Optional(
         Type.Boolean({
-          description: "Defaults to true — the agent runs detached, returning its ID immediately, and you are notified on completion. Set false only when your very next action depends on the result; the call then blocks and returns the agent's full output inline.",
+          description: `Optional execution mode. Default without an agent-file pin: ${getBackgroundByDefault() ? "background" : "foreground"}. Agent-file configuration takes precedence. Background returns execution identity; foreground waits for results.`,
         }),
       ),
       resume: Type.Optional(
         Type.String({
-          description: "Optional agent ID to resume from. Continues from previous context. Resumes detached like any other spawn; pass run_in_background: false to block and get the result inline. An agent can only be resumed once its current run has finished — use subagent_message to reach one mid-run.",
+          description: "Real agent_id of a finished agent. With resume only prompt and optional run_in_background are accepted; stored session settings are retained.",
         }),
       ),
       isolated: Type.Optional(
@@ -1837,46 +1834,23 @@ Terse command-style prompts produce shallow, generic work.
     execute: async (toolCallId, params, signal, onUpdate, ctx) => {
       assertActive();
 
-      // Reload custom agents so new project/global .md files are picked up without restart
-      reloadCustomAgents();
-
-      const rawType = params.subagent_type as SubagentType;
-      // A blank prompt or description is rejected before anything is resolved or
-      // spawned. Previously a blank prompt reached the child, which spent a whole
-      // turn discovering it had no task; a blank description produced an unnamed
-      // row in every list. The schema covers the type; this covers emptiness.
-      assertNonEmptyString(params.prompt, "`prompt`");
-      assertNonEmptyString(params.description, "`description`");
-      // Single decision point for dispatch (#183): unknown, disabled and
-      // case-ambiguous types are refused here, BEFORE anything spawns, so a
-      // background or scheduled call can't start running the wrong agent while
-      // the caller is still unaware. `fallbackSubagent` decides whether an
-      // unresolvable type falls back or fails closed.
-      const dispatch = resolveSpawnType(rawType);
-      // `resume` replays a stored session and ignores `subagent_type` entirely,
-      // but the parameter is required by the schema — so gating it here would
-      // make a live agent unresumable the moment its type is deleted, disabled,
-      // or gains a case-clashing sibling. Only a real spawn is gated.
-      if (!dispatch.ok && !params.resume) return errorResult(dispatch.message);
-      const subagentType = dispatch.ok ? dispatch.type : rawType;
-      // What the caller actually asked for, named once: `fellBackFrom` is "" for
-      // a blank request, so reading it inline invites the `??`-vs-`||` slip that
-      // once persisted an empty type into a scheduled job.
-      const requestedType = (dispatch.ok && dispatch.fellBackFrom) || subagentType;
-      // Start-time parameters that `resume` cannot honour, refused once and up
-      // front. The stored session already owns its model, thinking level,
-      // isolation and context inheritance; accepting these silently meant a
-      // caller could ask for a specific model and get a run on a different one
-      // with no indication that the request had been dropped.
-      try { assertResumeOptions(params); }
+      try { assertAgentToolArguments(params, { nested: false, isolation: isWorktreeIsolationEnabled(), scheduling: isSchedulingEnabled() }); }
       catch (err) { return errorResult(err instanceof Error ? err.message : String(err)); }
-      // Computed at resolution rather than after the run, so the background and
-      // schedule branches carry it too — previously it existed only on the
-      // foreground path. Resume deliberately doesn't: it replays the stored
-      // session and ignores `subagent_type` entirely, so a note about type
-      // substitution would be describing something that didn't happen.
-      const fallbackNote = dispatch.ok && dispatch.fellBackFrom !== undefined
-        ? `Note: Unknown agent type "${dispatch.fellBackFrom}" — using ${resolveType(subagentType) ? subagentType : "the fallback agent config"}.\n\n`
+      reloadCustomAgents();
+      const resumeTarget = params.resume === undefined ? undefined : manager.getRecord(params.resume);
+      if (params.resume !== undefined) {
+        if (!resumeTarget || !isTopLevelAgent(resumeTarget)) return errorResult(`Agent not found: "${params.resume}".`);
+        if (!resumeTarget.session) return errorResult(`Agent "${params.resume}" has no active session to resume.`);
+        if (manager.isRunActive(resumeTarget.id) || resumeTarget.status === "running" || resumeTarget.status === "queued") return errorResult(`Agent "${params.resume}" is still active — use subagent_message or agent_manage wait.`);
+      }
+      const rawType = (resumeTarget?.type ?? params.subagent_type) as SubagentType;
+      const dispatch = resumeTarget ? { ok: true as const, type: resumeTarget.type } : resolveSpawnType(rawType);
+      if (!dispatch.ok) return errorResult(dispatch.message);
+      const subagentType = dispatch.type;
+      const fellBackFrom = "fellBackFrom" in dispatch ? dispatch.fellBackFrom as string | undefined : undefined;
+      const requestedType = fellBackFrom || subagentType;
+      const fallbackNote = fellBackFrom !== undefined
+        ? `Note: Unknown agent type "${fellBackFrom}" — using ${resolveType(subagentType) ? subagentType : "the fallback agent config"}.\n\n`
         : "";
 
       const displayName = getDisplayName(subagentType);
@@ -1891,7 +1865,7 @@ Terse command-style prompts produce shallow, generic work.
 
       // Resolve model from agent config first; tool-call params only fill gaps.
       let model = ctx.model;
-      if (resolvedConfig.modelInput) {
+      if (!resumeTarget && resolvedConfig.modelInput) {
         const resolved = resolveModel(resolvedConfig.modelInput, ctx.modelRegistry);
         if (typeof resolved === "string") {
           if (resolvedConfig.modelFromParams) return errorResult(resolved);
@@ -1912,8 +1886,8 @@ Terse command-style prompts produce shallow, generic work.
         agentLabel: customConfig?.displayName ?? subagentType,
         modelInput: resolvedConfig.modelInput,
       });
-      if (scopeVerdict.kind === "error") return errorResult(scopeVerdict.message);
-      if (scopeVerdict.kind === "warn") ctx.ui.notify(scopeVerdict.message, "warning");
+      if (!resumeTarget && scopeVerdict.kind === "error") return errorResult(scopeVerdict.message);
+      if (!resumeTarget && scopeVerdict.kind === "warn") ctx.ui.notify(scopeVerdict.message, "warning");
 
       assertActive();
       const thinking = resolvedConfig.thinking;
@@ -1962,6 +1936,10 @@ Terse command-style prompts produce shallow, generic work.
         // disclose a parameter that was accepted but could not take effect (#182).
         requestedThinking: resolvedConfig.overridden?.thinking,
         requestedModel: askedModel,
+        requestedRunInBackground: resolvedConfig.overridden?.runInBackground,
+        requestedInheritContext: resolvedConfig.overridden?.inheritContext,
+        requestedIsolated: resolvedConfig.overridden?.isolated,
+        requestedIsolation: resolvedConfig.overridden?.isolation,
         maxTurns: effectiveMaxTurns,
         isolated,
         inheritContext,
@@ -1969,14 +1947,20 @@ Terse command-style prompts produce shallow, generic work.
         isolation,
       };
       const overrideNoteFor = (rec: AgentRecord | undefined) =>
-        formatInvocationOverrideNote(rec?.invocation ?? agentInvocation);
+        formatInvocationOverrideNote(resumeTarget ? {
+          ...rec?.invocation,
+          requestedModel: undefined, requestedThinking: undefined,
+          requestedRunInBackground: resolvedConfig.overridden?.runInBackground,
+          requestedInheritContext: undefined, requestedIsolated: undefined, requestedIsolation: undefined,
+          runInBackground,
+        } : rec?.invocation ?? agentInvocation);
       // Tool-result render shows the mode label too; viewer's header already does.
       const modeLabel = getPromptModeLabel(subagentType);
       const { tags: invocationTags } = buildInvocationTags(agentInvocation);
       const agentTags = modeLabel ? [modeLabel, ...invocationTags] : invocationTags;
       const detailBase = {
         displayName,
-        description: params.description,
+        description: params.description ?? resumeTarget?.description ?? subagentType,
         subagentType,
         modelName,
         tags: agentTags.length > 0 ? agentTags : undefined,
@@ -2066,7 +2050,7 @@ Terse command-style prompts produce shallow, generic work.
         }
 
         if (manager.isRunActive(existing.id)) {
-          return textResult(`Agent "${existing.id}" is still running — wait or steer instead.`);
+          return errorResult(`Agent "${existing.id}" is still running — wait or steer instead.`);
         }
 
         // Background resume: detached run that notifies on completion, mirroring
@@ -2081,7 +2065,7 @@ Terse command-style prompts produce shallow, generic work.
           // live run's abort controller); say why here, where the model can act
           // on it, instead of letting it read as a generic failure.
           if (existing.status === "running" || existing.status === "queued") {
-            return textResult(
+            return errorResult(
               `Agent "${params.resume}" is still ${existing.status} — it can only be resumed once its current run finishes.\n` +
               `Use subagent_message to send it a message mid-run, or agent_manage action=wait to wait for it.`,
             );
@@ -2130,7 +2114,7 @@ Terse command-style prompts produce shallow, generic work.
           },
         });
         assertActive();
-        if (!resumed) return textResult(`Agent "${id}" is still running — wait or steer instead.`);
+        if (!resumed) return errorResult(`Agent "${id}" is still running — wait or steer instead.`);
         if (manager.isRunActive(id)) agentActivity.set(id, state);
         const run = manager.getRun(id)!;
         const lease = registerAgentWait(manager, coordinator, run, "launch", signal, () => reconsiderAgentNotice(existing));
@@ -2932,10 +2916,11 @@ Terse command-style prompts produce shallow, generic work.
     description:
       "Send a steering message to a running agent. The message will interrupt the agent after its current tool execution " +
       "and be injected into its conversation, allowing you to redirect its work mid-run. Only works on running agents.",
-    promptSnippet: "Send a steering message to redirect a running background agent",
+    promptGuidelines: messageToolGuidance(),
+    promptSnippet: "Send additional guidance to a running agent",
     parameters: Type.Object({
       agent_id: Type.String({
-        description: "The agent ID to steer (must be currently running). The agent's handle also works — its `name` if you gave it one, otherwise its type (`explore`, `explore-2`).",
+        description: "Real agent_id from launch/list; must identify a currently running agent owned by this session. Names and execution_id are not accepted.",
       }),
       message: Type.String({
         minLength: 1,
@@ -2943,9 +2928,9 @@ Terse command-style prompts produce shallow, generic work.
       }),
     }, { additionalProperties: false }),
     execute: async (_toolCallId, params, _signal, _onUpdate, _ctx) => {
-      try { assertNonEmptyString(params.message, "`message`"); }
+      try { assertMessageToolArguments(params); }
       catch (err) { return errorResult(err instanceof Error ? err.message : String(err)); }
-      const record = resolveAgentRef(params.agent_id);
+      const record = manager.getRecord(params.agent_id);
       if (!record || !isTopLevelAgent(record)) {
         return errorResult(`Agent not found: "${params.agent_id}". It may have been cleaned up.`);
       }
@@ -2976,7 +2961,7 @@ Terse command-style prompts produce shallow, generic work.
         if (contextPercent !== null) stateParts.push(`context ${Math.round(contextPercent)}% full`);
         if (record.compactionCount) stateParts.push(`${record.compactionCount} compaction${record.compactionCount === 1 ? "" : "s"}`);
         return textResult(
-          `Steering message sent to agent ${record.id}. The agent will process it after its current tool execution.\n` +
+          `Steering message sent to agent ${record.id}. Submitted to its session; this does not confirm it has been read or processed.\n` +
           `Current state: ${stateParts.join(" · ")}`,
         );
       } catch (err) {

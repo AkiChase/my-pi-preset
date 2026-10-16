@@ -113,7 +113,8 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
     repeatStart: () => handlers.get("session_start")![0]!(undefined, ctx),
     artifactDir: sessionTaskDir(cwd, "offline-test"),
     start(background = false, extra: Record<string, unknown> = {}, signal?: AbortSignal, call?: { id: string | undefined }) {
-      return execute("subagent_run", { subagent_type: "general-purpose", description: "offline", prompt: "test", run_in_background: background, ...extra }, signal, call);
+      const defaults = Object.hasOwn(extra, "resume") ? { prompt: "test", run_in_background: background } : { subagent_type: "general-purpose", description: "offline", prompt: "test", run_in_background: background };
+      return execute("subagent_run", { ...defaults, ...extra }, signal, call);
     },
     async close() {
       const artifactDirs = new Set(coordinator.list().flatMap(row => row.artifacts.filter(artifact => artifact.kind === "conversation" && artifact.path.includes(root.split("/").pop()!)).map(artifact => dirname(artifact.path))));
@@ -142,7 +143,9 @@ for (const background of [false, true]) void it(`legacy model turn limit cannot 
   const f = await factory({ defaultMaxTurns: 7 });
   const pending: Promise<unknown>[] = [];
   try {
-    const launch = f.start(background, { max_turns: 1 }); pending.push(launch); void launch.catch(() => {}); await tick();
+    const refused = await f.start(background, { max_turns: 1 });
+    assert.equal(refused.isError, true); assert.equal(f.calls.length, 0);
+    const launch = f.start(background); pending.push(launch); void launch.catch(() => {}); await tick();
     assert.equal(f.calls[0]!.options.maxTurns, 7);
     const id = f.calls[0]!.options.agentId!;
     assert.equal(f.registry.getRecord(id)?.maxTurns, 7);
@@ -152,7 +155,7 @@ for (const background of [false, true]) void it(`legacy model turn limit cannot 
     f.calls[0]!.options.onTurnEnd?.(3); f.calls[0]!.finish(); await tick(); await pause(260);
     assert.equal(f.notices[0]?.details?.maxTurns, 7);
     setDefaultMaxTurns(9);
-    const resume = f.start(background, { resume: id, subagent_type: "custom", max_turns: 2 }); pending.push(resume); void resume.catch(() => {}); await tick();
+    const resume = f.start(background, { resume: id }); pending.push(resume); void resume.catch(() => {}); await tick();
     assert.equal(f.resumes[0]!.options?.maxTurns, 9);
     assert.equal(f.registry.getRecord(id)?.invocation?.maxTurns, 9);
     assert.equal(f.coordinator.list()[0]?.stats.maxTurns, 9);
@@ -165,7 +168,9 @@ for (const background of [false, true]) void it(`legacy model turn limit cannot 
 void it("model scheduled delegation never persists legacy or default turn budgets and fires with current user configuration", async () => {
   const f = await factory({ schedulingEnabled: true, defaultMaxTurns: 7 });
   try {
-    const result = await f.start(true, { schedule: "1s", max_turns: 1 });
+    const refused = await f.start(true, { schedule: "1s", max_turns: 1 });
+    assert.equal(refused.isError, true); assert.equal(f.calls.length, 0);
+    const result = await f.start(true, { schedule: "1s" });
     assert.match(text(result), /Scheduled/);
     const path = join(f.ctx.cwd, ".pi", "subagent-schedules", "offline-test.json");
     const stored = JSON.parse(readFileSync(path, "utf8")) as { jobs: { max_turns?: number }[] };
@@ -186,14 +191,14 @@ void it("actual root delegation preserves frontmatter limits including unlimited
       const agentDir = join(f.root, "agent", "agents");
       mkdirSync(agentDir, { recursive: true });
       writeFileSync(join(agentDir, "limited.md"), `---\nname: limited\ndescription: Offline configured agent\nmax_turns: ${budget}\n---\nDo work.\n`);
-      await f.start(true, { subagent_type: "limited", max_turns: 1 }); await tick();
+      await f.start(true, { subagent_type: "limited" }); await tick();
       const id = f.calls[0]!.options.agentId!, effective = budget || undefined;
       assert.equal(f.calls[0]!.options.maxTurns, budget);
       assert.equal(f.registry.getRecord(id)?.invocation?.maxTurns, effective);
       assert.equal(f.coordinator.list()[0]?.stats.maxTurns, effective);
       f.calls[0]!.finish(); await tick(); await pause(260);
       assert.equal(f.notices[0]?.details?.maxTurns, effective);
-      await f.start(true, { resume: id, subagent_type: "general-purpose", max_turns: 2 }); await tick();
+      await f.start(true, { resume: id }); await tick();
       assert.equal(f.resumes[0]!.options?.maxTurns, budget);
       assert.equal(f.registry.getRecord(id)?.invocation?.maxTurns, effective);
       f.resumes[0]!.finish(); await tick(); await pause(260);
@@ -205,7 +210,9 @@ void it("actual root delegation preserves frontmatter limits including unlimited
 void it("default actual model delegation stays unlimited despite legacy budget", async () => {
   const f = await factory({ defaultMaxTurns: 0 });
   try {
-    await f.start(true, { max_turns: 1 }); await tick();
+    const refused = await f.start(true, { max_turns: 1 });
+    assert.equal(refused.isError, true); assert.equal(f.calls.length, 0);
+    await f.start(true); await tick();
     assert.equal(f.calls[0]!.options.maxTurns, 0);
     assert.equal(f.registry.getRecord(f.calls[0]!.options.agentId!)?.maxTurns, undefined);
     f.calls[0]!.finish(); await tick();

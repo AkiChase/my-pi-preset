@@ -14,7 +14,7 @@ export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhig
 export const thinkingParamShape = {
   thinking: Type.Optional(
     StringEnum(THINKING_LEVELS, {
-      description: `Thinking level: ${THINKING_LEVELS.join(", ")}. Overrides agent default.`,
+      description: `Thinking level: ${THINKING_LEVELS.join(", ")}. Agent-file configuration takes precedence.`,
     }),
   ),
 };
@@ -151,7 +151,7 @@ export function resolveAgentInvocationConfig(
    *
    * Turn budgets are user/internal configuration, never model arguments.
    */
-  overridden?: { thinking?: ThinkingLevel; model?: string };
+  overridden?: { thinking?: ThinkingLevel; model?: string; runInBackground?: boolean; inheritContext?: boolean; isolated?: boolean; isolation?: IsolationMode };
 } {
   // Precedence first, collapse second — reversing these loses the veto, since
   // an agent file's "off" only outranks a caller's "worktree" while it is still
@@ -168,6 +168,15 @@ export function resolveAgentInvocationConfig(
     ? params.model
     : undefined;
 
+  const overrides: NonNullable<ReturnType<typeof resolveAgentInvocationConfig>["overridden"]> = {
+    thinking: overriddenThinking, model: overriddenModel,
+    runInBackground: agentConfig?.runInBackground !== undefined && params.run_in_background !== undefined && agentConfig.runInBackground !== params.run_in_background ? params.run_in_background : undefined,
+    inheritContext: agentConfig?.inheritContext !== undefined && params.inherit_context !== undefined && agentConfig.inheritContext !== params.inherit_context ? params.inherit_context : undefined,
+    isolated: agentConfig?.isolated !== undefined && params.isolated !== undefined && agentConfig.isolated !== params.isolated ? params.isolated : undefined,
+    isolation: agentConfig?.isolation !== undefined && params.isolation !== undefined && agentConfig.isolation !== params.isolation ? params.isolation as IsolationMode : undefined,
+  };
+  for (const key of Object.keys(overrides) as (keyof typeof overrides)[]) if (overrides[key] === undefined) delete overrides[key];
+
   return {
     modelInput: agentConfig?.model ?? params.model,
     modelFromParams: agentConfig?.model == null && params.model != null,
@@ -180,9 +189,7 @@ export function resolveAgentInvocationConfig(
     // Undefined rather than an empty object when nothing was overridden: callers
     // spread this into the invocation snapshot, and an always-present key would
     // put `requestedThinking: undefined` on every record.
-    overridden: overriddenThinking || overriddenModel
-      ? { thinking: overriddenThinking, model: overriddenModel }
-      : undefined,
+    overridden: Object.values(overrides).some(value => value !== undefined) ? overrides : undefined,
   };
 }
 
@@ -195,6 +202,14 @@ export function formatInvocationOverrideNote(invocation: AgentInvocation | undef
   }
   if (invocation.requestedThinking !== undefined && invocation.requestedThinking !== invocation.thinking) {
     changes.push(`thinking requested ${JSON.stringify(invocation.requestedThinking)}, effective ${JSON.stringify(invocation.thinking ?? "inherited")}`);
+  }
+  for (const [field, requested, effective] of [
+    ["run_in_background", invocation.requestedRunInBackground, invocation.runInBackground],
+    ["inherit_context", invocation.requestedInheritContext, invocation.inheritContext],
+    ["isolated", invocation.requestedIsolated, invocation.isolated],
+    ["isolation", invocation.requestedIsolation, invocation.isolation ?? "off"],
+  ] as const) {
+    if (requested !== undefined && requested !== effective) changes.push(`${field} requested ${JSON.stringify(requested)}, effective ${JSON.stringify(effective)}`);
   }
   return changes.length ? `Note: Agent configuration overrides requested values: ${changes.join("; ")}.\n\n` : "";
 }

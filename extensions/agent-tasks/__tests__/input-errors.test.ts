@@ -21,7 +21,7 @@ import type { AgentManagerDependencies } from "../src/agent-manager.ts";
 import type { RunResult } from "../src/agent-runner.ts";
 import type { AgentRecord, NotificationDetails } from "../src/types.ts";
 import { assertNonEmptyString } from "../src/spawn-input.ts";
-import { THINKING_LEVELS, resolveAgentInvocationConfig, thinkingParam } from "../src/invocation-config.ts";
+import { THINKING_LEVELS, resolveAgentInvocationConfig, thinkingParam, formatInvocationOverrideNote } from "../src/invocation-config.ts";
 
 const { createNestedSubagentTools } = await import("../src/nested-tools.ts");
 const { default: agentTasks } = await import("../src/index.ts");
@@ -186,10 +186,9 @@ void it("a blank prompt or description is refused before any agent is started", 
         // into `isError: true` with the message, and it stops the call at the
         // guard instead of threading a flag through the rest of execute().
         for (const [field, value] of [["prompt", "   "], ["description", "\n"]] as const) {
-            await assert.rejects(
-                () => f.execute("subagent_run", { subagent_type: "general-purpose", description: "ok", prompt: "ok", [field]: value }),
-                new RegExp(`\`${field}\` must be a non-empty string`)
-            );
+            const result = await f.execute("subagent_run", { subagent_type: "general-purpose", description: "ok", prompt: "ok", [field]: value });
+            assert.equal(result.isError, true);
+            assert.match(text(result), new RegExp(`\`${field}\` must be a non-empty string`));
         }
         assert.equal(f.calls.length, 0, "no run may start from a blank field");
     } finally { await f.close(); }
@@ -200,8 +199,7 @@ void it("resume refuses start-time parameters rather than accepting and ignoring
     try {
         for (const [field, value] of [["model", "sonnet"], ["thinking", "minimal"], ["isolated", true], ["inherit_context", true], ["isolation", "worktree"]] as const) {
             const result = await f.execute("subagent_run", {
-                subagent_type: "general-purpose", description: "resume", prompt: "continue",
-                resume: "does-not-exist", [field]: value,
+                prompt: "continue", resume: "does-not-exist", [field]: value,
             });
             assert.equal((result as { isError?: boolean }).isError, true, `${field} must be refused with resume`);
             assert.match(text(result), new RegExp(field));
@@ -209,7 +207,7 @@ void it("resume refuses start-time parameters rather than accepting and ignoring
         }
         // A bare resume still reaches the ordinary lookup, so the conflict check
         // is not swallowing the path it is meant to protect.
-        const plain = await f.execute("subagent_run", { subagent_type: "general-purpose", description: "resume", prompt: "continue", resume: "does-not-exist" });
+        const plain = await f.execute("subagent_run", { prompt: "continue", resume: "does-not-exist" });
         assert.equal((plain as { isError?: boolean }).isError, true);
         assert.match(text(plain), /not found/);
     } finally { await f.close(); }
@@ -264,6 +262,17 @@ void it("a frontmatter override keeps the caller's own value visible in the effe
     assert.equal(resolveAgentInvocationConfig({ name: "pinned", description: "x", thinking: "high" } as never, { thinking: "high" }).overridden, undefined);
 });
 
+void it("configuration retains boolean and isolation precedence and discloses false requests", () => {
+    const resolved = resolveAgentInvocationConfig({ name: "pinned", description: "x", runInBackground: true, isolated: true, inheritContext: true, isolation: "off" } as never,
+        { run_in_background: false, isolated: false, inherit_context: false, isolation: "worktree" });
+    assert.equal(resolved.runInBackground, true); assert.equal(resolved.isolation, undefined);
+    const note = formatInvocationOverrideNote({ runInBackground: resolved.runInBackground, isolated: resolved.isolated, inheritContext: resolved.inheritContext, isolation: resolved.isolation,
+        requestedRunInBackground: resolved.overridden?.runInBackground, requestedIsolated: resolved.overridden?.isolated,
+        requestedInheritContext: resolved.overridden?.inheritContext, requestedIsolation: resolved.overridden?.isolation });
+    for (const field of ["run_in_background", "isolated", "inherit_context", "isolation"]) assert.match(note, new RegExp(field));
+    assert.match(note, /requested false, effective true/); assert.match(note, /requested "worktree", effective "off"/);
+});
+
 void it("all five registered fixed schemas reject unknown fields through the host validator", async () => {
     const f = await factory();
     try {
@@ -315,6 +324,13 @@ void it("blank root steering is refused before lookup, events, queueing or sessi
         }
         record.session = undefined;
         mock.mock.restore();
+        for (const ref of [record.handle!, `exec_not_an_agent`, "unknown-name"]) {
+            const result = await f.execute("subagent_message", { agent_id: ref, message: "continue" });
+            assert.equal(result.isError, true); assert.equal(record.pendingSteers, undefined);
+        }
+        const queued = await f.execute("subagent_message", { agent_id: id, message: "continue" });
+        assert.equal(queued.isError, undefined); assert.match(text(queued), /queued/);
+        assert.deepEqual(record.pendingSteers, ["continue"]);
     } finally { await f.close(); }
 });
 
@@ -340,7 +356,7 @@ void it("nested steering blanks and resume conflicts are refused before any mana
                 assert.match(text(result), /`message` must be a non-empty string/);
             }
         }
-        const base = { subagent_type: "general-purpose", description: "resume", prompt: "continue", resume: "owned" };
+        const base = { prompt: "continue", resume: "owned" };
         for (const [key, value] of [["model", ""], ["thinking", "off"], ["isolated", false], ["inherit_context", false], ["isolation", "off"]] as const) {
             const result = await run!.execute("call", { ...base, [key]: value }, undefined, undefined, f.ctx);
             assert.equal(result.isError, true);

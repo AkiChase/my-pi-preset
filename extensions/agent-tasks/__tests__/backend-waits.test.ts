@@ -80,7 +80,9 @@ void it("nested actual delegation ignores legacy turn budgets and keeps user def
   try {
     const tool = createNestedSubagentTools({ manager: f.manager, pi, parentAgentId: "parent", depth: 1,
       maxSubagentDepth: 2, allowedSubagents: "all", configCwd: ctx.cwd })[0]!;
-    const params = { subagent_type: "general-purpose", description: "nested", prompt: "test", max_turns: 1 };
+    const params = { subagent_type: "general-purpose", description: "nested", prompt: "test" };
+    const refused = await tool.execute("legacy", { ...params, max_turns: 1 }, undefined, undefined, ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext);
+    assert.equal(refused.isError, true); assert.equal(f.calls.length, 0);
     const launch = tool.execute("nested", params, undefined, undefined, ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext); await tick();
     assert.equal(f.manager.getRecord(f.calls[0]!.id)?.maxTurns, 7);
     assert.equal(f.manager.getRecord(f.calls[0]!.id)?.invocation?.maxTurns, 7);
@@ -88,7 +90,7 @@ void it("nested actual delegation ignores legacy turn budgets and keeps user def
     const launchResult = await launch;
     assert.match(launchResult.content.map(block => block.type === "text" ? block.text : "").join(""), new RegExp(`agent_id=${f.calls[0]!.id} execution_id=exec_`));
     setDefaultMaxTurns(9);
-    const resume = tool.execute("nested-resume", { ...params, resume: f.calls[0]!.id }, undefined, undefined, ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext); await tick();
+    const resume = tool.execute("nested-resume", { prompt: "test", resume: f.calls[0]!.id }, undefined, undefined, ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext); await tick();
     assert.equal(f.resumes[0]!.options?.maxTurns, 9);
     assert.equal(f.manager.getRecord(f.calls[0]!.id)?.invocation?.maxTurns, 9);
     f.resumes[0]!.finish();

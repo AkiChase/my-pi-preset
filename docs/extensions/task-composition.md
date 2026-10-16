@@ -78,7 +78,9 @@ Monitor 的 wait 等整个观察结束，不是下一条事件。解除或取消
 
 ## 子 Agent 与 workflow
 
-`subagent_run` 新建或恢复 Agent；后台启动返回稳定的 `agent_id` 与本次 `execution_id`，前台则直接等待结果。`subagent_message` 用 agent_id 和 message 给运行中的 Agent 发指示。完成后 subagent_run 的 resume 使用 agent_id 继续同一会话，得到新的 execution_id。
+`subagent_run` 新建或恢复 Agent；后台启动返回稳定的 `agent_id` 与本次 `execution_id`，前台则直接等待结果。新建需要 `prompt`、`description`、`subagent_type`；恢复只传 `resume`、`prompt` 和可选 `run_in_background`，沿用原会话类型、名称与设置，不重复新建字段。子 Agent 恢复自己的孩子时固定前台，不能传 `run_in_background`。
+
+Agent 文件配置优先于调用参数；省略参数沿用配置/默认值，显式不同请求被覆盖时结果会说明请求值与实际值。`subagent_message` 用真实 `agent_id` 和非空 `message` 给运行中的 Agent 发指示，不接受名称别名或 `execution_id`；queued 表示等待会话初始化，sent 表示已提交，均不保证已读取或处理。完成后用 `subagent_run` 的 `resume` 继续同一会话，得到新的 `execution_id`。
 
 `subagent_workflow` 执行编排脚本，可调用 Agent，也可以不启动 Agent。每次启动或基于旧 journal 重放都产生独立 execution_id；resumeFromRunId 使用旧 workflow 的 wf_ 执行 ID。暂停、继续、跳过和重试仍在 `/agents` UI，不是管理工具动作。
 
