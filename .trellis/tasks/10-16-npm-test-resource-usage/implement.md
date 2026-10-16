@@ -22,6 +22,43 @@
 - 原始日志位于本轮 owned `/tmp/pi-test-resource-b2-tYcpP1`，验收后清理本目录。无需持久化原始日志，以上记录独立于临时路径。
 - 第二批完成，继续复用任务，不归档。下一轮目前仅候选：实际资源占用仍主要由大量原生集成/初始化校验叠加造成，需审查其覆盖重复和进程树峰值，不能继续只凭单文件耗时猜测。
 
+## 模块性能诊断（用户批准执行，不修改测试代码）
+
+Node v24.14.1、10 可用核、既有 SDK、每组临时 agent-dir。12 个模块合计 139 个入口，串行运行 `/usr/bin/time -l node --test --test-concurrency=8 --test-force-exit <该模块全部文件>`；结果均 exit 0、0 fail/skipped。脚本按半秒 cadence 使用 `ps -axo pid,ppid,%cpu,rss,comm` 从 time PID 递归收集当时存活进程树。短命 Python/Git 可在采样间结束或被 reparent，`ps %cpu` 是 OS 平滑统计而非精确半秒 CPU 增量，因此采样峰值低估/滞后，不能作为硬峰值上限。累计 CPU time 包含回收的子进程，比采样总量更适合比较成本；模块墙钟不能相加成全量墙钟。
+
+| 模块 | 文件 | wall s | user+sys s | 平均核 |
+| --- | ---: | ---: | ---: | ---: |
+| trellis | 29 | 85.67 | 421.20 | 4.92 |
+| agent-tasks | 11 | 19.80 | 14.29 | 0.72 |
+| scripts | 2 | 16.55 | 11.38 | 0.69 |
+| at-path-completion | 7 | 8.78 | 5.70 | 0.65 |
+| memory | 9 | 4.21 | 14.58 | 3.46 |
+| process-tasks | 33 | 3.13 | 15.91 | 5.08 |
+| runtime-tasks | 10 | 2.94 | 9.61 | 3.27 |
+| session-assist | 16 | 2.05 | 11.96 | 5.83 |
+| beautify | 6 | 1.71 | 6.57 | 3.84 |
+| task-ui | 9 | 1.26 | 4.77 | 3.79 |
+| shared | 4 | 0.62 | 1.59 | 2.56 |
+| extension-boundaries | 3 | 0.50 | 1.31 | 2.62 |
+
+合计 CPU 518.87 s，Trellis 占 81.2%。Trellis 当时存活进程树采样最多 20 进程，出现 Node/Python/Git；采样 %cpu 合计最高 550.2%，不是真实瞬时上限。其他短模块也有启动峰值（memory 采样 633.6%、agent 588.6%），但持续时间/累计成本远小于 Trellis。scripts 采样峰值 24.2% 与累计平均 0.69 核不一致，印证大量短命子进程在 ps 采样中丢失；不采用该低采样值推断 CPU 成本。
+
+### Trellis 二次细分
+
+继续串行运行各细分、相同配置，均 exit 0：
+
+| 组 | 文件 | wall s | CPU s | 平均核 |
+| --- | ---: | ---: | ---: | ---: |
+| dispatch.test.mjs | 1 | 35.67 | 28.86 | 0.81 |
+| agent-context-integration.test.mjs | 1 | 26.77 | 21.54 | 0.80 |
+| 初始化：init-review/initialization/skill-deployment | 3 | 27.56 | 55.33 | 2.01 |
+| 更新接管：adopt-block/adopt-project/apply-template/resource-update | 4 | 24.75 | 34.83 | 1.41 |
+| 其他 Trellis 文件 | 20 | 39.06 | 167.42 | 4.29 |
+
+细分合计 CPU 307.98 s，低于合并运行的 421.20 s；机器负载/调度/缓存不同，不能直接量化并发因果，但支持大量原生集成同时运行产生明显争用，非只有 dispatch/context 两文件。其他组最慢具体用例 readiness malformed materials 6.36 s、Python/host interoperability 4.22 s、clone identity 3.62 s。更新组 unsupported runtime/scope/lock 矩阵 6.44 s、stale confirmation 4.25 s、symlink safeguards 3.84 s。下一批应先审这些矩阵反复初始化与查询，不优先删仅 1–3 秒的 UI/Process 模块。
+
+原始日志、每组命令/采样、临时 driver 在 owned `/tmp/pi-test-modules-xFAq9i/`，本轮完成无未诊断测试失败，可按 owned 范围清理。未改产品代码，没有安装/真实 provider/终端执行；采样是诊断，不证明自然退出（模块运行保留全量 force-exit）。下一批优化范围尚未批准。
+
 ## 阶段与提交检查点
 
 1. **S1 调度与 GC 精简**：package test 并发 8、两处 Trellis 内层并发移除；删除三组 GC 用例和专用 driver；更新测试规范过时的 GC 要求。检查三组 editor/owner 和两组 Trellis 测试、静态配置/glob，然后提交。
