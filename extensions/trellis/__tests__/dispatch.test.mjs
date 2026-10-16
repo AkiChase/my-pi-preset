@@ -127,7 +127,7 @@ function project(t,scope,root) {
  const replies=[];
  bus.on('subagents:rpc:ping',({requestId})=>bus.emit('subagents:rpc:ping:reply:'+requestId,{success:true,data:{version:2}}));
  let seq=0, spawnFailure;
- bus.on('subagents:rpc:spawn',params=>{replies.push(params);bus.emit('subagents:rpc:spawn:reply:'+params.requestId,spawnFailure ? {success:false,error:spawnFailure} : {success:true,data:{id:'agent-'+(++seq)}});});
+ bus.on('subagents:rpc:spawn',params=>{replies.push(params);bus.emit('subagents:rpc:spawn:reply:'+params.requestId,spawnFailure ? {success:false,error:spawnFailure} : {success:true,data:{id:'agent-'+(++seq),execution_id:'exec_'+Buffer.from(JSON.stringify(['agent-'+seq,'1'])).toString('base64url')}});});
  const call=input=>tools.get('trellis_dispatch').execute('tool',input,undefined,undefined,{cwd:root});
  const dispatch=(agent='trellis-implement')=>call({agent,prompt:'work'});
  return {root,task,put,run,dispatch,call,bus,replies,handlers,git,chdir,failSpawn:error=>{spawnFailure=error;}};

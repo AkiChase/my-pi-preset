@@ -40,7 +40,7 @@ export function validateDispatchParams(input: unknown): DispatchParams {
 	return { action, agent: args.agent, prompt: args.prompt, ...optionalTask };
 }
 
-interface RpcReply { success: boolean; data?: { id?: string; version?: number }; error?: string }
+interface RpcReply { success: boolean; data?: { id?: string; execution_id?: string; version?: number }; error?: string }
 export function rpc(pi: ExtensionAPI, method: string, payload: Record<string, unknown>, timeout = 15000): Promise<RpcReply> {
 	return new Promise((done, reject) => {
 		const requestId = typeof payload.requestId === "string" ? payload.requestId : randomUUID();
@@ -115,7 +115,7 @@ export function registerDispatchTool(pi: ExtensionAPI, activeTask: (ctx: Extensi
 	});
 	pi.registerTool({
 		name: "trellis_dispatch", label: "Trellis Dispatch",
-		description: "Dispatch an approved Trellis role in the shared source directory when unbound, or its prepared managed worktree when bound. Never creates worktrees or falls back from a binding. Returns a real agent ID. Stop requests provider cancellation and retains occupancy until terminal evidence. Main coordinates shared-directory edits and phases. Use task_manage status/output/wait with the returned agent ID as task_id (optional exact run_id); successful final retrieval consumes that run. Use subagent_message with agent_id/message to steer a running agent.",
+		description: "Dispatch an approved Trellis role in the shared source directory when unbound, or its prepared managed worktree when bound. Never creates worktrees or falls back from a binding. Returns a real agent ID. Stop requests provider cancellation and retains occupancy until terminal evidence. Main coordinates shared-directory edits and phases. Use agent_manage status/output/wait with the returned execution_id; successful final retrieval consumes that run. Use subagent_message with agent_id/message to steer a running agent.",
 		parameters: { type: "object", properties: { action: { type: "string", enum: ["dispatch", "stop", ""], description: "dispatch (default when omitted or empty) or stop an existing execution" }, agent: { type: "string", enum: ["trellis-implement", "trellis-check", "trellis-research", ""], description: "Required non-empty Trellis role for dispatch; omit entirely for stop" }, task: { type: "string", description: "Optional approved task reference; omitted or empty uses the local/active task" }, prompt: { type: "string", description: "Required non-empty dispatch instructions; newlines/tabs are preserved, NUL is forbidden; omit entirely for stop" } }, additionalProperties: false } as unknown as Parameters<ExtensionAPI["registerTool"]>[0]["parameters"],
 		executionMode: "sequential",
 		async execute(_id, input, signal, _update, ctx) {
@@ -191,7 +191,7 @@ export function registerDispatchTool(pi: ExtensionAPI, activeTask: (ctx: Extensi
 						record.state = finished?.state ?? "running"; record.error = typeof finished?.error === "string" ? finished.error.slice(0, 4096) : undefined;
 						writeSourceExecution(record);
 						if (!finished) sourceOwned.set(record.agentId, record);
-						return { content: [{ type: "text", text: `Agent ID: ${record.agentId}\nDirectory: ${source.root}\nShared source directory — no filesystem isolation. Coordinate overlapping edits.\nUse task_manage status/output/wait with this ID as task_id; subagent_message uses agent_id/message for running agents.` }], details: { agentId: record.agentId, mode: "source", cwd: source.root } };
+						return { content: [{ type: "text", text: `Agent ID: ${record.agentId}\nExecution ID: ${reply.data.execution_id}\nDirectory: ${source.root}\nShared source directory — no filesystem isolation. Coordinate overlapping edits.\nUse agent_manage status/output/wait with execution_id=${reply.data.execution_id}; subagent_message uses agent_id/message for running agents.` }], details: { agentId: record.agentId, mode: "source", cwd: source.root } };
 					} catch (error) { record.state = "unknown"; record.error = String(error).slice(0, 4096); writeSourceExecution(record); throw error; }
 				}
 				const selectedRole = args.agent.slice("trellis-".length) as MaterialRole;
@@ -221,7 +221,7 @@ export function registerDispatchTool(pi: ExtensionAPI, activeTask: (ctx: Extensi
 					if (finished) { try { record.finalSnapshot = worktreeSnapshot(binding); } catch { /* unverified snapshot */ } }
 					writeExecution(binding, record);
 					if (!finished) owned.set(record.agentId!, { binding, record });
-					return { content: [{ type: "text", text: `Agent ID: ${record.agentId}\nWorktree: ${binding.worktreePath}\nBinding: ${binding.bindingId}\nUse task_manage status/output/wait with this ID as task_id; subagent_message uses agent_id/message for running agents. No automatic next phase or cleanup.` }], details: { agentId: record.agentId, bindingId: binding.bindingId, mode: "managed", cwd: binding.worktreePath } };
+					return { content: [{ type: "text", text: `Agent ID: ${record.agentId}\nExecution ID: ${reply.data.execution_id}\nWorktree: ${binding.worktreePath}\nBinding: ${binding.bindingId}\nUse agent_manage status/output/wait with execution_id=${reply.data.execution_id}; subagent_message uses agent_id/message for running agents. No automatic next phase or cleanup.` }], details: { agentId: record.agentId, bindingId: binding.bindingId, mode: "managed", cwd: binding.worktreePath } };
 				} catch (error) { record.state = "unknown"; record.error = String(error); writeExecution(binding, record); throw error; }
 			} finally { release(); }
 		},

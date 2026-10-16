@@ -1,3 +1,4 @@
+import { executionId } from "../../../runtime-tasks/execution-id.ts";
 import type { RuntimeTaskCapability } from "../../../runtime-tasks/facade.ts";
 import { taskResult, type RuntimeTaskMetadata } from "../../../runtime-tasks/contracts.ts";
 import type { TaskCoordinator } from "../../../task-ui/coordinator.ts";
@@ -35,11 +36,11 @@ export function createWorkflowManagement(options: {
           task.abortController.abort();
           for (const record of options.manager.listAgents()) if (record.workflowId === task.id) options.manager.abort(record.id);
         }
-        return taskResult(`task_type=workflow task_id=${task.id} run_id=${task.id}\nStop ${requested ? "requested" : "not needed"}; observed status=${task.status}. Worker/host execution may still be draining.`, meta());
+        return taskResult(`kind=workflow execution_id=${task.id}\nStop ${requested ? "requested" : "not needed"}; observed status=${task.status}. Worker/host execution may still be draining.`, meta());
       }
       if (params.action === "output") {
         if (task.terminalResolved) consume();
-        return taskResult(`task_type=workflow task_id=${task.id} run_id=${task.id}\nScript ${task.terminalResolved ? "return/error" : "still running"}:\n${task.terminalResolved ? task.terminalResult!.text : task.status}\n\nProgress logs (last 100 entries):\n${progressPreview(task.terminalResult?.logs ?? task.logs)}\nJournal: ${task.journalPath ?? "unavailable"}`, meta());
+        return taskResult(`kind=workflow execution_id=${task.id}\nScript ${task.terminalResolved ? "return/error" : "still running"}:\n${task.terminalResolved ? task.terminalResult!.text : task.status}\n\nProgress logs (last 100 entries):\n${progressPreview(task.terminalResult?.logs ?? task.logs)}\nJournal: ${task.journalPath ?? "unavailable"}`, meta());
       }
       if (params.action !== "wait") return taskResult("Unsupported workflow action.", { ...meta(), error_code: "unsupported" });
       const lease = coordinator.registerWait<Awaited<WorkflowTask["terminal"]>>({ identity, label: task.workflowName ?? task.id, kind: "retrieval", signal,
@@ -47,11 +48,11 @@ export function createWorkflowManagement(options: {
       });
       void task.terminal.then(terminal => lease.complete(terminal));
       try {
-        if (!lease.settled) try { onUpdate?.(taskResult(`task_id=${task.id} run_id=${task.id}\nWaiting for workflow script return.`, { ...meta(), wait_outcome: "waiting" })); } catch { /* optional presentation sink */ }
+        if (!lease.settled) try { onUpdate?.(taskResult(`execution_id=${task.id}\nWaiting for workflow script return.`, { ...meta(), wait_outcome: "waiting" })); } catch { /* optional presentation sink */ }
         const outcome = await lease.result;
         if (!options.active() || tasks.get(task.id) !== task) return taskResult("Workflow activation is closed.", { ...meta(), error_code: "closed", wait_outcome: "cancelled" });
-        if (outcome.kind !== "completed") return taskResult(`task_id=${task.id} run_id=${task.id}\nWait ${outcome.kind === "detached" ? "released" : "cancelled"}; target unchanged.`, { ...meta(), wait_outcome: outcome.kind === "detached" ? "released" : "cancelled" });
-        return taskResult(`task_type=workflow task_id=${task.id} run_id=${task.id}\nScript return/error:\n${outcome.value.text}\n\nProgress logs (last 100 entries):\n${progressPreview(outcome.value.logs)}`, { ...meta(), wait_outcome: "completed" });
+        if (outcome.kind !== "completed") return taskResult(`execution_id=${task.id}\nWait ${outcome.kind === "detached" ? "released" : "cancelled"}; target unchanged.`, { ...meta(), wait_outcome: outcome.kind === "detached" ? "released" : "cancelled" });
+        return taskResult(`kind=workflow execution_id=${task.id}\nScript return/error:\n${outcome.value.text}\n\nProgress logs (last 100 entries):\n${progressPreview(outcome.value.logs)}`, { ...meta(), wait_outcome: "completed" });
       } finally { if (!lease.settled) lease.dispose(); }
     },
   };

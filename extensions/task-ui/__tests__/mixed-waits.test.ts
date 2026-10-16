@@ -62,7 +62,7 @@ void it("one shared /bg releases mixed shell/agent launch and retrieval waits wi
         });
         const run = manager.getRun(id)!;
         const agentLaunch = registerAgentWait(manager, coordinator, run, "launch", agentParent.signal);
-        const shellRetrieval = tools.get("task_manage")!.execute("mixed-shell-retrieval", { action: "wait", task_id: job.id }, undefined, undefined, ctx);
+        const shellRetrieval = tools.get("process_manage")!.execute("mixed-shell-retrieval", { action: "wait", task_id: job.id }, undefined, undefined, ctx);
         const agentRetrieval = registerAgentWait(manager, coordinator, run, "retrieval");
         const before = coordinator.list();
         assert.equal(before.length, 2);

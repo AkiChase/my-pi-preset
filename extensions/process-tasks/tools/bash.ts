@@ -109,8 +109,8 @@ export function registerBashTool(
   - In interactive mode, background_after_seconds controls how long to wait before backgrounding a still-running command (default: ${reg.config.timeoutMs / 1000}s). It does not terminate the command. Do not combine it with run_in_background=true. Use /bg to release a current wait without stopping execution.
   - In non-interactive mode, foreground commands wait until completion; background_after_seconds is not supported. Background tasks remain session-owned and are stopped when the session closes.
   - Foreground completion returns a tool result; background completion sends a notification automatically unless its final result has already been delivered. Do not poll list/status merely to detect completion.
-  - A background launch result means started, not successfully completed. Keep the returned task_id and run_id. Use task_manage status/output/wait/stop to inspect, read, await, or stop the bash task; do not include task_type in these targeted calls. task_manage also manages monitor, subagent, and workflow tasks.
-  - Never use sleep merely to wait for a task. Use task_manage action="wait", or a condition loop that exits when ready.
+  - A background launch result means started, not successfully completed. Keep the returned task_id. Use process_manage status/output/wait/stop to inspect, read, await, or stop the bash task; do not include task_type in these targeted calls. process_manage also manages monitor tasks; use agent_manage for subagent/workflow executions.
+  - Never use sleep merely to wait for a task. Use process_manage action="wait", or a condition loop that exits when ready.
   - Examples:
     Foreground: {"command":"git status --short","description":"Inspect working tree"}
     Immediate background: {"command":"npm test","run_in_background":true,"description":"Run tests"}

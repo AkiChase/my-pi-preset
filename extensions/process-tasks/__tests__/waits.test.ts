@@ -137,9 +137,9 @@ void it("already-aborted retrieval and wait:false return promptly without stoppi
         const { job, finish } = h.fakeJob();
         const signal = new AbortController();
         signal.abort();
-        const result = await h.tools.get("task_manage")!.execute("retrieve", { action: "wait", task_id: job.id }, signal.signal, undefined, h.ctx);
+        const result = await h.tools.get("process_manage")!.execute("retrieve", { action: "wait", task_id: job.id }, signal.signal, undefined, h.ctx);
         assert.match(result.content[0]!.text!, /Wait cancelled; target unchanged/);
-        const peek = await h.tools.get("task_manage")!.execute("peek", { action: "status", task_id: job.id }, undefined, undefined, h.ctx);
+        const peek = await h.tools.get("process_manage")!.execute("peek", { action: "status", task_id: job.id }, undefined, undefined, h.ctx);
         assert.match(peek.content[0]!.text!, /: running/);
         assert.doesNotMatch(peek.content[0]!.text!, /finished/);
         assert.equal(job.outcomeSurfaced, undefined);
@@ -155,8 +155,8 @@ void it("two retrieval waits share counts; cancelling one cannot release the sib
     try {
         const { job, finish } = h.fakeJob();
         const signal = new AbortController();
-        const a = h.tools.get("task_manage")!.execute("a", { action: "wait", task_id: job.id }, signal.signal, undefined, h.ctx);
-        const b = h.tools.get("task_manage")!.execute("b", { action: "wait", task_id: job.id }, undefined, undefined, h.ctx);
+        const a = h.tools.get("process_manage")!.execute("a", { action: "wait", task_id: job.id }, signal.signal, undefined, h.ctx);
+        const b = h.tools.get("process_manage")!.execute("b", { action: "wait", task_id: job.id }, undefined, undefined, h.ctx);
         assert.equal(h.source.list()[0]!.executionMode, "background");
         assert.equal(h.source.list()[0]!.waitCount, 2);
         signal.abort();
@@ -176,7 +176,7 @@ for (const winner of ["completion", "detach"] as const) {
         const h = harness();
         try {
             const { job, finish } = h.fakeJob();
-            const waits = ["a", "b"].map((id) => h.tools.get("task_manage")!.execute(id, { action: "wait", task_id: job.id }, undefined, undefined, h.ctx));
+            const waits = ["a", "b"].map((id) => h.tools.get("process_manage")!.execute(id, { action: "wait", task_id: job.id }, undefined, undefined, h.ctx));
             finish();
             if (winner === "completion") await tick();
             else await Promise.resolve(); // exit marked terminal, retrieval continuation still queued

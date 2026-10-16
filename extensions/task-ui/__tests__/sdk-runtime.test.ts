@@ -206,7 +206,7 @@ void it("actual SDK AgentSession.reload invokes old shutdown before activation r
         await AgentSession.prototype.reload.call(seam as unknown as AgentSession);
         assert.deepEqual(order, ["reload", "invalidate", "create"]);
         assert.equal(processExists(pid), false); assert.equal(agentStops, 1);
-        assert.match((await old.execute("task_manage", { action: "output", task_id: "old" })).content[0].text!, /closed/);
+        assert.match((await old.execute("process_manage", { action: "output", task_id: "old" })).content[0].text!, /closed/);
         await assert.rejects(old.execute("bash", { command: "echo old" }), /closed/);
         assert.ok(fresh); assert.equal(fresh.reg.totalStarted, 0);
         await fresh.execute("bash", { command: "printf FRESH_RELOAD" });

@@ -1,3 +1,4 @@
+import { createToolCallHeading } from "../../beautify/tool-call-heading.ts";
 import { launchMetadata, launchText } from "../../runtime-tasks/launch.ts";
 import type { Model } from "@earendil-works/pi-ai";
 import {
@@ -162,7 +163,8 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
 
   const agentTool = defineTool({
     name: NESTED_TOOL_NAMES[0],
-    label: "Agent",
+    label: "subagent_run",
+    renderCall: (args, theme, context) => createToolCallHeading({ name: "subagent_run", detail: `${args.subagent_type ?? ""} · ${args.description ?? ""}`, theme, context }),
     description:
       "Launch a child-safe nested subagent for bounded delegated work. " +
       "Only use agent types allowed by this parent agent; nesting is depth-limited.",
@@ -176,7 +178,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
       ...thinkingParam(),
       run_in_background: Type.Optional(
         Type.Boolean({
-          description: "Defaults to false for nested spawns — the call blocks and returns the child's result inline. Set true only for work you will collect later with task_manage; a detached child is stopped when you finish.",
+          description: "Defaults to false for nested spawns — the call blocks and returns the child's result inline. Set true only for work you will collect later with agent_manage; a detached child is stopped when you finish.",
         }),
       ),
       resume: Type.Optional(Type.String({ description: "Resume a nested agent owned by this parent." })),
@@ -243,7 +245,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
         defaultRunInBackground: false,
       });
       if (invocation.runInBackground && context.canCollectBackground?.() === false) {
-        return textResult("Nested background launch requires an available owned task_manage tool. Use foreground execution or allow task_manage.", true);
+        return textResult("Nested background launch requires an available owned agent_manage tool. Use foreground execution or allow agent_manage.", true);
       }
       let model = ctx.model;
       if (invocation.modelInput) {
@@ -396,7 +398,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
 
   const steerTool = defineTool({
     name: NESTED_TOOL_NAMES[1],
-    label: "Steer Nested Agent",
+    label: "subagent_message",
     description: "Send guidance to a running nested agent owned by this parent.",
     parameters: Type.Object({
       agent_id: Type.String(),

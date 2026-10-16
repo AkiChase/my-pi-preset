@@ -69,7 +69,7 @@ const { DEFAULTS } = await import(new URL("process-tasks/config.ts", root));
 const { add, createRunningJob } = await import(new URL("process-tasks/registry.ts", root));
 const { createProcessTaskSource } = await import(new URL("process-tasks/source.ts", root));
 const { createProcessManagement } = await import(new URL("process-tasks/management.ts", root));
-const { createRuntimeTaskFacade, registerRuntimeTaskTool } = await import(new URL("runtime-tasks/facade.ts", root));
+const { createRuntimeTaskFacade } = await import(new URL("runtime-tasks/facade.ts", root));
 const reg = new BackgroundRegistry({ ...DEFAULTS, logDir: dir });
 const make = (id, logPath) => {
   const job = createRunningJob({ id, command: "offline fixture", pid: 0, logPath, toolCallId: id });
@@ -79,9 +79,11 @@ const make = (id, logPath) => {
 const bad = make("bad", badPath);
 const good = make("good", goodPath);
 const source = createProcessTaskSource(reg);
-const facade = createRuntimeTaskFacade([createProcessManagement(reg, source)]);
+const { registerManagementTool } = await import(new URL("runtime-tasks/tools.ts", root));
+const capabilities = [createProcessManagement(reg, source)];
+const facade = createRuntimeTaskFacade(capabilities);
 let tool;
-registerRuntimeTaskTool({ registerTool(definition) { tool = definition; } }, facade);
+registerManagementTool({ registerTool(definition) { tool = definition; } }, "process", capabilities);
 const ctx = { cwd: dir };
 const run = params => tool.execute("log-error-probe", params, undefined, undefined, ctx);
 const text = result => result.content.map(block => block.type === "text" ? block.text : "").join("\n");
@@ -98,29 +100,29 @@ try {
   closed();
   if (change) {
     assert.equal(result.isError, true);
-    assert.equal(result.details.runtimeTask.error_code, "closed");
+    assert.equal(result.details.runtimeManagement.error_code, "closed");
     assert.doesNotMatch(text(result), /needle (normal|fallback|partial)/);
     console.log(JSON.stringify({ scenario, change, target, error_code: "closed", streams: streams.length }));
   } else {
     const unavailable = ["missing", "directory", "unreadable"].includes(scenario);
     if (unavailable) {
       assert.equal(result.isError, true);
-      assert.equal(result.details.runtimeTask.error_code, "log_error");
+      assert.equal(result.details.runtimeManagement.error_code, "log_error");
       assert.match(text(result), /Cannot read log|cannot read/i);
       assert.doesNotMatch(text(result), /No matches for/);
-      assert.equal(result.details.runtimeTask.task_id, bad.id);
+      assert.equal(result.details.runtimeManagement.task_id, bad.id);
       assert.notEqual(bad.outcomeSurfaced, true);
       const global = await run({ action: "search", pattern: "needle" });
       closed();
       assert.equal(global.isError, true);
-      assert.equal(global.details.runtimeTask.error_code, "log_error");
-      assert.equal(global.details.runtimeTask.count, 1);
+      assert.equal(global.details.runtimeManagement.error_code, "log_error");
+      assert.equal(global.details.runtimeManagement.count, 1);
       assert.match(text(global), /incomplete/i);
       assert.match(text(global), /needle normal/);
       assert.match(text(global), /bad\.log/);
     } else {
       assert.notEqual(result.isError, true);
-      assert.equal(result.details.runtimeTask.count, 1, "discard partial streamed hits before tail fallback");
+      assert.equal(result.details.runtimeManagement.count, 1, "discard partial streamed hits before tail fallback");
       assert.match(text(result), /log tail/);
       assert.match(text(result), /needle fallback/);
       assert.doesNotMatch(text(result), /needle partial/);
@@ -130,15 +132,15 @@ try {
     const next = await run({ action: "search", task_id: good.id, pattern: "NEEDLE", ignore_case: true, context: 1 });
     closed();
     assert.notEqual(next.isError, true);
-    assert.equal(next.details.runtimeTask.count, 1);
+    assert.equal(next.details.runtimeManagement.count, 1);
     assert.match(text(next), /:2: needle normal/);
     const output = await run({ action: "output", task_id: good.id, offset: 7, limit: 6 });
-    assert.deepEqual(output.details.runtimeTask.range, { start: 7, end: 13, size: Buffer.byteLength(body), omitted_before: 7, omitted_after: Buffer.byteLength(body) - 13 });
+    assert.deepEqual(output.details.runtimeManagement.range, { start: 7, end: 13, size: Buffer.byteLength(body), omitted_before: 7, omitted_after: Buffer.byteLength(body) - 13 });
     assert.equal(fs.readFileSync(goodPath, "utf8"), body);
     if (scenario === "directory") assert.ok(fs.statSync(badPath).isDirectory());
     else if (scenario === "missing") assert.equal(fs.existsSync(badPath), false);
     else assert.equal(fs.readFileSync(badPath, "utf8"), "before\nneedle fallback\nafter\n");
-    console.log(JSON.stringify({ scenario, error_code: result.details.runtimeTask.error_code ?? null, streams: streams.length, subsequent: "ok", retained: true }));
+    console.log(JSON.stringify({ scenario, error_code: result.details.runtimeManagement.error_code ?? null, streams: streams.length, subsequent: "ok", retained: true }));
   }
 } finally {
   facade.close(); source.dispose(); reg.coordinator.dispose();

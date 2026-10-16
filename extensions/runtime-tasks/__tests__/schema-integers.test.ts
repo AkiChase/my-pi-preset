@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
 import { validateToolArguments } from "@earendil-works/pi-ai";
-import { createRuntimeTaskFacade, runtimeTaskTool } from "../facade.ts";
+import { managementTool } from "../tools.ts";
 
 it("task_manage rejects fractional paging before host integer coercion can discard it", () => {
-  const tool = runtimeTaskTool(createRuntimeTaskFacade([]));
+  const tool = managementTool("process", []).tool;
   const validate = (args: Record<string, string | number>) => validateToolArguments(tool,
     { type: "toolCall", id: "call", name: tool.name, arguments: args });
   // Each paging field is reachable only through the action that accepts it.

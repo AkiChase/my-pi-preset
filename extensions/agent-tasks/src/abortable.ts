@@ -2,7 +2,7 @@
  * abortable.ts — race a promise against an AbortSignal without cancelling the
  * underlying work.
  *
- * Used by the `task_manage` wait paths (top-level and nested): pressing
+ * Used by the `agent_manage` wait paths (top-level and nested): pressing
  * Esc cancels only the caller's wait; the background child keeps running and its
  * result stays unconsumed. The listener is removed on every settle path so the
  * signal accumulates no handlers, and a late settlement of the wrapped promise

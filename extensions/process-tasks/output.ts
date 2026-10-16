@@ -128,7 +128,7 @@ export function readLastLine(logPath: string, scanBytes = 2_048): string {
 /**
  * The last `maxLines` non-empty lines of a log, ANSI-stripped and bounded by
  * `maxChars` of trailing bytes — what a failure notification inlines so the
- * model can see *why* a job failed without a second `task_manage output` round-trip.
+ * model can see *why* a job failed without a second `process_manage output` round-trip.
  *
  * Progress-bar redraws (`\r`) collapse to their final segment, same as
  * readLastLine: a 500-frame download bar would otherwise eat the whole budget
@@ -220,7 +220,7 @@ export type ToolTextUpdate = (update: {
 /**
  * Stream a log file's live tail into a tool's onUpdate callback — the shared
  * "show live output while a job runs" mechanic used by bash and the
- * task_manage wait action. Returns the poller's stop handle.
+ * process_manage wait action. Returns the poller's stop handle.
  */
 export function streamLog(
     logPath: string,

@@ -7,7 +7,8 @@ import { loadConfig as loadTaskUIConfig } from "./task-ui/config.ts";
 import { registerTaskControls } from "./task-ui/controls.ts";
 import { registerDownOpener } from "./task-ui/editor.ts";
 import { createTaskUIOwner } from "./task-ui/owner.ts";
-import { createRuntimeTaskFacade, runtimeTaskTool, type RuntimeTaskCapability } from "./runtime-tasks/facade.ts";
+import { type RuntimeTaskCapability } from "./runtime-tasks/facade.ts";
+import { managementTool } from "./runtime-tasks/tools.ts";
 import { childManagement, childManagementRegistered } from "./runtime-tasks/child-handoff.ts";
 import processTasks from "./process-tasks/index.ts";
 import agentTasks, { runInChildSessionContext } from "./agent-tasks/src/index.ts";
@@ -27,11 +28,12 @@ export default async function taskComposition(pi: ExtensionAPI): Promise<void> {
   for (const warning of [...uiLoad.warnings, ...warnings]) console.error(`[task-ui] config: ${warning}`);
   let reportResult: ((id: string, result: import("./runtime-tasks/contracts.ts").RuntimeTaskResult) => import("./runtime-tasks/contracts.ts").RuntimeTaskResult) | undefined;
   agentTasks(pi, { coordinator, lifecycle, onManagement: capability => capabilities.push(capability), onManagementResult: reporter => { reportResult = reporter; } });
-  const facade = createRuntimeTaskFacade(capabilities);
-  lifecycle.onClose(() => { facade.close(); reportResult = undefined; });
-  const managementTool = runtimeTaskTool(facade, (id, result) => reportResult?.(id, result) ?? result);
-  pi.registerTool(managementTool);
-  childManagementRegistered(managementTool);
+  const process = managementTool("process", capabilities);
+  const agent = managementTool("agent", capabilities, (id, result) => reportResult?.(id, result) ?? result);
+  lifecycle.onClose(() => { process.close(); agent.close(); reportResult = undefined; });
+  pi.registerTool(process.tool);
+  pi.registerTool(agent.tool);
+  childManagementRegistered(agent.tool);
   pi.on("session_shutdown", async () => { await lifecycle.shutdown(); });
 
   registerDownOpener(pi, lifecycle, uiLoad.config.downOpener, uiOwner);

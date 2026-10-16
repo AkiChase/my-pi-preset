@@ -1,3 +1,5 @@
+import { createToolCallHeading } from "../../beautify/tool-call-heading.ts";
+import { executionId } from "../../runtime-tasks/execution-id.ts";
 import { launchMetadata, launchText, isLaunchMetadata } from "../../runtime-tasks/launch.ts";
 import { createAgentManagement } from "./management.ts";
 import { createWorkflowManagement } from "./workflow/management.ts";
@@ -12,7 +14,7 @@ import { TaskCoordinator } from "../../task-ui/coordinator.ts";
  *   subagent_run      — LLM-callable: spawn or resume a subagent
  *   subagent_workflow — LLM-callable: execute an opted-in workflow
  *   subagent_message  — LLM-callable: guide a running subagent
- * Management is registered once by composition as task_manage.
+ * Management is registered once by composition as agent_manage.
  *
  * Commands:
  *   /agents                 — Interactive agent management menu
@@ -23,7 +25,7 @@ import { isAbsolute, join } from "node:path";
 import { defineTool, type ExtensionAPI, type ExtensionCommandContext, type ExtensionContext, getAgentDir, getSettingsListTheme } from "@earendil-works/pi-coding-agent";
 import { Container, Key, matchesKey, type SettingItem, SettingsList, Spacer, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
-import { hasAgentBadge, renderAgentName } from "./agent-color.ts";
+import { renderAgentName } from "./agent-color.ts";
 import { buildNewAgentFile, disableInContent, enableInContent, isEmptyStub, locateAgentFile, personalAgentsDir, projectAgentsDir, serializeAgentFile } from "./agent-file-toggle.ts";
 import type { AgentManagerDependencies } from "./agent-manager.ts";
 import { createAgentTaskSource } from "./source.ts";
@@ -201,13 +203,14 @@ function formatTaskNotification(record: AgentRecord, resultMaxLen: number, showC
 
   const resultPreview = record.result
     ? record.result.length > resultMaxLen
-      ? record.result.slice(0, resultMaxLen) + "\n...(truncated, use task_manage for full output)"
+      ? record.result.slice(0, resultMaxLen) + "\n...(truncated, use agent_manage for full output)"
       : record.result
     : "No output.";
 
   return [
     `<task-notification>`,
-    `<task-id>${record.id}</task-id>`,
+    `<agent-id>${record.id}</agent-id>`,
+    `<execution-id>${executionId({ taskId: record.id, runId: record.runId ?? "1" }, "subagent")}</execution-id>`,
     record.toolCallId ? `<tool-use-id>${escapeXml(record.toolCallId)}</tool-use-id>` : null,
     record.outputFile ? `<output-file>${escapeXml(record.outputFile)}</output-file>` : null,
     `<status>${escapeXml(status)}</status>`,
@@ -515,7 +518,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
   const pendingUsage = new PendingUsagePool();
 
   // ---- Cancellable pending notifications ----
-  // Holds notifications briefly so task_manage can cancel them
+  // Holds notifications briefly so agent_manage can cancel them
   // before they reach pi.sendMessage (fire-and-forget).
   const pendingNudges = new Map<string, ReturnType<typeof setTimeout>>();
   const NUDGE_HOLD_MS = 200;
@@ -613,7 +616,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
 
         pi.sendMessage<NotificationDetails>({
           customType: "subagent-notification",
-          content: `Background agent group completed: ${label}\n\n${notifications}\n\nUse task_manage for full output.`,
+          content: `Background agent group completed: ${label}\n\n${notifications}\n\nUse agent_manage for full output.`,
           display: true,
           details,
         }, { deliverAs: "followUp", triggerTurn: true });
@@ -902,7 +905,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
           abort: (id) => manager.abort(id),
           consumeResult: (id) => {
             const record = resolveAgentRef(id);
-            // Same guard as task_manage: a running agent has no result
+            // Same guard as agent_manage: a running agent has no result
             // to consume, and its notification is still the caller's only
             // signal that it finished.
             if (!record || record.parentAgentId) return false;
@@ -1673,7 +1676,7 @@ Terse command-style prompts produce shallow, generic work.
   // of a second implementation that has to be kept in step with this one.
   const agentTool = defineTool({
     name: SUBAGENT_TOOL_NAMES.AGENT,
-    label: "Agent",
+    label: "subagent_run",
     description: agentToolDescription,
     promptSnippet: "Launch autonomous sub-agents for complex multi-step tasks",
     promptGuidelines: [
@@ -1692,7 +1695,7 @@ Terse command-style prompts produce shallow, generic work.
       name: Type.Optional(
         Type.String({
           description:
-            'Optional memorable name for this agent, e.g. "auth-audit", so it can be addressed as `@name` at the prompt and by subagent_message. Use its returned task_id with task_manage. Names accept letters, digits, `_` and `-`. Worth setting when several agents of the same type run at once; omit for one-off work. The agent stays reachable by its type either way.',
+            'Optional memorable name for this agent, e.g. "auth-audit", so it can be addressed as `@name` at the prompt and by subagent_message. Use its returned execution_id with agent_manage. Names accept letters, digits, `_` and `-`. Worth setting when several agents of the same type run at once; omit for one-off work. The agent stays reachable by its type either way.',
         }),
       ),
       subagent_type: Type.String({
@@ -1732,24 +1735,8 @@ Terse command-style prompts produce shallow, generic work.
     // ---- Custom rendering: Claude Code style ----
 
     renderCall(args, theme, context) {
-      // A badge closes its own background, which would clear the tool block's row tint
-      // for the rest of the line, so the badge restores it. The tint is opened here too:
-      // the TUI's Box paints it, but HTML export takes it from CSS, and restoring a
-      // background the line never opened is what banded the export before. The line is
-      // deliberately left open — Box.applyBackgroundToLine pads to width and *then*
-      // wraps, so closing here would leave that padding untinted, and HTML export closes
-      // any open span per line anyway. No badge means no tint, so an uncolored agent
-      // renders exactly the line it always did.
-      const rowBackground = hasAgentBadge(args.subagent_type)
-        ? theme.getBgAnsi(context.isPartial ? "toolPendingBg" : context.isError ? "toolErrorBg" : "toolSuccessBg")
-        : "";
-      const desc = args.description ?? "";
-      const name = renderAgentName(args.subagent_type, theme, {
-        fallbackColor: "toolTitle",
-        restoreBackground: rowBackground,
-        bold: true,
-      });
-      return new Text(rowBackground + "▸ " + name + (desc ? "  " + theme.fg("muted", desc) : ""), 0, 0);
+      const detail = [String(args.subagent_type ?? ""), String(args.description ?? "")].filter(Boolean).join(" · ");
+      return createToolCallHeading({ name: "subagent_run", detail, theme, context });
     },
 
     renderResult(result, { expanded, isPartial }, theme, renderContext) {
@@ -1808,7 +1795,7 @@ Terse command-style prompts produce shallow, generic work.
               line += "\n" + theme.fg("dim", `  ${l}`);
             }
             if (resultText.split("\n").length > 50) {
-              line += "\n" + theme.fg("muted", "  ... (use task_manage action=output with verbose for full output)");
+              line += "\n" + theme.fg("muted", "  ... (use agent_manage action=output with execution_id and verbose for full output)");
             }
           }
         } else {
@@ -2096,7 +2083,7 @@ Terse command-style prompts produce shallow, generic work.
           if (existing.status === "running" || existing.status === "queued") {
             return textResult(
               `Agent "${params.resume}" is still ${existing.status} — it can only be resumed once its current run finishes.\n` +
-              `Use subagent_message to send it a message mid-run, or task_manage action=wait to wait for it.`,
+              `Use subagent_message to send it a message mid-run, or agent_manage action=wait to wait for it.`,
             );
           }
 
@@ -2118,7 +2105,7 @@ Terse command-style prompts produce shallow, generic work.
             (record.outputFile ? `Output file: ${record.outputFile}\n` : "") +
             (isQueued ? `Position: queued (max ${manager.getMaxConcurrent()} concurrent)\n` : "") +
             `\nYou will be notified when this agent completes.\n` +
-            `Use task_manage action=output to retrieve full results, or subagent_message to send it messages.`,
+            `Use agent_manage action=output to retrieve full results, or subagent_message to send it messages.`,
             { ...detailBaseFor(record), toolUses: record.toolUses, tokens: "", durationMs: 0, status: "background" as const, agentId: id },
           );
         }
@@ -2150,7 +2137,7 @@ Terse command-style prompts produce shallow, generic work.
         const outcome = await lease.result;
         assertActive();
         if (outcome.kind === "detached") {
-          return textResult(`${overrideNoteFor(existing)}Agent resumed in background.\nAgent ID: ${id}\nRun ID: ${run.identity.runId}\nThe same session continues; you will be notified when it completes.`,
+          return textResult(`${overrideNoteFor(existing)}Agent resumed in background.\nAgent ID: ${id}\nExecution ID: ${executionId(run.identity, "subagent")}\nThe same session continues; you will be notified when it completes.`,
             { ...detailBaseFor(existing), status: "background" as const, agentId: id, toolUses: existing.toolUses, tokens: "", durationMs: 0 });
         }
         if (outcome.kind !== "completed") return errorResult(`Agent ${id} interrupted.`);
@@ -2254,7 +2241,7 @@ Terse command-style prompts produce shallow, generic work.
           (record?.outputFile ? `Output file: ${record.outputFile}\n` : "") +
           (isQueued ? `Position: queued (max ${manager.getMaxConcurrent()} concurrent)\n` : "") +
           `\nYou will be notified when this agent completes.\n` +
-          `Use task_manage action=output to retrieve full results, or subagent_message to send it messages.\n` +
+          `Use agent_manage action=output to retrieve full results, or subagent_message to send it messages.\n` +
           `Do not duplicate this agent's work.`,
           { ...detailBaseFor(record), toolUses: 0, tokens: "", durationMs: 0, status: "background" as const, agentId: id },
         );
@@ -2374,7 +2361,7 @@ Terse command-style prompts produce shallow, generic work.
         const outcome = await lease.result;
         assertActive();
         if (outcome.kind === "detached") {
-          return textResult(`${fallbackNote}${overrideNoteFor(live)}Agent continuing in background.\nAgent ID: ${fgId}\nRun ID: ${run.identity.runId}\n` +
+          return textResult(`${fallbackNote}${overrideNoteFor(live)}Agent continuing in background.\nAgent ID: ${fgId}\nExecution ID: ${executionId(run.identity, "subagent")}\n` +
             (live.outputFile ? `Output file: ${live.outputFile}\n` : "") + "The same execution continues; you will be notified when it completes.",
             { ...detailBaseFor(live), toolUses: live.toolUses, tokens: "", durationMs: 0, status: "background" as const, agentId: fgId });
         }
@@ -2633,12 +2620,8 @@ Terse command-style prompts produce shallow, generic work.
       ),
     }, { additionalProperties: false }),
 
-    renderCall(args, theme) {
-      return new Text(
-        `${theme.fg("toolTitle", "▸ ")}${theme.bold(theme.fg("toolTitle", "subagent_workflow"))}  ${theme.fg("muted", workflowCallName(args))}`,
-        0,
-        0,
-      );
+    renderCall(args, theme, context) {
+      return createToolCallHeading({ name: "subagent_workflow", detail: workflowCallName(args), theme, context });
     },
 
     renderResult(result, _options, theme, renderContext) {
@@ -2923,7 +2906,7 @@ Terse command-style prompts produce shallow, generic work.
         `Description: ${record.description}\n\n`;
 
       if (record.status === "running" || record.status === "queued") {
-        output += `Agent is still ${record.status}. Use task_manage action=wait or check back later.`;
+        output += `Agent is still ${record.status}. Use agent_manage action=wait or check back later.`;
       } else if (record.status === "error") {
         output += `Error: ${record.error}${partialOutputSuffix(record)}`;
       } else {
@@ -2945,7 +2928,7 @@ Terse command-style prompts produce shallow, generic work.
 
   registerToolReportingUsage(defineTool({
     name: SUBAGENT_TOOL_NAMES.STEER,
-    label: "Steer Agent",
+    label: "subagent_message",
     description:
       "Send a steering message to a running agent. The message will interrupt the agent after its current tool execution " +
       "and be injected into its conversation, allowing you to redirect its work mid-run. Only works on running agents.",

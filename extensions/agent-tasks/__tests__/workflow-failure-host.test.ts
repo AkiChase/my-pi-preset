@@ -1,3 +1,4 @@
+import { registerManagementTool } from "../../runtime-tasks/tools.ts";
 import "./source-loader.mjs";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -7,7 +8,7 @@ import { it } from "node:test";
 import vm from "node:vm";
 import { WORKER_SOURCE } from "../src/workflow/worker-source.ts";
 import type { ExtensionAPI, ExtensionToolContext } from "@earendil-works/pi-coding-agent";
-import { createRuntimeTaskFacade, registerRuntimeTaskTool, type RuntimeTaskCapability } from "../../runtime-tasks/facade.ts";
+import { createRuntimeTaskFacade, type RuntimeTaskCapability } from "../../runtime-tasks/facade.ts";
 import { TaskCoordinator } from "../../task-ui/coordinator.ts";
 import { TaskLifecycle } from "../../task-ui/lifecycle.ts";
 import { observeWorkflowControl } from "./source-loader.mjs";
@@ -44,7 +45,7 @@ async function harness() {
         managerDependencies: { runAgent: async () => { throw new Error("No provider is allowed in these scripts"); } },
     });
     const facade = createRuntimeTaskFacade(capabilities); lifecycle.onClose(facade.close);
-    registerRuntimeTaskTool(pi, facade);
+    registerManagementTool(pi, "agent", capabilities);
     const ctx = { cwd: root, hasUI: false, mode: "print", ui: { setWidget() {}, setStatus() {}, notify() {} },
         sessionManager: { getSessionId: () => "workflow-failure-test", getBranch: () => [] }, modelRegistry: {},
     } as unknown as ExtensionToolContext;
@@ -78,7 +79,7 @@ for (const construct of ["parallel", "pipeline"]) void it(`registered ${construc
         const task = h.tasks.get(id)!;
         assert.ok(task); assert.equal(task.status, "completed"); assert.equal(task.value, "value".repeat(2000));
         const reason = construct === "parallel" ? /Check.*parallel\(\) branch 0.*thunk failed distinctly/ : /Check.*pipeline\(\) item 0 stage 0.*stage failed distinctly/;
-        for (const text of [String(notice.content), notice.details.resultPreview, (await task.terminal).text, resultText(await h.execute("task_manage", { action: "output", task_id: id })), resultText(await h.execute("task_manage", { action: "wait", task_id: id }))]) {
+        for (const text of [String(notice.content), notice.details.resultPreview, (await task.terminal).text, resultText(await h.execute("agent_manage", { action: "output", execution_id: id })), resultText(await h.execute("agent_manage", { action: "wait", execution_id: id }))]) {
             assert.match(text, /Tolerated failures \(1\)/);
             assert.match(text, reason);
         }
@@ -94,7 +95,7 @@ void it("registered workflow author failure appears in terminal, notification an
         const id = (launched.details as { taskId: string }).taskId;
         const notice = await h.notice, task = h.tasks.get(id)!;
         assert.equal(task.status, "failed"); assert.equal(task.agentCount, 0); assert.equal(task.value, undefined);
-        for (const text of [String(notice.content), notice.details.resultPreview, (await task.terminal).text, resultText(await h.execute("task_manage", { action: "output", task_id: id }))]) {
+        for (const text of [String(notice.content), notice.details.resultPreview, (await task.terminal).text, resultText(await h.execute("agent_manage", { action: "output", execution_id: id }))]) {
             assert.match(text, /agent\(prompt\).*non-empty string/);
         }
     } finally { await h.close(); }
@@ -109,7 +110,7 @@ for (const syntax of [false, true]) void it(`registered nested ${syntax ? "synta
         const id = (launched.details as { taskId: string }).taskId;
         const notice = await h.notice, task = h.tasks.get(id)!;
         assert.equal(task.status, "failed"); assert.equal(task.agentCount, 0); assert.equal(task.value, undefined);
-        for (const text of [String(notice.content), notice.details.resultPreview, (await task.terminal).text, resultText(await h.execute("task_manage", { action: "output", task_id: id }))]) {
+        for (const text of [String(notice.content), notice.details.resultPreview, (await task.terminal).text, resultText(await h.execute("agent_manage", { action: "output", execution_id: id }))]) {
             assert.match(text, /workflow\(/);
             assert.match(text, syntax ? /Unexpected token|SyntaxError/ : /not found|ENOENT|cannot|could not/i);
             assert.doesNotMatch(text, /Tolerated failures/);

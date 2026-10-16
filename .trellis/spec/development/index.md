@@ -40,6 +40,15 @@ When overriding a built-in tool, explicitly replace its description/snippet/guid
 7. **Wrong vs correct:** wrong: treat a foreground waiting threshold as a kill deadline or interpret launch `exit_code:0` as success. Correct: detach at threshold, retain task identity, and wait/read the final result to determine success.
 
 
+## Split Runtime Management
+
+- `process_manage` handles bash/monitor with task_id; `agent_manage` handles subagent/workflow with execution_id. Do not register task_manage aliases or map old tool configuration. Keep action schemas flat and closed; action-field/type checks run before backend effects.
+- Encode subagent execution IDs canonically as exec_ + base64url JSON [agentId, internalRunId]; workflow execution IDs remain wf_ IDs. Encoding grants no authority: scope, ownership and exact current identity still gate every action. Resume invalidates new calls using the old Agent handle; already-admitted waits retain their original terminal. Do not add historical result storage.
+- Composition owns both registrations and shared lifecycle. Agent child-loader fallback/deny/narrow/active gates require agent_manage to collect nested background work; process_manage cannot substitute, and fallback cannot revive process capability.
+- Public launch/management envelopes use version 2 and group-specific IDs; internal source/coordinator identities remain unchanged. Project metadata only, never rewrite arbitrary result text to replace IDs. Notifications capture the execution identity and must not switch to a resumed run.
+- Custom call headings import `createToolCallHeading` from extensions/beautify/tool-call-heading.ts, not the extension entry. The component is stateless, independent of global theme initialization, width-safe and uses the real snake_case tool name first. It neither registers execution nor consumes results nor adds a second shell background. Business types are secondary plain detail; do not pass external ANSI as trusted style.
+- Validate good process output `{action:"output",task_id:"b",offset:0}`, good Agent wait `{action:"wait",execution_id:"exec_..."}`, and reject mismatched group IDs, old run_id/task_id Agent fields, unsupported verbose for workflow, unknown fields and malformed canonical handles with zero backend calls. See testing guidelines for natural-exit and actual loader regression.
+
 ## Lifecycle and Resource Ownership
 
 Factories may load without sessions: start long-lived processes, watchers, sockets and timers only in the owning session/command/tool. Every process, listener, timer, worker, dialog and pending callback needs a cleanup owner; `unref()` is not disposal.

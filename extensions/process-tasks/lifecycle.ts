@@ -281,7 +281,7 @@ export function markKilledSilently(reg: BackgroundRegistry, job: Job): void {
 
 /** Kill a job quietly and abort its registered monitors/timers. The outcome is
  *  marked surfaced BEFORE the kill so the exit handler's notification is
- *  suppressed (panel x, task_manage stop, session quit). */
+ *  suppressed (panel x, process_manage stop, session quit). */
 export function terminateJobSilently(reg: BackgroundRegistry, job: Job): void {
     if (isTerminalStatus(job.status)) return;
     markOutcomeSurfaced(job);
@@ -355,7 +355,7 @@ export function isBlankCommand(command: string): boolean {
 export const SLEEP_WAIT_GUIDANCE =
     "A fixed `sleep N` to wait wastes time and leaves a job lingering for the " +
     "full duration. Instead:\n" +
-    "• Waiting on a background job you started? Use task_manage action='wait' — it " +
+    "• Waiting on a background job you started? Use process_manage action='wait' — it " +
     "returns as soon as that job finishes.\n" +
     "• Waiting for a condition? Use the monitor tool, or a poll loop that EXITS " +
     "when ready (e.g. `until grep -q READY log; do sleep 0.5; done`).\n" +

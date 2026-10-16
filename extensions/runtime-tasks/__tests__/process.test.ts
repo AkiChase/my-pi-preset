@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import { syncBuiltinESMExports } from "node:module";
 import fs from "node:fs";
-import { runtimeTaskTool } from "../facade.ts";
+import { managementTool } from "../tools.ts";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -101,15 +101,16 @@ for (const target of [false, true]) for (const change of ["close", "replace"] as
   }) as typeof create);
   syncBuiltinESMExports();
   t.after(() => { t.mock.restoreAll(); syncBuiltinESMExports(); });
-  const tool = runtimeTaskTool(f.facade);
+  const registered = managementTool("process", [createProcessManagement(f.reg, f.source)]);
+  const tool = registered.tool;
   try {
     const { job } = f.makeJob();
     const pending = tool.execute("search", { action: "search", pattern: "match", ...(target ? { task_id: job.id } : {}) }, undefined, undefined, f.ctx);
-    if (change === "close") { f.facade.close(); f.reg.closed = true; }
+    if (change === "close") { f.facade.close(); registered.close(); f.reg.closed = true; }
     else f.reg.jobs.set(job.id, { ...job });
     const result = await pending;
     assert.equal(result.isError, true);
-    assert.equal(result.details.runtimeTask.error_code, "closed");
+    assert.equal(result.details.runtimeManagement.error_code, "closed");
     assert.doesNotMatch(result.content.map(block => block.type === "text" ? block.text : "").join(""), /match line/);
     assert.ok(streams.length > 0); assert.ok(streams.every(stream => stream.closed), "actual log fd closed before publishing");
     assert.equal(fs.readFileSync(job.logPath, "utf8"), "first line\nmatch line\nlast line\n", "log is preserved");

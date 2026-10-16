@@ -3,7 +3,7 @@
  * See PROVENANCE.md for the upstream commit this diverged from.
  *
  * Registers bash (override) and monitor (streaming-event watch).
- * Returns a finite management capability to composition's unique task_manage.
+ * Returns a finite management capability to composition's unique process_manage.
  * Also registers process diagnostic commands; shared controls belong to composition.
  */
 

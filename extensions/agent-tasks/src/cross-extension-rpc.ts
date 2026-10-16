@@ -13,6 +13,7 @@
  * completion-notification race, and what protocol version 2 does not promise.
  */
 
+import { executionId } from "../../runtime-tasks/execution-id.ts";
 import { assertSpawnInput, normalizeAgentDescription, parseSpawnOptions } from "./spawn-input.ts";
 import { isTopLevelAgent } from "./agent-manager.ts";
 import { type ModelRegistry, resolveModel } from "./model-resolver.ts";
@@ -44,10 +45,10 @@ export interface SpawnCapable {
    * to the two fields `isTopLevelAgent` reads, so the RPC layer keeps its
    * deliberately shallow view of the manager.
    */
-  getRecord(id: string): Pick<AgentRecord, "parentAgentId" | "workflowId"> | undefined;
+  getRecord(id: string): Pick<AgentRecord, "runId" | "parentAgentId" | "workflowId"> | undefined;
   /**
    * Mark a settled agent's result as read by the caller, suppressing the
-   * completion notification — what `task_manage` does when it returns
+   * completion notification — what `agent_manage` does when it returns
    * one. False when there is no such agent, or it has not settled yet.
    */
   consumeResult(id: string): boolean;
@@ -184,7 +185,9 @@ export function registerRpcHandlers(deps: RpcDeps): RpcHandle {
       // than an id for an agent that never ran.
       await manager.awaitStartup(id);
       if (!active()) throw new Error("Agent task activation is closing");
-      return { id };
+      const run = manager.getRecord(id);
+      if (!run?.runId) throw new Error("Spawned agent execution identity is unavailable");
+      return { id, execution_id: executionId({ taskId: id, runId: run.runId }, "subagent") };
     }, active,
   );
 

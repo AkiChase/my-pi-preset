@@ -19,7 +19,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { BUILTIN_TOOL_NAMES, getAgentConfig, getConfig, getMemoryToolNames, getReadOnlyMemoryToolNames, getToolNamesForType } from "./agent-types.ts";
 import { withChildManagement } from "../../runtime-tasks/child-handoff.ts";
-import { createRuntimeTaskFacade, runtimeTaskTool } from "../../runtime-tasks/facade.ts";
+import { managementTool } from "../../runtime-tasks/tools.ts";
 import { TaskCoordinator } from "../../task-ui/coordinator.ts";
 import { runInChildSessionContext } from "./child-context.ts";
 import { buildParentContext, extractText } from "./context.ts";
@@ -837,7 +837,7 @@ export async function runAgent(
     appendSystemPromptOverride: () => [],
   });
   const childManagementFactory = agentConfig?.allowedSubagents && !options.isolated &&
-    !agentConfig.disallowedTools?.includes("task_manage") && options.nestedRuntime &&
+    !agentConfig.disallowedTools?.includes("agent_manage") && options.nestedRuntime &&
     options.nestedRuntime.depth < (options.nestedRuntime.maxSubagentDepth ?? getMaxSubagentDepth())
       ? options.nestedRuntime.management : undefined;
   let compositionTool: import("@earendil-works/pi-coding-agent").ToolDefinition | undefined;
@@ -937,22 +937,22 @@ export async function runAgent(
   const nestedRuntime = options.nestedRuntime && options.nestedRuntime.depth < effectiveMaxDepth
     ? options.nestedRuntime
     : undefined;
-  const managementExtensions = noExtensions ? [] : loader.getExtensions().extensions.filter(extension => extension.tools.has("task_manage"));
+  const managementExtensions = noExtensions ? [] : loader.getExtensions().extensions.filter(extension => extension.tools.has("agent_manage"));
   // Never override a registered tool. Ext selectors are authoritative: an
   // owned-only custom tool must not bypass explicit extension-tool narrowing.
   const fallbackCoordinator = childManagementFactory && managementExtensions.length === 0 && extNames.size === 0
     ? new TaskCoordinator() : undefined;
-  const fallbackFacade = fallbackCoordinator ? createRuntimeTaskFacade([childManagementFactory!(fallbackCoordinator)]) : undefined;
-  const fallbackTools = fallbackFacade ? [runtimeTaskTool(fallbackFacade)] : [];
+  const fallbackFacade = fallbackCoordinator ? managementTool("agent", [childManagementFactory!(fallbackCoordinator)]) : undefined;
+  const fallbackTools = fallbackFacade ? [fallbackFacade.tool] : [];
   const compositionAllowed = compositionTool !== undefined && managementExtensions.some(extension => {
-    if (extension.tools.get("task_manage")?.definition !== compositionTool) return false;
+    if (extension.tools.get("agent_manage")?.definition !== compositionTool) return false;
     const canons = extensionCanonicalNames(extension.path);
     const narrowed = canons.map(name => narrowing.get(name)).find(Boolean);
-    return (extNames.size === 0 || canons.some(name => extNames.has(name))) && (!narrowed || narrowed.has("task_manage"));
+    return (extNames.size === 0 || canons.some(name => extNames.has(name))) && (!narrowed || narrowed.has("agent_manage"));
   });
   let childSession: AgentSession | undefined;
-  const canCollectBackground = () => !disallowedSet?.has("task_manage") &&
-    (fallbackFacade !== undefined || compositionAllowed) && (!childSession || childSession.getActiveToolNames().includes("task_manage"));
+  const canCollectBackground = () => !disallowedSet?.has("agent_manage") &&
+    (fallbackFacade !== undefined || compositionAllowed) && (!childSession || childSession.getActiveToolNames().includes("agent_manage"));
   const nestedTools = agentConfig?.allowedSubagents && nestedRuntime && !options.isolated
     ? createNestedSubagentTools({
         manager: nestedRuntime.manager,

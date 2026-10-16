@@ -35,12 +35,12 @@ export function middlePath(path: string, width: number, suffix = ""): string {
   const head = clipPlain(graphemes.join(""), room - 1 - visibleWidth(tail));
   return head + "…" + tail + suffix;
 }
-export function summary(path: string, suffix: string, stats: string, width: number, theme: Theme, secondary = ""): string[] {
+export function summary(path: string, suffix: string, stats: string, width: number, theme: Theme, secondary = "", showHint = true): string[] {
   if (width < 1) return [];
   path = clean(path).replace(/\n/g, "\\n");
   stats = clean(stats).replace(/\n/g, "\\n");
   secondary = clean(secondary).replace(/\n/g, "\\n");
-  const hint = clean(keyHint("app.tools.expand", "expand"));
+  const hint = showHint ? clean(keyHint("app.tools.expand", "expand")) : "";
   const minimumTitle = Math.min(visibleWidth(path + suffix), Math.max(visibleWidth(suffix), Math.min(12, Math.floor(width / 3))));
   const fields = secondary ? secondary.split(" · ") : [];
   let metadata = [stats, ...fields, hint].filter(Boolean).join(" · ");
@@ -53,14 +53,14 @@ export function summary(path: string, suffix: string, stats: string, width: numb
   const label = middlePath(path, room, suffix);
   return [theme.fg("accent", label) + (metadata ? "  " + theme.fg("muted", metadata) : "")];
 }
-export function toolHeading(name: string, detail: string, suffix: string, stats: string, width: number, theme: Theme, expanded: boolean, secondary = ""): string[] {
+export function toolHeading(name: string, detail: string, suffix: string, stats: string, width: number, theme: Theme, expanded: boolean, secondary = "", showHint = true): string[] {
   if (width < 1) return [];
   if (expanded) return wrap(name + (detail || suffix ? "  " + detail + suffix : ""), width).map(line => theme.fg("accent", line));
   // Identity is a separate field: middle-path clipping may only shorten details.
   const identity = clipPlain(name, width);
   const room = width - visibleWidth(identity) - 2;
   if (room < 1) return [theme.fg("accent", identity)];
-  const rest = summary(detail, suffix, stats, room, theme, secondary)[0]!;
+  const rest = summary(detail, suffix, stats, room, theme, secondary, showHint)[0]!;
   return [theme.fg("accent", identity) + (visibleWidth(rest) ? "  " + rest : "")];
 }
 export function splitView(raw: string, noticePattern: RegExp): View {

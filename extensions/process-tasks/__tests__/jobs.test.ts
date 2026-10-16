@@ -80,7 +80,7 @@ void describe("jobs kill — CC's TaskStopTool", () => {
         );
         assert.equal(
             res.content[0].text,
-            `task_type=bash task_id=${job.id} run_id=${job.id}\nStop requested; observed status=killed. Actual execution may still be draining.`
+            `task_type=bash task_id=${job.id}\nStop requested; observed status=killed. Actual execution may still be draining.`
         );
         assert.equal(job.status, "killed");
         assert.equal(job.outcomeSurfaced, true, "marked so the exit path skips notifying");

@@ -1,3 +1,4 @@
+import { managementContract } from "../tools/management.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -47,10 +48,10 @@ test("actual backend stop summaries report observed status without inventing a r
     const running = await f.execute("bash", { command: "tail -f /dev/null", run_in_background: true }) as unknown as { details: { runtimeLaunch: { task_id: string } } };
     for (const [id, requested, observed] of [[finished.details.runtimeLaunch.task_id, false, "completed"], [running.details.runtimeLaunch.task_id, true, "killed"], [running.details.runtimeLaunch.task_id, false, "killed"]] as const) {
       const args = { action: "stop", task_id: id };
-      const result = await f.execute("task_manage", args) as unknown as Result;
+      const result = await f.execute("process_manage", args) as unknown as Result;
       assert.match(result.content[0]!.type === "text" ? result.content[0]!.text ?? "" : "", requested ? /Stop requested/ : /Stop not needed/);
-      assert.equal(taskManageContract(args, result, context(args))!.stats, `stop · observed ${observed}`);
-      const c = new ToolExecutionComponent("task_manage", "truth", args, {}, optionalRenderers("task_manage", undefined, taskManageContract), screen, dir);
+      assert.equal(managementContract("process")(args, result, context(args))!.stats, `stop · observed ${observed}`);
+      const c = new ToolExecutionComponent("process_manage", "truth", args, {}, optionalRenderers("process_manage", undefined, managementContract("process")), screen, dir);
       c.updateResult({ ...result, isError: false });
       assert.doesNotMatch(rows(c).join("\n"), /requested/);
     }
@@ -170,11 +171,11 @@ test("actual registered process task_manage produces seven action envelopes with
   const dir = mkdtempSync(join(tmpdir(), "beautify-jobs-contract-")), f = processActivation(dir);
   const captured = new Map<string, Parameters<ExtensionAPI["registerTool"]>[0]>();
   registerManagementFixture({ registerTool(tool) { captured.set(tool.name, tool as unknown as Parameters<ExtensionAPI["registerTool"]>[0]); } } as ExtensionAPI, f.reg);
-  const execute = (args: Record<string, unknown>) => captured.get("task_manage")!.execute("jobs-test", args, undefined, undefined, f.context);
+  const execute = (args: Record<string, unknown>) => captured.get("process_manage")!.execute("jobs-test", args, undefined, undefined, f.context);
   const validate = async (args: Record<string, unknown>) => {
     const result = await execute(args), copy = structuredClone(result);
-    assert.ok(taskManageContract(args, result, context(args)), JSON.stringify(result));
-    const c = new ToolExecutionComponent("task_manage", "real", args, {}, optionalRenderers("task_manage", undefined, taskManageContract), screen, dir);
+    assert.ok(managementContract("process")(args, result, context(args)), JSON.stringify(result));
+    const c = new ToolExecutionComponent("process_manage", "real", args, {}, optionalRenderers("process_manage", undefined, managementContract("process")), screen, dir);
     c.updateResult({ ...result, isError: false }); c.render(120); c.setExpanded(true); c.render(120);
     assert.deepEqual(result, copy);
   };
@@ -188,12 +189,12 @@ test("actual registered process task_manage produces seven action envelopes with
     const id = launched.content[0]!.text!.match(/ID: ([^.]+)\./)![1]!;
     let partial: Result | undefined;
     const controller = new AbortController();
-    const following = captured.get("task_manage")!.execute("follow", { action: "wait", task_id: id }, controller.signal, result => { partial = result; }, f.context);
+    const following = captured.get("process_manage")!.execute("follow", { action: "wait", task_id: id }, controller.signal, result => { partial = result; }, f.context);
     await until(() => !!partial);
-    assert.equal(taskManageContract({ action: "wait", task_id: id }, partial, context({ action: "wait", task_id: id }, { isPartial: true }))?.stats, "waiting");
+    assert.equal(managementContract("process")({ action: "wait", task_id: id }, partial, context({ action: "wait", task_id: id }, { isPartial: true }))?.stats, "waiting");
     f.coordinator.detachAll();
     const final = await following;
-    assert.equal(taskManageContract({ action: "wait", task_id: id }, final, context({ action: "wait", task_id: id }))?.stats, "wait released · target unchanged");
+    assert.equal(managementContract("process")({ action: "wait", task_id: id }, final, context({ action: "wait", task_id: id }))?.stats, "wait released · target unchanged");
     assert.equal(f.reg.jobs.get(id)?.status, "running");
     await validate({ action: "stop", task_id: id });
     await validate({ action: "wait", task_id: id });
@@ -262,12 +263,12 @@ test("actual SDK task_manage typed errors retain error flag and render without c
   const args = { action: "output", task_id: "missing" };
   const assistantMessage: AssistantMessage = { role: "assistant", content: [], api: "anthropic-messages", provider: "anthropic", model: "offline", stopReason: "toolUse", timestamp: 0, usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } };
   try {
-    const tool: AgentTool = { name: "task_manage", label: "task_manage", description: "offline", parameters: definition!.parameters,
+    const tool: AgentTool = { name: "process_manage", label: "process_manage", description: "offline", parameters: definition!.parameters,
       execute: (id, args, signal, update) => definition!.execute(id, args, signal, update, f.context) };
-    const outcome = await runToolCall({ type: "toolCall", id: "error", name: "task_manage", arguments: args }, { tools: [tool], assistantMessage, context: { messages: [] } });
+    const outcome = await runToolCall({ type: "toolCall", id: "error", name: "process_manage", arguments: args }, { tools: [tool], assistantMessage, context: { messages: [] } });
     assert.equal(outcome.isError, true);
-    assert.equal(taskManageContract(args, outcome.result, context(args, { isError: true }))?.stats, "not_found");
-    const c = new ToolExecutionComponent("task_manage", "error", args, {}, optionalRenderers("task_manage", undefined, taskManageContract), screen, dir);
+    assert.equal(managementContract("process")(args, outcome.result, context(args, { isError: true }))?.stats, "not_found");
+    const c = new ToolExecutionComponent("process_manage", "error", args, {}, optionalRenderers("process_manage", undefined, managementContract("process")), screen, dir);
     c.updateResult({ ...outcome.result, isError: true });
     assert.match(rows(c).join("\n"), /not_found|not found/i);
     assert.ok(c.render(80).some((line: string) => line.includes(themeSdk.theme.getBgAnsi("toolErrorBg"))));

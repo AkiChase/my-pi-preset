@@ -1,9 +1,9 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { launchMetadata, launchText } from "./launch.ts";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { AgentToolUpdateCallback } from "@earendil-works/pi-agent-core";
-import { StringEnum, Type } from "@earendil-works/pi-ai";
 import type { TaskIdentity, TaskView } from "../task-ui/types.ts";
 import {
-  TASK_ACTIONS, TASK_LOG_TYPES, TASK_TYPES, runtimeTaskType, taskResult, validateRuntimeTaskParams, validateTargetOptions,
+  TASK_ACTIONS, TASK_TYPES, runtimeTaskType, taskResult, validateRuntimeTaskParams, validateTargetOptions,
   type RuntimeTaskParams, type RuntimeTaskResult, type RuntimeTaskDetails,
 } from "./contracts.ts";
 
@@ -49,7 +49,7 @@ export function createRuntimeTaskFacade(initial: readonly RuntimeTaskCapability[
       if (params.task_type !== undefined && params.task_type !== metadata.task_type)
         return taskResult("task_type does not match target.", { ...metadata, error_code: "invalid_arguments" });
       if (params.action === "status") return taskResult([
-        `task_type=${metadata.task_type} task_id=${view.taskId} run_id=${view.runId}`,
+        launchText(launchMetadata(metadata.task_type, view.taskId, view.runId, "background")),
         `${view.title}: ${view.status} (raw_status=${entry.rawStatus})`,
         `mode=${view.executionMode} wait_count=${view.waitCount}`,
         `capabilities=${JSON.stringify(view.capabilities)}`,
@@ -62,7 +62,7 @@ export function createRuntimeTaskFacade(initial: readonly RuntimeTaskCapability[
       const filtered = entries.filter(({ entry }) => params.task_type === undefined || runtimeTaskType(entry.view) === params.task_type);
       return taskResult(filtered.length ? filtered.map(({ entry }) => {
         const view = entry.view;
-        return `task_type=${runtimeTaskType(view)} task_id=${view.taskId} run_id=${view.runId} status=${view.status} raw_status=${entry.rawStatus} mode=${view.executionMode} wait_count=${view.waitCount} manageable=${entry.manageable}${view.parentKey ? ` parent=${view.parentKey}` : ""}\n  ${view.title}${entry.note ? `\n  ${entry.note}` : ""}`;
+        return `${launchText(launchMetadata(runtimeTaskType(view), view.taskId, view.runId, "background"))} status=${view.status} raw_status=${entry.rawStatus} mode=${view.executionMode} wait_count=${view.waitCount} manageable=${entry.manageable}${view.parentKey ? ` parent=${view.parentKey}` : ""}\n  ${view.title}${entry.note ? `\n  ${entry.note}` : ""}`;
       }).join("\n") : "No runtime tasks in this scope.", { action: "list", task_type: params.task_type, count: filtered.length });
     }
     if (params.action === "search") {
@@ -89,66 +89,4 @@ export function createRuntimeTaskFacade(initial: readonly RuntimeTaskCapability[
     return taskResult("Target action requires task_id.", { action: params.action, error_code: "invalid_arguments" });
   };
   return { execute, close };
-}
-
-export function runtimeTaskTool(facade: ReturnType<typeof createRuntimeTaskFacade>, report: (id: string, result: RuntimeTaskResult) => RuntimeTaskResult = (_id, result) => result) {
-  return {
-    name: "task_manage", label: "Runtime Tasks",
-    description: "Manage runtime bash, monitor, subagent and workflow tasks in this scope. Not Trellis planning tasks.",
-    promptSnippet: "List/status/output/wait/stop/search/stats for runtime tasks",
-    promptGuidelines: [
-      "Use task_id and optional exact run_id returned by launch/list. Omitted run_id binds the current run at call admission.",
-      "wait waits for the entire task, including monitors; /bg or cancellation releases only the wait, not execution.",
-      "output returns final subagent answers, workflow script returns, or a byte page of process logs. verbose is only for subagents.",
-      "search is regex over bash/monitor logs only. stats separates current retained counts from process activation cumulative metrics.",
-    ],
-    parameters: Type.Union([
-      Type.Object({
-        action: Type.Literal("list"),
-        task_type: Type.Optional(StringEnum(TASK_TYPES)),
-      }, { additionalProperties: false }),
-      Type.Object({
-        action: Type.Literal("status"),
-        task_id: Type.String({ description: "Target task id, as returned by launch/list." }),
-        run_id: Type.Optional(Type.String({ description: "Exact run id; omitting it binds the current run at call admission." })),
-      }, { additionalProperties: false }),
-      Type.Object({
-        action: Type.Literal("output"),
-        task_id: Type.String({ description: "Target task id, as returned by launch/list." }),
-        run_id: Type.Optional(Type.String({ description: "Exact run id; omitting it binds the current run at call admission." })),
-        offset: Type.Optional(Type.Number({ minimum: 0, multipleOf: 1, description: "Integer byte offset to start reading at." })),
-        limit: Type.Optional(Type.Number({ minimum: 1, multipleOf: 1, description: "Maximum bytes or lines to return; an integer of at least 1." })),
-        verbose: Type.Optional(Type.Boolean({ description: "Include full subagent detail; only valid for subagent output." })),
-      }, { additionalProperties: false }),
-      Type.Object({
-        action: Type.Literal("wait"),
-        task_id: Type.String({ description: "Target task id, as returned by launch/list." }),
-        run_id: Type.Optional(Type.String({ description: "Exact run id; omitting it binds the current run at call admission." })),
-        limit: Type.Optional(Type.Number({ minimum: 1, multipleOf: 1, description: "Maximum bytes or lines to return; an integer of at least 1." })),
-        verbose: Type.Optional(Type.Boolean({ description: "Include full subagent detail; only valid for subagent wait." })),
-      }, { additionalProperties: false }),
-      Type.Object({
-        action: Type.Literal("stop"),
-        task_id: Type.String({ description: "Target task id, as returned by launch/list." }),
-        run_id: Type.Optional(Type.String({ description: "Exact run id; omitting it binds the current run at call admission." })),
-      }, { additionalProperties: false }),
-      Type.Object({
-        action: Type.Literal("search"),
-        task_id: Type.Optional(Type.String({ description: "Limit the search to this task id." })),
-        run_id: Type.Optional(Type.String({ description: "Exact run id; omitting it binds the current run at call admission." })),
-        task_type: Type.Optional(StringEnum(TASK_LOG_TYPES)),
-        pattern: Type.String({ description: "Regular expression to search for." }),
-        ignore_case: Type.Optional(Type.Boolean({ description: "Case-insensitive matching." })),
-        context: Type.Optional(Type.Number({ minimum: 0, multipleOf: 1, description: "Integer lines of context around each match." })),
-      }, { additionalProperties: false }),
-      Type.Object({
-        action: Type.Literal("stats"),
-        task_type: Type.Optional(StringEnum(TASK_TYPES)),
-      }, { additionalProperties: false }),
-    ]),
-    execute: async (id: string, params: RuntimeTaskParams, signal: AbortSignal | undefined, onUpdate: AgentToolUpdateCallback<RuntimeTaskDetails> | undefined, ctx: ExtensionContext) => report(id, await facade.execute(params, signal, onUpdate, ctx)),
-  };
-}
-export function registerRuntimeTaskTool(pi: ExtensionAPI, facade: ReturnType<typeof createRuntimeTaskFacade>, report?: (id: string, result: RuntimeTaskResult) => RuntimeTaskResult): void {
-  pi.registerTool(runtimeTaskTool(facade, report));
 }

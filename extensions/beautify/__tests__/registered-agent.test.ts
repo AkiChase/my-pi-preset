@@ -1,3 +1,4 @@
+import { registerManagementTool } from "../../runtime-tasks/tools.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -9,8 +10,10 @@ import type { AgentManagerDependencies } from "../../agent-tasks/src/agent-manag
 import type { RunResult } from "../../agent-tasks/src/agent-runner.ts";
 import { TaskCoordinator } from "../../task-ui/coordinator.ts";
 import { TaskLifecycle } from "../../task-ui/lifecycle.ts";
-import { taskManageContract as agentContract } from "../tools/task-manage.ts";
-import { createRuntimeTaskFacade, registerRuntimeTaskTool, type RuntimeTaskCapability } from "../../runtime-tasks/facade.ts";
+import { managementContract } from "../tools/management.ts";
+import { executionId } from "../../runtime-tasks/execution-id.ts";
+const agentContract = managementContract("agent");
+import { createRuntimeTaskFacade, type RuntimeTaskCapability } from "../../runtime-tasks/facade.ts";
 import type { RenderContext } from "../types.ts";
 const { default: agentTasks } = await import("../../agent-tasks/src/index.ts");
 const tick = async () => { for (let i = 0; i < 30; i++) await new Promise<void>(done => setImmediate(done)); };
@@ -39,23 +42,23 @@ test("actual registered task_manage emits running/completed/verbose/not-found/re
   } as unknown as ExtensionAPI;
   const ctx = { cwd, hasUI: false, mode: "print", ui: { setStatus() {}, setWidget() {}, notify() {} }, sessionManager: { getSessionId: () => "offline-beautify", getBranch: () => [] }, modelRegistry: {} } as unknown as ExtensionToolContext;
   const viewContext = (args: Record<string, unknown>): RenderContext => ({ args, toolCallId: "display", invalidate() {}, lastComponent: undefined, state: {}, cwd, executionStarted: true, argsComplete: true, isPartial: false, expanded: false, showImages: true, isError: false, durationMs: 0, outputPad: 1 });
-  const execute = (args: Record<string, unknown>, signal?: AbortSignal) => tools.get("task_manage")!.execute("get-result", args, signal, undefined, ctx);
+  const execute = (args: Record<string, unknown>, signal?: AbortSignal) => tools.get("agent_manage")!.execute("get-result", args, signal, undefined, ctx);
   try {
     const capabilities: RuntimeTaskCapability[] = [];
     agentTasks(pi, { coordinator, lifecycle, managerDependencies: dependencies, onManagement: c => capabilities.push(c) });
-    registerRuntimeTaskTool(pi, createRuntimeTaskFacade(capabilities));
+    registerManagementTool(pi, "agent", capabilities);
     await handlers.get("session_start")![0]!(undefined, ctx);
-    const notFound = await execute({ action: "output", task_id: "absent" }); assert.equal(agentContract({ action: "output", task_id: "absent" }, notFound, viewContext({ action: "output", task_id: "absent" }))?.stats, "not_found");
+    const notFound = await execute({ action: "output", execution_id: executionId({ taskId: "absent", runId: "1" }, "subagent") }); assert.equal(agentContract({ action: "output", execution_id: executionId({ taskId: "absent", runId: "1" }, "subagent") }, notFound, viewContext({ action: "output", execution_id: executionId({ taskId: "absent", runId: "1" }, "subagent") }))?.stats, "stale");
     await tools.get("subagent_run")!.execute("launch", { subagent_type: "general-purpose", description: "Actual description", prompt: "offline", run_in_background: true }, undefined, undefined, ctx);
     await tick();
     const id = coordinator.list().find(view => view.kind === "agent")!.taskId;
-    const args = { action: "output", task_id: id, verbose: true };
+    const args = { action: "output", execution_id: executionId({ taskId: id, runId: "1" }, "subagent"), verbose: true };
     const running = await execute(args), copy = structuredClone(running);
     assert.equal(agentContract(args, running, viewContext(args))?.stats, "running");
     assert.equal(agentContract(args, running, viewContext(args))?.title, "Actual description");
     assert.match(running.content[0]!.type === "text" ? running.content[0]!.text : "", /verbose conversation/);
     assert.deepEqual(running, copy);
-    const waitingArgs = { action: "wait", task_id: id };
+    const waitingArgs = { action: "wait", execution_id: executionId({ taskId: id, runId: "1" }, "subagent") };
     const release = execute(waitingArgs); await tick(); coordinator.detachAll();
     assert.match(agentContract(waitingArgs, await release, viewContext(waitingArgs))!.stats, /wait released.*unchanged/);
     assert.equal(coordinator.list().find(view => view.taskId === id)?.status, "running");

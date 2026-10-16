@@ -76,7 +76,7 @@ void describe("bash explicit background — rejects a backgrounded sleep wait", 
         const { tool, ctx } = bashBg();
         await assert.rejects(
             () => tool.execute("t1", { run_in_background: true, command: "cd /repo; sleep 600; cat log" }, undefined, undefined, ctx),
-            /Blocked: sleep 600.*task_manage action='wait'/s
+            /Blocked: sleep 600.*process_manage action='wait'/s
         );
     });
 

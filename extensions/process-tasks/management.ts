@@ -30,7 +30,7 @@ export function createProcessManagement(reg: BackgroundRegistry, source: TaskSou
     if (!slice) return taskResult(`Cannot read log: ${job.logPath}. Task status=${job.status}.`, { ...meta, error_code: "log_error" });
     if (consume && isTerminalStatus(job.status)) markOutcomeSurfaced(job, reg);
     return taskResult([
-      `task_type=${meta.task_type} task_id=${job.id} run_id=${job.id} status=${meta.status} raw_status=${job.status}`,
+      `task_type=${meta.task_type} task_id=${job.id} status=${meta.status} raw_status=${job.status}`,
       `Output for ${job.name ?? job.command} — bytes ${slice.start}-${slice.end} of ${slice.size}. Log: ${job.logPath}`,
       slice.start ? `[${slice.start} earlier bytes omitted; offset=0]` : "",
       slice.text || "(no output)",
@@ -60,7 +60,7 @@ export function createProcessManagement(reg: BackgroundRegistry, source: TaskSou
       if (params.action === "stop") {
         const requested = !isTerminalStatus(job.status);
         if (requested) terminateJobSilently(reg, job);
-        return taskResult(`task_type=${runtimeTaskType({ kind: job.kind ?? "shell" })} task_id=${job.id} run_id=${job.id}\nStop ${requested ? "requested" : "not needed"}; observed status=${job.status}. Actual execution may still be draining.`, metadata(identity, params));
+        return taskResult(`task_type=${runtimeTaskType({ kind: job.kind ?? "shell" })} task_id=${job.id}\nStop ${requested ? "requested" : "not needed"}; observed status=${job.status}. Actual execution may still be draining.`, metadata(identity, params));
       }
       if (params.action !== "wait") return taskResult("Unsupported process action.", { ...metadata(identity, params), error_code: "unsupported" });
       ensureCompletionPromise(job);
@@ -77,12 +77,12 @@ export function createProcessManagement(reg: BackgroundRegistry, source: TaskSou
       let poller: ReturnType<typeof streamLog> | undefined;
       try {
         if (!lease.settled) {
-          onUpdate?.(taskResult(`task_id=${job.id} run_id=${job.id}\nWaiting for entire task to finish.`, { ...metadata(identity, params), wait_outcome: "waiting" }));
+          onUpdate?.(taskResult(`task_id=${job.id}\nWaiting for entire task to finish.`, { ...metadata(identity, params), wait_outcome: "waiting" }));
           poller = streamLog(job.logPath, update => onUpdate?.(taskResult(update.content.map(block => block.text).join("\n"), { ...metadata(identity, params), wait_outcome: "waiting" })));
         }
         const outcome = await lease.result;
         if (reg.closed || reg.jobs.get(job.id) !== job) return taskResult("Process activation is closed.", { ...metadata(identity, params), error_code: "closed", wait_outcome: "cancelled" });
-        if (outcome.kind !== "completed") return taskResult(`task_id=${job.id} run_id=${job.id}\nWait ${outcome.kind === "detached" ? "released" : "cancelled"}; target unchanged.`, { ...metadata(identity, params), wait_outcome: outcome.kind === "detached" ? "released" : "cancelled" });
+        if (outcome.kind !== "completed") return taskResult(`task_id=${job.id}\nWait ${outcome.kind === "detached" ? "released" : "cancelled"}; target unchanged.`, { ...metadata(identity, params), wait_outcome: outcome.kind === "detached" ? "released" : "cancelled" });
         const result = completedOutput ?? output(identity, params, true);
         return taskResult(result.content.filter(block => block.type === "text").map(block => block.text).join("\n"), { ...result.details.runtimeTask, wait_outcome: "completed" });
       } finally { poller?.stop(); if (!lease.settled) lease.dispose(); }

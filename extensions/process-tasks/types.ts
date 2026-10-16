@@ -64,7 +64,7 @@ export interface Job {
     /**
      * Whether the agent has seen this job's terminal outcome — by
      * <task-notification>, by asking for the kill, or by reading it through
-     * `task_manage output` / `task_manage wait`. Set only AFTER the outcome actually
+     * `process_manage output` / `process_manage wait`. Set only AFTER the outcome actually
      * reached the agent. Delivery does not control metadata retention; all
      * terminal records stay for the same ten-minute window.
      *
@@ -75,7 +75,7 @@ export interface Job {
      */
     outcomeSurfaced?: boolean;
     /**
-     * In-flight `task_manage wait` waits. While above zero the terminal
+     * In-flight `process_manage wait` waits. While above zero the terminal
      * notification is skipped — the attach result IS the report — but the
      * outcome is NOT marked surfaced, so detaching early still leaves the job
      * able to notify later. A counter rather than a flag because two attaches
@@ -85,7 +85,7 @@ export interface Job {
     attachCount?: number;
     /**
      * Why the last notification send failed. The outcome is then stranded:
-     * nothing reached the agent, so `task_manage list` has to show the job and say
+     * nothing reached the agent, so `process_manage list` has to show the job and say
      * so, rather than silently dropping it.
      */
     notifyError?: string;
