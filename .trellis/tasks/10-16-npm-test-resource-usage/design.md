@@ -1,5 +1,35 @@
 # 生命周期测试精简审查
 
+## 第三批具体诊断与建议（尚未批准实施）
+
+已完整读取 apply-template、worktree-cli、manifest-provenance、init-review、initialization 五个测试文件及 engine.ts 的 manifest/资源验证实现。用户要求给出具体有效结论，本轮用仓库外 registerHooks 对现有测试做内存变换实验，不修改仓库测试。
+
+### T1：manifest-provenance.test.mjs:143–147 的约 50 种 malformedManifests 矩阵
+
+每个 schema 字段变体都会 preserved(t)→复制完整项目→verifyRuntime(copy)→完整 snapshot→verifyRuntime→inspect（Python probe）→plan（再 inspect/校验）→完整 snapshot。实际目标仅为 validateManifest 的字段/键集合/格式规则。改为同一真实 manifest 的 structuredClone，每个变体调用已有纯 validateManifest(manifest, packageProvenance)。packageProvenance 每组准备一次。保留少量 malformed runtime/template/skill 的 verifyRuntime/inspect/plan 端到端拒绝与无写入检查。移除约 50 个输入变体逐个证明 inspect/plan 无写入的重复集成覆盖，明确列为取舍，不假称同等覆盖。
+
+已做原测试和内存优化对照：命令 node --test --test-concurrency=1 --test-force-exit --test-name-pattern='^manifest rejects' manifest-provenance.test.mjs；baseline 19.15 s、CPU 17.77 s；optimized 1.25 s、CPU 1.26 s。全部选中变体通过，串行先 baseline 后 optimized 单次，缓存顺序可能影响部分结果，但重复 setup 路径和调用数消除明确。不是全量加速百分比。
+
+### T2：init-review.test.mjs:resource manifest rejects/still rejects 矩阵
+
+其中 unknown role/source/kind/hash/template/mode 与 T1 重复，包括 missing role、wrong runtime source、unknown role field、malformed role fingerprint、malformed template mode。保留 init-review 的 forged incomplete operation/recovery 攻击；将重复 schema-only 变体删去或归并到 T1，保留代表性 runtime 篡改在 inspect/plan 的拒绝接线。stale template/role safe update 通过 applyResourcePlan 的成功链路不同，不能只换纯 validator。
+
+### T3：apply-template.test.mjs:10 fixture
+
+每个用例/矩阵分支执行 apply(plan(root,'Dev'))，全文件约 22 次完整初始化。其中 stale confirmation 4 次、runtime/scope/worktree/lock 6 次、symlink 3 次。这里测试 templatePlan/applyTemplatePlan，不测试初始化。使用已有 copyRuntimeFixture(t,{user:'Dev'}) 共用一次真实初始化，保留模板预览/发布/备份/无写入/运行时变化全部真实，不 mock template API。不应重写全局 runtime fixture 校验。
+
+### T4：worktree-cli.test.mjs:93–103 readiness 矩阵
+
+六个变体每次 fixture 都 git init+commit，create --confirm，再 prepare --confirm。先用一个 fixture 创建一次 unprepared worktree，逐次恢复 manifest 后运行 six prepare；每次失败检查状态仍 unprepared、target task 不存在，断言更强且状态保持独立变体输入。manifest/readiness 错误不改变 Git identity，无需六次 create。另有 strict CLI arguments 约 30 次 subprocess，大多是 parser 行为；Python 已有 parser unit tests，但本轮先不扩展删除，单独保留部署 CLI 接线。
+
+### T5：两个明确 O(N²) 文件快照
+
+initialization.test.mjs:35 和 manifest-provenance.test.mjs:74 在 for(before entries) 内调用 f.snapshot()[path]；每个 path 都重读整棵目录。提到循环外 const after=f.snapshot()，同样逐项比较 before/after，无断言损失。仓库外内存实验两个选中用例 baseline 6.79 s、CPU 6.37 s；optimized 5.88 s、CPU 5.87 s，均通过。不是主瓶颈但确定多余 I/O。
+
+### 顺序与边界
+
+建议先 T1/T2（最大已测收益）→T3/T5（fixture/snapshot）→T4（原生 create 复用），每阶段 focused 检查并提交；最终 Trellis 模块 time 对照及全量验收。不改生产实现、不新增测试层入口、不引入全局缓存/伪造哈希。不对未试验的 T3/T4 承诺具体收益。原始实验位于 owned /tmp/pi-test-targets-RwxTRd，可在结果记录后清理；实验模块使用 force-exit，不证明自然退出。
+
 ## 第一批后的下一轮探索（只读，尚未批准实施）
 
 全量实测最慢为 dispatch 81.07 s、agent context 66.00 s，sync 17.70 s。下一轮优先处理 Trellis 逻辑测试不必要的原生 CLI 重复调用，而非盲删轻量内存断言。
