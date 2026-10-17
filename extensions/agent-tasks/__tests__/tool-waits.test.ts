@@ -106,7 +106,7 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
   const registry = Reflect.get(globalThis, Symbol.for("pi-subagents:manager")) as {
     hasRunning(): boolean; getRecord(id: string): AgentRecord | undefined;
   };
-  const execute = (name: string, params: Record<string, unknown>, signal?: AbortSignal, call: { id: string | undefined } = { id: "offline-call" }) => tools.get(name)!.execute(call.id!, name === "agent_manage" ? params : completeToolCall(tools.get(name)!.parameters, params), signal, () => { throw new Error("inline renderer failed"); }, ctx);
+  const execute = (name: string, params: Record<string, unknown>, signal?: AbortSignal, call: { id: string | undefined } = { id: "offline-call" }) => tools.get(name)!.execute(call.id!, completeToolCall(tools.get(name)!.parameters, params), signal, () => { throw new Error("inline renderer failed"); }, ctx);
   return { coordinator, lifecycle, source, calls, events, rpcReplies, entries,
     rpc: (value: unknown) => events.emit("subagents:rpc:spawn", value),
     shutdownHandlers: () => handlers.get("session_shutdown")!.length, tools, resumes, notices, execute, ctx, registry, root,

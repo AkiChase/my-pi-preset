@@ -1,3 +1,4 @@
+import { parseControlArguments } from "../../shared/tool-arguments.ts";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
@@ -19,15 +20,12 @@ export type DispatchParams =
 /** Validate direct callers as well as host-normalized arguments before any query or RPC. */
 export function validateDispatchParams(input: unknown): DispatchParams {
 	if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("trellis_dispatch input must be an object with action, agent, task and prompt fields only");
-	const args = input as Record<string, unknown>;
-	for (const key of Reflect.ownKeys(args)) {
-		if (typeof key !== "string" || !["action", "agent", "task", "prompt"].includes(key)) throw new Error(`Unknown trellis_dispatch field ${String(key)}; remove it (allowed: action, agent, task, prompt)`);
-	}
+	const args = parseControlArguments(input, ["action", "agent", "task", "prompt"], ["action", "agent", "task", "prompt"]);
 	const action = args.action === "" || args.action === undefined ? "dispatch" : args.action;
-	if (action !== "dispatch" && action !== "stop") throw new Error("action must be dispatch or stop; omit it or use an empty string for dispatch");
+	if (action !== "dispatch" && action !== "stop") throw new Error("action must be dispatch or stop; set it to null or use an empty string for dispatch");
 	if (action === "stop") {
 		for (const key of ["agent", "prompt"]) {
-			if (Object.hasOwn(args, key)) throw new Error(`${key} is a dispatch-only field; remove it for stop (stop accepts action and task only)`);
+			if (Object.hasOwn(args, key)) throw new Error(`${key} is a dispatch-only field; set it to null for stop (stop uses action and task only)`);
 		}
 	}
 	const task = args.task === "" ? undefined : args.task;
@@ -116,7 +114,7 @@ export function registerDispatchTool(pi: ExtensionAPI, activeTask: (ctx: Extensi
 	pi.registerTool({
 		name: "trellis_dispatch", label: "Trellis Dispatch",
 		description: "Dispatch an approved Trellis role in the shared source directory when unbound, or its prepared managed worktree when bound. Never creates worktrees or falls back from a binding. Returns a real agent ID. Stop requests provider cancellation and retains occupancy until terminal evidence. Main coordinates shared-directory edits and phases. Use agent_manage status/output/wait with the returned execution_id; successful final retrieval consumes that run. Use subagent_message with agent_id/message to steer a running agent.",
-		parameters: { type: "object", properties: { action: { type: "string", enum: ["dispatch", "stop", ""], description: "dispatch (default when omitted or empty) or stop an existing execution" }, agent: { type: "string", enum: ["trellis-implement", "trellis-check", "trellis-research", ""], description: "Required non-empty Trellis role for dispatch; omit entirely for stop" }, task: { type: "string", description: "Optional approved task reference; omitted or empty uses the local/active task" }, prompt: { type: "string", description: "Required non-empty dispatch instructions; newlines/tabs are preserved, NUL is forbidden; omit entirely for stop" } }, additionalProperties: false } as unknown as Parameters<ExtensionAPI["registerTool"]>[0]["parameters"],
+		parameters: { type: "object", properties: { action: { anyOf: [{ type: "null" }, { type: "string", enum: ["dispatch", "stop", ""] }], description: "dispatch (default when null or empty) or stop an existing execution" }, agent: { anyOf: [{ type: "null" }, { type: "string", enum: ["trellis-implement", "trellis-check", "trellis-research", ""] }], description: "Required non-null Trellis role for dispatch; set null for stop" }, task: { anyOf: [{ type: "null" }, { type: "string" }], description: "Approved task reference; null or empty uses the local/active task" }, prompt: { anyOf: [{ type: "null" }, { type: "string" }], description: "Required non-empty text for dispatch; newlines/tabs are preserved, NUL is forbidden; set null for stop" } }, required: ["action", "agent", "task", "prompt"], additionalProperties: false } as unknown as Parameters<ExtensionAPI["registerTool"]>[0]["parameters"],
 		executionMode: "sequential",
 		async execute(_id, input, signal, _update, ctx) {
 			if (shuttingDown) throw new Error("Host session shut down; reload before execution");

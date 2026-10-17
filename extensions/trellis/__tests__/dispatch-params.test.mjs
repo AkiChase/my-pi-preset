@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import test from 'node:test';
-import { registerDispatchTool, rpc, validateDispatchParams } from '../lib/subagent-rpc.ts';
+import { registerDispatchTool, rpc, validateDispatchParams as rawValidateDispatchParams } from '../lib/subagent-rpc.ts';
 
 // Resolve the actual host's validator, not a duplicated schema implementation.
 const aiPackage = findPackageJSON('@earendil-works/pi-ai', import.meta.resolve('@earendil-works/pi-coding-agent'));
@@ -27,8 +27,10 @@ function harness(activeTask = async () => undefined) {
   return { tool, requests, handlers };
 }
 const hostValidate = (tool, arguments_) => validateToolArguments(tool, {
-  id: 'schema-call', name: tool.name, arguments: arguments_,
+  id: 'schema-call', name: tool.name, arguments: complete(arguments_),
 });
+const complete = input => input && typeof input === "object" && !Array.isArray(input) ? { action: null, agent: null, task: null, prompt: null, ...input } : input;
+const validateDispatchParams = input => rawValidateDispatchParams(complete(input));
 const valid = { agent: 'trellis-implement', prompt: 'Work on the approved scope' };
 
 const invalidCases = [
@@ -41,7 +43,6 @@ const invalidCases = [
   [{ ...valid, agnet: 'trellis-check' }, /agnet/],
   [{ ...valid, action: 'launch' }, /action.*dispatch.*stop/],
   [{ ...valid, action: 1 }, /action/],
-  [{ ...valid, action: null }, /action/],
   [{ ...valid, action: {} }, /action/],
   [{ prompt: 'work' }, /agent/],
   [{ ...valid, agent: '' }, /agent/],
@@ -62,14 +63,13 @@ const invalidCases = [
   [{ ...valid, task: 'task\0name' }, /task/],
   [{ ...valid, task: 'task\x7f' }, /task/],
   [{ ...valid, task: 42 }, /task/],
-  [{ ...valid, task: null }, /task/],
   [{ ...valid, task: {} }, /task/],
   [{ action: 'stop', agent: 'trellis-check' }, /agent.*dispatch-only/],
   [{ action: 'stop', agent: '' }, /agent.*dispatch-only/],
-  [{ action: 'stop', agent: undefined }, /agent.*dispatch-only/],
+  [{ action: 'stop', agent: undefined }, /agent.*must be provided/],
   [{ action: 'stop', prompt: 'ignored' }, /prompt.*dispatch-only/],
   [{ action: 'stop', prompt: '' }, /prompt.*dispatch-only/],
-  [{ action: 'stop', prompt: undefined }, /prompt.*dispatch-only/],
+  [{ action: 'stop', prompt: undefined }, /prompt.*must be provided/],
   [{ action: 'stop', task: ' ' }, /task/],
   [{ action: 'stop', task: false }, /task/],
   [{ action: 'stop', extra: true }, /extra/],
@@ -82,19 +82,19 @@ test('dispatch schema is a plain closed object accepted by real host strict conv
   assert.equal(schema.additionalProperties, false);
   assert.deepEqual(Object.keys(schema.properties).sort(), ['action', 'agent', 'prompt', 'task']);
   for (const key of ['anyOf', 'oneOf', 'if']) assert.equal(Object.hasOwn(schema, key), false);
-  assert.deepEqual(schema.properties.action.enum, ['dispatch', 'stop', '']);
-  assert.deepEqual(schema.properties.agent.enum, ['trellis-implement', 'trellis-check', 'trellis-research', '']);
+  assert.deepEqual(schema.properties.action.anyOf[1].enum, ['dispatch', 'stop', '']);
+  assert.deepEqual(schema.properties.agent.anyOf[1].enum, ['trellis-implement', 'trellis-check', 'trellis-research', '']);
   for (const property of Object.values(schema.properties)) assert.ok(property.description);
   const strict = makeStrictJsonSchema(schema);
   assert.equal(strict.additionalProperties, false);
   assert.deepEqual(strict.required.sort(), ['action', 'agent', 'prompt', 'task']);
-  assert.equal(Object.hasOwn(schema, 'required'), false, 'strict conversion must not mutate the registered schema');
+  assert.deepEqual(schema.required, ['action', 'agent', 'task', 'prompt'], 'all exposed wire fields are required');
 });
 
 test('real host validation accepts legal legacy/stop shapes and rejects unknown fields/enums/types', () => {
   const { tool } = harness();
   for (const input of [valid, { ...valid, action: '' }, { ...valid, action: 'dispatch', task: '' }, { action: 'stop' }, { action: 'stop', task: '.trellis/tasks/test' }]) {
-    assert.deepEqual(hostValidate(tool, input), input);
+    assert.deepEqual(hostValidate(tool, input), complete(input));
   }
   for (const [input, pattern] of [
     [{ ...valid, promtp: 'work' }, /promtp/],
@@ -105,12 +105,12 @@ test('real host validation accepts legal legacy/stop shapes and rejects unknown 
   ]) assert.throws(() => hostValidate(tool, input), pattern);
   // Host scalar coercion and optional null handling are not direct-helper semantics.
   assert.equal(hostValidate(tool, { ...valid, prompt: 42 }).prompt, '42');
-  assert.deepEqual(hostValidate(tool, { action: 'stop', agent: null, prompt: null, task: null }), { action: 'stop' });
+  assert.deepEqual(hostValidate(tool, { action: 'stop', agent: null, prompt: null, task: null }), { action: 'stop', agent: null, prompt: null, task: null });
 });
 
 test('pure dispatch validator normalizes only legacy action/task and preserves exact prose without mutation', () => {
   for (const agent of ['trellis-implement', 'trellis-check', 'trellis-research']) {
-    for (const action of [undefined, '', 'dispatch']) {
+    for (const action of [null, '', 'dispatch']) {
       const input = Object.freeze({ action, agent, prompt: ' First line\n\t第二行 ', task: '' });
       assert.deepEqual(validateDispatchParams(input), { action: 'dispatch', agent, prompt: input.prompt });
       assert.equal(input.task, '');
@@ -126,7 +126,7 @@ test('pure dispatch validator normalizes only legacy action/task and preserves e
 test('pure dispatch validator rejects invalid arguments and identifies the offending field', () => {
   for (const [input, pattern] of invalidCases) assert.throws(() => validateDispatchParams(input), pattern);
   assert.throws(() => validateDispatchParams({ ...valid, [Symbol('extra')]: true }), /extra/);
-  assert.throws(() => validateDispatchParams(Object.defineProperty({ ...valid }, 'hidden', { value: true })), /hidden/);
+  assert.throws(() => rawValidateDispatchParams(Object.defineProperty(complete(valid), 'hidden', { value: true })), /hidden/);
 });
 
 test('registered execute rejects bad direct/host inputs before cwd, query, filesystem, activeTask or provider effects', async t => {
@@ -146,7 +146,7 @@ test('registered execute rejects bad direct/host inputs before cwd, query, files
   syncBuiltinESMExports();
   try {
     for (const [input, pattern] of invalidCases) {
-      await assert.rejects(h.tool.execute('direct', input, undefined, undefined, ctx), pattern);
+      await assert.rejects(h.tool.execute('direct', complete(input), undefined, undefined, ctx), pattern);
     }
     for (const input of [{ ...valid, prompt: '' }, { action: 'stop', agent: '' }, { action: 'stop', prompt: '' }]) {
       await assert.rejects(h.tool.execute('host', hostValidate(h.tool, input), undefined, undefined, ctx), /agent|prompt/);
@@ -164,6 +164,21 @@ test('registered execute rejects bad direct/host inputs before cwd, query, files
   }
   assert.equal(fs.readFileSync(marker, 'utf8'), 'preserved');
   assert.deepEqual(fs.readdirSync(root), ['unchanged']);
+});
+
+test('required nullable wire fields survive host validation and missing fields fail before effects', async () => {
+  const { tool } = harness();
+  const input = Object.freeze(complete({ ...valid, action: null, task: null }));
+  assert.deepEqual(hostValidate(tool, input), input);
+  assert.deepEqual(rawValidateDispatchParams(input), { action: 'dispatch', ...valid });
+  assert.deepEqual(rawValidateDispatchParams(complete({ action: 'stop' })), { action: 'stop' });
+  for (const field of Object.keys(input)) {
+    const missing = { ...input }; delete missing[field];
+    assert.throws(() => validateToolArguments(tool, { type: 'toolCall', id: 'missing', name: tool.name, arguments: missing }));
+    assert.throws(() => rawValidateDispatchParams(missing), /must be provided/);
+    await assert.rejects(tool.execute('missing', missing, undefined, undefined, { get cwd() { throw Error('must not query'); } }), /must be provided/);
+  }
+  assert.equal(input.action, null);
 });
 
 test('RPC timeout keeps execution uncertainty wording and removes its reply subscription', async () => {

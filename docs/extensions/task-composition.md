@@ -78,25 +78,19 @@ Monitor 的 wait 等整个观察结束，不是下一条事件。解除或取消
 
 ## 子 Agent 与 workflow
 
-`subagent_run` 新建或恢复 Agent；后台启动返回稳定的 `agent_id` 与本次 `execution_id`，前台则直接等待结果。调用必须提供当前工具暴露的全部字段，不使用的控制字段设为 `null`，不能省略或填空字符串。新建时 `prompt`、`description`、`subagent_type` 必须非空，`resume` 设为 `null`；恢复时提供非空 `resume` 和 `prompt`，其他新建字段设为 `null`，`run_in_background` 可用布尔值或 `null`。子 Agent 恢复自己的孩子时固定前台，`run_in_background` 必须为 `null`。禁用或当前入口未暴露的字段不能传入，即使值是 `null`。
+可以让模型新建子 Agent，或继续一个已完成 Agent 的会话。后台启动先返回执行标识，完成后通知；前台直接等待结果。恢复会话沿用原类型、名称与设置；子 Agent 恢复自己的孩子时固定前台。
 
-Agent 文件配置优先于调用参数；控制参数设为 `null` 时沿用配置/默认值，显式不同请求被覆盖时结果会说明请求值与实际值。`subagent_message` 用真实 `agent_id` 和非空 `message` 给运行中的 Agent 发指示，不接受名称别名或 `execution_id`；queued 表示等待会话初始化，sent 表示已提交，均不保证已读取或处理。完成后用 `subagent_run` 的 `resume` 继续同一会话，得到新的 `execution_id`。
+Agent 文件配置优先于模型的调用请求；未指定设置时沿用配置/默认值，请求被覆盖时结果会说明实际值。可以让模型给运行中的 Agent 发指示，或在它完成后继续同一会话。queued 表示等待会话初始化，sent 表示已提交，均不保证已读取或处理。
 
-`subagent_workflow` 执行编排脚本，可调用 Agent，也可以不启动 Agent。调用的全部字段都必须提供：新启动时 `script`、`scriptPath`、`name` 中恰好一个为有效来源，其余来源及 `resumeFromRunId` 设为 `null`；重放提供有效 `resumeFromRunId`，最多一个替代来源，所有来源设为 `null` 时沿用原脚本。名称和说明放在脚本 `meta`，不传工具 `title/description`。`args` 是必须提供的 JSON 数据，原样使用；`args: null` 在脚本中仍为 `null`，不会转成 undefined，重放也不自动沿用旧值。每次启动或基于旧 journal 重放都产生独立 execution_id；resumeFromRunId 使用旧 workflow 的 wf_ 执行 ID。暂停、继续、跳过和重试仍在 `/agents` UI，不是管理工具动作。
+workflow 用脚本编排多步工作，可以调用 Agent，也可以不启动 Agent。你可以提供脚本、文件路径或已保存的 workflow 名称。重放可以沿用原脚本或使用替代脚本；每次启动或重放都产生独立的执行标识。暂停、继续、跳过和重试在 `/agents` UI 中操作。
 
 ### 委派执行管理
 
-Agent 和 workflow 共用 `agent_manage`，但这个工具不负责发消息或恢复会话。
-
-| action | 参数与行为 |
-| --- | --- |
-| list | 可用 kind 筛选 subagent/workflow |
-| status / stop | execution_id 必填；查看本次执行或请求停止 |
-| output / wait | execution_id 必填；读取当前输出／进度或最终结果，或等待完成；verbose 仅 subagent 可用 |
+可以让模型列出 Agent／workflow 执行、查看状态、读取结果、等待完成或请求停止。这些操作不会恢复对话；要继续 Agent 会话，请明确告诉模型继续之前的 Agent。
 
 execution_id 是执行句柄，直接复制使用，不解析或拼接；它与表示会话的 agent_id 不同。Agent resume 后旧句柄的新查询或控制请求失效，不自动操作新执行，不支持据此读取旧结果。已经开始的等待仍绑定原执行。对话文件不会因此删除；当前尚未恢复的已完成执行仍可正常读取结果。
 
-workflow 输出为脚本结果／错误和进度，没有 Agent 对话详情；不要传 verbose，也没有日志字节分页和正则搜索。停止 workflow 会停止其所属 Agent，不停止独立兄弟。
+workflow 输出为脚本结果／错误和进度，没有 Agent 对话详情，也没有日志字节分页和正则搜索。停止 workflow 会停止其所属 Agent，不停止独立兄弟。
 
 子会话只管理其拥有的嵌套执行和本地进程；可见不等于能直接控制。没有可用 agent_manage 时不能启动无法收集结果的后台孩子；前台结果仍可直接返回。工具禁用、扩展选择、隔离和嵌套深度限制不会被管理入口绕过。
 

@@ -74,7 +74,7 @@ function fixture(configPatch: Partial<AgentConfig> = {}) {
   const call = (session: AgentSession, name: string, args: Record<string, unknown>, signal?: AbortSignal) => {
     const tool = session.agent.state.tools.find(tool => tool.name === name);
     assert.ok(tool, `${name} must be present in actual active SDK tools: ${session.getActiveToolNames()}`);
-    return tool.execute("offline-tool", name === "subagent_run" ? completeToolCall(tool.parameters, args) : args, signal);
+    return tool.execute("offline-tool", ["subagent_run", "agent_manage"].includes(name) ? completeToolCall(tool.parameters, args) : args, signal);
   };
   return { root, cwd, other, ctx, manager, calls, start, call, owner: () => owner!, onComplete: (callback: typeof completed) => { completed = callback; },
     async close() {
@@ -191,7 +191,7 @@ for (const mode of ["noExtensions", "excluded", "deny", "isolated", "nestedOff",
       assert.match(text(await f.call(session, "agent_manage", { action: "stop", execution_id: next.execution_id })), /Stop requested/);
       const retainedTool = session.agent.state.tools.find(tool => tool.name === "agent_manage")!;
       await shutdownChildSession(session);
-      assert.equal(meta(await retainedTool.execute("late", { action: "list" }, undefined)).error_code, "closed", "closed owned-only facade cannot revive");
+      assert.equal(meta(await retainedTool.execute("late", { action: "list", execution_id: null, kind: null, verbose: null }, undefined)).error_code, "closed", "closed owned-only facade cannot revive");
     }
   } finally { await f.close(); }
 });

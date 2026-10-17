@@ -13,7 +13,9 @@ import { TaskCoordinator } from "../../task-ui/coordinator.ts";
 import { TaskLifecycle } from "../../task-ui/lifecycle.ts";
 import { managementContract } from "../tools/management.ts";
 import { executionId } from "../../runtime-tasks/execution-id.ts";
-const agentContract = managementContract("agent");
+const rawAgentContract = managementContract("agent");
+const complete = (args: Record<string, unknown>) => ({ execution_id: null, kind: null, verbose: null, ...args });
+const agentContract: typeof rawAgentContract = (args, result, ctx) => rawAgentContract(complete(args), result, ctx);
 import { createRuntimeTaskFacade, type RuntimeTaskCapability } from "../../runtime-tasks/facade.ts";
 import type { RenderContext } from "../types.ts";
 const { default: agentTasks } = await import("../../agent-tasks/src/index.ts");
@@ -43,7 +45,7 @@ test("actual registered task_manage emits running/completed/verbose/not-found/re
   } as unknown as ExtensionAPI;
   const ctx = { cwd, hasUI: false, mode: "print", ui: { setStatus() {}, setWidget() {}, notify() {} }, sessionManager: { getSessionId: () => "offline-beautify", getBranch: () => [] }, modelRegistry: {} } as unknown as ExtensionToolContext;
   const viewContext = (args: Record<string, unknown>): RenderContext => ({ args, toolCallId: "display", invalidate() {}, lastComponent: undefined, state: {}, cwd, executionStarted: true, argsComplete: true, isPartial: false, expanded: false, showImages: true, isError: false, durationMs: 0, outputPad: 1 });
-  const execute = (args: Record<string, unknown>, signal?: AbortSignal) => tools.get("agent_manage")!.execute("get-result", args, signal, undefined, ctx);
+  const execute = (args: Record<string, unknown>, signal?: AbortSignal) => tools.get("agent_manage")!.execute("get-result", complete(args), signal, undefined, ctx);
   try {
     const capabilities: RuntimeTaskCapability[] = [];
     agentTasks(pi, { coordinator, lifecycle, managerDependencies: dependencies, onManagement: c => capabilities.push(c) });

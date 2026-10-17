@@ -53,7 +53,7 @@ async function harness() {
     await handlers.get("session_start")![0]!(undefined, ctx);
     return {
         tasks, notice, root,
-        execute: (name: string, params: Record<string, unknown>) => tools.get(name)!.execute("failure-host-call", name === "agent_manage" ? params : completeToolCall(tools.get(name)!.parameters, params), undefined, undefined, ctx),
+        execute: (name: string, params: Record<string, unknown>) => tools.get(name)!.execute("failure-host-call", completeToolCall(tools.get(name)!.parameters, params), undefined, undefined, ctx),
         async close() {
             try { await lifecycle.shutdown(); }
             finally {

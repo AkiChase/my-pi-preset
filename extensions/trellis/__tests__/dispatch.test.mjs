@@ -128,7 +128,7 @@ function project(t,scope,root) {
  bus.on('subagents:rpc:ping',({requestId})=>bus.emit('subagents:rpc:ping:reply:'+requestId,{success:true,data:{version:2}}));
  let seq=0, spawnFailure;
  bus.on('subagents:rpc:spawn',params=>{replies.push(params);bus.emit('subagents:rpc:spawn:reply:'+params.requestId,spawnFailure ? {success:false,error:spawnFailure} : {success:true,data:{id:'agent-'+(++seq),execution_id:'exec_'+Buffer.from(JSON.stringify(['agent-'+seq,'1'])).toString('base64url')}});});
- const call=input=>tools.get('trellis_dispatch').execute('tool',input,undefined,undefined,{cwd:root});
+ const call=input=>tools.get('trellis_dispatch').execute('tool',{action:null,agent:null,task:null,prompt:null,...input},undefined,undefined,{cwd:root});
  const dispatch=(agent='trellis-implement')=>call({agent,prompt:'work'});
  return {root,task,put,run,dispatch,call,bus,replies,handlers,git,chdir,failSpawn:error=>{spawnFailure=error;}};
 }
@@ -292,7 +292,7 @@ test('new host can request source stop and reconcile terminal evidence from disk
  const f=await stateFixture(t,false);await f.dispatch();f.handlers.get('session_shutdown')();assert.equal(sourceRecord(f).state,'unknown');
  const tools=new Map();registerDispatchTool({events:f.bus,on:()=>{},registerTool:tool=>tools.set(tool.name,tool)},async()=>f.task);
  f.bus.on('subagents:rpc:stop',({requestId,agentId})=>{assert.equal(agentId,'agent-1');f.bus.emit('subagents:rpc:stop:reply:'+requestId,{success:true});});
- await tools.get('trellis_dispatch').execute('new',{action:'stop'},undefined,undefined,{cwd:f.root});assert.equal(sourceRecord(f).state,'unknown');
+ await tools.get('trellis_dispatch').execute('new',{action:'stop',agent:null,task:null,prompt:null},undefined,undefined,{cwd:f.root});assert.equal(sourceRecord(f).state,'unknown');
  f.bus.emit('subagents:completed',{id:'agent-1'});assert.equal(sourceRecord(f).state,'completed');
 });
 test('source record reader interoperates with Python create preview and rejects malformed leases',async t=>{
@@ -321,9 +321,9 @@ test('terminal before new host first call reconciles cached evidence despite cor
  const tools=new Map();registerDispatchTool({events:f.bus,on:()=>{},registerTool:tool=>tools.set(tool.name,tool)},async()=>f.task);
  f.put('.trellis/.runtime/pi-trellis/source-executions/'+ '0'.repeat(64)+'.json','null');
  f.bus.emit('subagents:completed',{id:'agent-1'});
- await assert.rejects(tools.get('trellis_dispatch').execute('stop',{action:'stop'},undefined,undefined,{cwd:f.root}),/No known agent id/);
+ await assert.rejects(tools.get('trellis_dispatch').execute('stop',{action:'stop',agent:null,task:null,prompt:null},undefined,undefined,{cwd:f.root}),/No known agent id/);
  assert.equal(sourceRecord(f).state,'completed');
- const result=await tools.get('trellis_dispatch').execute('next',{agent:'trellis-check',prompt:'check'},undefined,undefined,{cwd:f.root});assert.equal(result.details.agentId,'agent-2');
+ const result=await tools.get('trellis_dispatch').execute('next',{action:null,task:null,agent:'trellis-check',prompt:'check'},undefined,undefined,{cwd:f.root});assert.equal(result.details.agentId,'agent-2');
 });
 test('source terminal queues under reservation lock and cannot overwrite a newer request',async t=>{
  const f=await stateFixture(t,false);await f.dispatch();const record=sourceRecord(f);

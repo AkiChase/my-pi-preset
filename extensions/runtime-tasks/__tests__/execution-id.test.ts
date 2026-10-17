@@ -19,9 +19,9 @@ test("old handles fail before backend calls and admitted waits retain exact iden
     calls++; await pending; return taskResult("original result", { action: "wait", task_type: "subagent", task_id: identity.taskId, run_id: identity.runId });
   } }]);
   const old = executionId({ taskId: "a", runId: "1" }, "subagent");
-  const waiting = tool.execute("wait", { action: "wait", execution_id: old }, undefined, undefined, {} as never);
+  const waiting = tool.execute("wait", { action: "wait", execution_id: old, kind: null, verbose: null }, undefined, undefined, {} as never);
   run = "2";
-  const stale = await tool.execute("stop", { action: "stop", execution_id: old }, undefined, undefined, {} as never);
+  const stale = await tool.execute("stop", { action: "stop", execution_id: old, kind: null, verbose: null }, undefined, undefined, {} as never);
   assert.equal(stale.isError, true); assert.equal(calls, 1);
   finish(); const result = await waiting;
   assert.ok("execution_id" in result.details.runtimeManagement);

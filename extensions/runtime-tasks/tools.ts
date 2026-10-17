@@ -1,3 +1,4 @@
+import { nullableControl, parseControlArguments } from "../shared/tool-arguments.ts";
 import { createToolCallHeading } from "../beautify/tool-call-heading.ts";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { AgentToolUpdateCallback } from "@earendil-works/pi-agent-core";
@@ -51,20 +52,21 @@ const processGuidance = `Process_manage usage:
     Stop observation: {"action":"stop","task_id":"<monitor_task_id>"}`;
 const agentGuidance = `Agent_manage usage:
   - Manage executions started by subagent_run or subagent_workflow, not process logs or Agent conversation control. Use process_manage for bash/monitor; subagent_message for messages; subagent_run for Agent resume; subagent_workflow for workflow replay.
-  - Accepted arguments by action (? means optional; action is required):
-    list: kind?
-    status/stop: execution_id
-    output/wait: execution_id, verbose?
-  - kind filters list to subagent/workflow. Copy execution_id from launch/list; do not construct it or substitute agent_id. agent_id identifies a conversation for messaging/resume; execution_id identifies one execution.
+  - Provide every exposed field: action, execution_id, kind, verbose. Set unused controls to null; action must be non-null. Unknown fields remain invalid even when null.
+  - Non-null arguments by action:
+    list: kind filter if needed; execution_id and verbose must be null.
+    status/stop: execution_id; kind and verbose must be null.
+    output/wait: execution_id and verbose if needed; kind must be null.
+  - kind filters list to subagent/workflow. Copy execution_id from launch/list; do not construct it or substitute agent_id. agent_id identifies a conversation for messaging/resume; execution_id identifies one execution. Do not provide non-null values outside the selected action.
   - Agent resume produces a new execution_id. New calls with the previous execution_id fail as stale; they never operate on the resumed execution. A wait already admitted remains bound to its original execution. Workflow replay creates a separate execution with a new ID.
-  - output returns current output/progress or a final result; wait awaits the whole execution. verbose is only for subagent output/wait and requests formatted detail, not an unlimited trace. Omit it for workflow.
+  - output returns current output/progress or a final result; wait awaits the whole execution. verbose is only for subagent output/wait and requests formatted detail, not an unlimited trace. Set verbose to null for workflow.
   - /bg or cancellation releases a wait without stopping execution. stop requests cancellation; it may still be draining. Stopping a workflow also stops its owned agents, not independent siblings. Visible owned children cannot necessarily be managed directly by another owner.
   - Successful terminal output/wait delivery reports that execution's result and avoids duplicate completion notifications; list/status do not consume it. Completion is notified automatically; do not poll solely to detect completion.
   - Examples:
-    List workflows: {"action":"list","kind":"workflow"}
-    Read result: {"action":"output","execution_id":"<execution_id>"}
-    Await execution: {"action":"wait","execution_id":"<execution_id>"}
-    Stop execution: {"action":"stop","execution_id":"<execution_id>"}`;
+    List workflows: {"action":"list","execution_id":null,"kind":"workflow","verbose":null}
+    Read result: {"action":"output","execution_id":"<execution_id>","kind":null,"verbose":null}
+    Await execution: {"action":"wait","execution_id":"<execution_id>","kind":null,"verbose":null}
+    Stop execution: {"action":"stop","execution_id":"<execution_id>","kind":null,"verbose":null}`;
 
 export interface ManagementParams {
   action: RuntimeTaskParams["action"]; task_id?: string; task_type?: "bash" | "monitor";
@@ -80,13 +82,27 @@ const fields = {
   process: { list: ["task_type"], stats: ["task_type"], status: ["task_id"], stop: ["task_id"], output: ["task_id", "offset", "limit"], wait: ["task_id", "limit"], search: ["pattern", "task_id", "task_type", "ignore_case", "context"] },
   agent: { list: ["kind"], status: ["execution_id"], stop: ["execution_id"], output: ["execution_id", "verbose"], wait: ["execution_id", "verbose"] },
 } as const;
+export interface AgentManagementParams { action: ManagementParams["action"]; execution_id: string | null; kind: "subagent" | "workflow" | null; verbose: boolean | null }
+export function parseAgentManagementParams(value: unknown): ManagementParams {
+  const params = parseControlArguments(value, ["action", "execution_id", "kind", "verbose"], ["execution_id", "kind", "verbose"]);
+  const error = validateNormalizedManagementParams("agent", params);
+  if (error) throw new Error(error);
+  return params as unknown as ManagementParams;
+}
 export function validateManagementParams(group: ManagementGroup, value: unknown): string | undefined {
+  if (group === "agent") {
+    try { parseAgentManagementParams(value); return undefined; }
+    catch (error) { return error instanceof Error ? error.message : String(error); }
+  }
+  return validateNormalizedManagementParams(group, value);
+}
+function validateNormalizedManagementParams(group: ManagementGroup, value: unknown): string | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return "Arguments must be an object.";
   const v = value as Record<string, unknown>, table = fields[group] as Record<string, readonly string[]>;
   if (typeof v.action !== "string" || !Object.hasOwn(table, v.action)) return `Unsupported ${group} management action.`;
   const accepted = ["action", ...table[v.action]!];
   const bad = Object.keys(v).find(k => !accepted.includes(k));
-  if (bad) return `Field '${bad}' is not accepted for ${v.action}. Accepted fields: ${accepted.join(", ")}. Omit fields that do not apply to this action.`;
+  if (bad) return `Field '${bad}' is not accepted for ${v.action}. Accepted fields: ${accepted.join(", ")}. ${group === "agent" ? "Set fields that do not apply to this action to null." : "Omit fields that do not apply to this action."}`;
   const target = group === "process" ? "task_id" : "execution_id";
   if (["status", "output", "wait", "stop"].includes(v.action) && (typeof v[target] !== "string" || !v[target].trim())) return `${v.action} requires ${target}.`;
   if (v.task_id !== undefined && (typeof v.task_id !== "string" || !v.task_id.trim())) return "task_id must be a non-empty string.";
@@ -119,13 +135,18 @@ export function managementTool(group: ManagementGroup, capabilities: readonly Ru
     pattern: Type.Optional(Type.String({ description: "Required search regex." })), ignore_case: Type.Optional(Type.Boolean({ description: "Search case-insensitivity; default false." })),
     context: Type.Optional(Type.Number({ minimum: 0, multipleOf: 1, description: "Search context lines; default 0." })),
   }, { additionalProperties: false }) : Type.Object({
-    action: StringEnum(["list", "status", "output", "wait", "stop"] as const), execution_id: Type.Optional(Type.String({ description: "Execution handle from launch/list; required for targeted actions." })),
-    kind: Type.Optional(StringEnum(["subagent", "workflow"] as const, { description: "List filter only." })), verbose: Type.Optional(Type.Boolean({ description: "Formatted detail for subagent output/wait only." })),
+    action: StringEnum(["list", "status", "output", "wait", "stop"] as const), execution_id: nullableControl(Type.String({ description: "Execution handle from launch/list; non-null for targeted actions, null for list." })),
+    kind: nullableControl(StringEnum(["subagent", "workflow"] as const, { description: "List filter; null for no filter or other actions." })), verbose: nullableControl(Type.Boolean({ description: "Formatted detail for subagent output/wait; null when unused or for workflow." })),
   }, { additionalProperties: false });
   let closed = false;
   const close = () => { closed = true; facade.close(); };
-  const execute = async (id: string, params: ManagementParams, signal: AbortSignal | undefined, update: AgentToolUpdateCallback<ManagementDetails> | undefined, ctx: ExtensionContext) => {
-    const error = validateManagementParams(group, params);
+  const execute = async (id: string, input: ManagementParams | AgentManagementParams, signal: AbortSignal | undefined, update: AgentToolUpdateCallback<ManagementDetails> | undefined, ctx: ExtensionContext) => {
+    let params: ManagementParams = input as ManagementParams;
+    let error: string | undefined;
+    if (group === "agent") {
+      try { params = parseAgentManagementParams(input); }
+      catch (failure) { error = failure instanceof Error ? failure.message : String(failure); }
+    } else error = validateManagementParams(group, input);
     const fail = (text: string, code = "invalid_arguments") => ({ content: [{ type: "text" as const, text }], details: { runtimeManagement: { version: 2 as const, group, action: String(params?.action ?? "status"), error_code: code } }, isError: true });
     if (closed) return fail("Management activation is closed.", "closed");
     if (error) return fail(error);

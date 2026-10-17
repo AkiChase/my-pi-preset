@@ -43,11 +43,11 @@ test("split management schemas define each field once and defer combinations to 
     const { tool } = managementTool(group, [capability]);
     const schema = JSON.parse(JSON.stringify(tool.parameters));
     assert.equal(schema.type, "object"); assert.equal(schema.anyOf, undefined); assert.equal(schema.additionalProperties, false);
-    assert.deepEqual(schema.required, ["action"]);
-    const bad = group === "process" ? { action: "status", task_id: "x", limit: 1 } : { action: "wait", task_id: "x" };
+    assert.deepEqual(schema.required, group === "process" ? ["action"] : ["action", "execution_id", "kind", "verbose"]);
+    const bad = group === "process" ? { action: "status", task_id: "x", limit: 1 } : { action: "status", execution_id: "x", kind: null, verbose: false };
     const result = await tool.execute("bad", bad as never, undefined, undefined, ctx);
     assert.equal(result.isError, true);
-    assert.match(result.content[0]!.type === "text" ? result.content[0]!.text : "", /Omit fields that do not apply to this action/);
+    assert.match(result.content[0]!.type === "text" ? result.content[0]!.text : "", /fields that do not apply to this action/);
   }
   assert.equal(calls, 0);
 });
