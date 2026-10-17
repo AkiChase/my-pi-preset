@@ -53,7 +53,6 @@ PI_BIN=/path/to/pi ./install.sh
 | [Session Name](docs/extensions/session-name.md) | 自动评估会话标题，也可手动刷新并保护手动命名。 |
 | [Widget Display](docs/extensions/widget-display.md) | 统一内置插件的编辑器区域信息，保持稳定排列。 |
 | [Recap](docs/extensions/recap.md) | 会话结束并空闲后生成简短回顾，帮助恢复工作。 |
-| [Tool Guidance](docs/extensions/tool-guidance.md) | 在工具规则旁统一提醒省略未用的可选参数，保留合法空值。 |
 | [Task Composition](docs/extensions/task-composition.md) | 在共享面板中管理命令、子 Agent 和 workflow 的执行与等待。 |
 | [Monitor](docs/extensions/monitor.md) | 持续监听命令或 WebSocket，分批通知并提醒静默与恢复。 |
 | [Beautify](docs/extensions/beautify.md) | 精简工具结果展示，并美化输入框。 |

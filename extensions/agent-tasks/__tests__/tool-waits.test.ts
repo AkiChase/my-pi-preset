@@ -1,3 +1,4 @@
+import { completeToolCall } from "./tool-inputs.ts";
 import { executionId } from "../../runtime-tasks/execution-id.ts";
 import { registerManagementTool } from "../../runtime-tasks/tools.ts";
 import { createRuntimeTaskFacade, type RuntimeTaskCapability } from "../../runtime-tasks/facade.ts";
@@ -105,7 +106,7 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
   const registry = Reflect.get(globalThis, Symbol.for("pi-subagents:manager")) as {
     hasRunning(): boolean; getRecord(id: string): AgentRecord | undefined;
   };
-  const execute = (name: string, params: Record<string, unknown>, signal?: AbortSignal, call: { id: string | undefined } = { id: "offline-call" }) => tools.get(name)!.execute(call.id!, params, signal, () => { throw new Error("inline renderer failed"); }, ctx);
+  const execute = (name: string, params: Record<string, unknown>, signal?: AbortSignal, call: { id: string | undefined } = { id: "offline-call" }) => tools.get(name)!.execute(call.id!, name === "agent_manage" ? params : completeToolCall(tools.get(name)!.parameters, params), signal, () => { throw new Error("inline renderer failed"); }, ctx);
   return { coordinator, lifecycle, source, calls, events, rpcReplies, entries,
     rpc: (value: unknown) => events.emit("subagents:rpc:spawn", value),
     shutdownHandlers: () => handlers.get("session_shutdown")!.length, tools, resumes, notices, execute, ctx, registry, root,
@@ -724,7 +725,7 @@ void it("actual clone privately overrides custom frontmatter foreground pin, ord
   let invoke!: (tool: import("@earendil-works/pi-coding-agent").ToolDefinition) => Promise<void>;
   const f = await factory({ agentMentions: "model" }, {}, cloneTransport(tool => invoke(tool)), { customAgent: true });
   const toasts: string[] = []; f.ctx.ui.notify = message => { toasts.push(message); }; f.ctx.getSystemPrompt = () => "original main system";
-  invoke = async tool => { await tool.execute("clone-id", { subagent_type: "custom", description: "clone custom", prompt: "clone work" }, undefined, undefined, f.ctx); };
+  invoke = async tool => { await tool.execute("clone-id", completeToolCall(tool.parameters, { subagent_type: "custom", description: "clone custom", prompt: "clone work" }), undefined, undefined, f.ctx); };
   try {
     await f.input("@custom clone work"); await tick();
     const row = f.coordinator.list()[0]!;
@@ -742,7 +743,7 @@ void it("actual clone Agent model refusal reports original text once without fal
   const toasts: { text: string; type?: string }[] = []; f.ctx.ui.notify = (text, type) => { toasts.push({ text, type }); }; f.ctx.getSystemPrompt = () => "main";
   const known = { provider: "offline", id: "known", name: "Known model" };
   f.ctx.modelRegistry = { find: () => known, getAll: () => [known], getAvailable: () => [known] } as unknown as ExtensionToolContext["modelRegistry"];
-  invoke = async tool => { await tool.execute("clone-id", { subagent_type: "general-purpose", description: "refused", prompt: "work", model: "missing-model" }, undefined, undefined, f.ctx); };
+  invoke = async tool => { await tool.execute("clone-id", completeToolCall(tool.parameters, { subagent_type: "general-purpose", description: "refused", prompt: "work", model: "missing-model" }), undefined, undefined, f.ctx); };
   try {
     await f.input("@general-purpose do work"); await tick();
     assert.equal(f.coordinator.list().length, 0); assert.equal(f.calls.length, 0);
@@ -753,7 +754,7 @@ void it("clone throwing after admission gives failure feedback but never retries
   let invoke!: (tool: import("@earendil-works/pi-coding-agent").ToolDefinition) => Promise<void>;
   const f = await factory({ agentMentions: "model" }, {}, cloneTransport(tool => invoke(tool)), { onEvent(name) { if (name === "subagents:created") throw new Error("partial admission observer failure"); } });
   const errors: string[] = []; f.ctx.ui.notify = (text, type) => { if (type === "error") errors.push(text); }; f.ctx.getSystemPrompt = () => "main";
-  invoke = async tool => { await tool.execute("clone-id", { subagent_type: "general-purpose", description: "partial", prompt: "work" }, undefined, undefined, f.ctx); };
+  invoke = async tool => { await tool.execute("clone-id", completeToolCall(tool.parameters, { subagent_type: "general-purpose", description: "partial", prompt: "work" }), undefined, undefined, f.ctx); };
   try {
     await f.input("@general-purpose do work"); await tick();
     assert.equal(f.calls.length, 1); assert.equal(f.coordinator.list().length, 1);

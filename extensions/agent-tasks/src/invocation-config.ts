@@ -1,3 +1,4 @@
+import { nullableControl } from "../../shared/tool-arguments.ts";
 import { Type, StringEnum } from "@earendil-works/pi-ai";
 import type { AgentConfig, AgentInvocation, IsolationMode, JoinMode, ThinkingLevel } from "./types.ts";
 
@@ -12,9 +13,9 @@ import type { AgentConfig, AgentInvocation, IsolationMode, JoinMode, ThinkingLev
 export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
 
 export const thinkingParamShape = {
-  thinking: Type.Optional(
+  thinking: nullableControl(
     StringEnum(THINKING_LEVELS, {
-      description: `Thinking level: ${THINKING_LEVELS.join(", ")}. Agent-file configuration takes precedence.`,
+      description: `Thinking level: ${THINKING_LEVELS.join(", ")}. Set null to use configuration/defaults. Agent-file configuration takes precedence.`,
     }),
   ),
 };
@@ -56,10 +57,10 @@ export function thinkingParam(): Partial<typeof thinkingParamShape> {
  * a second legal value is what lets a model decline one, not being told to.
  */
 const isolationParamShape = {
-  isolation: Type.Optional(
+  isolation: nullableControl(
     Type.Union([Type.Literal("off"), Type.Literal("worktree")], {
       description:
-        'Isolation mode. Default "off". "off" runs the agent in the current checkout, the same as omitting the field. "worktree" creates a temporary git worktree so the agent works on an isolated copy of the repo (a copy cannot see uncommitted or staged changes in the main checkout).',
+        'Isolation mode. Set null to use configuration/defaults. Default "off". "off" runs the agent in the current checkout. "worktree" creates a temporary git worktree so the agent works on an isolated copy of the repo (a copy cannot see uncommitted or staged changes in the main checkout).',
     }),
   ),
 };

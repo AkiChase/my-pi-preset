@@ -1,3 +1,4 @@
+import { nullableControl } from "../../shared/tool-arguments.ts";
 import { createToolCallHeading } from "../../beautify/tool-call-heading.ts";
 import { executionId } from "../../runtime-tasks/execution-id.ts";
 import { launchMetadata, launchText, isLaunchMetadata } from "../../runtime-tasks/launch.ts";
@@ -85,7 +86,7 @@ import { completeWorkflowTask, createWorkflowTask, failWorkflowTask, formatWorkf
 import { workflowToolGuidance } from "./workflow/tool-description.ts";
 import { isWorktreeIsolationEnabled, setWorktreeIsolationEnabled } from "./worktree.ts";
 import { runToolGuidance, messageToolGuidance } from "./tool-guidance.ts";
-import { assertAgentToolArguments, assertMessageToolArguments, assertWorkflowToolArguments } from "./tool-contract.ts";
+import { parseAgentToolArguments, assertMessageToolArguments, parseWorkflowToolArguments } from "./tool-contract.ts";
 import { assertNonEmptyString, assertSpawnInput, normalizeAgentDescription, parseSpawnOptions } from "./spawn-input.ts";
 import { escapeXml } from "./xml.ts";
 
@@ -1512,10 +1513,10 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
   // preserves Type.Object's inference when present and produces a
   // `schedule`-free schema when absent — zero LLM-context cost in disabled mode.
   const scheduleParamShape = {
-    schedule: Type.Optional(
+    schedule: nullableControl(
       Type.String({
         description:
-          'Opt-in only — fire later instead of now. Omit to run immediately (the default, almost always correct). ' +
+          'Opt-in only — fire later instead of now. Set null to run immediately (the default, almost always correct). ' +
           'Formats: 6-field cron ("0 0 9 * * 1" = 9am Mon), interval ("5m"/"1h"), one-shot ("+10m" or ISO). ' +
           'Forces run_in_background; incompatible with inherit_context and resume. Returns job ID.',
       }),
@@ -1537,43 +1538,43 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       prompt: Type.String({
         description: "The task for the agent to perform.",
       }),
-      description: Type.Optional(Type.String({
-        description: "Required for new agents: a short, specific task description. Not accepted with resume.",
+      description: nullableControl(Type.String({
+        description: "Required for new agents: a short, specific task description. Set null with resume.",
       })),
-      name: Type.Optional(
+      name: nullableControl(
         Type.String({
           description:
-            'Optional name for a new agent, usable as @name in the input box. Tool messaging/resume uses the real agent_id; execution management uses execution_id. Not accepted with resume.',
+            'Name for a new agent; set null for an automatic name, usable as @name in the input box. Tool messaging/resume uses the real agent_id; execution management uses execution_id. Set null with resume.',
         }),
       ),
-      subagent_type: Type.Optional(Type.String({
-        description: `Required for new agents only. Available types: ${getAvailableTypes().join(", ")}.`,
+      subagent_type: nullableControl(Type.String({
+        description: `Required non-null for new agents; null with resume. Available types: ${getAvailableTypes().join(", ")}.`,
       })),
-      model: Type.Optional(
+      model: nullableControl(
         Type.String({
           description:
-            'Optional model override. Accepts "provider/modelId" or fuzzy name (e.g. "haiku", "sonnet"). Omit to use the agent type\'s default.',
+            'Model override. Accepts "provider/modelId" or fuzzy name (e.g. "haiku", "sonnet"). Set null to use the agent type\'s default.',
         }),
       ),
       ...thinkingParam(),
-      run_in_background: Type.Optional(
+      run_in_background: nullableControl(
         Type.Boolean({
-          description: `Optional execution mode. Default without an agent-file pin: ${getBackgroundByDefault() ? "background" : "foreground"}. Agent-file configuration takes precedence. Background returns execution identity; foreground waits for results.`,
+          description: `Execution mode; set null to use configuration/defaults. Default without an agent-file pin: ${getBackgroundByDefault() ? "background" : "foreground"}. Agent-file configuration takes precedence. Background returns execution identity; foreground waits for results.`,
         }),
       ),
-      resume: Type.Optional(
+      resume: nullableControl(
         Type.String({
-          description: "Real agent_id of a finished agent. Omit entirely for new agents; an empty string is invalid. With resume only prompt and optional run_in_background are accepted; stored session settings are retained.",
+          description: "Real agent_id of a finished agent. Set null for new agents; an empty string is invalid. With resume, set new-agent fields to null; prompt and run_in_background remain applicable; stored session settings are retained.",
         }),
       ),
-      isolated: Type.Optional(
+      isolated: nullableControl(
         Type.Boolean({
-          description: "If true, agent gets no extension/MCP tools — only built-in tools.",
+          description: "Set null to use configuration/defaults. If true, agent gets no extension/MCP tools — only built-in tools.",
         }),
       ),
-      inherit_context: Type.Optional(
+      inherit_context: nullableControl(
         Type.Boolean({
-          description: "If true, fork parent conversation into the agent. Default: false (fresh context).",
+          description: "Set null to use configuration/defaults. If true, fork parent conversation into the agent. Default: false (fresh context).",
         }),
       ),
       ...isolationParam(isWorktreeIsolationEnabled()),
@@ -1682,10 +1683,11 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
 
     // ---- Execute ----
 
-    execute: async (toolCallId, params, signal, onUpdate, ctx) => {
+    execute: async (toolCallId, input, signal, onUpdate, ctx) => {
       assertActive();
 
-      try { assertAgentToolArguments(params, { nested: false, isolation: isWorktreeIsolationEnabled(), scheduling: isSchedulingEnabled() }); }
+      let params;
+      try { params = parseAgentToolArguments(input, { nested: false, isolation: isWorktreeIsolationEnabled(), scheduling: isSchedulingEnabled() }); }
       catch (err) { return errorResult(err instanceof Error ? err.message : String(err)); }
       reloadCustomAgents();
       const resumeTarget = params.resume === undefined ? undefined : manager.getRecord(params.resume);
@@ -1743,7 +1745,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       assertActive();
       const thinking = resolvedConfig.thinking;
       const inheritContext = resolvedConfig.inheritContext;
-      const runInBackground = cloneBackgroundParams.has(params) || resolvedConfig.runInBackground;
+      const runInBackground = cloneBackgroundParams.has(input) || resolvedConfig.runInBackground;
       const isolated = resolvedConfig.isolated;
       const isolation = resolvedConfig.isolation;
       // Whether this spawn writes its .output transcript. Per-agent
@@ -2409,41 +2411,39 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     promptSnippet: "Run a deterministic script that orchestrates many subagents",
     promptGuidelines: workflowToolGuidance(buildTypeListText()),
     parameters: Type.Object({
-      script: Type.Optional(
+      script: nullableControl(
         Type.String({
           maxLength: 524288,
-          description: "Inline workflow source. Must begin with `export const meta = { name, description }`.",
+          description: "Inline workflow source. Set null when using another source or replaying the prior script. Must begin with `export const meta = { name, description }`.",
         }),
       ),
-      scriptPath: Type.Optional(
+      scriptPath: nullableControl(
         Type.String({
           description:
-            "Workflow script file path; mutually exclusive with script and name.",
+            "Workflow script file path; set null when unused. Mutually exclusive with non-null script and name.",
         }),
       ),
-      name: Type.Optional(
+      name: nullableControl(
         Type.String({
           description:
-            "Saved workflow name; mutually exclusive with script and scriptPath. Looked up in project .pi/workflows, .agents/workflows and the user's workflow directory.",
+            "Saved workflow name; set null when unused. Mutually exclusive with non-null script and scriptPath. Looked up in project .pi/workflows, .agents/workflows and the user's workflow directory.",
         }),
       ),
-      args: Type.Optional(
-        Type.Any({
-          description: "Exposed to the script as the global `args`, verbatim. Must be JSON-shaped.",
-        }),
-      ),
-      resumeFromRunId: Type.Optional(
+      args: Type.Any({
+        description: "Required JSON data passed to the script as global args, verbatim. Null is data, not an unspecified control value.",
+      }),
+      resumeFromRunId: nullableControl(
         Type.String({
           pattern: "^wf_[a-z0-9-]{6,}$",
           description:
-            "Run id of an earlier workflow in this session. Its unchanged leading agent() calls return their recorded results instantly; the first changed or failed call, and everything after it, runs live. Same script and args means nothing re-runs.",
+            "Set null for a new execution, or provide a run id of an earlier workflow in this session. Its unchanged leading agent() calls return their recorded results instantly; the first changed or failed call, and everything after it, runs live. Same script and args means nothing re-runs.",
         }),
       ),
 
     }, { additionalProperties: false }),
 
     renderCall(args, theme, context) {
-      return createToolCallHeading({ name: "subagent_workflow", detail: workflowCallName(args), theme, context });
+      return createToolCallHeading({ name: "subagent_workflow", detail: workflowCallName({ script: args.script ?? undefined, scriptPath: args.scriptPath ?? undefined, name: args.name ?? undefined }), theme, context });
     },
 
     renderResult(result, _options, theme, renderContext) {
@@ -2471,9 +2471,10 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       );
     },
 
-    execute: async (toolCallId, params, _signal, _onUpdate, ctx) => {
+    execute: async (toolCallId, input, _signal, _onUpdate, ctx) => {
       assertActive();
-      try { assertWorkflowToolArguments(params); assertBoundarySafe(params.args, "args"); }
+      let params;
+      try { params = parseWorkflowToolArguments(input); assertBoundarySafe(params.args, "args"); }
       catch (err) { return errorResult(err instanceof Error ? err.message : String(err)); }
       const resumeFrom = resolveResumeTarget(params.resumeFromRunId, workflowTasks);
       if (resumeFrom !== undefined && !resumeFrom.ok) return errorResult(resumeFrom.message);

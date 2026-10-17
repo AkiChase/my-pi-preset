@@ -78,11 +78,11 @@ Monitor 的 wait 等整个观察结束，不是下一条事件。解除或取消
 
 ## 子 Agent 与 workflow
 
-`subagent_run` 新建或恢复 Agent；后台启动返回稳定的 `agent_id` 与本次 `execution_id`，前台则直接等待结果。新建需要 `prompt`、`description`、`subagent_type`；恢复只传 `resume`、`prompt` 和可选 `run_in_background`，沿用原会话类型、名称与设置，不重复新建字段。子 Agent 恢复自己的孩子时固定前台，不能传 `run_in_background`。
+`subagent_run` 新建或恢复 Agent；后台启动返回稳定的 `agent_id` 与本次 `execution_id`，前台则直接等待结果。调用必须提供当前工具暴露的全部字段，不使用的控制字段设为 `null`，不能省略或填空字符串。新建时 `prompt`、`description`、`subagent_type` 必须非空，`resume` 设为 `null`；恢复时提供非空 `resume` 和 `prompt`，其他新建字段设为 `null`，`run_in_background` 可用布尔值或 `null`。子 Agent 恢复自己的孩子时固定前台，`run_in_background` 必须为 `null`。禁用或当前入口未暴露的字段不能传入，即使值是 `null`。
 
-Agent 文件配置优先于调用参数；省略参数沿用配置/默认值，显式不同请求被覆盖时结果会说明请求值与实际值。`subagent_message` 用真实 `agent_id` 和非空 `message` 给运行中的 Agent 发指示，不接受名称别名或 `execution_id`；queued 表示等待会话初始化，sent 表示已提交，均不保证已读取或处理。完成后用 `subagent_run` 的 `resume` 继续同一会话，得到新的 `execution_id`。
+Agent 文件配置优先于调用参数；控制参数设为 `null` 时沿用配置/默认值，显式不同请求被覆盖时结果会说明请求值与实际值。`subagent_message` 用真实 `agent_id` 和非空 `message` 给运行中的 Agent 发指示，不接受名称别名或 `execution_id`；queued 表示等待会话初始化，sent 表示已提交，均不保证已读取或处理。完成后用 `subagent_run` 的 `resume` 继续同一会话，得到新的 `execution_id`。
 
-`subagent_workflow` 执行编排脚本，可调用 Agent，也可以不启动 Agent。新启动必须只提供 `script`、`scriptPath`、`name` 中一个；重放可省略来源沿用原脚本，或提供一个替代来源，不能同时传多个。名称和说明放在脚本 `meta`，不传工具 `title/description`。`args` 原样使用，重放省略时仍为 undefined，不自动沿用旧值。每次启动或基于旧 journal 重放都产生独立 execution_id；resumeFromRunId 使用旧 workflow 的 wf_ 执行 ID。暂停、继续、跳过和重试仍在 `/agents` UI，不是管理工具动作。
+`subagent_workflow` 执行编排脚本，可调用 Agent，也可以不启动 Agent。调用的全部字段都必须提供：新启动时 `script`、`scriptPath`、`name` 中恰好一个为有效来源，其余来源及 `resumeFromRunId` 设为 `null`；重放提供有效 `resumeFromRunId`，最多一个替代来源，所有来源设为 `null` 时沿用原脚本。名称和说明放在脚本 `meta`，不传工具 `title/description`。`args` 是必须提供的 JSON 数据，原样使用；`args: null` 在脚本中仍为 `null`，不会转成 undefined，重放也不自动沿用旧值。每次启动或基于旧 journal 重放都产生独立 execution_id；resumeFromRunId 使用旧 workflow 的 wf_ 执行 ID。暂停、继续、跳过和重试仍在 `/agents` UI，不是管理工具动作。
 
 ### 委派执行管理
 

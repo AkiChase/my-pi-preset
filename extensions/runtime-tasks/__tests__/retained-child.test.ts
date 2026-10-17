@@ -1,3 +1,4 @@
+import { completeToolCall } from "../../agent-tasks/__tests__/tool-inputs.ts";
 import { executionId } from "../execution-id.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -73,7 +74,7 @@ function fixture(configPatch: Partial<AgentConfig> = {}) {
   const call = (session: AgentSession, name: string, args: Record<string, unknown>, signal?: AbortSignal) => {
     const tool = session.agent.state.tools.find(tool => tool.name === name);
     assert.ok(tool, `${name} must be present in actual active SDK tools: ${session.getActiveToolNames()}`);
-    return tool.execute("offline-tool", args, signal);
+    return tool.execute("offline-tool", name === "subagent_run" ? completeToolCall(tool.parameters, args) : args, signal);
   };
   return { root, cwd, other, ctx, manager, calls, start, call, owner: () => owner!, onComplete: (callback: typeof completed) => { completed = callback; },
     async close() {

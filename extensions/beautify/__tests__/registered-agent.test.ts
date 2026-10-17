@@ -1,3 +1,4 @@
+import { completeToolCall } from "../../agent-tasks/__tests__/tool-inputs.ts";
 import { registerManagementTool } from "../../runtime-tasks/tools.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -49,7 +50,7 @@ test("actual registered task_manage emits running/completed/verbose/not-found/re
     registerManagementTool(pi, "agent", capabilities);
     await handlers.get("session_start")![0]!(undefined, ctx);
     const notFound = await execute({ action: "output", execution_id: executionId({ taskId: "absent", runId: "1" }, "subagent") }); assert.equal(agentContract({ action: "output", execution_id: executionId({ taskId: "absent", runId: "1" }, "subagent") }, notFound, viewContext({ action: "output", execution_id: executionId({ taskId: "absent", runId: "1" }, "subagent") }))?.stats, "stale");
-    await tools.get("subagent_run")!.execute("launch", { subagent_type: "general-purpose", description: "Actual description", prompt: "offline", run_in_background: true }, undefined, undefined, ctx);
+    await tools.get("subagent_run")!.execute("launch", completeToolCall(tools.get("subagent_run")!.parameters, { subagent_type: "general-purpose", description: "Actual description", prompt: "offline", run_in_background: true }), undefined, undefined, ctx);
     await tick();
     const id = coordinator.list().find(view => view.kind === "agent")!.taskId;
     const args = { action: "output", execution_id: executionId({ taskId: id, runId: "1" }, "subagent"), verbose: true };

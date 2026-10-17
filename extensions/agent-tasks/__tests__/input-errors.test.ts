@@ -1,3 +1,5 @@
+import { parseAgentToolArguments } from "../src/tool-contract.ts";
+import { completeToolCall } from "./tool-inputs.ts";
 /**
  * S2: subagent input admission and failure marking.
  *
@@ -53,7 +55,7 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
         mkdirSync(join(config, "agents"));
         writeFileSync(join(config, "agents", "custom.md"), typeof settings.customAgent === "string" ? settings.customAgent : "---\nname: custom\ndescription: Offline agent\n---\nDo work.\n");
     }
-    writeFileSync(join(config, "agent-tasks.json"), JSON.stringify({ schedulingEnabled: false, outputTranscript: false, rememberAgents: false, defaultJoinMode: "async", ...settings }));
+    writeFileSync(join(config, "agent-tasks.json"), JSON.stringify({ schedulingEnabled: false, worktreeIsolation: true, outputTranscript: false, rememberAgents: false, defaultJoinMode: "async", ...settings }));
     const previous = process.env.PI_CODING_AGENT_DIR;
     process.env.PI_CODING_AGENT_DIR = config;
 
@@ -119,7 +121,7 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
     await handlers.get("session_start")![0]!(undefined, ctx);
 
     const execute = (name: string, params: Record<string, unknown>) =>
-        tools.get(name)!.execute("call", params, undefined, () => {}, ctx);
+        tools.get(name)!.execute("call", completeToolCall(tools.get(name)!.parameters, params), undefined, () => {}, ctx);
     const paramSchema = (name: string) => tools.get(name)!.parameters;
 
     const registry = Reflect.get(globalThis, Symbol.for("pi-subagents:manager")) as { getRecord(id: string): AgentRecord | undefined };
@@ -149,7 +151,7 @@ function hostError(parameters: unknown, args: unknown, name = "subagent_run"): E
     try {
         validateToolArguments(
             { name, description: "", parameters } as never,
-            { id: "call", name, arguments: args } as never
+            { id: "call", name, arguments: completeToolCall(parameters as never, args as Record<string, unknown>) } as never
         );
         return undefined;
     } catch (err) {
@@ -167,7 +169,7 @@ void it("actual registered Agent tools contribute one official SDK rule group an
             const selectedTools = definitions.map(tool => tool.name);
             const prompt = buildSystemPrompt({ cwd: f.cwd, selectedTools: [...selectedTools, "peer"], toolSnippets: { ...snippets, peer: "Peer index" }, toolGuidelines: { ...guidelines, peer: ["Peer guideline"] } });
             for (const heading of ["Subagent_run usage:", "Subagent_message usage:", "Subagent_workflow usage:"]) assert.equal(prompt.split(heading).length - 1, 1);
-            assert.match(prompt, /omit resume entirely for a new agent/);
+            assert.match(prompt, /set resume to null for a new agent/);
             assert.match(prompt, new RegExp(`execution defaults to ${backgroundByDefault ? "background" : "foreground"}`));
             assert.match(prompt, /Peer index/); assert.match(prompt, /Peer guideline/);
             assert.doesNotMatch(prompt, /OLD_CUSTOM_TEMPLATE|toolDescriptionMode|\{\{typeList\}\}/);
@@ -185,11 +187,16 @@ void it("thinking is a closed enum in both the root and nested schemas", async (
     try {
         for (const [label, parameters] of [["root", f.paramSchema("subagent_run")], ["nested", f.nested()[0]!.parameters]] as const) {
             const schema = JSON.parse(JSON.stringify(parameters)) as { properties: Record<string, { enum?: string[] }> };
-            assert.deepEqual(schema.properties.thinking?.enum, [...THINKING_LEVELS], `${label}: thinking must list every level`);
-            // Optional: an enum that were required would break every call that
-            // does not name a level.
-            const required = (JSON.parse(JSON.stringify(parameters)) as { required?: string[] }).required ?? [];
-            assert.ok(!required.includes("thinking"), `${label}: thinking must stay optional`);
+            assert.deepEqual((schema.properties.thinking as { anyOf: { enum?: string[] }[] }).anyOf[1]?.enum, [...THINKING_LEVELS], `${label}: thinking must list every level`);
+            // Every exposed control is required and explicitly nullable.
+            const required = (JSON.parse(JSON.stringify(parameters)) as { required: string[] }).required;
+      assert.deepEqual([...required].sort(), Object.keys(schema.properties).sort(), "all wire fields are required");
+      const complete = completeToolCall(parameters as never, { prompt: "work", description: "work", subagent_type: "general-purpose" });
+      for (const field of required) {
+        const missing = { ...complete }; delete missing[field];
+        assert.throws(() => validateToolArguments({ name: "subagent_run", description: "", parameters } as never, { type: "toolCall", id: "missing", name: "subagent_run", arguments: missing as never }));
+      }
+            assert.ok(required.includes("thinking"), `${label}: thinking must be provided, using null for defaults`);
         }
     } finally { await f.close(); }
 });
@@ -242,12 +249,12 @@ void it("blank resume placeholders are corrected before any root or nested manag
         allowedSubagents: "all", configCwd: f.cwd,
     })[0]!;
     try {
-        for (const resume of ["", " \t\n", null]) {
+        for (const resume of ["", " \t\n"]) {
             const args = { prompt: "inspect", description: "Inspect", subagent_type: "general-purpose", resume };
-            for (const result of [await f.execute("subagent_run", args), await nested.execute("bad", args as never, undefined, undefined, f.ctx)]) {
+            for (const result of [await f.execute("subagent_run", args), await nested.execute("bad", completeToolCall(nested.parameters, args as never), undefined, undefined, f.ctx)]) {
                 assert.equal(result.isError, true);
                 assert.match(text(result), /`resume` must be/);
-                assert.match(text(result), /Omit resume entirely for a new agent/);
+                assert.match(text(result), /Set resume to null for a new agent/);
                 assert.doesNotMatch(text(result), /Field 'description'/);
             }
         }
@@ -257,24 +264,27 @@ void it("blank resume placeholders are corrected before any root or nested manag
     } finally { mock.mock.restore(); await f.close(); }
 });
 
-void it("actual host removes non-nullable optional null but preserves empty strings and legitimate values", async () => {
+void it("actual host preserves required nullable null for tool admission and preserves legitimate values", async () => {
     const f = await factory();
     try {
         const tool = f.tools.get("subagent_run")!;
         const args = { prompt: "inspect", description: "Inspect", subagent_type: "general-purpose", resume: null, model: null, run_in_background: false, isolated: false };
-        const validated = validateToolArguments(tool, { type: "toolCall", id: "host", name: tool.name, arguments: args });
-        assert.equal(Object.hasOwn(validated, "resume"), false);
-        assert.equal(Object.hasOwn(validated, "model"), false);
+        const validated = validateToolArguments(tool, { type: "toolCall", id: "host", name: tool.name, arguments: completeToolCall(tool.parameters, args) as never });
+        assert.equal(validated.resume, null);
+        assert.equal(validated.model, null);
+        const admitted = parseAgentToolArguments(validated, { nested: false, isolation: true, scheduling: false });
+        assert.equal(Object.hasOwn(admitted, "resume"), false);
+        assert.equal(Object.hasOwn(admitted, "model"), false);
         assert.equal(validated.run_in_background, false);
         assert.equal(validated.isolated, false);
         assert.equal(args.resume, null, "host validation does not mutate the original payload");
-        const empty = validateToolArguments(tool, { type: "toolCall", id: "host", name: tool.name, arguments: { ...args, resume: "" } });
+        const empty = validateToolArguments(tool, { type: "toolCall", id: "host", name: tool.name, arguments: completeToolCall(tool.parameters, { ...args, resume: "" }) as never });
         assert.equal(empty.resume, "");
         const result = await f.execute(tool.name, empty);
         assert.equal(result.isError, true);
-        assert.match(text(result), /Omit resume entirely/);
+        assert.match(text(result), /Set resume to null/);
         const workflow = f.tools.get("subagent_workflow")!;
-        const json = validateToolArguments(workflow, { type: "toolCall", id: "json", name: workflow.name, arguments: { script: "return args", args: { nil: null, flag: false, index: 0, text: "" } } });
+        const json = validateToolArguments(workflow, { type: "toolCall", id: "json", name: workflow.name, arguments: completeToolCall(workflow.parameters, { script: "return args", args: { nil: null, flag: false, index: 0, text: "" } }) as never });
         assert.deepEqual(json.args, { nil: null, flag: false, index: 0, text: "" });
         assert.equal(f.calls.length, 0);
     } finally { await f.close(); }
@@ -314,7 +324,7 @@ void it("the nested delegation tool marks a blank field as an error result rathe
     const f = await factory();
     try {
         const nested = f.nested()[0]!;
-        const result = await nested.execute("call", { subagent_type: "general-purpose", description: "  ", prompt: "ok" }, undefined, () => {}, f.ctx);
+        const result = await nested.execute("call", completeToolCall(nested.parameters, { subagent_type: "general-purpose", description: "  ", prompt: "ok" }), undefined, () => {}, f.ctx);
         // A nested tool has no host loop to convert a throw; it returns the
         // message with `isError` so the parent agent sees a failed call.
         assert.equal((result as { isError?: boolean }).isError, true);
@@ -332,7 +342,7 @@ void it("assertNonEmptyString separates a missing value from a blank one", () =>
 void it("thinkingParam is the single source shared by the root, nested and wizard lists", () => {
     assert.deepEqual(Object.keys(thinkingParam()), ["thinking"]);
     const schema = JSON.parse(JSON.stringify(thinkingParam().thinking)) as { enum?: string[]; description?: string };
-    assert.deepEqual(schema.enum, [...THINKING_LEVELS]);
+    assert.deepEqual((schema as { anyOf: { enum?: string[] }[] }).anyOf[1]?.enum, [...THINKING_LEVELS]);
     for (const level of THINKING_LEVELS) assert.match(schema.description ?? "", new RegExp(level));
 });
 
@@ -456,7 +466,7 @@ void it("nested steering blanks and resume conflicts are refused before any mana
         }
         const base = { prompt: "continue", resume: "owned" };
         for (const [key, value] of [["model", ""], ["thinking", "off"], ["isolated", false], ["inherit_context", false], ["isolation", "off"]] as const) {
-            const result = await run!.execute("call", { ...base, [key]: value }, undefined, undefined, f.ctx);
+            const result = await run!.execute("call", completeToolCall(run!.parameters, { ...base, [key]: value }), undefined, undefined, f.ctx);
             assert.equal(result.isError, true);
             assert.match(text(result), new RegExp(key));
             assert.match(text(result), /No agent was resumed/);
@@ -466,7 +476,7 @@ void it("nested steering blanks and resume conflicts are refused before any mana
         assert.equal(steers, 0);
         assert.equal(record.pendingSteers, undefined);
         record.status = "completed";
-        await run!.execute("call", base, undefined, undefined, f.ctx);
+        await run!.execute("call", completeToolCall(run!.parameters, base), undefined, undefined, f.ctx);
         assert.equal(resumes, 1, "a plain nested resume still reaches the manager");
     } finally { await f.close(); }
 });
@@ -531,12 +541,12 @@ for (const background of [false, true]) void it(`nested ${background ? "backgrou
         modelRegistry(f.ctx);
         const run = createNestedSubagentTools({ manager, pi: {} as ExtensionAPI, parentAgentId: "parent", depth: 1,
             maxSubagentDepth: 2, allowedSubagents: "all", configCwd: f.cwd })[0]!;
-        const result = await run.execute("call", { subagent_type: "custom", description: "work", prompt: "work",
-            model: "other", thinking: "minimal", run_in_background: background }, undefined, undefined, f.ctx);
+        const result = await run.execute("call", completeToolCall(run.parameters, { subagent_type: "custom", description: "work", prompt: "work",
+            model: "other", thinking: "minimal", run_in_background: background }), undefined, undefined, f.ctx);
         assertOverride(text(result), "low");
         if (!background) assert.match(text(result), /nested answer/);
-        const same = await run.execute("call", { subagent_type: "custom", description: "work", prompt: "work",
-            model: "pinned", thinking: "low", run_in_background: background }, undefined, undefined, f.ctx);
+        const same = await run.execute("call", completeToolCall(run.parameters, { subagent_type: "custom", description: "work", prompt: "work",
+            model: "pinned", thinking: "low", run_in_background: background }), undefined, undefined, f.ctx);
         assert.doesNotMatch(text(same), /model requested|thinking requested/);
     } finally { await f.close(); }
 });

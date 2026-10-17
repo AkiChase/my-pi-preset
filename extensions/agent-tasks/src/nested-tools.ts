@@ -1,3 +1,4 @@
+import { nullableControl } from "../../shared/tool-arguments.ts";
 import { createToolCallHeading } from "../../beautify/tool-call-heading.ts";
 import { launchMetadata, launchText } from "../../runtime-tasks/launch.ts";
 import type { Model } from "@earendil-works/pi-ai";
@@ -20,7 +21,7 @@ import { loadCustomAgents } from "./custom-agents.ts";
 import { formatInvocationOverrideNote, isolationParam, resolveAgentInvocationConfig, thinkingParam } from "./invocation-config.ts";
 import { describeModel, resolveModel } from "./model-resolver.ts";
 import { runToolGuidance, messageToolGuidance } from "./tool-guidance.ts";
-import { assertAgentToolArguments, assertMessageToolArguments } from "./tool-contract.ts";
+import { parseAgentToolArguments, assertMessageToolArguments } from "./tool-contract.ts";
 import { checkModelScope } from "./model-scope.ts";
 import {
   createOutputFilePath,
@@ -173,25 +174,26 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
     promptGuidelines: runToolGuidance({ nested: true, backgroundByDefault: false, isolation: isWorktreeIsolationEnabled(), scheduling: false, agentTypes: availableIn(loadRegistry()).join(", ") || "none" }),
     parameters: Type.Object({
       prompt: Type.String({ description: "Self-contained task for the nested agent." }),
-      description: Type.Optional(Type.String({ description: "Required for new agents only: short task description." })),
-      subagent_type: Type.Optional(Type.String({ description: `Required for new agents only. Allowed types: ${availableIn(loadRegistry()).join(", ") || "none"}.` })),
-      model: Type.Optional(Type.String({ description: "Optional provider/model override." })),
+      description: nullableControl(Type.String({ description: "Required non-null for new agents; null with resume: short task description." })),
+      subagent_type: nullableControl(Type.String({ description: `Required non-null for new agents; null with resume. Allowed types: ${availableIn(loadRegistry()).join(", ") || "none"}.` })),
+      model: nullableControl(Type.String({ description: "Provider/model override; set null to use configuration/defaults." })),
       // Same enum as the top-level tool, from the same source: a typo here would
       // otherwise be cast straight to a ThinkingLevel and quietly do nothing.
       ...thinkingParam(),
-      run_in_background: Type.Optional(
+      run_in_background: nullableControl(
         Type.Boolean({
           description: "Defaults to false for nested spawns — the call blocks and returns the child's result inline. Set true only for work you will collect later with agent_manage; a detached child is stopped when you finish.",
         }),
       ),
-      resume: Type.Optional(Type.String({ description: "Real agent_id of a finished owned child; omit entirely for new agents, not an empty string. Only resume and prompt are accepted, and execution waits inline." })),
-      isolated: Type.Optional(Type.Boolean()),
-      inherit_context: Type.Optional(Type.Boolean()),
+      resume: nullableControl(Type.String({ description: "Real agent_id of a finished owned child; set null for new agents, not an empty string. With resume, set all other control fields to null; execution waits inline." })),
+      isolated: nullableControl(Type.Boolean()),
+      inherit_context: nullableControl(Type.Boolean()),
       ...isolationParam(isWorktreeIsolationEnabled()),
     }, { additionalProperties: false }),
-    execute: async (_toolCallId, params, signal, _onUpdate, ctx) => {
+    execute: async (_toolCallId, input, signal, _onUpdate, ctx) => {
+      let params;
       try {
-        assertAgentToolArguments(params, { nested: true, isolation: isWorktreeIsolationEnabled(), scheduling: false });
+        params = parseAgentToolArguments(input, { nested: true, isolation: isWorktreeIsolationEnabled(), scheduling: false });
       } catch (err) {
         return errorResult(err instanceof Error ? err.message : String(err));
       }

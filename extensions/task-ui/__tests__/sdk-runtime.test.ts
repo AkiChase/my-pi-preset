@@ -1,3 +1,5 @@
+import { completeToolCall } from "../../agent-tasks/__tests__/tool-inputs.ts";
+import type { TSchema } from "typebox";
 import "../../agent-tasks/__tests__/source-loader.mjs";
 import assert from "node:assert/strict";
 import { it } from "node:test";
@@ -19,6 +21,7 @@ const { default: agentTasks } = await import("../../agent-tasks/src/index.ts");
 import type { RunResult } from "../../agent-tasks/src/agent-runner.ts";
 
 interface Tool {
+    parameters: TSchema;
     execute(id: string, params: unknown, signal: AbortSignal | undefined, update: undefined, ctx: ExtensionToolContext): Promise<unknown>;
 }
 
@@ -85,7 +88,7 @@ void it("actual SDK runtime new/resume/fork/import/quit creates fresh factories;
         const session = { ...partialSession, extensionRunner: runner } as unknown as AgentSession;
         const result = { session, backend, coordinator, lifecycle, tools, messages, ctx,
             counts: () => ({ agentRuns, agentStops }),
-            execute(name: string, params: unknown) { return tools.get(name)!.execute(name, params, undefined, undefined, ctx); },
+            execute(name: string, params: unknown) { const tool = tools.get(name)!; return tool.execute(name, name === "subagent_run" ? completeToolCall(tool.parameters, params as Record<string, unknown>) : params, undefined, undefined, ctx); },
             launchForeground(command: string) { foreground = tools.get("bash")!.execute("fg", { command }, parent.signal, undefined, ctx); return foreground; },
         };
         activations.push(result);
@@ -202,7 +205,7 @@ void it("actual SDK AgentSession.reload invokes old shutdown before activation r
     try {
         await old.execute("bash", { run_in_background: true, command: "tail -f /dev/null" });
         const pid = [...old.reg.jobs.values()][0]!.pid;
-        await old.execute("subagent_run", { subagent_type: "general-purpose", description: "reload", prompt: "offline", run_in_background: true });
+        await old.execute("subagent_run", completeToolCall((old.tools.get("subagent_run")! as unknown as { parameters: TSchema }).parameters, { subagent_type: "general-purpose", description: "reload", prompt: "offline", run_in_background: true }));
         await AgentSession.prototype.reload.call(seam as unknown as AgentSession);
         assert.deepEqual(order, ["reload", "invalidate", "create"]);
         assert.equal(processExists(pid), false); assert.equal(agentStops, 1);

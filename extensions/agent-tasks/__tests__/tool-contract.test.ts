@@ -1,53 +1,49 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assertAgentToolArguments, assertMessageToolArguments, assertWorkflowToolArguments } from "../src/tool-contract.ts";
-test("workflow tool sources are exclusive and replay preserves optional source", () => {
-  assert.doesNotThrow(() => assertWorkflowToolArguments({ script: "return args", args: { x: 1 } }));
-  assert.doesNotThrow(() => assertWorkflowToolArguments({ resumeFromRunId: "wf_abcdef" }));
-  assert.doesNotThrow(() => assertWorkflowToolArguments({ resumeFromRunId: "wf_abcdef", name: "review" }));
-  for (const value of [{}, { script: "x", name: "review" }, { scriptPath: "x", name: "review" }, { script: "" }, { name: null }, { script: "x", title: "ignored" }, { script: "x", description: "ignored" }, { resumeFromRunId: "" }]) assert.throws(() => assertWorkflowToolArguments(value));
-});
+import { agentToolFields, parseAgentToolArguments, assertMessageToolArguments, parseWorkflowToolArguments } from "../src/tool-contract.ts";
 const main = { nested: false, isolation: true, scheduling: true };
 const nested = { ...main, nested: true, scheduling: false };
-test("tool admission separates spawn and resume without ignored parameters", () => {
-  assert.doesNotThrow(() => assertAgentToolArguments({ prompt: "continue", resume: "agent", run_in_background: false }, main));
-  assert.doesNotThrow(() => assertAgentToolArguments({ prompt: "continue", resume: "agent" }, nested));
-  assert.doesNotThrow(() => assertAgentToolArguments({ prompt: "inspect", description: "inspect code", subagent_type: "Explore" }, main));
-  for (const field of ["description", "name", "subagent_type", "model", "thinking", "isolated", "inherit_context", "isolation", "schedule"]) {
-    assert.throws(() => assertAgentToolArguments({ prompt: "continue", resume: "agent", [field]: "value" }, main), /not accepted/);
-  }
-  for (const mode of [false, true]) assert.throws(() => assertAgentToolArguments({ prompt: "continue", resume: "agent", run_in_background: mode }, nested));
-  for (const value of [null, [], {}, { prompt: "x", resume: "" }, { prompt: "x", resume: null }, { prompt: "x", description: "x" }]) assert.throws(() => assertAgentToolArguments(value, main));
-});
-test("empty resume diagnoses the trigger before unrelated spawn fields in both modes", () => {
-  const base = { prompt: "inspect", description: "inspect code", subagent_type: "Explore" };
+const run = (values: Record<string, unknown>, capabilities = main) => ({ ...Object.fromEntries(agentToolFields(capabilities).map(field => [field, null])), ...values });
+const workflow = (values: Record<string, unknown>) => ({ script: null, scriptPath: null, name: null, args: null, resumeFromRunId: null, ...values });
+
+test("required control nulls select spawn/resume without mutating the wire object", () => {
   for (const capabilities of [main, nested]) {
-    for (const resume of ["", " \t\n", null, 7]) {
-      assert.throws(() => assertAgentToolArguments({ ...base, resume }, capabilities), error => {
-        assert.ok(error instanceof Error);
-        assert.match(error.message, /`resume` must be/);
-        assert.match(error.message, /Omit resume entirely for a new agent/);
-        assert.doesNotMatch(error.message, /Field 'description'/);
-        return true;
-      });
+    const input = Object.freeze(run({ prompt: "inspect", description: "work", subagent_type: "Explore" }, capabilities));
+    assert.deepEqual(parseAgentToolArguments(input, capabilities), { prompt: "inspect", description: "work", subagent_type: "Explore" });
+    assert.equal(input.resume, null);
+    const resume = parseAgentToolArguments(run({ prompt: "continue", resume: "agent" }, capabilities), capabilities);
+    assert.deepEqual(resume, { prompt: "continue", resume: "agent" });
+    for (const field of agentToolFields(capabilities)) {
+      const missing = { ...input }; delete missing[field];
+      assert.throws(() => parseAgentToolArguments(missing, capabilities), /must be provided/);
     }
-    assert.throws(() => assertAgentToolArguments({ ...base, resume: "agent" }, capabilities), /Supplying resume selects resume mode/);
   }
 });
-test("workflow diagnoses blank source placeholders before source conflicts", () => {
-  assert.throws(() => assertWorkflowToolArguments({ script: "return args", name: "" }), /`name` must be a non-empty string/);
-  assert.throws(() => assertWorkflowToolArguments({ script: "return args", name: "review" }), /Omit unused source fields entirely/);
-  assert.doesNotThrow(() => assertWorkflowToolArguments({ script: "return args", args: null }));
-  assert.doesNotThrow(() => assertWorkflowToolArguments({ script: "return args", args: { flag: false, index: 0, text: "" } }));
+test("null cannot hide unknown or unavailable fields and non-null mode conflicts remain errors", () => {
+  const base = { prompt: "inspect", description: "work", subagent_type: "Explore" };
+  for (const extra of [{ typo: null }, { model: " " }, { thinking: "hight" }, { isolated: "false" }, { name: "a b" }]) assert.throws(() => parseAgentToolArguments(run({ ...base, ...extra }), main));
+  assert.throws(() => parseAgentToolArguments(run({ ...base, schedule: null }, nested), nested), /schedule/);
+  assert.throws(() => parseAgentToolArguments(run({ ...base, name: null }, nested), nested), /name/);
+  const disabled = { ...main, isolation: false };
+  assert.throws(() => parseAgentToolArguments(run({ ...base, isolation: null }, disabled), disabled), /isolation/);
+  for (const capabilities of [main, nested]) {
+    for (const resume of ["", " \t\n", 7]) assert.throws(() => parseAgentToolArguments(run({ ...base, resume }, capabilities), capabilities), /`resume` must be/);
+    assert.throws(() => parseAgentToolArguments(run({ ...base, resume: "agent" }, capabilities), capabilities), /non-null resume selects resume mode/);
+    assert.throws(() => parseAgentToolArguments(run({ prompt: "x" }, capabilities), capabilities), /description/);
+  }
+  for (const mode of [false, true]) assert.throws(() => parseAgentToolArguments(run({ prompt: "continue", resume: "agent", run_in_background: mode }, nested), nested), /run_in_background/);
+  assert.equal(parseAgentToolArguments(run({ ...base, run_in_background: false, thinking: "off" }), main).run_in_background, false);
 });
-test("direct tool calls reject unknown, malformed and disabled fields", () => {
-  const base = { prompt: "inspect", description: "inspect code", subagent_type: "Explore" };
-  for (const extra of [{ typo: true }, { isolated: "false" }, { thinking: "hight" }, { name: "a b" }, { isolation: "remote" }, { model: " " }]) assert.throws(() => assertAgentToolArguments({ ...base, ...extra }, main));
-  assert.throws(() => assertAgentToolArguments({ ...base, isolation: "off" }, { ...main, isolation: false }));
-  assert.throws(() => assertAgentToolArguments({ ...base, name: "unused" }, nested));
-  assert.throws(() => assertAgentToolArguments({ ...base, schedule: "+10m" }, nested));
+test("workflow requires every wire field, ignores only control null and preserves data null", () => {
+  const input = Object.freeze(workflow({ script: "return args" }));
+  assert.deepEqual(parseWorkflowToolArguments(input), { script: "return args", args: null });
+  assert.equal(input.name, null);
+  assert.deepEqual(parseWorkflowToolArguments(workflow({ resumeFromRunId: "wf_abcdef" })), { resumeFromRunId: "wf_abcdef", args: null });
+  for (const args of [null, false, 0, "", { value: null }, [null]]) assert.equal(parseWorkflowToolArguments(workflow({ script: "return args", args })).args, args);
+  for (const field of Object.keys(input)) { const missing: Record<string, unknown> = { ...input }; delete missing[field]; assert.throws(() => parseWorkflowToolArguments(missing), /must be provided/); }
+  for (const value of [{}, { script: "x", name: "review" }, { script: "" }, { resumeFromRunId: "" }, { script: "x", typo: null }]) assert.throws(() => parseWorkflowToolArguments(workflow(value)));
 });
-test("message admission validates the closed real-ID input shape", () => {
+test("message strings remain required non-null and closed", () => {
   assert.doesNotThrow(() => assertMessageToolArguments({ agent_id: "agent", message: "continue" }));
-  for (const value of [null, [], { agent_id: "", message: "x" }, { agent_id: "agent", message: " " }, { agent_id: "agent", message: "x", execution_id: "exec_" }]) assert.throws(() => assertMessageToolArguments(value));
+  for (const value of [null, [], {}, { agent_id: null, message: "x" }, { agent_id: "agent", message: null }, { agent_id: "agent", message: " " }, { agent_id: "agent", message: "x", extra: null }]) assert.throws(() => assertMessageToolArguments(value));
 });
