@@ -196,7 +196,9 @@ for (const order of ["before", "after"]) void it(`history-equivalent instance wr
     } finally { await h.dispose(); }
 });
 
-void it("owner fresh model exposes foreground-only and four-second visibility, refuses open/closed interaction", async () => {
+void it("owner fresh model exposes foreground-only and four-second visibility, refuses open/closed interaction", async t => {
+    const now = 1_000_000;
+    t.mock.method(Date, "now", () => now);
     const h = harness();
     const identity = { sourceId: "shell", taskId: "fg", runId: "1" };
     let view: TaskView = { ...identity, key: taskKey(identity), title: "fg", kind: "shell", status: "running", executionMode: "foreground", waitCount: 1, stats: {}, artifacts: [], capabilities: { stop: true, details: true } };
@@ -204,8 +206,8 @@ void it("owner fresh model exposes foreground-only and four-second visibility, r
     const owner = createTaskUIOwner(h.pi, h.coordinator, h.lifecycle, DEFAULTS);
     try {
         assert.equal(owner.canOpen(), true);
-        view = { ...view, status: "completed", endedAt: Date.now() - 3_999 }; assert.equal(owner.canOpen(), true);
-        view = { ...view, endedAt: Date.now() - 4_000 }; assert.equal(owner.canOpen(), false);
+        view = { ...view, status: "completed", endedAt: now - 3_999 }; assert.equal(owner.canOpen(), true);
+        view = { ...view, endedAt: now - 4_000 }; assert.equal(owner.canOpen(), false);
         view = { ...view, status: "running" };
         let done!: () => void;
         h.ctx.ui.custom = async <T>() => new Promise<T>(resolve => { done = () => resolve(undefined as T); });
