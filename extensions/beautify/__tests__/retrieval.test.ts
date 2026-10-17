@@ -1,3 +1,4 @@
+import { processInput } from "../../runtime-tasks/__tests__/process-input.ts";
 import { managementContract } from "../tools/management.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -18,6 +19,23 @@ import { loadExtensions, resolver, ToolExecutionComponent, KeybindingsManager, t
 import { processActivation, until } from "../../process-tasks/__tests__/process-harness.ts";
 import { createRunningJob, add } from "../../process-tasks/registry.ts";
 import { registerManagementFixture } from "../../process-tasks/__tests__/management-fixture.ts";
+test("process renderer normalizes nullable IDs and preserves strict result/fallback guards", () => {
+  const contract = managementContract("process");
+  const args = Object.freeze(processInput({ action: "list" }));
+  const result = { content: [{ type: "text" as const, text: "body" }], details: { runtimeManagement: { version: 2, group: "process", action: "list", count: 2 } } };
+  assert.equal(contract(args, result, context(args))?.stats, "2 tasks");
+  assert.equal(args.task_id, null);
+  assert.equal(contract({ action: "list" }, result, context({ action: "list" })), undefined);
+  assert.equal(contract({ ...args, typo: null }, result, context(args)), undefined);
+  assert.equal(contract({ ...args, offset: 0 }, result, context(args)), undefined);
+  const waiting = processInput({ action: "wait", task_id: "job" });
+  const partial = { ...result, details: { runtimeManagement: { version: 2, group: "process", action: "wait", task_id: "job", wait_outcome: "waiting" } } };
+  assert.equal(contract(waiting, partial, context(waiting, { isPartial: true }))?.stats, "waiting");
+  assert.equal(contract(waiting, partial, context(waiting)), undefined);
+  assert.equal(contract({ ...waiting, task_id: "other" }, partial, context(waiting, { isPartial: true })), undefined);
+  assert.equal(contract(waiting, { ...partial, details: { runtimeManagement: { ...partial.details.runtimeManagement, group: "agent" } } }, context(waiting, { isPartial: true })), undefined);
+});
+
 const theme = themeSdk.theme as Theme;
 const raw = (text: string) => ({ content: [{ type: "text" as const, text }], details: undefined });
 const context = (args: Record<string, unknown>, extra = {}): RenderContext => ({ args, toolCallId: "test", invalidate() {}, lastComponent: undefined, state: {}, cwd: "/fixture", executionStarted: true, argsComplete: true, isPartial: false, expanded: false, showImages: true, isError: false, durationMs: 0, outputPad: 2, ...extra });
@@ -47,7 +65,7 @@ test("actual backend stop summaries report observed status without inventing a r
     const finished = await f.execute("bash", { command: "printf complete" }) as unknown as { details: { runtimeLaunch: { task_id: string } } };
     const running = await f.execute("bash", { command: "tail -f /dev/null", run_in_background: true }) as unknown as { details: { runtimeLaunch: { task_id: string } } };
     for (const [id, requested, observed] of [[finished.details.runtimeLaunch.task_id, false, "completed"], [running.details.runtimeLaunch.task_id, true, "killed"], [running.details.runtimeLaunch.task_id, false, "killed"]] as const) {
-      const args = { action: "stop", task_id: id };
+      const args = processInput({ action: "stop", task_id: id });
       const result = await f.execute("process_manage", args) as unknown as Result;
       assert.match(result.content[0]!.type === "text" ? result.content[0]!.text ?? "" : "", requested ? /Stop requested/ : /Stop not needed/);
       assert.equal(managementContract("process")(args, result, context(args))!.stats, `stop · observed ${observed}`);
@@ -172,7 +190,8 @@ test("actual registered process task_manage produces seven action envelopes with
   const captured = new Map<string, Parameters<ExtensionAPI["registerTool"]>[0]>();
   registerManagementFixture({ registerTool(tool) { captured.set(tool.name, tool as unknown as Parameters<ExtensionAPI["registerTool"]>[0]); } } as ExtensionAPI, f.reg);
   const execute = (args: Record<string, unknown>) => captured.get("process_manage")!.execute("jobs-test", args, undefined, undefined, f.context);
-  const validate = async (args: Record<string, unknown>) => {
+  const validate = async (input: { action: string; [key: string]: unknown }) => {
+    const args = processInput(input);
     const result = await execute(args), copy = structuredClone(result);
     assert.ok(managementContract("process")(args, result, context(args)), JSON.stringify(result));
     const c = new ToolExecutionComponent("process_manage", "real", args, {}, optionalRenderers("process_manage", undefined, managementContract("process")), screen, dir);
@@ -189,12 +208,12 @@ test("actual registered process task_manage produces seven action envelopes with
     const id = launched.content[0]!.text!.match(/ID: ([^.]+)\./)![1]!;
     let partial: Result | undefined;
     const controller = new AbortController();
-    const following = captured.get("process_manage")!.execute("follow", { action: "wait", task_id: id }, controller.signal, result => { partial = result; }, f.context);
+    const following = captured.get("process_manage")!.execute("follow", processInput({ action: "wait", task_id: id }), controller.signal, result => { partial = result; }, f.context);
     await until(() => !!partial);
-    assert.equal(managementContract("process")({ action: "wait", task_id: id }, partial, context({ action: "wait", task_id: id }, { isPartial: true }))?.stats, "waiting");
+    assert.equal(managementContract("process")(processInput({ action: "wait", task_id: id }), partial, context({ action: "wait", task_id: id }, { isPartial: true }))?.stats, "waiting");
     f.coordinator.detachAll();
     const final = await following;
-    assert.equal(managementContract("process")({ action: "wait", task_id: id }, final, context({ action: "wait", task_id: id }))?.stats, "wait released · target unchanged");
+    assert.equal(managementContract("process")(processInput({ action: "wait", task_id: id }), final, context({ action: "wait", task_id: id }))?.stats, "wait released · target unchanged");
     assert.equal(f.reg.jobs.get(id)?.status, "running");
     await validate({ action: "stop", task_id: id });
     await validate({ action: "wait", task_id: id });
@@ -260,7 +279,7 @@ test("actual SDK task_manage typed errors retain error flag and render without c
   const dir = mkdtempSync(join(tmpdir(), "beautify-error-contract-")), f = processActivation(dir);
   let definition: Parameters<ExtensionAPI["registerTool"]>[0] | undefined;
   registerManagementFixture({ registerTool(tool) { definition = tool as unknown as Parameters<ExtensionAPI["registerTool"]>[0]; } } as ExtensionAPI, f.reg);
-  const args = { action: "output", task_id: "missing" };
+  const args = processInput({ action: "output", task_id: "missing" });
   const assistantMessage: AssistantMessage = { role: "assistant", content: [], api: "anthropic-messages", provider: "anthropic", model: "offline", stopReason: "toolUse", timestamp: 0, usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } };
   try {
     const tool: AgentTool = { name: "process_manage", label: "process_manage", description: "offline", parameters: definition!.parameters,

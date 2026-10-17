@@ -1,3 +1,4 @@
+import { processInput } from "../../runtime-tasks/__tests__/process-input.ts";
 /**
  * `jobs` read paths: byte-range paging for `output`, the explicit
  * required-parameter errors, and `search`'s scope / ignoreCase / context
@@ -73,7 +74,7 @@ const text = async (
     params: unknown,
     ctx: unknown
 ): Promise<string> => {
-    const res = await tool.execute("t", params, undefined, undefined, ctx);
+    const res = await tool.execute("t", processInput(params as { action: string }), undefined, undefined, ctx);
     return res.content[0]!.text;
 };
 
@@ -179,11 +180,11 @@ void describe("jobs — required parameters", () => {
         // for output and a TypeError elsewhere.
         const { tool, ctx } = harness();
         for (const action of ["output", "stop", "wait"]) {
-            const result = await tool.execute("t", { action }, undefined, undefined, ctx);
+            const result = await tool.execute("t", processInput({ action }), undefined, undefined, ctx);
             assert.match(result.content[0].text, new RegExp(`${action} requires task_id`));
             assert.equal((result as { isError?: boolean }).isError, true);
         }
-        const result = await tool.execute("t", { action: "search" }, undefined, undefined, ctx);
+        const result = await tool.execute("t", processInput({ action: "search" }), undefined, undefined, ctx);
         assert.match(result.content[0].text, /search requires pattern/);
         assert.equal((result as { isError?: boolean }).isError, true);
     });
@@ -222,7 +223,7 @@ void describe("jobs search — scope, case, context", () => {
 
     void it("errors on an unknown jobId instead of silently scanning everything", async () => {
         const { tool, ctx } = harness();
-        const result = await tool.execute("t", { action: "search", task_id: "ghost", pattern: "x" }, undefined, undefined, ctx);
+        const result = await tool.execute("t", processInput({ action: "search", task_id: "ghost", pattern: "x" }), undefined, undefined, ctx);
         assert.equal((result as { isError?: boolean }).isError, true);
         assert.match(result.content[0].text, /not found/i);
     });

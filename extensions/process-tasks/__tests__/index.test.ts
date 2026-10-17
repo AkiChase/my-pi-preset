@@ -1,3 +1,4 @@
+import { processInput } from "../../runtime-tasks/__tests__/process-input.ts";
 import { registerManagementTool } from "../../runtime-tasks/tools.ts";
 import { EventEmitter } from "node:events";
 import registerWidgetDisplay from "../../shared/widget-display/owner.ts";
@@ -121,7 +122,7 @@ void describe("session_start — registry is born empty (no revival)", () => {
         await h.handlers.get("session_start")!({}, ctx);
 
         const jobs = h.tools.get("process_manage")!;
-        const res = await jobs.execute("t1", { action: "list" }, undefined, undefined, uiCtx);
+        const res = await jobs.execute("t1", processInput({ action: "list" }), undefined, undefined, uiCtx);
         assert.equal(res.content[0].text, "No runtime tasks in this scope.");
         assert.equal(h.appendedEntries.length, 0, "no state snapshot is written");
     });
@@ -133,7 +134,7 @@ void describe("session_start — registry is born empty (no revival)", () => {
         assert.ok(liveMarkedProcesses() > 0);
         await h.handlers.get("session_start")!({ reason: "new" }, uiCtx);
         await sleep(200);
-        const list = await h.tools.get("process_manage")!.execute("new-list", { action: "list" }, undefined, undefined, uiCtx);
+        const list = await h.tools.get("process_manage")!.execute("new-list", processInput({ action: "list" }), undefined, undefined, uiCtx);
         assert.equal(list.content[0].text, "No runtime tasks in this scope.");
         assert.equal(liveMarkedProcesses(), 0);
         assert.equal(h.messages.filter((m) => m.customType === EVENT.taskNotification).length, 0);
@@ -164,7 +165,7 @@ void describe("session_shutdown — kills running tasks on ANY reason", () => {
             await sleep(200); // let the SIGTERM land
 
             const jobs = h.tools.get("process_manage")!;
-            assert.match((await jobs.execute("t3", { action: "list" }, undefined, undefined, uiCtx)).content[0].text, /activation is closed/);
+            assert.match((await jobs.execute("t3", processInput({ action: "list" }), undefined, undefined, uiCtx)).content[0].text, /activation is closed/);
             assert.equal(h.backend.source.list().length, 0, "disposed source no longer exposes runtime rows");
             assert.equal(liveMarkedProcesses(), 0, "no orphaned process survives");
             assert.equal(
@@ -378,7 +379,7 @@ test("actual factory retains hundreds of terminals beyond admission: bounded sin
         assert.equal(failed.details.monitorBatchOverflow.manifestPath, undefined); assert.match(failed.content, /manifest unavailable/);
         // Existing jobs list exposes unsurfaced terminal notifyError, without
         // consuming outcomes or requiring another unsolicited wakeup.
-        const list = await h.tools.get("process_manage")!.execute("list", { action: "list" }, undefined, undefined, context);
+        const list = await h.tools.get("process_manage")!.execute("list", processInput({ action: "list" }), undefined, undefined, context);
         assert.match(list.content[0]!.text, /notification.*failed|notify.*failed/i);
         t.mock.timers.tick(100000); assert.equal(h.messages.length, 2);
         live.emit("message", { data: "fresh live activity" }); t.mock.timers.tick(200);

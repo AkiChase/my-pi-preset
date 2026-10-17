@@ -1,3 +1,4 @@
+import { processInput } from "../../runtime-tasks/__tests__/process-input.ts";
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
@@ -199,7 +200,7 @@ test("AC18: jobs kill of active monitor with pending/silence timer uses the same
     const h = harness(t, {}, { wakeAbsentMs: 10000 }); h.emit("first"); h.tick(200); h.emit("pending");
     let execute!: (id: string, params: unknown, signal: unknown, update: unknown, ctx: unknown) => Promise<unknown>;
     registerManagementFixture({ registerTool(def: { execute: typeof execute }) { execute = def.execute; } } as never, h.reg);
-    await execute("kill", { action: "stop", task_id: h.job.id }, undefined, undefined,
+    await execute("kill", processInput({ action: "stop", task_id: h.job.id }), undefined, undefined,
         { ui: { setWidget() {}, setStatus() {}, theme: { fg: (_: string, s: string) => s } } });
     h.tick(100000); assert.equal(h.sent.length, 1); assert.equal(h.job.outcomeSurfaced, true);
 });
@@ -349,8 +350,8 @@ test("shared retrieval detach on the terminal tick re-delivers the bounded monit
     let jobs!: { execute(id: string, params: unknown, signal: unknown, onUpdate: unknown, ctx: unknown): Promise<{ content: { text: string }[] }> };
     registerManagementFixture({ registerTool: (tool: typeof jobs) => { jobs = tool; } } as never, h.reg);
     const ctx = { ui: { notify() {} } };
-    const a = jobs.execute("a", { action: "wait", task_id: h.job.id }, undefined, undefined, ctx);
-    const b = jobs.execute("b", { action: "wait", task_id: h.job.id }, undefined, undefined, ctx);
+    const a = jobs.execute("a", processInput({ action: "wait", task_id: h.job.id }), undefined, undefined, ctx);
+    const b = jobs.execute("b", processInput({ action: "wait", task_id: h.job.id }), undefined, undefined, ctx);
     h.emit("first"); h.tick(200); h.emit("pending");
     // end() awaits two microtasks; detach after onExit suppresses final but before result completion.
     const ending = h.end({ code: 0, signal: null }, "final fragment");
@@ -499,7 +500,7 @@ test("inline attach completion consumes delayed terminal without notification or
     const h = harness(t); h.emit("first"); h.tick(200); h.emit("pending");
     let jobs!: { execute(id: string, params: unknown, signal: unknown, onUpdate: unknown, ctx: unknown): Promise<{ content: { text: string }[] }> };
     registerManagementFixture({ registerTool: (tool: typeof jobs) => { jobs = tool; } } as never, h.reg);
-    const result = jobs.execute("attach", { action: "wait", task_id: h.job.id }, undefined, undefined, { ui: { notify() {} } });
+    const result = jobs.execute("attach", processInput({ action: "wait", task_id: h.job.id }), undefined, undefined, { ui: { notify() {} } });
     await h.end({ code: 0, signal: null }, "tail"); await result;
     assert.equal(h.job.outcomeSurfaced, true); assert.equal(h.reg.notificationRetries.size, 0);
     h.tick(200); h.tick(100000); assert.equal(h.sent.length, 1);

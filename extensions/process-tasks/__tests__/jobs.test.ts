@@ -1,3 +1,4 @@
+import { processInput } from "../../runtime-tasks/__tests__/process-input.ts";
 /**
  * `jobs` tool actions — kill result strings (CC's TaskStopTool), unknown-id
  * errors and retained terminal outcomes.
@@ -73,7 +74,7 @@ void describe("jobs kill — CC's TaskStopTool", () => {
         const job = mkJob(reg, { id: `job-${process.pid}-k1`, command: "npm run\nbuild" });
         const res = await tool.execute(
             "t1",
-            { action: "stop", task_id: job.id },
+            processInput({ action: "stop", task_id: job.id }),
             undefined,
             undefined,
             ctx
@@ -89,7 +90,7 @@ void describe("jobs kill — CC's TaskStopTool", () => {
 
     void it("unknown id errors with CC's exact string", async () => {
         const { tool, ctx } = harness();
-        assert.match((await tool.execute("t2", { action: "stop", task_id: "nope" }, undefined, undefined, ctx)).content[0].text, /not found/i);
+        assert.match((await tool.execute("t2", processInput({ action: "stop", task_id: "nope" }), undefined, undefined, ctx)).content[0].text, /not found/i);
     });
 });
 
@@ -99,20 +100,20 @@ void describe("jobs output — a read surfaces the outcome", () => {
         const job = mkJob(reg, { id: `job-${process.pid}-o1` });
         job.status = "completed";
         job.exitCode = 0;
-        await tool.execute("t3", { action: "output", task_id: job.id }, undefined, undefined, ctx);
+        await tool.execute("t3", processInput({ action: "output", task_id: job.id }), undefined, undefined, ctx);
         assert.equal(job.outcomeSurfaced, true);
     });
 
     void it("does NOT mark a still-running job (peek)", async () => {
         const { tool, reg, ctx } = harness();
         const job = mkJob(reg, { id: `job-${process.pid}-o2` });
-        await tool.execute("t4", { action: "output", task_id: job.id }, undefined, undefined, ctx);
+        await tool.execute("t4", processInput({ action: "output", task_id: job.id }), undefined, undefined, ctx);
         assert.equal(job.outcomeSurfaced, undefined, "completion must still notify later");
     });
 
     void it("unknown id errors with CC's exact string", async () => {
         const { tool, ctx } = harness();
-        assert.match((await tool.execute("t5", { action: "output", task_id: "ghost" }, undefined, undefined, ctx)).content[0].text, /not found/i);
+        assert.match((await tool.execute("t5", processInput({ action: "output", task_id: "ghost" }), undefined, undefined, ctx)).content[0].text, /not found/i);
     });
 });
 
@@ -125,7 +126,7 @@ void describe("jobs list — retained metadata", () => {
         swept.exitCode = 0;
         markOutcomeSurfaced(swept);
 
-        const res = await tool.execute("t6", { action: "list" }, undefined, undefined, ctx);
+        const res = await tool.execute("t6", processInput({ action: "list" }), undefined, undefined, ctx);
         const text = res.content[0].text;
 
         assert.equal(reg.jobs.has(swept.id), true, "listing must not reclaim metadata");
@@ -146,7 +147,7 @@ void describe("jobs list — retained metadata", () => {
         stranded.exitCode = 3;
         stranded.notifyError = "steer queue closed";
 
-        const res = await tool.execute("t7", { action: "list" }, undefined, undefined, ctx);
+        const res = await tool.execute("t7", processInput({ action: "list" }), undefined, undefined, ctx);
         const text = res.content[0].text;
 
         assert.ok(reg.jobs.has(stranded.id), "not swept — nobody has been told");
@@ -164,7 +165,7 @@ void describe("jobs attach — suppression is scoped to the wait", () => {
         const ac = new AbortController();
         const pending = tool.execute(
             "t8",
-            { action: "wait", task_id: job.id },
+            processInput({ action: "wait", task_id: job.id }),
             ac.signal,
             () => {},
             ctx
@@ -188,8 +189,8 @@ void describe("jobs attach — suppression is scoped to the wait", () => {
         const job = mkJob(reg, { id: `job-${process.pid}-a2`, command: "long-build" });
         const first = new AbortController();
         const second = new AbortController();
-        const a = tool.execute("t9", { action: "wait", task_id: job.id }, first.signal, () => {}, ctx);
-        const b = tool.execute("t10", { action: "wait", task_id: job.id }, second.signal, () => {}, ctx);
+        const a = tool.execute("t9", processInput({ action: "wait", task_id: job.id }), first.signal, () => {}, ctx);
+        const b = tool.execute("t10", processInput({ action: "wait", task_id: job.id }), second.signal, () => {}, ctx);
         assert.equal(job.attachCount, 2);
 
         first.abort();

@@ -1,12 +1,10 @@
-import { isManagementDetails, parseAgentManagementParams, validateManagementParams, type ManagementDetails, type ManagementGroup } from "../../runtime-tasks/tools.ts";
+import { isManagementDetails, parseAgentManagementParams, parseProcessManagementParams, type ManagementDetails, type ManagementGroup } from "../../runtime-tasks/tools.ts";
 import type { RetrievalContract } from "./task-manage.ts";
 export function managementContract(group: ManagementGroup): RetrievalContract {
   return (input, result, ctx) => {
     let args = input;
-    if (group === "agent") {
-      try { args = parseAgentManagementParams(input) as unknown as typeof input; }
-      catch { return undefined; }
-    } else if (validateManagementParams(group, input)) return undefined;
+    try { args = (group === "agent" ? parseAgentManagementParams(input) : parseProcessManagementParams(input)) as unknown as typeof input; }
+    catch { return undefined; }
     const id = args.task_id ?? args.execution_id;
     const title = `${args.action}${id ? ` ${id}` : ""}`;
     if (!result) return { title, stats: args.action === "wait" ? "waiting" : "" };

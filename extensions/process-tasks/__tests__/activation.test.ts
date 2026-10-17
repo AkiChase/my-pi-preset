@@ -1,3 +1,4 @@
+import { processInput } from "../../runtime-tasks/__tests__/process-input.ts";
 import assert from "node:assert/strict";
 import { it } from "node:test";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -42,7 +43,7 @@ void it("shutdown stops fg/bg/command monitor/pending/attach and owned timers de
         await h.execute("monitor", { command: "trap '' TERM; printf 'first\n'; printf 'pending\n'; while true; do sleep 0.1; done", description: "watch" });
         const jobs = [...h.reg.jobs.values()];
         await until(() => jobs.every((job) => readFileSync(job.logPath, "utf8").length > 0));
-        const retrieval = h.execute("process_manage", { action: "wait", task_id: jobs[1]!.id });
+        const retrieval = h.execute("process_manage", processInput({ action: "wait", task_id: jobs[1]!.id }));
         const pending = createRunningJob({ id: "pending", command: "pending", pid: 0, logPath: join(dir, "pending.log"), toolCallId: "pending" });
         pending.status = "pending"; ensureCompletionPromise(pending); add(h.reg, pending);
         const terminal = pending.donePromise!;
@@ -59,7 +60,7 @@ void it("shutdown stops fg/bg/command monitor/pending/attach and owned timers de
         assert.equal(h.reg.notificationRetries.size, 0); assert.equal(h.source.list().length, 0);
         await sleep(40); assert.equal(h.messages.length, beforeMessages, "silent stop must not flush monitor pending");
         for (const name of ["bash", "bash", "monitor", "process_manage"]) {
-            const params = name === "monitor" ? { command: "echo late", description: "late" } : name === "process_manage" ? { action: "list" } : { command: "echo late" };
+            const params = name === "monitor" ? { command: "echo late", description: "late" } : name === "process_manage" ? processInput({ action: "list" }) : { command: "echo late" };
             if (name === "process_manage") assert.match((await h.execute(name, params)).content[0].text!, /closed/);
             else await assert.rejects(h.execute(name, params), /closed/);
         }

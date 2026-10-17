@@ -1,5 +1,6 @@
 // Invoked in disposable cwd/agent dirs by loading.test.ts. Use the real cached
 // host loader: Pi 1.1.0 replaces its jiti graph when the resource cwd changes.
+import { processInput } from "../../runtime-tasks/__tests__/process-input.ts";
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -130,7 +131,7 @@ try {
     assert.match(launch.content[0].text, new RegExp(`task_id=${identity.task_id}`));
     // Spawn deliberately unrefs its child; this standalone driver owns a bounded keepalive.
     const keepalive = setTimeout(() => {}, 5000);
-    try { assert.match((await ext.tools.get("process_manage").definition.execute("local", { action: "wait", task_id: identity.task_id }, undefined, undefined, ctx)).content[0].text, /CHILD/); }
+    try { assert.match((await ext.tools.get("process_manage").definition.execute("local", processInput({ action: "wait", task_id: identity.task_id }), undefined, undefined, ctx)).content[0].text, /CHILD/); }
     finally { clearTimeout(keepalive); }
     assert.match((await call({ action: "output", execution_id: "exec_" + Buffer.from(JSON.stringify(["owned", "1"])).toString("base64url") })).content[0].text, /owned answer/);
     await close(child);

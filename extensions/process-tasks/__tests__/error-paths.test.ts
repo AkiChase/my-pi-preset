@@ -1,3 +1,4 @@
+import { processInput } from "../../runtime-tasks/__tests__/process-input.ts";
 import { createBashToolDefinition } from "@earendil-works/pi-coding-agent";
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
@@ -193,8 +194,8 @@ for (const mode of ["wait", "terminal", "sibling-cancel"] as const) {
             assert.equal(job.outcomeSurfaced, undefined, "snapshot/detail reads must remain non-consuming");
         }
         const signal = mode === "sibling-cancel" ? new AbortController() : undefined;
-        const sibling = signal ? h.tools.get("process_manage")!.execute("cancelled", { action: "wait", task_id: job.id }, signal.signal, undefined, h.ctx) : undefined;
-        const result = h.tools.get("process_manage")!.execute("inline", { action: "wait", task_id: job.id }, undefined, undefined, h.ctx);
+        const sibling = signal ? h.tools.get("process_manage")!.execute("cancelled", processInput({ action: "wait", task_id: job.id }), signal.signal, undefined, h.ctx) : undefined;
+        const result = h.tools.get("process_manage")!.execute("inline", processInput({ action: "wait", task_id: job.id }), undefined, undefined, h.ctx);
         if (signal) {
             assert.equal(job.attachCount, 2);
             signal.abort(); await sibling;

@@ -1,5 +1,6 @@
 // Subprocess-only resource/error probe: an unhandled readline error must fail
 // this process, not the parent test runner. Production code is loaded unchanged.
+import { processInput } from "./process-input.ts";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import readline from "node:readline";
@@ -85,7 +86,7 @@ const facade = createRuntimeTaskFacade(capabilities);
 let tool;
 registerManagementTool({ registerTool(definition) { tool = definition; } }, "process", capabilities);
 const ctx = { cwd: dir };
-const run = params => tool.execute("log-error-probe", params, undefined, undefined, ctx);
+const run = params => tool.execute("log-error-probe", processInput(params), undefined, undefined, ctx);
 const text = result => result.content.map(block => block.type === "text" ? block.text : "").join("\n");
 const closed = () => {
   assert.ok(streams.length > 0);

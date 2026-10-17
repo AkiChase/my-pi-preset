@@ -1,3 +1,4 @@
+import { processInput } from "./process-input.ts";
 import { test } from "node:test";
 import { syncBuiltinESMExports } from "node:module";
 import fs from "node:fs";
@@ -105,7 +106,7 @@ for (const target of [false, true]) for (const change of ["close", "replace"] as
   const tool = registered.tool;
   try {
     const { job } = f.makeJob();
-    const pending = tool.execute("search", { action: "search", pattern: "match", ...(target ? { task_id: job.id } : {}) }, undefined, undefined, f.ctx);
+    const pending = tool.execute("search", processInput({ action: "search", pattern: "match", ...(target ? { task_id: job.id } : {}) }), undefined, undefined, f.ctx);
     if (change === "close") { f.facade.close(); registered.close(); f.reg.closed = true; }
     else f.reg.jobs.set(job.id, { ...job });
     const result = await pending;

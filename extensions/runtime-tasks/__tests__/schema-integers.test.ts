@@ -1,3 +1,4 @@
+import { processInput } from "./process-input.ts";
 import assert from "node:assert/strict";
 import { it } from "node:test";
 import { validateToolArguments } from "@earendil-works/pi-ai";
@@ -6,7 +7,7 @@ import { managementTool } from "../tools.ts";
 it("task_manage rejects fractional paging before host integer coercion can discard it", () => {
   const tool = managementTool("process", []).tool;
   const validate = (args: Record<string, string | number>) => validateToolArguments(tool,
-    { type: "toolCall", id: "call", name: tool.name, arguments: args });
+    { type: "toolCall", id: "call", name: tool.name, arguments: processInput(args as { action: string }) });
   // Each paging field is reachable only through the action that accepts it.
   const cases: readonly (readonly [string, Record<string, string | number>, readonly string[]])[] = [
     ["output", { task_id: "x" }, ["offset", "limit"]],
@@ -25,8 +26,8 @@ it("task_manage rejects fractional paging before host integer coercion can disca
           error => error instanceof Error && error.message.includes(field), `${action}/${field}=${String(value)}`);
       }
       const args = { action, ...base, [field]: 2 };
-      assert.deepEqual(validate(args), args);
-      assert.deepEqual(validate({ ...args, [field]: "2" }), args);
+      assert.deepEqual(validate(args), processInput(args));
+      assert.deepEqual(validate({ ...args, [field]: "2" }), processInput(args));
     }
   }
 });
