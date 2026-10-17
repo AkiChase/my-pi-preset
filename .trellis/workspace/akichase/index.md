@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 28
+- **Total Sessions**: 29
 - **Last Active**: 2026-10-17
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~901 | Active |
+| `journal-1.md` | ~939 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 29 | 2026-10-17 | 统一工具可选参数说明与诊断 | `f69497c`, `fa33cb6`, `4e36472` | `main` |
 | 28 | 2026-10-17 | Agent 工具组契约规范化与收尾 | `05905e5`, `21c273e`, `b889368`, `fab4a79` | `main` |
 | 27 | 2026-10-16 | 运行任务工具拆分与 Monitor 契约收尾 | `af02794`, `79a60fc` | `main` |
 | 26 | 2026-10-16 | 修复 @ 路径补全过期候选并收尾 | `fce686b`, `dbc5751` | `main` |

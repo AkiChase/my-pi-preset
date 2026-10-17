@@ -899,3 +899,41 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Next Steps
 
 - 只读盘点剩余工具的维护归属和契约缺口；下一组任务尚未批准。
+
+
+## Session 29: 统一工具可选参数说明与诊断
+<!-- trellis-session: v=2 fp=eb149280f59745ce -->
+
+**Date**: 2026-10-17
+**Task**: 统一工具可选参数说明与诊断
+**Branch**: `main`
+
+### Summary
+
+在默认rules块中单次添加可选参数缺省说明；修复Agent空resume优先诊断，完善workflow/monitor/management省略提示，不改第三方或合法参数语义。用户验收后归档，清除本会话绑定并清理本轮自有临时日志。
+
+### Main Changes
+
+- 新增Tool Guidance单一官方promptGuidelines入口，实际SDK验证位置与去重。
+- 主/嵌套Agent空resume在lookup前拒绝；保留host optional-null与raw准入区别。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f69497c` | feat: add one optional tool argument guideline |
+| `fa33cb6` | fix: explain omitted arguments before mode conflicts |
+| `4e36472` | docs: record optional tool argument contracts and verification |
+
+### Testing
+
+- [OK] 最新pnpm check：类型及1432/1432 PASS；自然退出聚焦75/75 PASS；文档链接与diff检查通过。
+- [OK] 首次S2类型检查失败为测试ToolCall缺type，修正后通过；无线上provider/个人reload或独立Agent审查。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 任务已归档；个人加载新版本尚未验证，无push。
