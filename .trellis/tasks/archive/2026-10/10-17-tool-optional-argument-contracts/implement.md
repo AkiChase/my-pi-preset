@@ -2,7 +2,7 @@
 
 ## 状态
 
-用户已批准开始实施；S1/S2已完成并分别验证提交，等待用户验收/收尾。主直接实施与自审，不启动Agent；本任务不改公开字段/有效语义/权限。unused implement/check manifests故意为空，start使用--allow-empty-context，不称完整manifest验证通过。
+用户已批准开始实施；S1/S2已完成并分别验证提交，用户已验收并授权收尾（归档、清除本会话绑定、journal及范围内本地提交）。主直接实施与自审，不启动Agent；本任务不改公开字段/有效语义/权限。unused implement/check manifests故意为空，start使用--allow-empty-context，不称完整manifest验证通过。
 
 ## S1：单一通用缺省说明
 
@@ -55,6 +55,12 @@ S1新增测试使用extensions/__tests__/tool-guidance.test.ts，并纳入标准
 - 最终R1–R5/AC1–AC4已按默认SDK与离线注册测试核对：说明在rules内且docs前一次；raw空/null resume错误先于description冲突，零lookup/spawn/resume；host null去除与JSON null/false/0/空串保留有回归。未运行线上provider/真实终端/个人reload，无独立Agent复核，不称模型永不填错。
 - start记录main与base_branch相同警告；本任务在源目录直接实施，无worktree或PR；当前不归档、不journal。角色manifest仍故意为空，不称完整task validate通过。
 - 原始输出保留于自有/tmp/tool-optional-contracts-Xidsc5直至最终检查与清理；最终结果自包含记录，不需复制日志进仓库。
+
+## 最终验收与收尾
+
+用户明确允许收尾。产品提交f69497c、fa33cb6，规划/证据提交4e36472；最新全套类型与1432/1432 PASS、自然退出聚焦75/75 PASS，失败与修正事实保留于前文。最终相关产品无未提交修改，保留6个最小任务材料，不留原始日志或重复报告。
+
+已核查本轮自有日志及诊断，无未解决失败；lsof +D /tmp/tool-optional-contracts-Xidsc5 无打开文件（exit1为空匹配），仅清理该目录，不清理其他临时或用户生成.DS_Store。直接main实施、无PR，归档显式使用--skip-branch-validation；不伪造分支。其他并行任务/部署资源改动保留，不包含安装/reload/push或历史重写。
 
 ## 最终检查与提交
 
