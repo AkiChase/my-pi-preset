@@ -937,3 +937,42 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Next Steps
 
 - 任务已归档；个人加载新版本尚未验证，无push。
+
+
+## Session 30: 修复 Agent 工具 nullable 契约
+<!-- trellis-session: v=2 fp=cf899d57b02f9dcf -->
+
+**Date**: 2026-10-17
+**Task**: 修复 Agent 工具 nullable 契约
+**Branch**: `main`
+
+### Summary
+
+完成 Agent 工具必填 nullable 参数契约、删除全局可选参数提示并收尾归档；随后清理用户文档中的 Agent 工具协议教学。
+
+### Main Changes
+
+- 将 subagent_run、subagent_workflow、agent_manage 与 trellis_dispatch 的控制字段改为显式 nullable 契约，并保留 workflow args 的 JSON null 数据语义。
+- 删除全局 Tool Guidance 扩展；用户文档只保留功能和操作，不再教授模型工具字段或调用协议。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `301672d` | fix: require explicit nullable Agent tool controls |
+| `b7e20f2` | fix: align Agent management and dispatch nullable controls |
+| `6b021c6` | docs: record Agent nullable contracts and verification |
+| `3534a7e` | chore(task): archive Agent nullable contracts |
+| `d00dc9b` | docs: simplify Agent user guidance |
+
+### Testing
+
+- [OK] pnpm check 1429/1429 PASS；相关自然退出测试 201/201 PASS；git diff --check PASS。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 等待用户重新部署验证真实 provider 的工具调用；确认后再规划其他工具修复。

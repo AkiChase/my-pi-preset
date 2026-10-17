@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 29
+- **Total Sessions**: 30
 - **Last Active**: 2026-10-17
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~939 | Active |
+| `journal-1.md` | ~978 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 30 | 2026-10-17 | 修复 Agent 工具 nullable 契约 | `301672d`, `b7e20f2`, `6b021c6`, `3534a7e`, `d00dc9b` | `main` |
 | 29 | 2026-10-17 | 统一工具可选参数说明与诊断 | `f69497c`, `fa33cb6`, `4e36472` | `main` |
 | 28 | 2026-10-17 | Agent 工具组契约规范化与收尾 | `05905e5`, `21c273e`, `b889368`, `fab4a79` | `main` |
 | 27 | 2026-10-16 | 运行任务工具拆分与 Monitor 契约收尾 | `af02794`, `79a60fc` | `main` |
