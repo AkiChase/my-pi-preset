@@ -1,0 +1,4 @@
+{"file":".trellis/spec/development/index.md","reason":"Review execution ownership, validation before effects and renderer boundaries; do not modify specs"}
+{"file":".trellis/spec/testing/index.md","reason":"Review actual host, registered-tool, natural-exit and renderer evidence"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Verify shared parser reuse without extending backend semantics"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace model envelope through execution and rendering while preserving identity and consumption"}
