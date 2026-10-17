@@ -22,7 +22,7 @@ Common single-phase workflows you can chain across turns:
 
 For larger work, run several in sequence — read each result before deciding the next phase. You stay in the loop; each workflow is one well-scoped fan-out.
 
-Pass exactly one source: inline \`script\`, file \`scriptPath\`, or saved \`name\`. Do not combine sources. A replay with resumeFromRunId may omit the source to reuse the prior saved script. Title and description belong in script meta, not tool arguments.
+Pass exactly one source: inline \`script\`, file \`scriptPath\`, or saved \`name\`. Omit the other source fields entirely; empty strings are invalid, not placeholders. A replay with resumeFromRunId may omit the source to reuse the prior saved script. Title and description belong in script meta, not tool arguments.
 
 Pass the script inline via \`script\` — do not Write it to a file first. Every invocation automatically persists its script to a file under the session directory and returns the path in the tool result. To iterate on a workflow, edit that file with Write/Edit and re-invoke subagent_workflow with \`{scriptPath: "<path>"}\` instead of resending the full script. A script you will run more than once belongs in \`.pi/workflows/<name>.js\` (or \`.agents/workflows/\`, or \`<agent dir>/workflows/\` for one that follows the user everywhere); call it with \`name: "<name>"\` instead of re-sending the source.
 

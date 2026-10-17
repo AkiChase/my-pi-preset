@@ -102,7 +102,7 @@ export function registerMonitorTool(pi: ExtensionAPI, reg: BackgroundRegistry): 
             const hasCommand = typeof p.command === "string" && !isBlankCommand(p.command);
             const hasWs = !!p.ws && typeof p.ws.url === "string" && p.ws.url.length > 0;
             if (commandGiven && wsGiven) {
-                throw new Error("Provide either `command` or `ws`, not both.");
+                throw new Error("Provide either `command` or `ws`, not both. Omit the unused source entirely; an empty command still counts as supplied.");
             }
             if (!hasCommand && !hasWs) {
                 if (commandGiven) throw new Error("`command` is empty; provide a shell script or a `ws` source.");

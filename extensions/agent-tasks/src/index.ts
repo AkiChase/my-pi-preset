@@ -1563,7 +1563,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       ),
       resume: Type.Optional(
         Type.String({
-          description: "Real agent_id of a finished agent. With resume only prompt and optional run_in_background are accepted; stored session settings are retained.",
+          description: "Real agent_id of a finished agent. Omit entirely for new agents; an empty string is invalid. With resume only prompt and optional run_in_background are accepted; stored session settings are retained.",
         }),
       ),
       isolated: Type.Optional(

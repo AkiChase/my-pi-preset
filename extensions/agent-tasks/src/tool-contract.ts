@@ -7,14 +7,19 @@ export interface AgentToolCapabilities { nested: boolean; isolation: boolean; sc
 export function assertAgentToolArguments(value: unknown, capabilities: AgentToolCapabilities): asserts value is Record<string, unknown> {
   const params = assertObject(value);
   const resume = Object.hasOwn(params, "resume");
+  if (resume) {
+    try { assertNonEmptyString(params.resume, "`resume`"); }
+    catch (error) {
+      throw new Error(`${error instanceof Error ? error.message : String(error)} Omit resume entirely for a new agent; to resume, provide a real agent_id. No agent was resumed.`);
+    }
+  }
   const allowed = resume
     ? ["prompt", "resume", ...(capabilities.nested ? [] : ["run_in_background"])]
     : ["prompt", "description", "subagent_type", ...(capabilities.nested ? [] : ["name"]), "model", "thinking", "run_in_background", "isolated", "inherit_context",
       ...(capabilities.isolation ? ["isolation"] : []), ...(capabilities.scheduling ? ["schedule"] : [])];
   assertFields(params, allowed);
   assertNonEmptyString(params.prompt, "`prompt`");
-  if (resume) assertNonEmptyString(params.resume, "`resume`");
-  else {
+  if (!resume) {
     assertNonEmptyString(params.description, "`description`");
     assertNonEmptyString(params.subagent_type, "`subagent_type`");
   }
@@ -32,12 +37,12 @@ export function assertWorkflowToolArguments(value: unknown): asserts value is Re
   const params = assertObject(value);
   assertFields(params, ["script", "scriptPath", "name", "args", "resumeFromRunId"]);
   const sources = ["script", "scriptPath", "name"].filter(field => Object.hasOwn(params, field));
-  if (sources.length > 1 || (sources.length === 0 && !Object.hasOwn(params, "resumeFromRunId"))) throw new Error("Provide exactly one of script, scriptPath or name; replay may omit the source.");
   for (const field of sources) assertNonEmptyString(params[field], `\`${field}\``);
   if (Object.hasOwn(params, "resumeFromRunId")) {
     assertNonEmptyString(params.resumeFromRunId, "`resumeFromRunId`");
     if (!/^wf_[a-z0-9-]{6,}$/.test(String(params.resumeFromRunId))) throw new Error("resumeFromRunId must be a workflow execution ID.");
   }
+  if (sources.length > 1 || (sources.length === 0 && !Object.hasOwn(params, "resumeFromRunId"))) throw new Error("Provide exactly one of script, scriptPath or name; replay may omit the source. Omit unused source fields entirely rather than filling them with empty strings.");
 }
 
 export function assertMessageToolArguments(value: unknown): asserts value is Record<string, unknown> {
@@ -53,5 +58,5 @@ function assertObject(value: unknown): Record<string, unknown> {
 }
 function assertFields(params: Record<string, unknown>, allowed: string[]): void {
   const invalid = Object.keys(params).find(field => !allowed.includes(field));
-  if (invalid) throw new Error(`Field '${invalid}' is not accepted for this invocation. Accepted fields: ${allowed.join(", ")}.${Object.hasOwn(params, "resume") ? " No agent was resumed." : ""}`);
+  if (invalid) throw new Error(`Field '${invalid}' is not accepted for this invocation. Accepted fields: ${allowed.join(", ")}.${Object.hasOwn(params, "resume") ? " Supplying resume selects resume mode. Omit new-agent fields when resuming, or omit resume entirely to start a new agent. No agent was resumed." : " Omit fields that do not apply to this invocation."}`);
 }

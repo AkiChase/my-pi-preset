@@ -21,7 +21,7 @@ export function runToolGuidance(options: RunGuidanceOptions): string[] {
     Do not pass fields outside the selected mode. Required strings must be non-empty; description is a short, specific UI summary for new agents only.
   - Available permitted agent types:
 ${options.agentTypes.split("\n").map(line => `    ${line}`).join("\n")}
-  - Resume uses the real agent_id of a finished, resumable agent and retains its type, name and stored session settings. Do not repeat new-agent fields. Use subagent_message for a running agent.
+  - Resume uses the real agent_id of a finished, resumable agent and retains its type, name and stored session settings. Supplying resume selects resume mode; omit resume entirely for a new agent, rather than passing an empty string. Do not repeat new-agent fields. Use subagent_message for a running agent.
   - Agent-file configuration takes precedence over call parameters. Omitted values use configuration/defaults. Results state explicit requests overridden by configuration; do not assume a requested value became effective.
   - ${modeRule}
   - A background launch means accepted or queued, not completed. Copy agent_id for messaging/resume and execution_id for agent_manage status/output/wait/stop. Do not substitute IDs. Foreground returns inline results; releasing a wait does not stop execution.

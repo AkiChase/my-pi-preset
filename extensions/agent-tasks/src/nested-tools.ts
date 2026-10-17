@@ -184,7 +184,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
           description: "Defaults to false for nested spawns — the call blocks and returns the child's result inline. Set true only for work you will collect later with agent_manage; a detached child is stopped when you finish.",
         }),
       ),
-      resume: Type.Optional(Type.String({ description: "Real agent_id of a finished owned child; only resume and prompt are accepted, and execution waits inline." })),
+      resume: Type.Optional(Type.String({ description: "Real agent_id of a finished owned child; omit entirely for new agents, not an empty string. Only resume and prompt are accepted, and execution waits inline." })),
       isolated: Type.Optional(Type.Boolean()),
       inherit_context: Type.Optional(Type.Boolean()),
       ...isolationParam(isWorktreeIsolationEnabled()),

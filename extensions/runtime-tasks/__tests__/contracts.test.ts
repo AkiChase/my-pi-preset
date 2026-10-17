@@ -47,6 +47,7 @@ test("split management schemas define each field once and defer combinations to 
     const bad = group === "process" ? { action: "status", task_id: "x", limit: 1 } : { action: "wait", task_id: "x" };
     const result = await tool.execute("bad", bad as never, undefined, undefined, ctx);
     assert.equal(result.isError, true);
+    assert.match(result.content[0]!.type === "text" ? result.content[0]!.text : "", /Omit fields that do not apply to this action/);
   }
   assert.equal(calls, 0);
 });

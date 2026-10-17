@@ -116,6 +116,16 @@ void describe("monitor parameter schema", () => {
         assert.equal(h.reg.totalStarted, 0);
     });
 
+    it("empty unused command still conflicts with ws and explains omission", async () => {
+        const h = harness();
+        await assert.rejects(
+            h.tool.execute("placeholder", { command: "", ws: { url: "ws://x" }, description: "x" }, undefined, undefined, h.ctx),
+            /Omit the unused source entirely; an empty command still counts as supplied/
+        );
+        assert.equal(h.reg.jobs.size, 0);
+        assert.equal(h.reg.totalStarted, 0);
+    });
+
     it("names the empty field when a source is present but unusable", async () => {
         const h = harness();
         await assert.rejects(

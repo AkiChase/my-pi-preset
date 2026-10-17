@@ -86,7 +86,7 @@ export function validateManagementParams(group: ManagementGroup, value: unknown)
   if (typeof v.action !== "string" || !Object.hasOwn(table, v.action)) return `Unsupported ${group} management action.`;
   const accepted = ["action", ...table[v.action]!];
   const bad = Object.keys(v).find(k => !accepted.includes(k));
-  if (bad) return `Field '${bad}' is not accepted for ${v.action}. Accepted fields: ${accepted.join(", ")}.`;
+  if (bad) return `Field '${bad}' is not accepted for ${v.action}. Accepted fields: ${accepted.join(", ")}. Omit fields that do not apply to this action.`;
   const target = group === "process" ? "task_id" : "execution_id";
   if (["status", "output", "wait", "stop"].includes(v.action) && (typeof v[target] !== "string" || !v[target].trim())) return `${v.action} requires ${target}.`;
   if (v.task_id !== undefined && (typeof v.task_id !== "string" || !v.task_id.trim())) return "task_id must be a non-empty string.";

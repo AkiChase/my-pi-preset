@@ -167,6 +167,7 @@ void it("actual registered Agent tools contribute one official SDK rule group an
             const selectedTools = definitions.map(tool => tool.name);
             const prompt = buildSystemPrompt({ cwd: f.cwd, selectedTools: [...selectedTools, "peer"], toolSnippets: { ...snippets, peer: "Peer index" }, toolGuidelines: { ...guidelines, peer: ["Peer guideline"] } });
             for (const heading of ["Subagent_run usage:", "Subagent_message usage:", "Subagent_workflow usage:"]) assert.equal(prompt.split(heading).length - 1, 1);
+            assert.match(prompt, /omit resume entirely for a new agent/);
             assert.match(prompt, new RegExp(`execution defaults to ${backgroundByDefault ? "background" : "foreground"}`));
             assert.match(prompt, /Peer index/); assert.match(prompt, /Peer guideline/);
             assert.doesNotMatch(prompt, /OLD_CUSTOM_TEMPLATE|toolDescriptionMode|\{\{typeList\}\}/);
@@ -219,6 +220,63 @@ void it("a blank prompt or description is refused before any agent is started", 
             assert.match(text(result), new RegExp(`\`${field}\` must be a non-empty string`));
         }
         assert.equal(f.calls.length, 0, "no run may start from a blank field");
+    } finally { await f.close(); }
+});
+
+void it("blank resume placeholders are corrected before any root or nested manager lookup", async t => {
+    const f = await factory();
+    const { AgentManager } = await import("../src/agent-manager.ts");
+    let lookups = 0;
+    const original = AgentManager.prototype.getRecord;
+    const mock = t.mock.method(AgentManager.prototype, "getRecord", function (this: InstanceType<typeof AgentManager>, id: string) {
+        lookups++; return original.call(this, id);
+    });
+    const nested = createNestedSubagentTools({
+        manager: {
+            getRecord() { lookups++; return undefined; },
+            async resume() { throw new Error("unexpected resume"); },
+            spawn() { throw new Error("unexpected spawn"); },
+            async awaitStartup() {},
+            async spawnAndWait() { throw new Error("unexpected spawnAndWait"); },
+        }, pi: {} as ExtensionAPI, parentAgentId: "parent", depth: 1, maxSubagentDepth: 2,
+        allowedSubagents: "all", configCwd: f.cwd,
+    })[0]!;
+    try {
+        for (const resume of ["", " \t\n", null]) {
+            const args = { prompt: "inspect", description: "Inspect", subagent_type: "general-purpose", resume };
+            for (const result of [await f.execute("subagent_run", args), await nested.execute("bad", args as never, undefined, undefined, f.ctx)]) {
+                assert.equal(result.isError, true);
+                assert.match(text(result), /`resume` must be/);
+                assert.match(text(result), /Omit resume entirely for a new agent/);
+                assert.doesNotMatch(text(result), /Field 'description'/);
+            }
+        }
+        assert.equal(lookups, 0);
+        assert.equal(f.calls.length, 0);
+        assert.equal(f.coordinator.list().length, 0);
+    } finally { mock.mock.restore(); await f.close(); }
+});
+
+void it("actual host removes non-nullable optional null but preserves empty strings and legitimate values", async () => {
+    const f = await factory();
+    try {
+        const tool = f.tools.get("subagent_run")!;
+        const args = { prompt: "inspect", description: "Inspect", subagent_type: "general-purpose", resume: null, model: null, run_in_background: false, isolated: false };
+        const validated = validateToolArguments(tool, { type: "toolCall", id: "host", name: tool.name, arguments: args });
+        assert.equal(Object.hasOwn(validated, "resume"), false);
+        assert.equal(Object.hasOwn(validated, "model"), false);
+        assert.equal(validated.run_in_background, false);
+        assert.equal(validated.isolated, false);
+        assert.equal(args.resume, null, "host validation does not mutate the original payload");
+        const empty = validateToolArguments(tool, { type: "toolCall", id: "host", name: tool.name, arguments: { ...args, resume: "" } });
+        assert.equal(empty.resume, "");
+        const result = await f.execute(tool.name, empty);
+        assert.equal(result.isError, true);
+        assert.match(text(result), /Omit resume entirely/);
+        const workflow = f.tools.get("subagent_workflow")!;
+        const json = validateToolArguments(workflow, { type: "toolCall", id: "json", name: workflow.name, arguments: { script: "return args", args: { nil: null, flag: false, index: 0, text: "" } } });
+        assert.deepEqual(json.args, { nil: null, flag: false, index: 0, text: "" });
+        assert.equal(f.calls.length, 0);
     } finally { await f.close(); }
 });
 
