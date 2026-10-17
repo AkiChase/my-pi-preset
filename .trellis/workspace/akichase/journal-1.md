@@ -866,3 +866,36 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Next Steps
 
 - 评估 subagent_run、subagent_message、subagent_workflow 的整体参数、成组说明和返回契约；尚未批准下一任务实施。
+
+
+## Session 28: Agent 工具组契约规范化与收尾
+<!-- trellis-session: v=2 fp=882cf76b6591ed26 -->
+
+**Date**: 2026-10-17
+**Task**: Agent 工具组契约规范化与收尾
+**Branch**: `main`
+
+### Summary
+
+规范启动与恢复模式、真实ID消息、workflow来源互斥和保存前拒绝；统一官方指导并删除描述模式。验收后归档，保留并行改动。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `05905e5` | feat(agents): normalize spawn resume and messaging contracts |
+| `21c273e` | feat(workflow): validate exclusive sources before execution |
+| `b889368` | feat(agents): unify official tool guidance and remove description modes |
+| `fab4a79` | test(task-ui): fix clock at visibility boundary |
+
+### Testing
+
+- [OK] 最新默认 pnpm check 类型与1423/1423 PASS；S3自然退出404/404 PASS；UI固定时钟13/13 PASS。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 只读盘点剩余工具的维护归属和契约缺口；下一组任务尚未批准。
