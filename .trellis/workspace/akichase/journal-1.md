@@ -1236,3 +1236,41 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Next Steps
 
 - 只读审阅剩余planning任务并建议顺序，不启动其他任务。
+
+
+## Session 38: Beautify 输入框阶段状态
+<!-- trellis-session: v=2 fp=281a24739348a576 -->
+
+**Date**: 2026-10-18
+**Task**: Beautify 输入框阶段状态
+**Branch**: `main`
+
+### Summary
+
+完成 Beautify 输入框主会话阶段展示、独立审核与 tmux 实机验证；任务已归档。
+
+### Main Changes
+
+- 实现 Loading、Brewing、Tooling、Asking、Compacting 的原生 indicator 装饰与生命周期清理。
+- 补齐实际 SDK、集成 fixture 和文档回归；通过独立 tmux server 验证 Loading/Brewing 与动态窄宽 resize。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b9fc1a0` | feat(beautify): show main-session phases in editor status |
+| `5d4e5fc` | docs(trellis): record editor phase verification checkpoint |
+| `9a85b61` | docs(trellis): record editor phase tmux validation |
+| `48ca5cf` | chore(task): archive 10-14-editor-phase-status |
+
+### Testing
+
+- [OK] focused 9/9、相关回归 177/177、pnpm check 1462/1462；tmux 实机验证 Loading/Brewing/resize/cleanup 通过。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 如需扩展终端验收，可另行验证 Tooling、Asking、Compacting、Retry 和物理 IME。
