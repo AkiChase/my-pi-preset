@@ -976,3 +976,40 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Next Steps
 
 - 等待用户重新部署验证真实 provider 的工具调用；确认后再规划其他工具修复。
+
+
+## Session 31: 完成 process_manage nullable 参数契约
+<!-- trellis-session: v=2 fp=61a1dc8ad1b8b845 -->
+
+**Date**: 2026-10-18
+**Task**: 完成 process_manage nullable 参数契约
+**Branch**: `main`
+
+### Summary
+
+完成 process_manage 的 required-nullable envelope、共享解析与 Beautify 一致性；独立审查后修复 Bash 指引冲突并归档。
+
+### Main Changes
+
+- 将 process_manage 七个控制字段改为 required nullable，并以共享 parser 保持动作矩阵、分页和默认值语义。
+- 同步 Beautify、SDK prompt 与注册调用测试；Bash targeted-call 指引明确 task_type 使用 null。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ebfabce` | fix: require nullable process management controls |
+| `e6588f5` | docs: record process management nullable verification |
+| `ec32f4d` | chore(task): archive 10-17-process-manage-nullable-contracts |
+
+### Testing
+
+- [OK] 自然退出集成 642/642、审查修复聚焦 38/38、pnpm check 1431/1431、git diff --check 通过。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 评估并执行下一个已规划 nullable 契约任务。
