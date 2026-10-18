@@ -152,4 +152,6 @@ NOT_RUN：产品 phase reducer/controller（尚无实现）、完整 Beautify su
 
 ## 提交与交付
 
+已验证代码阶段 checkpoint：`b9fc1a0` — `feat(beautify): show main-session phases in editor status`。提交仅含本任务三份规划/task 元数据/role manifests、Beautify 产品与测试、三份集成 fixture 和 owning 文档，共 15 文件；无 raw 日志。提交后 scoped 产品文件干净，其他任务的并行修改保留。任务仍 in_progress，未进行真实 TUI、最终用户接受或归档。
+
 阶段 checkpoint 记录 hash、exact commands、退出码、独立 review 与修复结果。最终对 PRD AC 逐项核证据，保留未验证/环境限制，不把公开接口阻塞标成通过。不自动 push/install/sync/reload/archive；验收与生命周期收尾另走用户授权。
