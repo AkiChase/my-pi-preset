@@ -12,7 +12,6 @@
       "extensions/*.ts"
     ]
   },
-  "packageManager": "pnpm@10.33.0",
   "scripts": {
     "link-sdk": "node scripts/link-pi-sdk.mjs",
     "typecheck": "node scripts/link-pi-sdk.mjs && tsc -p tsconfig.json",
