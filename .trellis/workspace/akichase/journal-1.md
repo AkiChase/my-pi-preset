@@ -1161,3 +1161,41 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Next Steps
 
 - 若继续优化资源占用，先单独批准生产 query/初始化性能改造范围。
+
+
+## Session 36: 内置 Subagents Skill 与工具说明收尾
+<!-- trellis-session: v=2 fp=3f7e32ec79526967 -->
+
+**Date**: 2026-10-18
+**Task**: 内置 Subagents Skill 与工具说明收尾
+**Branch**: `main`
+
+### Summary
+
+完成内置 Subagents Skill 与渐进式披露、静态参数语义说明；process_manage 留在工具中。独立审查与聚焦49/49、全量1440/1440、类型检查通过，用户接受后归档并清空绑定。另按用户直接授权移除 pnpm 精确版本声明。
+
+### Main Changes
+
+- resources_discover 提供插件内 Skill，长 workflow 教程迁到按需 references，常驻 Rule 约减少90%；普通 Skill 禁用不联动为明确用户决定。
+- 初次临时HOME检查触发Corepack未授权下载，后续禁网直接验证；自有临时目录已定向清理。
+- 非PR任务使用skip-branch-validation归档；CLI自动提交因旧未tracked路径失败，主会话按exact archive scope补交，保留并行改动。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `88878a6` | Add built-in subagent guidance skill |
+| `2f32141` | Move subagent tutorials to progressive skill references |
+| `508e439` | Remove exact pnpm version pin |
+
+### Testing
+
+- [OK] 最终独立检查：聚焦49/49自然退出、TypeScript exit0、全量1440/1440；全量force-exit不证明自然生命周期。在线/视觉/cache测量未做。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 执行配置回显与渲染任务仍planning，未激活或实施。

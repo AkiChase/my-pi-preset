@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 35
+- **Total Sessions**: 36
 - **Last Active**: 2026-10-18
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1163 | Active |
+| `journal-1.md` | ~1201 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 36 | 2026-10-18 | 内置 Subagents Skill 与工具说明收尾 | `88878a6`, `2f32141`, `508e439` | `main` |
 | 35 | 2026-10-18 | 完成 npm test 资源占用优化 | `f7e395b`, `c4d0db8`, `7d1efff`, `508e439` | `main` |
 | 34 | 2026-10-18 | 补齐 research 执行者选择 | `d67ee2f`, `c0b02fc` | `main` |
 | 33 | 2026-10-18 | 完成 bash 与 memory_list 显式参数契约 | `55ad847`, `cef4126`, `c543657`, `b4cfbed` | `main` |
