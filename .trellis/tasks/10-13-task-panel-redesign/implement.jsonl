@@ -1,0 +1,4 @@
+{"file":".trellis/spec/development/index.md","reason":"SDK、overlay、只读数据与生命周期"}
+{"file":".trellis/spec/testing/index.md","reason":"隔离测试、真实宿主限制和自然退出"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"复用现有scroll模块与interaction模式"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"setup/shutdown身份与执行不变性"}

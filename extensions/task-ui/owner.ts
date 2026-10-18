@@ -4,14 +4,15 @@ import type { TaskLifecycle } from "./lifecycle.ts";
 import type { TaskUIConfig } from "./config.ts";
 import { TaskPanel } from "./panel.ts";
 import { taskSummary, TaskPanelModel } from "./model.ts";
+import { layoutError, loadNativeLayout, type NativeLayout } from "../shared/scroll-panel/native-layout.ts";
 
 /** Exactly one footer/subscriber/overlay owner per activation, never a backend UI. */
-export function createTaskUIOwner(pi: ExtensionAPI, coordinator: TaskCoordinator, lifecycle: TaskLifecycle, config: TaskUIConfig) {
+export function createTaskUIOwner(pi: ExtensionAPI, coordinator: TaskCoordinator, lifecycle: TaskLifecycle, config: TaskUIConfig, options: { loadLayout?: () => Promise<NativeLayout> } = {}) {
     let closed = !lifecycle.active;
     let ctx: ExtensionContext | undefined;
     let offSource: (() => void) | undefined;
     let lastStatus: string | undefined;
-    type Interaction = { panel?: TaskPanel; done?: () => void };
+    type Interaction = { panel?: TaskPanel; close: () => void };
     let interaction: Interaction | undefined;
     let offStart: (() => void) | undefined;
     const active = () => !closed && lifecycle.active;
@@ -34,7 +35,7 @@ export function createTaskUIOwner(pi: ExtensionAPI, coordinator: TaskCoordinator
         try { offSource?.(); } catch { /* isolate cleanup owners */ } offSource = undefined;
         try { offStart?.(); } catch { /* isolate cleanup owners */ } offStart = undefined;
         try { current?.panel?.dispose(); } catch { /* completion still closes overlay */ }
-        try { current?.done?.(); } catch { /* footer cleanup still runs */ }
+        try { current?.close(); } catch { /* footer cleanup still runs */ }
         try { origin?.ui.setStatus("task-ui", undefined); } catch { /* cleanup survives optional host errors */ }
     };
     const offClose = lifecycle.onClose(dispose);
@@ -59,19 +60,37 @@ export function createTaskUIOwner(pi: ExtensionAPI, coordinator: TaskCoordinator
             if (origin.mode !== "tui" || !origin.ui.custom) {
                 origin.ui.notify("Task Panel requires interactive TUI mode; use process_manage or agent_manage for details.", "info"); return;
             }
-            const current: Interaction = {};
-            interaction = current; // Publish owner BEFORE custom can reenter shutdown.
+            let installed = false, closeRequested = false, completed = false;
+            let done: (() => void) | undefined;
+            const finish = () => {
+                if (!installed || !done || completed) return;
+                completed = true;
+                current.panel?.dispose();
+                done();
+            };
+            const current: Interaction = { close() { closeRequested = true; finish(); } };
+            interaction = current; // Publish BEFORE layout/custom can reenter shutdown.
+            const live = () => active() && interaction === current && !closeRequested && !completed;
             try {
-                await origin.ui.custom<void>((tui, theme, keys, done) => {
-                    let completed = false;
-                    const finish = () => { if (!completed) { completed = true; done(); } };
-                    current.done = finish;
-                    const panel = new TaskPanel({ coordinator, config, ctx: origin, tui, theme, keys, done: finish });
+                let layout: NativeLayout;
+                try { layout = await (options.loadLayout ?? loadNativeLayout)(); }
+                catch (cause) { if (live()) origin.ui.notify(layoutError(cause, "Task Panel").message, "error"); return; }
+                if (!live()) return;
+                await origin.ui.custom<void>((tui, _theme, keys, complete) => {
+                    done = () => complete();
+                    const panel = new TaskPanel({ coordinator, config, layout, ctx: origin, tui, theme: () => origin.ui.theme, keys, done: current.close });
                     current.panel = panel;
-                    if (!active() || interaction !== current) { panel.dispose(); finish(); }
+                    if (!live()) { panel.dispose(); current.close(); }
                     return panel;
-                }, { overlay: true, overlayOptions: { anchor: "center", width: "90%", maxHeight: "70%" } });
+                }, { overlay: true, overlayOptions: { anchor: "top-left", width: "100%", maxHeight: "100%", margin: 0 }, onHandle: () => {
+                    // Wait for our handle: setup cancellation must not close an
+                    // unrelated overlay on hosts with pre-install completion semantics.
+                    installed = true;
+                    if (!live()) closeRequested = true;
+                    if (closeRequested) finish();
+                } });
             } finally {
+                completed = true;
                 current.panel?.dispose();
                 if (interaction === current) interaction = undefined;
             }

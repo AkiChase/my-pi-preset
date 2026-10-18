@@ -16,6 +16,7 @@ import { markKilledSilently, startBackgroundJob, terminateJobSilently } from "..
 import { MonitorBuffer } from "../monitor-buffer.ts";
 import { openWsMonitorSource, spawnCommandSource, type MonitorSinks, type MonitorResult } from "../monitor-source.ts";
 import { TaskPanel } from "../../task-ui/panel.ts";
+import { loadNativeLayout } from "../../shared/scroll-panel/native-layout.ts";
 import { DEFAULTS as UI_DEFAULTS } from "../../task-ui/config.ts";
 import { createProcessTaskSource } from "../source.ts";
 import { registerManagementFixture } from "./management-fixture.ts";
@@ -189,7 +190,8 @@ test("AC18: viewing/closing panel leaves monitor scheduling alone; panel x and j
     const source = createProcessTaskSource(h.reg);
     const offSource = h.reg.coordinator.registerSource(source);
     t.after(() => { offSource(); source.dispose(); });
-    const panel = () => new TaskPanel({ coordinator: h.reg.coordinator, config: UI_DEFAULTS, ctx, theme, keys: { matches: () => false },
+    const layout = await loadNativeLayout();
+    const panel = () => new TaskPanel({ coordinator: h.reg.coordinator, config: UI_DEFAULTS, layout, ctx, theme, keys: { matches: () => false },
         tui: { terminal: { rows: 30 }, requestRender() {} } as never, done() {} });
     const p = panel(); p.render(100); p.handleInput("\u001b"); p.dispose();
     h.tick(5000); assert.equal(h.sent.length, 2); assert.match(h.sent[1]!.content, /pending/);

@@ -51,7 +51,7 @@ void it("actual SDK runtime new/resume/fork/import/quit creates fresh factories;
             getFlag: () => undefined, getAllTools: () => [], getActiveTools: () => [], appendEntry() {},
             events: { emit() {}, on() { return () => {}; } },
             sendMessage(message: unknown) { messages.push(message); },
-            on(event: string, callback: (event: unknown, ctx: ExtensionContext) => Promise<unknown>) { callbacks.set(event, callback); },
+            on(event: string, callback: (event: unknown, ctx: ExtensionContext) => Promise<unknown>) { callbacks.set(event, callback); return () => { if (callbacks.get(event) === callback) callbacks.delete(event); }; },
         };
         const backend = processTasks(partialPi as unknown as ExtensionAPI, { coordinator, lifecycle });
         let agentRuns = 0, agentStops = 0;
@@ -176,7 +176,7 @@ void it("actual SDK AgentSession.reload invokes old shutdown before activation r
         const pi = { registerTool(tool: { name: string }) { backend.tools.set(tool.name, tool as unknown as ReturnType<typeof processActivation>["tools"] extends Map<string, infer T> ? T : never); },
             registerCommand() {}, registerMessageRenderer() {}, registerEntryRenderer() {}, registerFlag() {},
             getFlag: () => undefined, getAllTools: () => [], getActiveTools: () => [], appendEntry() {}, sendMessage() {},
-            events: { emit() {}, on() { return () => {}; } }, on(name: string, callback: (event: unknown, ctx: ExtensionContext) => Promise<unknown>) { callbacks.set(name, callback); },
+            events: { emit() {}, on() { return () => {}; } }, on(name: string, callback: (event: unknown, ctx: ExtensionContext) => Promise<unknown>) { callbacks.set(name, callback); return () => { if (callbacks.get(name) === callback) callbacks.delete(name); }; },
         } as unknown as ExtensionAPI;
         agentTasks(pi, { coordinator: backend.coordinator, lifecycle: backend.lifecycle, managerDependencies: {
             runAgent: async (_ctx, _type, _prompt, options) => {

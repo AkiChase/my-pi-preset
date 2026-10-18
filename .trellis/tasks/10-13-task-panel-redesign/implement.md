@@ -76,7 +76,22 @@ pnpm check 全量使用 force-exit，不能证明自然生命周期；受影响 
 
 保留已知诊断：focused 有5次 `offStart is not a function`，来自 HEAD 已有 sdk-runtime.test.ts fake pi.on 未返回 unsubscribe 与 widget-display/client.dispose 的组合；本阶段不修该 fixture，不称无 cleanup 诊断。阶段3触及 widget/hint 时重新评估。真实终端/installed mounted overlay/provider NOT_RUN；当前 Panel 仍旧双栏，完整换行详情属于阶段2。无独立 lint 脚本。
 
-阶段 1 checkpoint：待记录提交 hash。当前分支 task/task-panel-redesign（由获批实施创建，本任务共享源执行、不创建 worktree）。
+阶段 1 checkpoint：2a8d466（feat: unify task panel presentation and tree selection），含耦合产品/测试及已批准 Panel 规划收拢材料，未纳入两个独立规划任务。当前分支 task/task-panel-redesign（由获批实施创建，本任务共享源执行、不创建 worktree）。
+
+## 阶段 2 实际检查记录
+委派 trellis-implement 实施，另一个 trellis-check 独立审查；main 核验实际 panel/owner 差异及最终日志。全屏 list/detail、上下分区、常驻 native ScrollView、wheel containment、键盘/滚轮独立位置、完整换行 metadata/有界详情和 onHandle/await fencing 完成。render 无 detail I/O，源刷新同步重入合并并校验 selected identity。
+
+首次 focused exit1：旧 fixture 将 native layout 自带的 OSC hyperlink-close 误作外部控制；调整为区分 host reset，仍检查外部 OSC/control，重跑87/87 exit0。首次 tsc exit2：process monitor-session fixture 直接构造 Panel 缺 layout，子实施因路径范围停报；main 同步同一构造契约（无产品范围扩大）后复验。
+
+独立审查发现并修复 source 同步重入递归/旧 detail 覆盖新选择、普通窄屏底栏截断 selected/global 操作提示；新增重入、30/40/60/80列、空 Agents 分区实际行定位与 footer wheel 测试。修正 onHandle 注释，不假称当前 SDK done 必然关闭 topmost；保留兼容 setup fence。
+
+最终命令（同阶段1 Node/SDK/隔离配置）：
+- `node node_modules/typescript/bin/tsc -p tsconfig.json` exit0。
+- `node --test --test-concurrency=2 extensions/task-ui/__tests__/*.test.ts extensions/shared/scroll-panel/__tests__/*.test.ts extensions/agent-tasks/__tests__/backend-waits.test.ts extensions/process-tasks/__tests__/monitor-session.test.ts` exit0，135/135，自然退出；focused 无 offStart 诊断。
+- 同阶段1直接 tsc+配置全量Node forced-exit suite exit0，1483/1483。未重新调用 Corepack 阻断的 pnpm check，未运行 link helper（已核实现有链接）。
+- `git diff --check` exit0。原始实现/审查输出在 stage2-implement/stage2-check 外部目录。
+
+sdk-runtime fake pi.on 已补实际 unsubscribe，原五次诊断消失；full 仍有2次同类诊断定位到 process waits.test.ts fake pi.on，未扩范围修。真实终端/installed bundled overlay/物理wheel/provider NOT_RUN，不以fixture冒充AC2/3全部验收。阶段2 checkpoint待记录；阶段3尚未开始。
 
 ## 尚未运行与材料维护
 本轮只维护现有规划与用户批准的合并关联，无产品测试、真实宿主测试、派发、start、commit 或 archive。旧 research 保留原文作为历史观察，不迁移/清理；现有角色 manifest 需执行前刷新，不能宣称 context validation 已通过。原 overview 材料在 merged/ 下，原 planning 值是合并前历史状态；meta 明确 merged_into/disposition，根级待办已退出，不伪造 completed。

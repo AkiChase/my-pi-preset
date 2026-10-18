@@ -1,3 +1,5 @@
+import { loadNativeLayout } from "../../shared/scroll-panel/native-layout.ts";
+const layout = await loadNativeLayout();
 import { completeToolCall } from "./tool-inputs.ts";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -429,13 +431,13 @@ for (const elapsed of [0, FINISHED_LINGER_MS - 1, FINISHED_LINGER_MS]) {
       const sweep = Reflect.get(f.manager, "cleanup"); sweep.call(f.manager);
       const retained = elapsed < FINISHED_LINGER_MS;
       assert.equal(!!f.manager.getRecord(id), retained, "source retention ends exactly with the shared group window");
-      panel = new TaskPanel({ coordinator: f.coordinator, config: UI_DEFAULTS, ctx: { ui: { notify() {} } } as unknown as ExtensionContext,
+      panel = new TaskPanel({ coordinator: f.coordinator, config: UI_DEFAULTS, layout, ctx: { ui: { notify() {} } } as unknown as ExtensionContext,
         theme: { fg: (_color, text) => text }, keys: { matches: () => false },
         tui: { terminal: { rows: 40 }, requestRender() {} } as never, done() {} });
       const rows = panel.model.refresh(f.coordinator.list(), now);
       assert.deepEqual(rows.map(row => [row.view.taskId, row.depth]), retained ? [[task.id, 0], [id, 1]] : []);
       if (retained) {
-        panel.handleInput("j");
+        panel.handleInput("j"); panel.handleInput("\r");
         assert.match(panel.render(180).join("\n"), /retained child answer/);
         assert.equal(f.manager.getRecord(id)?.resultConsumed, true, "preview never changes result ownership");
       }

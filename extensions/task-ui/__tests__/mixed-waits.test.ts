@@ -1,3 +1,5 @@
+import { loadNativeLayout } from "../../shared/scroll-panel/native-layout.ts";
+const layout = await loadNativeLayout();
 import { bashInput } from "../../process-tasks/__tests__/bash-input.ts";
 import { processInput } from "../../runtime-tasks/__tests__/process-input.ts";
 import assert from "node:assert/strict";
@@ -70,7 +72,7 @@ void it("one shared /task-detach releases mixed shell/agent launch and retrieval
         assert.equal(before.length, 2);
         assert.equal(coordinator.waitCount, 4);
         assert.ok(before.every(task => task.executionMode === "foreground" && task.waitCount === 2));
-        const panelArgs = { coordinator, config: UI_DEFAULTS, ctx,
+        const panelArgs = { coordinator, config: UI_DEFAULTS, layout, ctx,
             theme: { fg: (_color: string, text: string) => text }, keys: { matches: () => false },
             tui: { terminal: { rows: 40 }, requestRender() {} } as never, done() {} };
         const viewing = new TaskPanel(panelArgs);

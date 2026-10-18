@@ -1,3 +1,5 @@
+import { loadNativeLayout } from "../../shared/scroll-panel/native-layout.ts";
+const layout = await loadNativeLayout();
 import assert from "node:assert/strict";
 import { it } from "node:test";
 import { CustomEditor, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -203,7 +205,7 @@ void it("owner fresh model exposes foreground-only and four-second visibility, r
     const identity = { sourceId: "shell", taskId: "fg", runId: "1" };
     let view: TaskView = { ...identity, key: taskKey(identity), title: "fg", kind: "shell", status: "running", executionMode: "foreground", waitCount: 1, stats: {}, artifacts: [], capabilities: { stop: true, details: true } };
     h.coordinator.registerSource({ sourceId: "shell", revision: 1, list: () => [view], detail: () => ({ text: "log" }), stop: () => true, subscribe: () => () => {}, dispose() {} });
-    const owner = createTaskUIOwner(h.pi, h.coordinator, h.lifecycle, DEFAULTS);
+    const owner = createTaskUIOwner(h.pi, h.coordinator, h.lifecycle, DEFAULTS, { loadLayout: async () => layout });
     try {
         assert.equal(owner.canOpen(), true);
         view = { ...view, status: "completed", endedAt: now - 3_999 }; assert.equal(owner.canOpen(), true);
@@ -211,7 +213,7 @@ void it("owner fresh model exposes foreground-only and four-second visibility, r
         view = { ...view, status: "running" };
         let done!: () => void;
         h.ctx.ui.custom = async <T>() => new Promise<T>(resolve => { done = () => resolve(undefined as T); });
-        const open = owner.openPanel(h.ctx); assert.equal(owner.canOpen(), false); done(); await open; assert.equal(owner.canOpen(), true);
+        const open = owner.openPanel(h.ctx); assert.equal(owner.canOpen(), false); await Promise.resolve(); done(); await open; assert.equal(owner.canOpen(), true);
         await h.lifecycle.shutdown(); assert.equal(owner.canOpen(), false);
     } finally { owner.dispose(); await h.dispose(); }
 });
@@ -246,23 +248,24 @@ void it("beautify actual session_start before Down and real panel focus/nav/clos
         const second = { ...first, taskId: "second", key: taskKey({ ...identity, taskId: "second" }), title: "second" };
         h.coordinator.registerSource({ sourceId: "shell", revision: 0, list: () => [first, second], detail: () => ({ text: "output" }), stop: () => true, subscribe: () => () => {}, dispose() {} });
         const wait = h.coordinator.registerWait({ identity, label: "foreground", kind: "launch" });
-        h.ctx.ui.custom = async <T>(factory: Parameters<ExtensionContext["ui"]["custom"]>[0]) => new Promise<T>(resolve => {
+        h.ctx.ui.custom = async <T>(factory: Parameters<ExtensionContext["ui"]["custom"]>[0], options: Parameters<ExtensionContext["ui"]["custom"]>[1]) => new Promise<T>(resolve => {
             let lease: ReturnType<typeof h.tui.showOverlay> | undefined;
             let completed = false;
             const component = factory(h.tui, themeSdk.theme, h.keys, (value: unknown) => { completed = true; lease?.hide(); resolve(value as T); });
             assert.ok(!(component instanceof Promise));
             if (completed) return; // Synchronous capture probe is never mounted.
             activePanel = component as TaskPanel;
-            lease = h.tui.showOverlay(activePanel);
+            lease = h.tui.showOverlay(activePanel, typeof options?.overlayOptions === "function" ? options.overlayOptions() : options?.overlayOptions);
+            options?.onHandle?.(lease);
         });
-        const owner = createTaskUIOwner(pi, h.coordinator, h.lifecycle, DEFAULTS);
+        const owner = createTaskUIOwner(pi, h.coordinator, h.lifecycle, DEFAULTS, { loadLayout: async () => layout });
         registerDownOpener(pi, h.lifecycle, true, owner);
         for (const start of starts) await start({}, h.ctx);
         const editor = h.editor; assert.match(editor.render(80).join("\n"), /❯/);
         const input = editor.handleInput;
         for (const start of starts) await start({}, h.ctx);
         assert.equal(h.editor, editor); assert.equal(editor.handleInput, input);
-        h.dispatch(DOWN); assert.ok(activePanel); assert.equal(owner.canOpen(), false); assert.equal(h.coordinator.waitCount, 1);
+        h.dispatch(DOWN); await Promise.resolve(); assert.ok(activePanel); assert.equal(owner.canOpen(), false); assert.equal(h.coordinator.waitCount, 1);
         h.dispatch(DOWN); assert.equal(activePanel.model.selected?.taskId, "second"); assert.equal(wait.settled, false);
         h.dispatch("\x1b"); await pause(); assert.equal(h.tui.getFocusedComponent(), editor); assert.equal(owner.canOpen(), true);
         assert.equal(wait.settled, false); await h.lifecycle.shutdown();
