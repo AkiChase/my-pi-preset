@@ -2490,7 +2490,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       return createToolCallHeading({ name: "subagent_workflow", detail: workflowCallName({ script: args.script ?? undefined, scriptPath: args.scriptPath ?? undefined, name: args.name ?? undefined }), theme, context });
     },
 
-    renderResult(result, _options, theme, renderContext) {
+    renderResult(result, options, theme, renderContext) {
       const text = result.content[0]?.type === "text" ? result.content[0].text : "";
       const taskId = (result.details as { taskId?: string } | undefined)?.taskId;
       const task = taskId !== undefined ? workflowTasks.get(taskId) : undefined;
@@ -2512,6 +2512,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
           totalTokens: task.totalTokens,
         },
         theme,
+        options.expanded,
       );
     },
 
