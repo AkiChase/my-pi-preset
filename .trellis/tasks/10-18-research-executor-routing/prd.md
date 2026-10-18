@@ -42,4 +42,5 @@
 - 预期诊断：`task.py validate` 报 implement/check 两个 manifest 均为空；本任务直接实施和自审，没有派发角色，已用 `start --allow-empty-context`。不将该诊断描述为完整任务校验通过。
 - 启动警告：当前 branch 和 base_branch 均为 `main`；后续 archive 会拒绝同分支 PR 目标。本轮不创建分支或归档。
 - NOT_RUN：全量测试、typecheck、真实 provider 分派及资源部署；本轮是局部文案修改，没有 TypeScript 或运行时行为变化，测试不能证明真实模型会主动选择 research。
-- 提交前检查曾因 PRD 末尾多余空行失败（退出码 2，未执行 commit）；已移除空行并重新检查。
+- 提交前检查曾因 PRD 末尾多余空行失败（退出码 2，未执行 commit）；已移除空行，重跑 `git diff --cached --check` 通过。
+- 阶段提交：`d67ee2f`（`docs(trellis): include research in executor selection`）。提交后已核对范围，未包含并行修改；本次临时验证目录已检查并清理。任务保持绑定，未归档。
