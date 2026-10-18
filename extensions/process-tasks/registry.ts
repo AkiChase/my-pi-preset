@@ -4,7 +4,6 @@ import { resolve } from "node:path";
 import { JOB_ID_PREFIX, REGISTRY_SWEEP_MS, TERMINAL_RETENTION_MS, isTerminalStatus, type Job, type JobKind, type UiContext } from "./types.ts";
 import type { BackgroundRegistry } from "./state.ts";
 import { readBoundedTail } from "./output.ts";
-import { renderBackgroundHint } from "./hint.ts";
 
 const ID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
 
@@ -82,7 +81,7 @@ export function stopRegistrySweep(reg: BackgroundRegistry): void {
     reg.sweepTimer = undefined;
 }
 
-/** Publish source changes and maintain only the foreground duration hint ticker. */
+/** Publish source changes and maintain the shared TaskSource duration ticker. */
 export function renderSidebar(reg: BackgroundRegistry, ctx: UiContext): void {
     if (reg.closed) return;
     reg.changed();
@@ -96,7 +95,6 @@ function ensureSidebarTicker(reg: BackgroundRegistry, ctx: UiContext): void {
     reg.sidebarTimer = setInterval(() => {
         try {
             renderSidebar(reg, ctx);
-            renderBackgroundHint(reg, ctx);
         } catch {
             stopSidebarTicker(reg);
         }

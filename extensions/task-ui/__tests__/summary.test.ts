@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
-import type { ExtensionAPI, ExtensionContext, Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
+import { createEventBus, SessionManager, type ExtensionAPI, type ExtensionContext, type Theme, type ThemeColor } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 import statusBar from "../../status-bar.ts";
 import { TaskCoordinator } from "../coordinator.ts";
@@ -28,7 +28,7 @@ function fixture(shortcuts = DEFAULTS.shortcutTaskPanel) {
     const coordinator = new TaskCoordinator(); coordinator.registerSource(source);
     const lifecycle = new TaskLifecycle(coordinator);
     let footer: ReturnType<NonNullable<Parameters<ExtensionContext["ui"]["setFooter"]>[0]>> | undefined;
-    const ctx = { mode: "tui", cwd: "/tmp/summary", getContextUsage: () => undefined, ui: { theme,
+    const ctx = { sessionManager: SessionManager.inMemory("/tmp"), hasUI: true, mode: "tui", cwd: "/tmp/summary", getContextUsage: () => undefined, ui: { theme,
         setStatus(key: string, text: string | undefined) { if (text === undefined) statuses.delete(key); else statuses.set(key, text); },
         setFooter(factory: Parameters<ExtensionContext["ui"]["setFooter"]>[0]) {
             footer?.dispose?.();
@@ -37,7 +37,7 @@ function fixture(shortcuts = DEFAULTS.shortcutTaskPanel) {
             } as never);
         },
     } } as unknown as ExtensionContext;
-    const pi = { on(event: string, handler: (event: never, ctx: ExtensionContext) => unknown) {
+    const pi = { events: createEventBus(), on(event: string, handler: (event: never, ctx: ExtensionContext) => unknown) {
         const list = handlers.get(event) ?? []; list.push(handler); handlers.set(event, list);
         return () => { const index = list.indexOf(handler); if (index >= 0) list.splice(index, 1); };
     }, registerCommand() {}, getSettings: () => ({}), exec: async () => ({ code: 1, stdout: "", stderr: "" }) } as unknown as ExtensionAPI;

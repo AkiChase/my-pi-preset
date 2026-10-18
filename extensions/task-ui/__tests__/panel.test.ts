@@ -2,7 +2,7 @@ import { loadNativeLayout } from "../../shared/scroll-panel/native-layout.ts";
 const layout = await loadNativeLayout();
 import assert from "node:assert/strict";
 import { it } from "node:test";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { createEventBus, SessionManager, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 import { TaskCoordinator } from "../coordinator.ts";
 import { TaskLifecycle } from "../lifecycle.ts";
@@ -142,10 +142,10 @@ void it("footer counts only independent real work, including foreground-only and
 });
 
 function uiFixture(f: ReturnType<typeof sourceFixture>, reenter: "status" | "custom" | "factory" | undefined = undefined) {
-    const lifecycle = new TaskLifecycle(f.coordinator), handlers = new Set<(event: unknown, ctx: ExtensionContext) => unknown>();
+    const lifecycle = new TaskLifecycle(f.coordinator), handlers = new Map<string, Set<(event: unknown, ctx: ExtensionContext) => unknown>>();
     let opens = 0, panel: TaskPanel | undefined, completes = 0;
     const statuses: (string | undefined)[] = [];
-    const ctx = { mode: "tui", hasUI: true, ui: { theme: { fg: (_color: string, text: string) => text }, notify() {},
+    const ctx = { sessionManager: SessionManager.inMemory("/tmp"), mode: "tui", hasUI: true, ui: { theme: { fg: (_color: string, text: string) => text }, notify() {},
         setStatus(key: string, text: string | undefined) { assert.equal(key, "task-ui"); statuses.push(text); if (reenter === "status" && text) void lifecycle.shutdown(); },
         custom(factory: Parameters<ExtensionContext["ui"]["custom"]>[0], options: Parameters<ExtensionContext["ui"]["custom"]>[1]) {
             opens++;
@@ -157,9 +157,9 @@ function uiFixture(f: ReturnType<typeof sourceFixture>, reenter: "status" | "cus
             });
         },
     } } as unknown as ExtensionContext;
-    const pi = { on(_event: string, handler: (event: unknown, ctx: ExtensionContext) => unknown) { handlers.add(handler); return () => { handlers.delete(handler); }; } } as unknown as ExtensionAPI;
+    const pi = { events: createEventBus(), on(event: string, handler: (event: unknown, ctx: ExtensionContext) => unknown) { const set = handlers.get(event) ?? new Set(); set.add(handler); handlers.set(event, set); return () => { set.delete(handler); }; } } as unknown as ExtensionAPI;
     const owner = createTaskUIOwner(pi, f.coordinator, lifecycle, DEFAULTS, { loadLayout: async () => layout });
-    return { lifecycle, owner, ctx, statuses, start() { for (const handler of [...handlers]) handler({}, ctx); }, opens: () => opens, panel: () => panel, handlers: () => handlers.size, completes: () => completes };
+    return { lifecycle, owner, ctx, statuses, start() { for (const handler of [...handlers.get("session_start") ?? []]) handler({}, ctx); }, opens: () => opens, panel: () => panel, handlers: () => [...handlers.values()].reduce((n, set) => n + set.size, 0), completes: () => completes };
 }
 void it("one shared owner/explicit controls/overlay, lifecycle closes before wait disposal and unsubscribes", async () => {
     const f = sourceFixture([view("fg", { kind: "shell" })]), h = uiFixture(f);

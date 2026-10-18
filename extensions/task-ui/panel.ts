@@ -212,7 +212,8 @@ export class TaskPanel implements Component {
     }
     private footerLines(width: number, rows: number, position: string): string[] {
         const detach = this.args.config.shortcutBackground.join("/") || "/task-detach";
-        const actions = width >= 70 ? `x Stop selected · c Copy path · ${detach} Detach all waits` : `x Stop · c Copy · ${detach} All waits`;
+        const waits = this.args.coordinator.waitCount;
+        const actions = width >= 70 ? `waiting ${waits} · x Stop selected · c Copy path · ${detach} Detach all waits` : `waiting ${waits} · x Stop · c Copy · ${detach} All waits`;
         // Wrap action groups independently: ordinary narrow screens must not silently
         // lose either selected operations or the distinct global wait-release entry.
         const lines = [this.hints(width), actions].flatMap(line => wrapTextWithAnsi(line, width));

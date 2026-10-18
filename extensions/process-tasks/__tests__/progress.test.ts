@@ -60,7 +60,7 @@ void describe("readLastLine — live progress source", () => {
     });
 });
 
-void describe("renderSidebar — source publication and hint only", () => {
+void describe("renderSidebar — source publication only", () => {
     function ctxStub() {
         const widgets: unknown[] = [];
         const statuses: (string | undefined)[] = [];
@@ -101,7 +101,7 @@ void describe("renderSidebar — source publication and hint only", () => {
             renderSidebar(reg, ctx);
             assert.deepEqual(statuses, []);
             assert.deepEqual(widgets, []);
-            assert.ok(reg.sidebarTimer, "foreground hint still has a duration ticker");
+            assert.ok(reg.sidebarTimer, "foreground TaskSource still has a duration ticker");
         } finally { stopSidebarTicker(reg); }
     });
 });

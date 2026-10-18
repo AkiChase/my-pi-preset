@@ -91,7 +91,34 @@ pnpm check 全量使用 force-exit，不能证明自然生命周期；受影响 
 - 同阶段1直接 tsc+配置全量Node forced-exit suite exit0，1483/1483。未重新调用 Corepack 阻断的 pnpm check，未运行 link helper（已核实现有链接）。
 - `git diff --check` exit0。原始实现/审查输出在 stage2-implement/stage2-check 外部目录。
 
-sdk-runtime fake pi.on 已补实际 unsubscribe，原五次诊断消失；full 仍有2次同类诊断定位到 process waits.test.ts fake pi.on，未扩范围修。真实终端/installed bundled overlay/物理wheel/provider NOT_RUN，不以fixture冒充AC2/3全部验收。阶段2 checkpoint待记录；阶段3尚未开始。
+sdk-runtime fake pi.on 已补实际 unsubscribe，原五次诊断消失；full 仍有2次同类诊断定位到 process waits.test.ts fake pi.on，未扩范围修。真实终端/installed bundled overlay/物理wheel/provider NOT_RUN，不以fixture冒充AC2/3全部验收。阶段2 checkpoint dd44fcc（feat: add fullscreen native-scrolling task panel）；阶段3尚未开始。
+
+## 阶段 3 高度边界阻塞（未修改产品）
+实施者按授权边界停报；main 已阅读 height-boundary-blocker.txt 及 widget-display owner/client 核验。当前 Component 只提供 render(width)，Widget Display 没有宿主实际分配高度；Fullscreen SDK dock 将 editor/widgets/footer 共同 shrink，widget/footer minSize=0。按 terminal.rows 主动缩减只能是保守行数预算，不能保证宿主后续裁剪仍保留 hidden count/不挤 footer。
+
+阶段3本次未写产品、未运行测试；无自动修改中心owner/SDK或增加内部兼容接口。用户已认可公开 widget 路径：按终端总高度保守缩减，预留 hidden count，接受极端拥挤时宿主进一步裁剪及 hidden count/footer 不保证始终可见。不增加实际分配高度的内部兼容入口；阶段3按此继续。原始只读证据 /tmp/panel-redesign.Bqxo0J/stage3-implement/height-boundary-blocker.txt 保留。阶段1/2已提交不受影响。
+
+## 阶段 3 实际检查记录
+用户认可高度限制后继续委派实施，另派独立 trellis-check；前轮只读 blocker 保留，无产品部分写入。恢复旧agent调用返回 Agent not found，随后通过 trellis_dispatch 新角色重新读取材料执行，无绕过绑定。
+
+已实现 root-only belowEditor 概览：中心 agent_overview 槽/client、最多五任务行+hidden count、终端总高度保守预算、四秒终态保留、needed-only clock/expiry、reset/shutdown/source/setter 重入 fencing。删除 Process hint.ts/专有slot、字段和show/clear/reset接线；保留2秒partial窗口、共享source ticker、原PID/detach/results/notify/环境行为。底栏/Panel显示真实wait数量与全局入口。中文docs与provenance同步；main更新英文 widget-display spec，明确公开宽度接口及用户接受的极端裁剪限制。
+
+实现首次focused exit1（446/448）：overview fixture误拒host SGR reset、editor fixture缺sessionManager；修正后448/448。新增reset测试首次fixture触发顺序错误，修正后暴露真实旧footer空态未清除；owner加statusKnown后6/6。实现tsc exit2是readonly theme/fixture类型，修复后strict0，450 task/process、41 widget、392 agent/runtime/beautify自然退出，1477 full forced通过。
+
+独立审查修复发布失败清掉所有timer导致swept终态metadata无限保留：失败只停视觉clock，保留有限expiry。补实际中心sink失败、同activation同identity reset、footer sink失败独立性、resume根自身lifetime tokens/current duration；用临时内存loader恢复缺陷的probe exit1确认负例能捕获原错误，最终真实代码通过。审查首次tsc exit2为新增负例readonly数组声明，修正后重验。
+
+最终验证（同阶段1/2Node24.14.1、SDK1.3.0、已有link、隔离HOME/agent、networkoff）：
+- `node node_modules/typescript/bin/tsc -p tsconfig.json` exit0。
+- `node --test --test-concurrency=2 extensions/task-ui/__tests__/*.test.ts extensions/process-tasks/__tests__/*.test.ts` exit0，452/452，自然退出。
+- `node --test --test-concurrency=2 extensions/shared/widget-display/__tests__/*.test.ts extensions/__tests__/widget-*.test.ts scripts/pi-manifest.test.mjs` exit0，41/41，自然退出。
+- `node --test --test-concurrency=2 extensions/agent-tasks/__tests__/*.test.ts extensions/runtime-tasks/__tests__/*.test.ts extensions/beautify/__tests__/*.test.ts` exit0，392/392，自然退出。
+- 配置全量 `node --test --test-concurrency=8 --test-force-exit 'extensions/**/__tests__/*.test.ts' 'extensions/**/__tests__/*.test.mjs' 'scripts/*.test.mjs'` exit0，1479/1479；forced不证明自然清理。数量较阶段2下降因删除hint专有suite，并新增overview负例，不删执行合同覆盖。
+- `git diff --check`/相关docs本地链接/manifest引用存在性通过。没有独立lint脚本；pnpm check未重试既有Corepack阻断，link helper未运行（已有SDKlink已核实）。最终日志无offStart诊断，故障注入日志不等于产品失败。
+
+main已核验overview/owner/tests、实际process执行路径diff、docs/spec与最终日志；原始证据仍在 /tmp/panel-redesign.Bqxo0J/stage3-implement 和 stage3-check，含首次失败/defect-probe，不入repo。真实installed bundled terminal/物理wheel/视觉IME/provider NOT_RUN。阶段3 checkpoint待记录。
+
+## 最终验收缺口
+三个产品阶段及独立审查、静态/自动化验证已完成；AC2/AC3真实终端覆盖/焦点恢复/物理Fullscreen wheel尚未获授权运行，不能据fixture称完全验收。不自动同步/reload/push/merge main/归档。保留in_progress与源任务绑定，待真实验证决策；已有临时目录保留供后续诊断和宿主验证，不提前删除。
 
 ## 尚未运行与材料维护
 本轮只维护现有规划与用户批准的合并关联，无产品测试、真实宿主测试、派发、start、commit 或 archive。旧 research 保留原文作为历史观察，不迁移/清理；现有角色 manifest 需执行前刷新，不能宣称 context validation 已通过。原 overview 材料在 merged/ 下，原 planning 值是合并前历史状态；meta 明确 merged_into/disposition，根级待办已退出，不伪造 completed。

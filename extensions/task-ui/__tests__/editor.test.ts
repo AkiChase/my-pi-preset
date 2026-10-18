@@ -2,7 +2,7 @@ import { loadNativeLayout } from "../../shared/scroll-panel/native-layout.ts";
 const layout = await loadNativeLayout();
 import assert from "node:assert/strict";
 import { it } from "node:test";
-import { CustomEditor, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { SessionManager, CustomEditor, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Container, TuiMainScreen, setKeybindings, type AutocompleteProvider, type EditorComponent } from "@earendil-works/pi-tui";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -53,7 +53,7 @@ function harness() {
     };
     host.editorContainer.addChild(defaultEditor); tui.setFocus(defaultEditor);
     const ui = InteractiveMode.prototype.createExtensionUIContext.call(host);
-    const ctx = { ui, mode: "tui" } as unknown as ExtensionContext;
+    const ctx = { sessionManager: SessionManager.inMemory("/tmp"), hasUI: true, ui, mode: "tui" } as unknown as ExtensionContext;
     const handlers = new Set<(event: unknown, ctx: ExtensionContext) => unknown>();
     const pi = { on(_name: string, handler: (event: unknown, ctx: ExtensionContext) => unknown) {
         handlers.add(handler); return () => { handlers.delete(handler); };

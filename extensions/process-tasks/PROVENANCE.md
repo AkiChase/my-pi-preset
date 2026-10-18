@@ -79,37 +79,22 @@ a tool-call round-trip to ask the model what to do.
 
 ### Current interaction and retention model
 
-- Replaced the select → action menu → editor chain with one themed, width-safe
-  `ctx.ui.custom` overlay. The left roster selects immediately; the right side
-  shows metadata and live log output. Tab **switches** list/output focus,
-  arrows/jk select or scroll, PageUp/PageDown page, x stops only the selected
-  running job, c copies its absolute log path through Pi's public
-  `copyToClipboard`, and Esc closes the interaction. No persistent terminal
-  input listener and no rerun/dismiss/open-file actions are registered.
-- Removed the above-editor job pills. Only the footer counts running background
-  shell jobs and monitors separately; foreground shell jobs are excluded. The
-  existing foreground hand-off hint remains below the editor.
-- The only default shortcuts are Ctrl+Shift+B (background) and Shift+Down
-  (panel). `shortcutKillLatest` and the blind kill-latest handler are removed.
-- Completed/failed/killed rows hide after four seconds, except the selected
-  record stays readable during that interaction. Terminal metadata is retained
-  for ten minutes, then swept every sixty seconds. Sweeping does not delete
-  logs. Notification delivery and `jobs list` no longer evict records;
-  `recentTerminal`, `forget`, `jobs cleanup` and its disk deletion are removed.
-  Beyond retention, ID lookup is unknown; transcript log paths remain usable.
-- `endedAt` and lifetime metrics are frozen/count once on terminal transition,
-  including a silent kill followed by a late process exit. Runtime proc/stop/
-  completion hooks are released then. Sweep, hint and panel timers are stopped
-  at shutdown/session replacement; stale exit callbacks cannot notify a new
-  session. The open viewer retains only its selected metadata, so a sweep does
-  not blank final output.
-- Live output is a bounded tail using `outputPreviewChars`; it explicitly shows
-  the byte range and omitted early bytes. Full logs remain accessible via the
-  copied path or the existing paged `jobs output` API. Width calculations use
-  Pi's display-column utilities and rendered logs strip terminal controls.
-- Added fake-UI/offline tests for navigation, focus, real-time tail following,
-  clipboard paths, selection-specific kill, expiry and timer disposal, narrow/
-  wide-character rendering, and a single-overlay lifecycle.
+- Task composition owns a fullscreen Task Panel with one Agents/Processes list and
+  an Enter detail / Esc back-or-close interaction. Native scrolling/always-visible
+  scrollbars, real trees and selected bounded final snapshots live in task-ui.
+- The shared footer counts foreground/background work and actual launch/retrieval
+  waits independently. Configured global detach (or `/task-detach`) releases waits;
+  selected stop/path-copy remain separate operations.
+- The independent foreground shell hint, renderer, publisher, slot and hinted
+  state have been removed. Process registries never publish editor widgets.
+  Task UI's read-only below-editor overview contains agent/workflow roots only,
+  through Widget Display's declared client slot, with no backend detail reads.
+- The two-second foreground partial-output window is unchanged. The registry's
+  one-second TaskSource ticker and terminal metadata sweep remain owned and
+  stopped at shutdown/session replacement; late exit fencing is unchanged.
+- Process terminal metadata stays ten minutes; sweep does not delete logs.
+  Execution, cancellation, result consumption, monitor notifications and Trellis
+  environment isolation retain their backend owners and existing contracts.
 
 The entries below describe earlier changes. Where they mention immediate
 notification eviction, the recent-terminal ring, sidebar pills, or four default
@@ -356,3 +341,7 @@ explainable.
 ## 2026-10-13：展示与执行分离
 
 顶层 task-composition 直接调用本后端，不截获／重新注入 Bash，不修改 promptSnippet。独立 beautify 通过 SDK 1.2.0 的公开 resolver 美化四类工具，保留 backend schema、execute、guidelines 和结果。Pretty dependency／专属兼容已删除，standalone Pretty 仅作为 conflicts 禁止共存项。真实 host loader 的 root/child 工具集合不再包含 Pretty 重注册的 read/find/grep；这些继续由 Pi 内置工具提供。
+
+## 2026-10-15：只读概览与命令 hint 移除
+
+删除 `hint.ts`、foreground hint 槽及专有字段／show-clear-reset 接线；共享 TaskSource ticker 保留。错误路径回归改为实际 partial poller cleanup、源发布重入和超过两秒零 widget 写入，仍核验进程退出、租约／controller／timer 清理、日志及通知。Task Panel／底栏显示真实 waitCount 与配置入口，概览只由 Task UI owner 管理，不改变 Process 执行行为。前文 hint、双栏及旧名称属于历史偏离记录，不是当前界面。

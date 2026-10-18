@@ -43,7 +43,7 @@
 - Waiting 与 Background 独立，等待来自真实 waitCount，不从 executionMode 推导；owned 不是主会话 waiting。全局解除全部等待和选中任务 stop/copy 明确分开。
 
 ### R5：输入框下方只读概览
-- 通过 Widget Display 在 belowEditor 展示 agent/workflow 根任务，每项单行，耗时与 `↓ tokens` 右对齐；最多五个根任务，小终端进一步缩减，并明确 hidden count。空态隐藏、终态短暂保留。
+- 通过 Widget Display 在 belowEditor 展示 agent/workflow 根任务，每项单行，耗时与 `↓ tokens` 右对齐；最多五个根任务，小终端按总高度保守缩减，并明确 hidden count。用户接受极端拥挤时宿主进一步裁剪，不能保证 hidden count/footer 始终可见；不为实际分配高度增加内部兼容接口。空态隐藏、终态短暂保留。
 - 不重复铺开子任务、不求和父子 tokens；根项使用现有 stats。Agent tokens 为 input+output+cacheWrite，不含 cacheRead；resume tokens 为 lifetime，耗时为当前 run。Workflow totals 可能滞后，不修计费契约或制造全局累计。
 - 不恢复 main 行、原 FleetView 的 ←/↓ 激活、键盘导航、独立 viewer 或 aboveEditor agent-widget。不拦截输入、不调用 detail、不持有 selected pin。
 - Widget Display 不可用时不绕过它直接发布；任务底栏与 Panel 仍保持自身可用性。owner 持有订阅、clock/expiry 和清理，空态停止无用计时，reset/shutdown/迟到回调不复活 UI。

@@ -31,7 +31,7 @@ function harness(mode = "tui") {
             onSet?.(); if (value) widgets.set(key, value); writes.push(key);
         } } } as unknown as ExtensionContext;
     const api = pi(); owner(api);
-    const client = (slot: "recap" | "trellis" | "foreground_hint") => createWidgetClient(pi(), slot);
+    const client = (slot: "recap" | "trellis" | "agent_overview") => createWidgetClient(pi(), slot);
     const lines = () => [...widgets.values()].flatMap(value => Array.isArray(value) ? value : value.render(100));
     return { ctx, widgets, writes, lines, client, pi,
         setBeforeSet(fn: (() => void) | undefined) { beforeSet = fn; },
@@ -42,7 +42,7 @@ function harness(mode = "tui") {
         async emit(name: string, context = ctx) { for (const row of [...callbacks]) if (row.name === name) await row.callback({ type: name } as ExtensionEvent, context); } };
 }
 it("fixed slots ignore publish/update order, preserve other component identity and delete empty regions", async () => {
-    const h = harness(); const trellis = h.client("trellis"), recap = h.client("recap"), hint = h.client("foreground_hint");
+    const h = harness(); const trellis = h.client("trellis"), recap = h.client("recap"), hint = h.client("agent_overview");
     let creates = 0, disposes = 0;
     assert.equal(trellis.set(h.ctx, () => { creates++; return { render: () => ["Trellis"], invalidate() {}, dispose() { disposes++; } }; }), true);
     recap.set(h.ctx, ["Recap"]); assert.match(h.lines().join("\n"), /Recap[\s\S]*Trellis/); assert.equal(creates, 1); assert.equal(disposes, 0);
@@ -107,7 +107,7 @@ it("old setter returning after a nested session start cannot overwrite the new p
     old.dispose(); assert.match(h.lines().join("\n"), /fresh/); await h.emit("session_shutdown", fresh);
 });
 it("both regions close before dispose reentry; old cleanup does not clear the newer region", async () => {
-    const h = harness(); const old = h.client("recap"), hint = h.client("foreground_hint"), newer = h.client("foreground_hint");
+    const h = harness(); const old = h.client("recap"), hint = h.client("agent_overview"), newer = h.client("agent_overview");
     const fresh = { ...h.ctx, sessionManager: SessionManager.inMemory("/tmp") }; let disposes = 0;
     old.set(h.ctx, () => ({ render: () => ["old"], invalidate() {}, dispose() { disposes++; newer.set(fresh, ["new hint"]); } }));
     hint.set(h.ctx, ["old hint"]); await h.emit("session_start", fresh);

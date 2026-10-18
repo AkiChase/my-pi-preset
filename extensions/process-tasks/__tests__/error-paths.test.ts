@@ -19,7 +19,7 @@ import { processExists } from "../spawn.ts";
 
 interface Tool {
     name: string;
-    execute(id: string, params: unknown, signal: AbortSignal | undefined, update: undefined, ctx: unknown): Promise<{ content: { text?: string }[] }>;
+    execute(id: string, params: unknown, signal: AbortSignal | undefined, update: ((value: { content: { text?: string }[] }) => void) | undefined, ctx: unknown): Promise<{ content: { text?: string }[] }>;
 }
 const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
 function harness(t: TestContext) {
@@ -28,7 +28,6 @@ function harness(t: TestContext) {
     const tools = new Map<string, Tool>();
     const messages: unknown[] = [];
     const pi = { registerTool: (tool: Tool) => tools.set(tool.name, tool), sendMessage: (m: unknown) => messages.push(m) };
-    reg.hintPublisher = { set(ctx, content) { ctx.ui.setWidget("fixture-hint", content ? [...content] : undefined); return true; }, dispose() {} };
     const ctx = { cwd: dir, ui: { setWidget(_key: string, _content: unknown) {}, setStatus() {}, notify() {}, theme: { fg: (_: string, text: string) => text } } };
     registerBashTool(pi as never, reg, {} as never);
     registerManagementFixture(pi as never, reg);
@@ -70,63 +69,52 @@ function trackTimers(t: TestContext) {
     return active;
 }
 
-for (const failureMode of ["show-and-clear", "clear-only", "poller-stop"] as const) {
-    test(`foreground two-second hint ${failureMode} failure cannot orphan a launch`, async t => {
-        const timers = trackTimers(t);
-        const h = harness(t);
-        const primary = new Error("hint show failed");
-        const secondary = new Error("hint clear failed");
-        const writes: unknown[] = [];
-        t.mock.method(h.ctx.ui, "setWidget", (_key: string, content: unknown) => {
-            writes.push(content);
-            if (content === undefined) throw secondary;
-            if (failureMode === "show-and-clear") throw primary;
-        });
-        // Exercise a throwing stop handle without replacing streamLog: clear its
-        // actual poll timer first, then simulate failure in that cleanup step.
-        if (failureMode === "poller-stop") {
-            const set = globalThis.setTimeout, clear = globalThis.clearTimeout;
-            let pollTimer: NodeJS.Timeout | undefined;
-            t.mock.method(globalThis, "setTimeout", (callback: () => void, ms: number) => {
-                const timer = set(callback, ms);
-                if (ms === 1000) pollTimer = timer;
-                return timer;
-            });
-            t.mock.method(globalThis, "clearTimeout", (timer: NodeJS.Timeout) => {
-                clear(timer);
-                if (timer === pollTimer) { pollTimer = undefined; throw new Error("poller stop failed after clearing timer"); }
-            });
-        }
-        const result = h.tools.get("bash")!.execute("hint", bashInput({ command: "printf ready; tail -f /dev/null" }), undefined, undefined, h.ctx);
-        // Attach the rejection handler before advancing the quick-window timer.
-        const settled = result.then(value => ({ value, error: undefined }), error => ({ value: undefined, error }));
-        const job = [...h.reg.jobs.values()][0]!;
-        const controller = h.reg.jobAborts.get(job.id)!;
-        await until(() => readFileSync(job.logPath, "utf8").includes("ready"));
-        assert.equal(h.reg.coordinator.waitCount, 1);
-        t.mock.timers.tick(2000); await tick();
-        if (failureMode !== "show-and-clear") {
-            assert.ok(processExists(job.pid), "failed optional clear must not prematurely stop execution");
-            terminateJobSilently(h.reg, job);
-        }
-        const outcome = await settled;
-        if (failureMode === "show-and-clear") assert.equal(outcome.error, primary, "cleanup must not mask the primary show error");
-        else { assert.equal(outcome.error, undefined); assert.match(outcome.value!.content[0]!.text!, /ready/); }
-        assert.equal(writes.length, 2, "show and clear paths must both be exercised");
-        assert.equal(writes[1], undefined);
-        assert.equal(job.status, "killed");
-        assert.ok(!processExists(job.pid));
-        assert.ok(controller.signal.aborted);
-        assert.equal(h.reg.coordinator.waitCount, 0);
-        assert.equal(h.reg.foreground.size, 0);
-        assert.equal(h.reg.jobAborts.size, 0);
-        assert.equal(h.reg.notificationRetries.size, 0);
-        assert.equal(timers.size, 0);
-        assert.match(readFileSync(job.logPath, "utf8"), /ready/);
-        assert.equal(h.messages.length, 0);
-        assert.equal(getStats(h.reg).killed, 1);
+test("foreground partial-window poller stop failure cannot orphan a launch and never publishes a widget", async t => {
+    const timers = trackTimers(t), h = harness(t);
+    let writes = 0;
+    t.mock.method(h.ctx.ui, "setWidget", () => { writes++; throw new Error("removed widget must not be called"); });
+    const set = globalThis.setTimeout, clear = globalThis.clearTimeout;
+    let pollTimer: NodeJS.Timeout | undefined;
+    t.mock.method(globalThis, "setTimeout", (callback: () => void, ms: number) => {
+        const timer = set(callback, ms); if (ms === 1000) pollTimer = timer; return timer;
     });
-}
+    t.mock.method(globalThis, "clearTimeout", (timer: NodeJS.Timeout) => {
+        clear(timer); if (timer === pollTimer) { pollTimer = undefined; throw new Error("poller stop failed after clearing timer"); }
+    });
+    const result = h.tools.get("bash")!.execute("partial", bashInput({ command: "printf ready; tail -f /dev/null" }), undefined, undefined, h.ctx);
+    const job = [...h.reg.jobs.values()][0]!, controller = h.reg.jobAborts.get(job.id)!;
+    await until(() => readFileSync(job.logPath, "utf8").includes("ready"));
+    assert.equal(h.reg.coordinator.waitCount, 1);
+    t.mock.timers.tick(2000); await tick();
+    assert.ok(processExists(job.pid)); assert.equal(writes, 0);
+    terminateJobSilently(h.reg, job);
+    assert.match((await result).content[0]!.text!, /ready/);
+    assert.equal(job.status, "killed"); assert.equal(processExists(job.pid), false);
+    assert.ok(controller.signal.aborted); assert.equal(h.reg.coordinator.waitCount, 0);
+    assert.equal(h.reg.foreground.size, 0); assert.equal(h.reg.jobAborts.size, 0);
+    assert.equal(h.reg.notificationRetries.size, 0); assert.equal(timers.size, 0);
+    assert.equal(h.messages.length, 0); assert.equal(getStats(h.reg).killed, 1);
+});
+
+test("two-second window still delays partial output, source duration updates continue, detach preserves original execution", async t => {
+    const timers = trackTimers(t), h = harness(t), updates: string[] = [];
+    let widgets = 0; t.mock.method(h.ctx.ui, "setWidget", () => { widgets++; });
+    const pending = h.tools.get("bash")!.execute("stream", bashInput({ command: "printf partial-ready; tail -f /dev/null" }), undefined,
+        update => updates.push(update.content[0]?.text ?? ""), h.ctx);
+    const job = [...h.reg.jobs.values()][0]!;
+    await until(() => readFileSync(job.logPath, "utf8").includes("partial-ready"));
+    const before = h.source.list()[0]!.stats.durationMs!;
+    t.mock.timers.tick(1999); await tick(); assert.deepEqual(updates, []);
+    assert.ok(h.source.list()[0]!.stats.durationMs! > before); assert.ok(h.reg.sidebarTimer);
+    t.mock.timers.tick(1); await tick(); t.mock.timers.tick(1000); await tick();
+    assert.match(updates.join(""), /partial-ready/); assert.equal(widgets, 0);
+    assert.equal(h.reg.coordinator.detachAll(), 1); await pending;
+    assert.ok(processExists(job.pid)); assert.equal(h.reg.jobs.get(job.id), job);
+    assert.equal(h.reg.foreground.size, 0); assert.equal(h.reg.totalStarted, 1);
+    const updated = updates.length; t.mock.timers.tick(1000); await tick(); assert.equal(updates.length, updated);
+    terminateJobSilently(h.reg, job); await until(() => !processExists(job.pid));
+    stopSidebarTicker(h.reg); assert.equal(timers.size, 0); assert.equal(h.messages.length, 0);
+});
 
 test("foreground execution error survives a failing final source publication", async t => {
     const h = harness(t);

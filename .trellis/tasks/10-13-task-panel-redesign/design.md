@@ -13,7 +13,7 @@
 
 TaskPanelModel 继续管理 interaction-only metadata、真实 parentKey、折叠和 selected final pin；扩展树线 continuation/last-sibling、后代数量及折叠选择 reconciliation。稳定 key 作为身份，不以下标跨刷新保持选择。root/child 统计不求和。
 
-概览只复用纯展示和非选中根组保留规则，不复用带 selected pin 的 Panel model。最多五个根项，小终端按实际可用高度缩减并预留 hidden count；空态隐藏。具体高度预算通过宿主 widget render 能力实现，不能挤掉编辑器/固定 footer；不引入新配置来掩盖产品默认。
+概览只复用纯展示和非选中根组保留规则，不复用带 selected pin 的 Panel model。最多五个根项，小终端按总高度保守缩减并预留 hidden count；空态隐藏。Widget Component 仅有 render(width)，无法获知 dock 实际分配高度；用户已接受极端拥挤时宿主进一步裁剪及 hidden count/footer 可见性限制。不增加内部高度兼容入口、不改中心 owner/SDK/主布局，不引入新配置。
 
 ## 3. 全屏交互与原生滚动
 owner 在打开前调用共享 loadNativeLayout，并在 await 后检查 activation/interaction。overlay 使用 100% width/maxHeight、top-left、margin 0，保留原 live editor 和宿主模式。

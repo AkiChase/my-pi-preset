@@ -6,7 +6,7 @@ export const SESSION_START = "preset:widget-display:session-start:v1";
 export const SLOTS = {
     recap: { placement: "aboveEditor", order: 10 },
     trellis: { placement: "aboveEditor", order: 20 },
-    foreground_hint: { placement: "belowEditor", order: 10 },
+    agent_overview: { placement: "belowEditor", order: 10 },
 } as const;
 export type Slot = keyof typeof SLOTS;
 export type WidgetComponent = Component & { dispose?(): void };

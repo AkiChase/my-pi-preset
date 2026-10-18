@@ -9,9 +9,7 @@ import type { ExtensionUIContext, Theme } from "@earendil-works/pi-coding-agent"
 // --- Fixed internal constants ---
 // Configurable knobs live in config.ts; what stays here is either a rendering
 // detail with no reason to vary, or a value the interaction model depends on.
-/** How long a foreground command may finish in before the live-progress UI and
- *  the background hint appear. Shorter and quick commands would flicker a hint;
- *  longer and a slow command looks frozen. */
+/** Delay foreground tool partial output, without delaying explicit wait release. */
 export const QUICK_COMPLETION_MS = 2_000;
 export const FOREGROUND_TAIL_BYTES = 4_096;
 export const FINISHED_LINGER_MS = 4_000;
@@ -20,8 +18,6 @@ export const REGISTRY_SWEEP_MS = 60_000;
 
 export const PREVIEW_CHARS = {
     line: 80,
-    /** Command preview in the foreground hand-off hint. */
-    progress: 60,
 } as const;
 
 // --- Domain types ---
@@ -104,13 +100,8 @@ export type BackgroundReason = "manual" | "timeout";
  *  requestPause to flip the command into the background. */
 export interface ForegroundSlot {
     requestPause: (reason: BackgroundReason) => void;
-    /** The registry job backing this command — the hint reads its command text
-     *  and start time from there rather than duplicating them. */
+    /** Registry identity; wait release never replaces the execution. */
     jobId: string;
-    /** Whether this command has outlived the quick-completion window and so is
-     *  advertised in the "run in background" hint. The hint is derived from
-     *  these flags, so deleting the slot inherently retires the hint. */
-    hinted?: boolean;
 }
 
 // --- Event types ---

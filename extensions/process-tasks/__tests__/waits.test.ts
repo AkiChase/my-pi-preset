@@ -240,7 +240,7 @@ void it("factory injection registers one source, no shared controls; standalone 
     const shortcuts: string[] = [];
     const handlers = new Map<string, () => Promise<void>>();
     const pi = { registerTool() {}, registerMessageRenderer() {}, registerCommand: (name: string) => commands.push(name),
-        registerShortcut: (key: string) => shortcuts.push(key), on: (event: string, fn: () => Promise<void>) => handlers.set(event, fn) };
+        registerShortcut: (key: string) => shortcuts.push(key), on: (event: string, fn: () => Promise<void>) => { handlers.set(event, fn); return () => { if (handlers.get(event) === fn) handlers.delete(event); }; } };
     const backend = processTasks(pi as never, { coordinator });
     assert.equal(backend.coordinator, coordinator);
     assert.deepEqual(commands, ["process-tasks-version", "process-tasks-config"]);

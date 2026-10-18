@@ -27,7 +27,6 @@ import {
 } from "../types.ts";
 import { spawnWithFileOutput, type SpawnExit } from "../spawn.ts";
 import { streamLog, readLogSlice } from "../output.ts";
-import { showBackgroundHint, clearBackgroundHint } from "../hint.ts";
 import {
     add,
     createRunningJob,
@@ -199,14 +198,13 @@ async function runForeground(args: {
     const cleanup = () => {
         if (cleaned) return;
         cleaned = true;
-        // Each display teardown is independent: a failed poller/widget must
+        // Each display teardown is independent: a failed poller must
         // never starve timers, foreground ownership, or lease disposal.
         try { progressPoller?.stop(); } catch { /* best-effort display teardown */ }
         progressPoller = undefined;
         try { clearTimeout(timeoutTimer); } catch { /* continue teardown */ }
         try { clearTimeout(quickTimer); } catch { /* continue teardown */ }
         reg.foreground.delete(toolCallId);
-        try { clearBackgroundHint(reg, ctx, toolCallId); } catch { /* optional hint */ }
     };
     // Register before any await. The lease alone owns the parent cancellation link.
     const lease = reg.coordinator.registerWait<SpawnExit>({
@@ -296,7 +294,6 @@ async function runForeground(args: {
         ]);
         if (quickResult === null && !lease.settled) {
             progressPoller = streamLog(logPath, onUpdate);
-            showBackgroundHint(reg, ctx, toolCallId);
         }
         const outcome = quickResult ?? await lease.result;
         if (outcome.kind === "completed") return finishForeground(outcome.value);
@@ -325,7 +322,7 @@ async function runForeground(args: {
         const exit = await spawned.exit;
         return finishForeground(exit, true);
     } finally {
-        // Dispose before optional display cleanup. If setup/hint rendering threw,
+        // Dispose before optional display cleanup. If setup/progress streaming threw,
         // stop and observe the process exit before rejecting with that same error.
         const stopLaunch = !handedToBackground && !lease.settled;
         if (stopLaunch) lease.dispose();

@@ -253,20 +253,17 @@ for (const throws of [false, true]) {
     });
 }
 
-void it("backend freeze retires its hint before stop hooks can reenter a late render", async () => {
-    const { renderBackgroundHint, showBackgroundHint } = await import("../hint.ts");
-    const dir = mkdtempSync(join(tmpdir(), "process-hint-freeze-"));
+void it("backend freeze disarms source ticker before stop hooks can reenter a late publication", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "process-source-freeze-"));
     const h = processActivation(dir);
-    const writes: (readonly string[] | undefined)[] = [];
-    let disposed = 0;
-    h.reg.hintPublisher = { set(_ctx, lines) { writes.push(lines); return true; }, dispose() { disposed++; writes.push(undefined); } };
-    const job = add(h.reg, createRunningJob({ id: "hint", command: "controlled", pid: 0, logPath: join(dir, "hint.log"), toolCallId: "hint", isBackgrounded: false }));
-    h.reg.foreground.set("hint", { jobId: job.id, requestPause() {} });
-    showBackgroundHint(h.reg, h.context, "hint");
-    job.stop = () => { assert.equal(disposed, 1); renderBackgroundHint(h.reg, h.context); };
+    const { renderSidebar } = await import("../registry.ts");
+    const job = add(h.reg, createRunningJob({ id: "late", command: "controlled", pid: 0, logPath: join(dir, "late.log"), toolCallId: "late", isBackgrounded: false }));
+    renderSidebar(h.reg, h.context);
+    assert.ok(h.reg.sidebarTimer);
+    job.stop = () => { assert.equal(h.reg.closed, true); renderSidebar(h.reg, h.context); };
     try {
         await h.lifecycle.shutdown(); await h.lifecycle.shutdown();
-        assert.equal(disposed, 1); assert.equal(writes.length, 2); assert.equal(writes.at(-1), undefined);
-        assert.equal(h.reg.foreground.size, 0); assert.equal(h.reg.hintPublisher, undefined);
+        assert.equal(h.reg.sidebarTimer, undefined); assert.equal(h.reg.foreground.size, 0);
+        const revision = h.reg.revision; renderSidebar(h.reg, h.context); assert.equal(h.reg.revision, revision);
     } finally { await h.lifecycle.shutdown(); rmSync(dir, { recursive: true, force: true }); }
 });
