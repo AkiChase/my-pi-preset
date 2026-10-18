@@ -1,0 +1,4 @@
+{"file":".trellis/spec/development/index.md","reason":"工具owner、schema、验证副作用边界；本任务只读spec"}
+{"file":".trellis/spec/testing/index.md","reason":"host转换、自然退出、实际loader和隔离验证"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"复用浅层helper不改变数据null或全局语义"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"模型入口到内部执行/store及错误边界"}
