@@ -1311,3 +1311,37 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Next Steps
 
 - 父Panel规划须按已完成主对话范围重新核对，不将本任务当旧共享接口承诺验收。
+
+
+## Session 40: 清理锁文件镜像地址
+<!-- trellis-session: v=2 fp=c7e0bc0a6861fef4 -->
+
+**Date**: 2026-10-18
+**Task**: 清理锁文件镜像地址
+**Branch**: `main`
+
+### Summary
+
+删除锁文件 51 个镜像 tarball 字段，保留依赖版本与 integrity；本机默认 npm/pnpm 源切换到官方源，保留两个私有包专用源。轻量任务已验收归档，归档自动提交因未跟踪旧路径失败后已按实际归档目录补交。
+
+### Main Changes
+
+- 锁文件仅移除显式镜像 URL；个人配置仅修改默认 registry。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1c07d8b` | fix: remove environment-specific lockfile tarball URLs |
+
+### Testing
+
+- [OK] 字节级差异、配置摘要及专用源保持检查、pnpm offline frozen-lockfile lockfile-only 验证、git diff --check 均通过。未执行联网下载、实际安装或完整应用测试。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 无待办；未 push，其他任务改动保持原样。
