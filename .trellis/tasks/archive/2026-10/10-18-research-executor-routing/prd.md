@@ -30,7 +30,7 @@
 
 - 轻量单阶段任务，以本 PRD 为规划材料；拟由主会话直接修改并自审，不为这次已知位置的小范围文案调整刻意派发 research。
 - 经实施批准后，完成文案及必要的范围内测试，核对并行改动后提交一个经过验证的阶段；无法安全隔离提交时报告阻塞。
-- 用户已批准创建任务、保存规划，并以“开始吧”批准按上述范围实施；允许范围内验证和本地阶段提交，不授权资源部署、push 或归档。
+- 用户以“收尾吧”接受本次交付并授权适用的归档、会话记录、解除绑定及范围内本地收尾提交；仍不授权资源部署、push 或历史改写。
 - 验证计划：运行 `agent-documents.test.mjs`、`skill-resources.test.mjs`、`workflow-policy.test.mjs` 和 `apply-template.test.mjs`，核对文案、资源哈希和 `git diff --check`。资源正文变化需要同步对应 baseline 的当前哈希，保留历史来源字段。
 
 ## 实施与验证
@@ -40,7 +40,8 @@
 - PASS：`PI_CODING_AGENT_DIR=<本次独立临时 agent 目录> node --test extensions/trellis/__tests__/agent-documents.test.mjs extensions/trellis/__tests__/skill-resources.test.mjs extensions/trellis/__tests__/workflow-policy.test.mjs extensions/trellis/__tests__/apply-template.test.mjs`，退出码 0，32/32 通过，无跳过、无强制退出；包含资源哈希、引用、模板维护边界、真实 Python 阶段提取与空 manifest 默认拒绝检查。
 - PASS：`git diff --check`，退出码 0。
 - 预期诊断：`task.py validate` 报 implement/check 两个 manifest 均为空；本任务直接实施和自审，没有派发角色，已用 `start --allow-empty-context`。不将该诊断描述为完整任务校验通过。
-- 启动警告：当前 branch 和 base_branch 均为 `main`；后续 archive 会拒绝同分支 PR 目标。本轮不创建分支或归档。
+- 启动警告：branch 和 base_branch 均为 `main`，普通 archive 会拒绝同分支 PR 目标；此任务直接提交于 main，从未建立 PR，收尾采用 CLI 明确支持的 `--skip-branch-validation`，不伪造分支元数据。
 - NOT_RUN：全量测试、typecheck、真实 provider 分派及资源部署；本轮是局部文案修改，没有 TypeScript 或运行时行为变化，测试不能证明真实模型会主动选择 research。
 - 提交前检查曾因 PRD 末尾多余空行失败（退出码 2，未执行 commit）；已移除空行，重跑 `git diff --cached --check` 通过。
-- 阶段提交：`d67ee2f`（`docs(trellis): include research in executor selection`）。提交后已核对范围，未包含并行修改；本次临时验证目录已检查并清理。任务保持绑定，未归档。
+- 阶段提交：`d67ee2f`（`docs(trellis): include research in executor selection`），检查点记录：`c0b02fc`。提交后已核对范围，未包含并行修改；本次临时验证目录已检查并清理。
+- 收尾验收：已复核最终源文件与已验证提交一致，相关输入未变化，沿用 32/32 测试结果；任务仅保留 PRD、task.json 和未使用的空角色 manifest，没有原始日志或重复报告。
