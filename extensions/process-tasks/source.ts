@@ -38,7 +38,7 @@ export function createProcessTaskSource(reg: BackgroundRegistry): TaskSource {
                     ...identity,
                     key: taskKey(identity),
                     kind: job.kind ?? "shell",
-                    title: job.name ?? job.command,
+                    title: job.name?.trim() ? job.name : job.command,
                     description: job.command,
                     status: job.status === "pending" ? "queued" : job.status === "killed" ? "stopped" : job.status,
                     executionMode: job.isBackgrounded ? "background" : "foreground",

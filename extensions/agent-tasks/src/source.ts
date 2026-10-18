@@ -100,7 +100,7 @@ export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCo
         const declared = new Map((task.meta?.phases ?? []).map((phase, index) => [index, { index, title: phase.title, detail: phase.detail }]));
         for (const entry of task.workflowProgress) if (entry.type === "workflow_phase") declared.set(entry.index, { index: entry.index, title: entry.title, detail: declared.get(entry.index)?.detail });
         const phases = Object.freeze([...declared.values()].map(phase => Object.freeze(phase)));
-        views.push(Object.freeze({ ...identity, key: taskKey(identity), kind: "workflow", title: task.meta?.name ?? task.workflowName ?? task.id,
+        views.push(Object.freeze({ ...identity, key: taskKey(identity), kind: "workflow", title: task.meta?.name ?? task.workflowName ?? task.id, description: task.meta?.description,
           status: task.status === "killed" ? "stopped" : task.status, executionMode: "background", waitCount: coordinator.countWaits(identity),
           startedAt: task.startTime, endedAt: task.endTime,
           stats: Object.freeze({ tokens: task.totalTokens, toolUses: task.totalToolCalls, doneCount: task.doneCount, totalCount: task.agentCount, phases }),

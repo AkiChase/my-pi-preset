@@ -3,7 +3,10 @@ import type { TaskView } from "./types.ts";
 
 export const FINISHED_LINGER_MS = 4_000;
 export const isTerminal = (view: TaskView): boolean => ["completed", "failed", "stopped"].includes(view.status);
-export interface TaskRow { readonly view: TaskView; readonly depth: number; readonly group: boolean; }
+export interface TaskRow {
+    readonly view: TaskView; readonly depth: number; readonly group: boolean;
+    readonly prefix?: string; readonly descendantCount?: number;
+}
 
 /** Interaction-only metadata. Never retains backend records or consumes results. */
 export class TaskPanelModel {
@@ -34,6 +37,18 @@ export class TaskPanelModel {
         });
         const liveSelected = views.find(view => view.key === this.selected?.key);
         if (liveSelected) this.selected = liveSelected;
+        // A source can reparent the selected identity beneath an already collapsed
+        // row. Reconcile before the final pin can turn that hidden child into a root.
+        const currentByKey = new Map(this.current.map(view => [view.key, view]));
+        let parent = this.selected?.parentKey;
+        const ancestors = new Set<string>(this.selected ? [this.selected.key] : []);
+        while (parent && !ancestors.has(parent)) {
+            ancestors.add(parent);
+            const ancestor = currentByKey.get(parent);
+            if (!ancestor) break;
+            if (this.collapsed.has(parent)) this.selected = ancestor;
+            parent = ancestor.parentKey;
+        }
         const rows = this.rows();
         if (!this.selected && rows[0]) this.selected = rows[0].view;
         // The one pinned final snapshot outlives display retention, until switching.
@@ -47,27 +62,49 @@ export class TaskPanelModel {
         for (const view of this.current) if (view.parentKey && byKey.has(view.parentKey)) {
             const group = children.get(view.parentKey) ?? []; group.push(view); children.set(view.parentKey, group);
         }
+        const descendants = (key: string, visited = new Set<string>([key])): number => {
+            let count = 0;
+            for (const child of children.get(key) ?? []) if (!visited.has(child.key)) {
+                visited.add(child.key); count++; count += descendants(child.key, visited);
+            }
+            return count;
+        };
         const rows: TaskRow[] = [], seen = new Set<string>();
-        const visit = (view: TaskView, depth: number) => {
+        const visit = (view: TaskView, depth: number, continuation: boolean[] = [], last = true) => {
             if (seen.has(view.key)) return;
             seen.add(view.key);
             const nested = children.get(view.key) ?? [];
-            rows.push({ view, depth, group: nested.length > 0 || view.kind === "workflow" });
-            if (!this.collapsed.has(view.key)) for (const child of nested) visit(child, depth + 1);
+            const prefix = depth ? continuation.map(more => more ? "│  " : "   ").join("") + (last ? "└─" : "├─") : "";
+            rows.push({ view, depth, group: nested.length > 0 || view.kind === "workflow", prefix, descendantCount: descendants(view.key) });
+            if (!this.collapsed.has(view.key)) nested.forEach((child, index) => visit(child, depth + 1, depth ? [...continuation, !last] : [], index === nested.length - 1));
         };
         for (const view of this.current) if (!view.parentKey || !byKey.has(view.parentKey)) visit(view, 0);
         // Cyclic/invalid external hierarchy must not silently hide every row.
         for (const view of this.current) if (!seen.has(view.key) && (!view.parentKey || !this.collapsed.has(view.parentKey))) {
             // Only actual cycles need fallback; collapsed descendants stay hidden.
-            let parent = view.parentKey; const ancestors = new Set<string>(); let cycle = false;
-            while (parent && byKey.has(parent)) { if (ancestors.has(parent)) { cycle = true; break; } ancestors.add(parent); parent = byKey.get(parent)?.parentKey; }
-            if (cycle) visit(view, 0);
+            let parent = view.parentKey; const ancestors = new Set<string>(); let cycle = false, hidden = false;
+            while (parent && byKey.has(parent)) {
+                if (this.collapsed.has(parent) && seen.has(parent)) { hidden = true; break; }
+                if (ancestors.has(parent)) { cycle = true; break; }
+                ancestors.add(parent); parent = byKey.get(parent)?.parentKey;
+            }
+            if (cycle && !hidden) visit(view, 0);
         }
         return rows;
     }
     select(view: TaskView): void { this.selected = view; }
     expand(key: string): void { this.collapsed.delete(key); }
-    collapse(key: string): void { this.collapsed.add(key); }
+    collapse(key: string): void {
+        // Move selection before hiding descendants: the final pin must not resurrect a hidden child.
+        const byKey = new Map(this.current.map(view => [view.key, view]));
+        let parent = this.selected?.parentKey;
+        const seen = new Set<string>();
+        while (parent && !seen.has(parent)) {
+            if (parent === key) { this.selected = byKey.get(key) ?? this.selected; break; }
+            seen.add(parent); parent = byKey.get(parent)?.parentKey;
+        }
+        this.collapsed.add(key);
+    }
     isCollapsed(key: string): boolean { return this.collapsed.has(key); }
     dispose(): void { this.selected = undefined; this.retained.clear(); this.collapsed.clear(); this.current = []; }
 }

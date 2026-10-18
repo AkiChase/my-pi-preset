@@ -1,0 +1,29 @@
+{
+  "id": "task-panel-overview",
+  "name": "task-panel-overview",
+  "title": "全屏 Task Panel 与只读底部概览",
+  "description": "依赖共享展示规则，实现全终端 overlay 的上下分区任务列表、独立全屏详情页和只读 FleetView 风格底部概览。",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "akichase",
+  "assignee": "akichase",
+  "createdAt": "2026-10-13",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "剩余范围已收拢至父任务 10-13-task-panel-redesign；本记录迁至该任务 merged/ 下保留拆分历史，不独立实施。原 status=planning 仅保留合并前状态，不表示仍为待办或产品已完成。",
+  "meta": {
+    "merged_into": "10-13-task-panel-redesign",
+    "disposition": "merged_planning_record"
+  }
+}

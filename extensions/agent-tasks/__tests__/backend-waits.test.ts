@@ -310,6 +310,8 @@ void it("source freezes all owned/workflow/queued/no-session views, reads bounde
     for (const row of rows) { assert.ok(Object.isFrozen(row)); assert.ok(Object.isFrozen(row.stats)); assert.ok(Object.isFrozen(row.artifacts)); assert.equal("session" in row, false); }
     assert.equal(rows.find(row => row.taskId === nested)?.parentKey, rows.find(row => row.taskId === root)?.key);
     assert.equal(rows.find(row => row.taskId === owned)?.parentKey, rows.find(row => row.taskId === task.id)?.key);
+    assert.equal(rows.find(row => row.taskId === task.id)?.description, "test");
+    assert.equal(rows.find(row => row.taskId === task.id)?.title, "pipeline");
     const queuedRow = rows.find(row => row.taskId === queued)!;
     assert.match(f.source.detail(queuedRow)!.text, /conversation not established/);
     const record = f.manager.getRecord(root)!;

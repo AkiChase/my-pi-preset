@@ -1,19 +1,17 @@
-import { copyToClipboard, type ExtensionContext, type KeybindingsManager, type Theme } from "@earendil-works/pi-coding-agent";
-import { ScrollView, isKeyRelease, matchesKey, stripTerminalSequences, truncateToWidth, visibleWidth, wrapTextWithAnsi, type Component, type TUI } from "@earendil-works/pi-tui";
+import { copyToClipboard, type ExtensionContext, type KeybindingsManager } from "@earendil-works/pi-coding-agent";
+import { ScrollView, isKeyRelease, matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi, type Component, type TUI } from "@earendil-works/pi-tui";
 import type { TaskCoordinator } from "./coordinator.ts";
 import type { TaskUIConfig } from "./config.ts";
 import type { TaskDetail } from "./types.ts";
 import { TaskPanelModel, type TaskRow } from "./model.ts";
-
-export function cleanTaskText(text: string): string {
-    return stripTerminalSequences(text).replace(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/g, "");
-}
-const oneLine = (text: string) => cleanTaskText(text).replace(/[\r\n]/g, " ");
+import { cleanTaskText, taskLine, taskOneLine, type TaskTheme } from "./presentation.ts";
+export { cleanTaskText } from "./presentation.ts";
+const oneLine = taskOneLine;
 
 interface TaskPanelArgs {
     coordinator: TaskCoordinator; config: TaskUIConfig;
     ctx: Pick<ExtensionContext, "ui">; tui: Pick<TUI, "requestRender" | "terminal">;
-    theme: Pick<Theme, "fg">; keys: Pick<KeybindingsManager, "matches">;
+    theme: TaskTheme; keys: Pick<KeybindingsManager, "matches">;
     done: () => void; now?: () => number; copy?: (text: string) => Promise<void>;
 }
 
@@ -134,8 +132,11 @@ export class TaskPanel implements Component {
         const result = [border(`╭${"─".repeat(inner)}╮`), fullRow(this.args.theme.fg("accent", `Task Panel · ${this.focus === "list" ? "● Tasks" : "● Detail"} (${rows.length})`))];
         for (let i = 0; i < bodyHeight; i++) {
             const row = rows[start + i];
-            const label = row ? `${row.view.key === selected?.key ? "●" : " "} ${"  ".repeat(Math.min(row.depth, 8))}${row.group ? this.model.isCollapsed(row.view.key) ? "▸" : "▾" : "·"} ${row.view.kind} ${oneLine(row.view.title)} [${row.view.status}]` : "";
-            result.push(border("│") + fit(this.args.theme.fg(row?.view.key === selected?.key ? "accent" : "muted", label), left) + border("│") + fit(details[i] ?? "", right) + border("│"));
+            const label = row ? taskLine(row.view, left, this.args.theme, {
+                prefix: row.prefix, children: this.model.isCollapsed(row.view.key) ? row.descendantCount : undefined,
+                selected: row.view.key === selected?.key, now: this.args.now?.(),
+            }) : "";
+            result.push(border("│") + fit(label, left) + border("│") + fit(details[i] ?? "", right) + border("│"));
         }
         result.push(fullRow(oneLine(this.feedback) || "↑↓/jk · PgUp/PgDn · Home/End · ←→ groups"), fullRow(`Tab focus · x stop selected · c copy path · Esc close · ${this.args.config.shortcutBackground.join("/") || "/task-detach"} detach`), border(`╰${"─".repeat(inner)}╯`));
         return result.map(line => truncateToWidth(line, width));

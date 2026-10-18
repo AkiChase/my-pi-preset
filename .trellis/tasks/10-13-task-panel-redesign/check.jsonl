@@ -1,0 +1,5 @@
+{"file":".trellis/spec/development/index.md","reason":"SDK、只读投影、生命周期与UI边界"}
+{"file":".trellis/spec/development/widget-display.md","reason":"后续概览唯一发布所有权"}
+{"file":".trellis/spec/testing/index.md","reason":"隔离测试、自然退出和证据限制"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"复用实际语义而非重复框架"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"身份、执行/展示与生命周期回归"}

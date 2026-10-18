@@ -1,55 +1,82 @@
 # 实施计划
 
-## start 前门禁
-- [x] 用户已确认一起统一全部列出的呈现路径并完成方案审阅。
-- [ ] 将父任务拆成两个串行子任务：shared presentation/现有 renderer 适配 → 新 Panel/overview；子任务文档明确依赖与范围。
-- [ ] 补齐子任务上下文并 validate，核对目标 SDK、宿主模式及独立工作区基线，不覆盖 monitor/.pi 无关修改。
-- [ ] Panel 实施前核实公开原生 Stack/Scroll/ScrollView 的 overlay 接入、Regular/Fullscreen 布局及鼠标路由；遇阻报告，不回退到自制滚动条/手动截取。邻仓滚动任务不是整个重设计的硬前置依赖。
-- [x] 2026-10-15 用户批准直接更新设计：原生连续滚动、可视滚动条、Fullscreen 滚轮及边界不穿透；不沿用手动分页/PageUp/PageDown。仅规划，不 start、不改产品代码、不提交。
-- [ ] 滚动条常驻/按需、任务行点击和拖动尚未确认；不得擅自纳入实现，显示策略在 Panel 实施前确认。
-- [x] 2026-10-14 用户批准将独立 `bg-hint` 移除纳入已有规划；仅更新文档，不启动实施。
-- [x] 2026-10-14 用户批准将面板从全宽弹窗调整为参考 `/trellis-task-viewer` 的全终端 overlay，Enter 进入详情、Esc 返回/关闭；本轮只更新任务规划，不启动实施。
-- [ ] 根项概览五项上限仍为最小技术建议；底部概览与先行共享展示子任务范围不因全屏调整而扩大。
+## 当前状态与门禁
+- [x] 已核对当前源代码、共享滚动模块、Widget Display 及先行子任务最终验收；不将先行工具展示交付误认为 Panel helpers 已交付。
+- [x] 用户确认列表/详情滚动条常驻；概览最多五个根任务，小终端缩减并提示隐藏数量。
+- [x] 父任务收拢为唯一计划，children 已清空；原 Panel 子任务解除关联并迁至 merged/10-13-task-panel-overview 保留追溯，退出根级待办；已归档 presentation 只保留文档引用，不修改历史归档。
+- [x] 最终方案呈交并获明确实施批准：用户认可三个阶段实施、检查及本地阶段提交；不自动安装/同步/reload/push/归档或运行真实终端/provider。
+- [x] 执行前 Git 复核：产品文件干净，已有 Panel 规划/合并材料和两个独立规划任务保持；lockfile 镜像任务已归档至 HEAD 110d540。本机 Node v24.14.1，node_modules 存在；测试另行隔离并核实 SDK。
+- [ ] 刷新 selected role JSONL：主会话直接实施不需要 implement manifest；跨模块高风险阶段选择独立 check，派发前完整准备其实际上下文。不把旧 research 观察当完整注入。
+- [ ] 真实终端/provider 操作若未获批准，保留 NOT_RUN；不能用 fixture 替代物理滚轮与安装宿主验收。
 
-## 分阶段执行
-0. 子任务一交付并验收共享规则与现有 Agent call/result、workflow card/dialog、conversation-viewer、shell/monitor 标题与 Beautify bash 本地适配；补齐前台 description→Job.name，不重写旧导航/后端。子任务二等待该接口就绪后执行下面 panel/overview 阶段。
-1. 新增共享 presentation 工具及纯布局测试：description-first、状态圆点、tokens/耗时、Unicode/ANSI width、深层树缩进、protected suffix、小宽度降级。
-2. 扩展 TaskPanelModel 树前缀、子项计数与选择 reconciliation，覆盖真实 parentRun/workflow、orphan/cycle、收起隐藏选中项、根组终态四秒及 final pin。
-3. 重构 panel 为全屏 list/detail 状态，Agents/Processes 上下分区；owner 使用 100% 宽高、top-left、margin 0 的原生 overlay。先验证公开原生 Stack/Scroll 布局，再接入列表/详情各自的 `ScrollView`，完整正文交由原生布局裁剪并显示滚动条，header/footer 固定、背景填满终端，不用 render 后 slice/手工 updateLayout/重复 offsets 模拟视口。实现 Fullscreen 滚轮及边界 containment、Regular 键盘回退而不强开鼠标捕获；滚轮不改变选择，键盘选择变更时确保可见，定时刷新不拉回视口，返回/折叠/内容更新/resize 保留或收敛位置。移除手动分页及 PageUp/PageDown 处理/提示。保留 Enter→detail、Esc→list/close、树收起提示、selection background、全局 waits 与 selected actions 分离，以及 `/tasks` 和现有面板快捷入口；不切换宿主模式。
-4. 新增 belowEditor 只读 overview，复用 metadata/格式化，owner 持有 widget/subscription/clock/expiry；不调用 detail、不恢复旧 raw input listener、main 行或 viewers。同阶段删除 process-tasks 独立 `bg-hint` 及 show/clear/reset/专有缓存接线，保留输出流转与共享计时刷新；共享底栏/面板表达实际等待与配置驱动的全局解除入口，不新增 shell 概览。
-5. 按最终范围改造 active workflow progress 长标题/phase/stat 尾部布局；测试真实 card renderer 的宽度参数与 replay entry。
-6. 精确更新 README、extension/testing 指南及 agent provenance；现有其他任务 hunks 保持原样。
-7. 独立 trellis-check full-scope 审查，验证 UI 行为与后端契约，修复后复验；未经授权不提交/安装/归档。
+## 执行安排
+建议主会话直接实施，独立 check 审查跨模块投影、overlay/lifecycle 与 widget 集成。各阶段验证、检查实际 diff 后立即由主会话 scoped commit（实施批准包含阶段本地提交）；不累计到最终一次提交。Agent 不提交。后续若需要托管 worktree，按协议 preview/批准 prepare，不自动创建或临时隔离。
 
-## 测试矩阵
-- panel：上下分区、真实多级树、折叠与选择、详情返回定位、标题完整文本、有界输出、selected final pin、rows/columns resize。
-- presentation：中文/emoji 输入（不主动使用 emoji 图标）、换行/控制字符/ANSI、安全截断、极窄屏、右侧统计与连续选中背景。
-- overview：root/child 不重复汇总、states/等待、limit/hidden count、empty/四秒终态、计时与最终冻结、主题更新。
-- fullscreen container：overlay 选项、原生布局树实际视口/背景填满终端、固定 header/footer，空态/小屏不透出底层内容；regular/fullscreen 宿主、resize、主题切换、重复打开/关闭，返回恢复编辑器焦点和原文本。
-- native scrolling：长列表/长详情的原生裁剪与滚动条实际长度/位置，中文/ANSI/窄屏宽度预算扣除滚动条，移除旧手动截取及 PageUp/PageDown；滚轮与选择分离、键盘 ensure-visible、每秒刷新不拉回、返回/折叠/任务移除/输出更新/resize 的位置保持与收敛。
-- mouse host：Fullscreen 真实终端验证正文滚轮路由、上下边界不穿透底层对话、关闭后主界面恢复；Regular 验证键盘/滚动条与无强制鼠标捕获。模拟布局或输入测试不替代真实鼠标验收。
-- lifecycle：setter 同步 reentry、shutdown/reset、延迟 timer/callback、单 overlay、done 一次性与 dispose 幂等、自然退出无遗留 interval。
-- waits：foreground launch、background retrieval、no waits、detach all 多等待、selected stop 不变、Owned 不误标主会话 wait。
-- workflow progress：长 workflow/phase/child 文案保护状态与数字；不更改 token accounting。
-- hint removal：运行超过两秒仍无独立提示、多 shell/agent/retrieval 混合等待、配置快捷键与 /bg 回退、完成/detach/reset/shutdown 清理、自然退出；前台 description 优先/缺失回退，完整实际命令与 Trellis 前缀不变，面板耗时继续刷新。
-- integration：Beautify editor、footer semantic colors、SDK widget belowEditor placement、现有 agent/process 后端回归。
+### 阶段 1：展示与真实树模型（AC4–5）
+- kind-aware 可读标题、状态圆点、duration/tokens、安全宽度与连续 selected 背景。
+- 核对 Agent/Workflow description 投影，补 workflow description，处理 shell 空白回退；不重做已存在的 bash name 传递。
+- model 树线/后代数量、折叠选择 reconciliation、orphan/cycle/retention/final pin。
+- 保留 TaskSource/公开身份与 token accounting，主核 diff 和跨模块独立审查后阶段提交。
 
-## 验证命令
-先按 repository testing 指南确认 PI_CODING_AGENT_DIR 隔离与 PI_SDK_DIR；不得刷新真实用户配置。
+定向自然退出：task-ui suite、受影响 agent source/process source 测试；直接查找现有文件补充精确路径，不能假设未创建测试名。
+
+### 阶段 2：全屏列表/详情与原生滚动（AC1–3）
+- owner 预加载共享 native layout，overlay 安装 onHandle 与 shutdown 重入 fence。
+- 单一 list/detail interaction，Agents/Processes 上下分区；两处独立常驻 ScrollView、VStack、固定 header/footer、满终端背景。
+- 复用 wheel bridge，正文/边界 containment；不强开 Regular mouse，不复制 Task viewer section/Ctrl+C。
+- Enter/Esc、树、Home/End/jk、x/c/global detach，移除旧双栏/Tab/PageUp/PageDown/manual slice/updateLayout。
+- 渲染无 detail I/O；元数据/唯一 bounded selected preview 缓存、定时刷新不拉回、返回/resize/变化位置收敛。
+- 独立审查实际 owner/model/panel；定向自然退出与 TypeScript 后阶段提交。
 
 ```sh
-node --test extensions/task-ui/__tests__/*.test.ts
-node --test extensions/agent-tasks/__tests__/*.test.ts extensions/process-tasks/__tests__/*.test.ts
-node --test extensions/beautify/__tests__/*.test.ts
+node --test --test-concurrency=2 extensions/task-ui/__tests__/*.test.ts extensions/shared/scroll-panel/__tests__/*.test.ts
+```
+
+### 阶段 3：只读概览、hint 移除与集成（AC6–8）
+- Widget Display 声明 Agent overview 槽位及 client；root metadata、最多五项、小屏预算/hidden count、expiry/空态/主题/reset/shutdown。
+- 删除 Process hint renderer/专有字段/接线和 foreground_hint 槽位；保持 quick-completion/partial 及 source timer 行为。
+- 底栏/Panel 真实 waiting 与全局配置入口，回退 /task-detach。
+- 更新 docs/extensions/task-composition.md、Widget Display 文档/相关 spec 与真实 provenance，用户 docs 不加入 Agent 工具调用教学。
+- 独立审查 lifecycle/执行不变性、最终 AC/当前 diff；验证后阶段提交。
+
+```sh
+node --test --test-concurrency=2 extensions/task-ui/__tests__/*.test.ts extensions/process-tasks/__tests__/*.test.ts
+node --test --test-concurrency=2 extensions/shared/widget-display/__tests__/*.test.ts extensions/__tests__/widget-*.test.ts scripts/pi-manifest.test.mjs
+node --test --test-concurrency=2 extensions/agent-tasks/__tests__/*.test.ts extensions/runtime-tasks/__tests__/*.test.ts extensions/beautify/__tests__/*.test.ts
 pnpm check
 git diff --check
 ```
 
-全量 force-exit 不替代自然退出测试。新增 layout/renderer/SDK fixture 测试跟随相关 suite，手动宿主冒烟验证 regular/fullscreen 中的全终端覆盖、resize、打开/返回详情、Esc 关闭后编辑器焦点/文本恢复、输入框下方概览与主题。邻仓 viewer 的旧实现只作为容器/done 方式参考；新滚动任务的原生布局验证结果若已交付可借鉴，但不构成整个父任务硬依赖，亦不能用其历史测试替代本任务新验证。遇原生能力阻碍须报告，不擅自回退自制方案；真实鼠标验收未运行必须记为未验证。
+## 验证环境与证据
+命令仅是计划，当前未执行产品测试。依 .trellis/spec/testing/index.md 使用已有 SDK/依赖，整个测试调用隔离 PI_CODING_AGENT_DIR，必要 HOME；COREPACK_ENABLE_NETWORK=0，不访问个人配置、不安装或获取依赖。原始输出放 owned 仓库外临时目录，最终在本文记录命令、环境、exit code、失败原因/重跑与 NOT_RUN，不存 raw 到 research/evidence。
 
-## 风险与回滚
-- owner/model/panel 为高风险共享边界，逐阶段保留测试绿灯。
-- 不能用可见子行求和修 workflow tokens；现有统计时效/范围只解释不重算。
-- overview reset 后不得重注册，timer 空闲必须停。
-- 窄屏防止 suffix 或树缩进令任务标题全丢失。
-- 任何回滚只撤销本任务 hunks/新增文件，不触碰 monitor 任务或生成 .pi 配置。
+pnpm check 全量使用 force-exit，不能证明自然生命周期；受影响 focused suite 必须无 force-exit。执行前核实 SDK link helper 与当前脚本，不照旧命令假称通过。
+
+实际宿主验收需经授权后覆盖 installed bundled Pi 的 regular/fullscreen、全屏背景、长列表/详情、resize/theme、Enter/Esc、编辑器焦点/文本、Fullscreen 滚轮正文与边界不穿透及关闭恢复。fixture 不能证明真实鼠标、终端视觉、在线 provider 或任意插件组合。若暂不授权，报告验收缺口，不称任务完全完成。
+
+## 回归重点
+- 每个 kind/title/status/waiting/executionMode、中文/ANSI/极窄宽度；workflow/agent 根统计不重复求和。
+- 层级树/折叠隐藏选择、active descendant retention、根终态四秒/selected final preview、源移除/新 run。
+- overlay setup 取消不关闭其他 interaction、done 一次、sink 同步重入、迟到 callback、timer 自然退出。
+- 概览最多五根项/hidden count/小屏，中心不可用不 bypass，无 detail 读取/输入拦截。
+- 多 foreground/background retrieval waits，全局 detach 不改变原 PID/执行/结果消费；selected stop 仍独立。
+- hint 删除后超过两秒无旧 widget，Process 时钟继续更新，无 quick-completion/partial/通知/日志/Trellis 环境回归。
+- shared scroll/widget 消费者、既有工具展示/handling clock、Beautify/editor/管理工具兼容。
+
+## 阶段 1 实际检查记录
+主会话直接实施，独立 trellis-check 审查并 scoped 修复。展示 helpers、kind-aware 标题、Workflow description 投影、Process 空白名称回退、树线/后代计数/折叠选择 reconciliation 已完成；未提前实施全屏/概览。
+
+环境：Node v24.14.1、已安装 SDK 1.3.0/linked node_modules；PI_CODING_AGENT_DIR=/tmp/panel-redesign.Bqxo0J/agent、HOME=/tmp/panel-redesign.Bqxo0J/home、PI_SDK_DIR 指向已安装 release node_modules，COREPACK_ENABLE_NETWORK=0。原始日志在本轮 owned /tmp/panel-redesign.Bqxo0J。
+
+- 首轮 `node --test --test-concurrency=2 extensions/task-ui/__tests__/*.test.ts extensions/process-tasks/__tests__/source-view.test.ts extensions/agent-tasks/__tests__/backend-waits.test.ts`：exit0，70/70，自然退出；直接 tsc：exit0。
+- 独立审查修复长标题吞折叠 count、结构空格/深树分支、SGR reset 断背景、刷新 reparent/间接 cyclic 折叠隐藏 pin；增加四个回归。审查后同 focused 命令 exit0，74/74，自然退出；`./node_modules/.bin/tsc -p tsconfig.json` exit0。
+- `pnpm check`：exit1，Corepack 在隔离 HOME 下尝试解析 pnpm，网络禁用阻断 npm registry 访问；检查尚未开始，无下载，不记为产品断言失败或 PASS。
+- 直接已有入口重跑：`node node_modules/typescript/bin/tsc -p tsconfig.json && node --test --test-concurrency=8 --test-force-exit 'extensions/**/__tests__/*.test.ts' 'extensions/**/__tests__/*.test.mjs' 'scripts/*.test.mjs'`：exit0，1476/1476；等价覆盖 strict/full suite，但没有运行 link helper（已核实现有 SDK 链接）。全量 force-exit 不证明自然清理。
+- `git diff --check` exit0。独立审查日志 focused/typecheck/final.diff 主会话已核验。
+
+保留已知诊断：focused 有5次 `offStart is not a function`，来自 HEAD 已有 sdk-runtime.test.ts fake pi.on 未返回 unsubscribe 与 widget-display/client.dispose 的组合；本阶段不修该 fixture，不称无 cleanup 诊断。阶段3触及 widget/hint 时重新评估。真实终端/installed mounted overlay/provider NOT_RUN；当前 Panel 仍旧双栏，完整换行详情属于阶段2。无独立 lint 脚本。
+
+阶段 1 checkpoint：待记录提交 hash。当前分支 task/task-panel-redesign（由获批实施创建，本任务共享源执行、不创建 worktree）。
+
+## 尚未运行与材料维护
+本轮只维护现有规划与用户批准的合并关联，无产品测试、真实宿主测试、派发、start、commit 或 archive。旧 research 保留原文作为历史观察，不迁移/清理；现有角色 manifest 需执行前刷新，不能宣称 context validation 已通过。原 overview 材料在 merged/ 下，原 planning 值是合并前历史状态；meta 明确 merged_into/disposition，根级待办已退出，不伪造 completed。
