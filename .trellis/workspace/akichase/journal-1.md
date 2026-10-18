@@ -1051,3 +1051,38 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Next Steps
 
 - 只读查看 Bash 与 Memory nullable 控制字段任务，规划前确认授权。
+
+
+## Session 33: 完成 bash 与 memory_list 显式参数契约
+<!-- trellis-session: v=2 fp=71426e0cb363a961 -->
+
+**Date**: 2026-10-18
+**Task**: 完成 bash 与 memory_list 显式参数契约
+**Branch**: `main`
+
+### Summary
+
+按用户修订用明确领域值替代机械nullable：bash -1/0/正数控制模式，memory_list显式查询分页；两个阶段独立审查提交后验收归档。
+
+### Main Changes
+
+- bash删除run_in_background，旧timeoutMs配置退役并警告；保留执行和结果生命周期。
+- memory_list三个必填非nullable字段，安全入口校验在getOrigin前，其他Memory工具不改。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `55ad847` | feat: use explicit bash foreground and background values |
+| `cef4126` | fix: require explicit memory list parameters |
+| `c543657` | docs: record explicit bash and memory parameter verification |
+| `b4cfbed` | chore(task): archive 10-17-bash-memory-nullable-controls |
+
+### Testing
+
+- [OK] bash自然退出集成564/564，Agent77/77，Memory69/69，最终pnpm check1436/1436；两阶段独立审查无阻断。
+- [OK] SDK raw scalar转换限制保留；真实provider和物理终端NOT_RUN，docs/spec未改。
+
+### Status
+
+[OK] **Completed**
