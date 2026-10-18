@@ -1,5 +1,6 @@
 import { Type } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { parseControlArguments } from "../shared/tool-arguments.ts";
 import { MemoryError, TYPES, fail } from "./policy.ts";
 import type { MemoryStore } from "./store.ts";
 
@@ -9,7 +10,19 @@ export type GetOrigin = (cwd: string, signal?: AbortSignal) => ToolOrigin;
 const Name = Type.String({ maxLength: 80, pattern: "^[a-z0-9][a-z0-9_-]*$" });
 const Revision = Type.String({ pattern: "^[a-f0-9]{64}$" });
 const Description = Type.String({ maxLength: 160 });
-const Query = Type.String({ maxLength: 160 });
+const Query = Type.String({ maxLength: 160, pattern: "^[^\\x00-\\x1f\\x7f-\\x9f]*(?![\\s\\S])", description: "Filter names/descriptions; empty string lists all. At most 160 Unicode codepoints, no control characters." });
+function listArguments(value: unknown): { query: string; offset: number; limit: number } {
+  const invalid = (): never => fail("list", "Invalid memory_list arguments: provide only query (control-free string, at most 160 Unicode codepoints), offset (non-negative safe integer), and limit (safe integer 1–50). Use query=\"\", offset=0, limit=20 for the first page.");
+  let params: Record<string, unknown>;
+  // Shape errors can include untrusted field names; expose only a fixed safe MemoryError.
+  try { params = parseControlArguments(value, ["query", "offset", "limit"], []); }
+  catch { return invalid(); }
+  const { query, offset, limit } = params;
+  if (typeof query !== "string" || [...query].length > 160 || /[\x00-\x1f\x7f-\x9f]/u.test(query)
+    || typeof offset !== "number" || !Number.isSafeInteger(offset) || offset < 0
+    || typeof limit !== "number" || !Number.isSafeInteger(limit) || limit < 1 || limit > 50) return invalid();
+  return { query, offset, limit };
+}
 const result = (text: string, details: unknown, isError = false) => ({ content: [{ type: "text" as const, text }], details, ...(isError ? { isError: true } : {}) });
 async function boundary(operation: () => Promise<ReturnType<typeof result>>): Promise<ReturnType<typeof result>> {
   try { return await operation(); }
@@ -32,11 +45,19 @@ export function registerMemoryTools(pi: ExtensionAPI, getOrigin: GetOrigin): voi
     }),
   });
   pi.registerTool({
-    name: "memory_list", label: "memory_list", description: "List project memory metadata (no bodies). Default 20, maximum 50 per page and 8KiB. Continue using nextOffset; query filters name/description only.",
-    parameters: Type.Object({ query: Type.Optional(Query), offset: Type.Optional(Type.Number({ minimum: 0, multipleOf: 1 })), limit: Type.Optional(Type.Number({ minimum: 1, maximum: 50, multipleOf: 1 })) }, { additionalProperties: false }),
+    name: "memory_list", label: "memory_list", description: "List project memory metadata (no bodies). Provide query, offset and limit explicitly; maximum 50 per page and 8KiB. Continue using nextOffset; query filters name/description only.",
+    promptSnippet: "List project memory metadata with explicit query, offset and limit.",
+    promptGuidelines: [`memory_list usage:
+  - Always provide query, offset and limit. Use query=\"\" for all metadata, offset=0 for the first page, and limit=20 for an ordinary page.
+  - query filters names/descriptions only (at most 160 Unicode codepoints, no controls); offset is a non-negative safe integer; limit is a safe integer from 1 to 50.
+  - Results contain metadata only and fit 8KiB. Continue with nextOffset until it is null; use memory_read for bodies and revisions.
+  Examples:
+  - First page: {"query":"","offset":0,"limit":20}`],
+    parameters: Type.Object({ query: Query, offset: Type.Number({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER, multipleOf: 1, description: "Non-negative safe integer page offset. Use 0 for the first page." }), limit: Type.Number({ minimum: 1, maximum: 50, multipleOf: 1, description: "Safe integer page size, 1–50. Use 20 for an ordinary page." }) }, { additionalProperties: false }),
     execute: async (_id, params, signal, _update, ctx) => boundary(async () => {
+      const { query, offset, limit } = listArguments(params);
       const origin = getOrigin(ctx.cwd, signal); origin.assertActive();
-      const page = origin.store.list(params.query, params.offset, params.limit);
+      const page = origin.store.list(query, offset, limit);
       origin.assertActive();
       return result(page.text, { entries: page.entries, total: page.total, offset: page.offset, nextOffset: page.nextOffset });
     }),

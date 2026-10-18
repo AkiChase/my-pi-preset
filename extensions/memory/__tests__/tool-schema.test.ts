@@ -13,6 +13,7 @@ import { it } from "node:test";
 import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { validateToolArguments } from "@earendil-works/pi-ai";
 import memory from "../../memory.ts";
+import { listInput } from "./list-input.ts";
 import { fixture } from "./helpers.ts";
 
 const REVISION = "a".repeat(64);
@@ -59,7 +60,7 @@ void it("every memory tool rejects an unknown field instead of ignoring it", t =
     const { tools } = registered(t);
     for (const [name, args] of [
         ["memory_read", { name: "item", body: "x" }],
-        ["memory_list", { offset: 0, limitt: 5 }],
+        ["memory_list", listInput({ limitt: 5 })],
         ["memory_write", { name: "item", type: "user", description: "d", body: "b", expectedRevision: null, extra: 1 }],
         ["memory_forget", { name: "item", expectedRevision: REVISION, force: true }],
     ] as const) {
@@ -81,8 +82,8 @@ void it("description is bounded at the policy limit, not above it", t => {
 
 void it("list query is bounded at the store limit, not above it", t => {
     const { tools } = registered(t);
-    assert.equal(hostError(tools, "memory_list", { query: "q".repeat(160) }), undefined);
-    const err = hostError(tools, "memory_list", { query: "q".repeat(161) });
+    assert.equal(hostError(tools, "memory_list", listInput({ query: "q".repeat(160) })), undefined);
+    const err = hostError(tools, "memory_list", listInput({ query: "q".repeat(161) }));
     assert.ok(err, "a query longer than the store accepts must be rejected");
     assert.match(err.message, /query/);
 });
@@ -97,12 +98,12 @@ void it("name, revision and paging keep their declared bounds", t => {
     assert.equal(hostError(tools, "memory_forget", { name: "item", expectedRevision: REVISION }), undefined);
     for (const field of ["offset", "limit"] as const) {
         for (const fraction of [1.5, "1.5"]) {
-            const err = hostError(tools, "memory_list", { [field]: fraction });
+            const err = hostError(tools, "memory_list", listInput({ [field]: fraction }));
             assert.ok(err, `${field} must reject fractions without integer coercion`);
             assert.match(err.message, new RegExp(field));
         }
     }
-    assert.equal(hostError(tools, "memory_list", { limit: 50 }), undefined);
-    assert.ok(hostError(tools, "memory_list", { limit: 51 }), "the page size is capped at 50");
-    assert.ok(hostError(tools, "memory_list", { offset: -1 }), "offset is non-negative");
+    assert.equal(hostError(tools, "memory_list", listInput({ limit: 50 })), undefined);
+    assert.ok(hostError(tools, "memory_list", listInput({ limit: 51 })), "the page size is capped at 50");
+    assert.ok(hostError(tools, "memory_list", listInput({ offset: -1 })), "offset is non-negative");
 });
