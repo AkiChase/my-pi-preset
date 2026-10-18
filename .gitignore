@@ -1,6 +1,11 @@
 node_modules/
 *.tsbuildinfo
 local/
+
+.DS_Store
+
+__pycache__/
+*.py[cod]
 # pi-trellis:ignore:start
 /.worktree/
 /.trellis/.runtime/
