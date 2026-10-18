@@ -129,7 +129,9 @@ main已核验overview/owner/tests、实际process执行路径diff、docs/spec与
 NOT_RUN：physical human mouse、像素/人工视觉/物理IME、任意插件组合、online provider、full composition真实bash>2s/混合wait/detach/reset/reload（已有自动化定向覆盖，不称此次terminal覆盖）。本次无新增产品，因此复用最终严格/自动化检查，不机械重跑。
 
 ## 最终验收缺口
-三个产品阶段及独立审查、静态/自动化验证、上述真实installed终端脚本验收已完成。剩余physical human mouse及人工视觉判断未运行，不能冒充完全物理验收；下一步由用户接受已披露限制或进行人工验收。未经批准不合并main/归档/同步/reload/push。当前in_progress与任务绑定保留，owned临时目录暂留供人工复核。
+三个产品阶段及独立审查、静态/自动化验证、上述真实installed终端脚本验收已完成。用户明确接受physical human mouse及人工视觉未运行等披露限制，批准合回main和归档收尾；不冒充完全物理验收，不含同步/reload/push。main以ff-only从faf4841快进至8dffd29，产品与测试inputs不变，复用有效最终验证，无冲突不机械重跑。
+
+main已核验本轮raw/矩阵/失败重跑/启动及PID/server清理证据，最终ps确认无进程使用owned目录后，定向删除 /tmp/panel-redesign.Bqxo0J 成功；仅本轮原始日志/fixture/临时配置，未动历史材料。所有关键命令/环境/结果/失败原因和验证限制已在本文自包含保留，不依赖已删除临时链接。两个独立planning任务未纳入提交、未修改；task/task-panel-redesign分支保留，无worktree创建或删除。
 
 ## 尚未运行与材料维护
 本轮只维护现有规划与用户批准的合并关联，无产品测试、真实宿主测试、派发、start、commit 或 archive。旧 research 保留原文作为历史观察，不迁移/清理；现有角色 manifest 需执行前刷新，不能宣称 context validation 已通过。原 overview 材料在 merged/ 下，原 planning 值是合并前历史状态；meta 明确 merged_into/disposition，根级待办已退出，不伪造 completed。
