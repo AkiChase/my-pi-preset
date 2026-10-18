@@ -3,7 +3,7 @@ import { visibleWidth, type Component } from "@earendil-works/pi-tui";
 import { clean, clip, summary, toolHeading, wrap } from "../layout.ts";
 import { text, type Args, type RenderContext, type Result } from "../types.ts";
 export type Draw = (result: Result, theme: Theme, context: RenderContext, width: number) => string[];
-export interface Metadata { title?: string; suffix?: string; stats: string; secondary?: string }
+export interface Metadata { title?: string; suffix?: string; stats: string; secondary?: string; executionConfig?: import("../../runtime-tasks/execution-config.ts").AgentExecutionConfig }
 export type Describe = (result: Result | undefined, context: RenderContext) => Metadata;
 export function title(name: string, args: Args): string {
   if (name === "bash") {

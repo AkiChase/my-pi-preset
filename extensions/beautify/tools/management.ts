@@ -1,3 +1,5 @@
+import { parseExecutionId } from "../../runtime-tasks/execution-id.ts";
+import { copyAgentExecutionConfig } from "../../runtime-tasks/execution-config.ts";
 import { isManagementDetails, parseAgentManagementParams, parseProcessManagementParams, type ManagementDetails, type ManagementGroup } from "../../runtime-tasks/tools.ts";
 import type { RetrievalContract } from "./task-manage.ts";
 export function managementContract(group: ManagementGroup): RetrievalContract {
@@ -10,6 +12,10 @@ export function managementContract(group: ManagementGroup): RetrievalContract {
     if (!result) return { title, stats: args.action === "wait" ? "waiting" : "" };
     if (!isManagementDetails(result.details)) return undefined;
     const m = (result.details as ManagementDetails).runtimeManagement;
+    const execution = parseExecutionId(m.execution_id);
+    if (m.agent_id !== undefined && (m.kind !== "subagent" || execution?.taskId !== m.agent_id)) return undefined;
+    if (m.kind !== undefined && m.execution_id !== undefined &&
+        (m.kind === "workflow") !== m.execution_id.startsWith("wf_")) return undefined;
     if (!m || m.version !== 2 || m.group !== group || m.action !== args.action ||
         (id !== undefined && (m.task_id ?? m.execution_id) !== undefined && (m.task_id ?? m.execution_id) !== id) ||
         (ctx.isPartial && (m.action !== "wait" || m.wait_outcome !== "waiting")) || (!ctx.isPartial && m.wait_outcome === "waiting")) return undefined;
@@ -20,6 +26,7 @@ export function managementContract(group: ManagementGroup): RetrievalContract {
     if (m.action === "stop" && !m.error_code) stats = `stop · observed ${m.raw_status ?? m.status ?? "unknown"}`;
     if (m.wait_outcome === "waiting") stats = "waiting";
     if (m.wait_outcome === "released" || m.wait_outcome === "cancelled") stats = `wait ${m.wait_outcome} · target unchanged`;
-    return { title: m.title ?? title, stats, secondary: [m.task_type ?? m.kind, m.task_id ?? m.execution_id].filter(Boolean).join(" · ") };
+    return { title: m.title ?? title, stats, secondary: [m.task_type ?? m.kind, m.task_id ?? m.execution_id].filter(Boolean).join(" · "),
+      ...(m.executionConfig ? { executionConfig: copyAgentExecutionConfig(m.executionConfig) } : {}) };
   };
 }

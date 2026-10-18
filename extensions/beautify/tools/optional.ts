@@ -1,3 +1,4 @@
+import { executionConfigRows } from "../execution-config.ts";
 import { keyHint, type Theme, type ToolRenderers } from "@earendil-works/pi-coding-agent";
 import { Box, Container, Text, type Component } from "@earendil-works/pi-tui";
 import { clean, toolHeading, wrap } from "../layout.ts";
@@ -51,6 +52,10 @@ export function optionalRenderers(name: string, original: ToolRenderers | undefi
     if (cell.meta) {
       const meta = cell.meta;
       children.push(component(width => toolHeading(name, meta.title ?? "", "", meta.stats, width, theme, ctx.expanded, meta.secondary)));
+      if (meta.executionConfig) children.push(component(width => [
+        ...(ctx.expanded && meta.stats ? wrap(`State: ${meta.stats}`, width).map(row => theme.fg("muted", row)) : []),
+        ...executionConfigRows(meta.executionConfig!, ctx.expanded, width, theme),
+      ]));
       if (result && ctx.expanded) children.push(component(width => wrap(text(result), width).map(line => theme.fg(ctx.isError ? "error" : "toolOutput", line))));
     } else {
       if (phase === "call" || !cell.callDelegated) {

@@ -1,3 +1,6 @@
+import { executionConfigRows } from "../../beautify/execution-config.ts";
+import { clean, wrap } from "../../beautify/layout.ts";
+import { component } from "../../beautify/tools/shared.ts";
 import { copyAgentExecutionConfig, agentExecutionSummary } from "../../runtime-tasks/execution-config.ts";
 import { registerBuiltinSkills } from "./builtin-skills.ts";
 import { nullableControl } from "../../shared/tool-arguments.ts";
@@ -1593,96 +1596,136 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     },
 
     renderResult(result, { expanded, isPartial }, theme, renderContext) {
-      const details = result.details as AgentDetails | undefined;
+      const supplied = result.details as (AgentDetails & { runtimeLaunch?: unknown }) | undefined;
       const text = result.content[0]?.type === "text" ? result.content[0].text : "";
-      // Pi reports pre-execution failures (extension block, abort, argument
-      // validation) as `{ content: [reason], details: {} }` with isError set —
-      // no status to render, so show the reason instead of inventing one (#199).
-      if (renderContext.isError || !details?.status) {
-        return new Text(text, 0, 0);
-      }
-
-      // Helper: build "haiku · thinking: high · ↻5≤30 · 3 tool uses · 33.8k tokens" stats string
-      const stats = (d: AgentDetails) => {
-        const parts: string[] = [];
-        if (d.modelName) parts.push(d.modelName);
-        if (d.tags) parts.push(...d.tags);
-        if (d.turnCount != null && d.turnCount > 0) {
-          parts.push(formatTurns(d.turnCount, d.maxTurns));
+      const nonnegative = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0;
+      // Metadata may be historical or foreign. Validate every field used by the
+      // status renderer before formatting; a valid config does not validate its
+      // neighboring counters, spinner or legacy tags.
+      if (supplied && (
+        !nonnegative(supplied.toolUses) || typeof supplied.tokens !== "string" || !nonnegative(supplied.durationMs) ||
+        [supplied.cost, supplied.turnCount, supplied.maxTurns].some(value => value !== undefined && !nonnegative(value)) ||
+        (supplied.spinnerFrame !== undefined && (!Number.isInteger(supplied.spinnerFrame) || supplied.spinnerFrame < 0 || supplied.spinnerFrame >= SPINNER.length)) ||
+        (supplied.tags !== undefined && (!Array.isArray(supplied.tags) || supplied.tags.some(tag => typeof tag !== "string"))) ||
+        [supplied.modelName, supplied.activity, supplied.error].some(value => value !== undefined && typeof value !== "string")
+      )) return component(width => wrap(text, width).map(row => theme.fg(renderContext.isError ? "error" : "toolOutput", row)));
+      const identity = supplied?.runtimeLaunch;
+      const snapshot = copyAgentExecutionConfig(supplied?.executionConfig);
+      const config = isLaunchMetadata(identity) && "kind" in identity && identity.kind === "subagent" &&
+        (supplied?.agentId === undefined || supplied.agentId === identity.agent_id) &&
+        (typeof renderContext.args.resume !== "string" || renderContext.args.resume === identity.agent_id) &&
+        (snapshot?.mode === undefined || snapshot.mode === identity.mode) &&
+        typeof supplied?.status === "string" && ["queued", "running", "completed", "steered", "aborted", "stopped", "error", "background"].includes(supplied.status) &&
+        typeof supplied.toolUses === "number" && Number.isFinite(supplied.toolUses) &&
+        typeof supplied.tokens === "string" && typeof supplied.durationMs === "number" && Number.isFinite(supplied.durationMs) &&
+        (supplied.activity === undefined || typeof supplied.activity === "string") && (supplied.error === undefined || typeof supplied.error === "string")
+        ? snapshot : undefined;
+      // Legacy/foreign results retain the original readable renderer. Verified
+      // snapshots supplement its existing status styles, never live state.
+      const details = config && supplied ? { ...supplied, modelName: undefined, tags: undefined, tokens: clean(supplied.tokens),
+        activity: supplied.activity === undefined ? undefined : clean(supplied.activity),
+        error: supplied.error === undefined ? undefined : clean(supplied.error) } : supplied;
+      const legacy = (expanded: boolean) => {
+        // Pi reports pre-execution failures (extension block, abort, argument
+        // validation) as `{ content: [reason], details: {} }` with isError set —
+        // no status to render, so show the reason instead of inventing one (#199).
+        if (renderContext.isError || !details?.status) {
+          return new Text(text, 0, 0);
         }
-        if (d.toolUses > 0) parts.push(`${d.toolUses} tool use${d.toolUses === 1 ? "" : "s"}`);
-        if (d.tokens) parts.push(d.tokens);
-        if (showCost) {
-          const costText = formatCost(d.cost ?? 0);
-          if (costText) parts.push(costText);
-        }
-        return parts.map(p => fgPreservingNestedStyles(theme, "dim", p)).join(" " + theme.fg("dim", "·") + " ");
-      };
 
-      // ---- While running (streaming) ----
-      if (isPartial || details.status === "running") {
-        const frame = SPINNER[details.spinnerFrame ?? 0];
-        const s = stats(details);
-        return renderRunningAgentStatus(frame, s, details.activity ?? "thinking…", theme);
-      }
-
-      // ---- Background agent launched ----
-      if (details.status === "background") {
-        return new Text(theme.fg("dim", `  ⎿  Running in background (ID: ${details.agentId})`), 0, 0);
-      }
-
-      // ---- Completed / Steered ----
-      if (details.status === "completed" || details.status === "steered") {
-        const duration = formatMs(details.durationMs);
-        const isSteered = details.status === "steered";
-        const icon = isSteered ? theme.fg("warning", "✓") : theme.fg("success", "✓");
-        const s = stats(details);
-        let line = icon + (s ? " " + s : "");
-        line += " " + theme.fg("dim", "·") + " " + theme.fg("dim", duration);
-
-        if (expanded) {
-          const resultText = result.content[0]?.type === "text" ? result.content[0].text : "";
-          if (resultText) {
-            const lines = resultText.split("\n").slice(0, 50);
-            for (const l of lines) {
-              line += "\n" + theme.fg("dim", `  ${l}`);
-            }
-            if (resultText.split("\n").length > 50) {
-              line += "\n" + theme.fg("muted", "  ... (use agent_manage action=output with execution_id and verbose for full output)");
-            }
+        // Helper: build "haiku · thinking: high · ↻5≤30 · 3 tool uses · 33.8k tokens" stats string
+        const stats = (d: AgentDetails) => {
+          const parts: string[] = [];
+          if (d.modelName) parts.push(d.modelName);
+          if (d.tags) parts.push(...d.tags);
+          if (d.turnCount != null && d.turnCount > 0) {
+            parts.push(formatTurns(d.turnCount, d.maxTurns));
           }
-        } else {
-          const doneText = isSteered ? "Wrapped up (turn limit)" : "Done";
-          line += "\n" + theme.fg("dim", `  ⎿  ${doneText}`);
+          if (d.toolUses > 0) parts.push(`${d.toolUses} tool use${d.toolUses === 1 ? "" : "s"}`);
+          if (d.tokens) parts.push(d.tokens);
+          if (showCost) {
+            const costText = formatCost(d.cost ?? 0);
+            if (costText) parts.push(costText);
+          }
+          return parts.map(p => fgPreservingNestedStyles(theme, "dim", p)).join(" " + theme.fg("dim", "·") + " ");
+        };
+
+        // ---- While running (streaming) ----
+        if (isPartial || details.status === "running") {
+          const frame = SPINNER[details.spinnerFrame ?? 0];
+          const s = stats(details);
+          return renderRunningAgentStatus(frame, s, details.activity ?? "thinking…", theme);
         }
-        return new Text(line, 0, 0);
-      }
 
-      // ---- Stopped (user-initiated abort) ----
-      if (details.status === "stopped") {
+        // ---- Background agent launched ----
+        if (details.status === "background") {
+          return new Text(theme.fg("dim", `  ⎿  Running in background (ID: ${details.agentId})`), 0, 0);
+        }
+
+        // ---- Completed / Steered ----
+        if (details.status === "completed" || details.status === "steered") {
+          const duration = formatMs(details.durationMs);
+          const isSteered = details.status === "steered";
+          const icon = isSteered ? theme.fg("warning", "✓") : theme.fg("success", "✓");
+          const s = stats(details);
+          let line = icon + (s ? " " + s : "");
+          line += " " + theme.fg("dim", "·") + " " + theme.fg("dim", duration);
+
+          if (expanded) {
+            const resultText = result.content[0]?.type === "text" ? result.content[0].text : "";
+            if (resultText) {
+              const lines = resultText.split("\n").slice(0, 50);
+              for (const l of lines) {
+                line += "\n" + theme.fg("dim", `  ${l}`);
+              }
+              if (resultText.split("\n").length > 50) {
+                line += "\n" + theme.fg("muted", "  ... (use agent_manage action=output with execution_id and verbose for full output)");
+              }
+            }
+          } else {
+            const doneText = isSteered ? "Wrapped up (turn limit)" : "Done";
+            line += "\n" + theme.fg("dim", `  ⎿  ${doneText}`);
+          }
+          return new Text(line, 0, 0);
+        }
+
+        // ---- Stopped (user-initiated abort) ----
+        if (details.status === "stopped") {
+          const s = stats(details);
+          let line = theme.fg("dim", "■") + (s ? " " + s : "");
+          line += "\n" + theme.fg("dim", "  ⎿  Stopped");
+          return new Text(line, 0, 0);
+        }
+
+        // Anything left ("queued", or a status added later) has no rendering of
+        // its own — the turn-limit wording below must not be the catch-all.
+        if (details.status !== "error" && details.status !== "aborted") {
+          return new Text(text, 0, 0);
+        }
+
+        // ---- Error / Aborted (hard max_turns) ----
         const s = stats(details);
-        let line = theme.fg("dim", "■") + (s ? " " + s : "");
-        line += "\n" + theme.fg("dim", "  ⎿  Stopped");
+        let line = theme.fg("error", "✗") + (s ? " " + s : "");
+
+        if (details.status === "error") {
+          line += "\n" + theme.fg("error", `  ⎿  Error: ${details.error ?? "unknown"}`);
+        } else {
+          line += "\n" + theme.fg("warning", "  ⎿  Aborted (max turns exceeded)");
+        }
+
         return new Text(line, 0, 0);
-      }
-
-      // Anything left ("queued", or a status added later) has no rendering of
-      // its own — the turn-limit wording below must not be the catch-all.
-      if (details.status !== "error" && details.status !== "aborted") {
-        return new Text(text, 0, 0);
-      }
-
-      // ---- Error / Aborted (hard max_turns) ----
-      const s = stats(details);
-      let line = theme.fg("error", "✗") + (s ? " " + s : "");
-
-      if (details.status === "error") {
-        line += "\n" + theme.fg("error", `  ⎿  Error: ${details.error ?? "unknown"}`);
-      } else {
-        line += "\n" + theme.fg("warning", "  ⎿  Aborted (max turns exceeded)");
-      }
-
-      return new Text(line, 0, 0);
+      };
+      if (!config) return legacy(expanded);
+      const status = renderContext.isError
+        ? new Text(theme.fg("error", `✗ Error · observed ${details?.status ?? "unknown"}`), 0, 0)
+        : legacy(false);
+      return component(width => [
+        ...status.render(width),
+        ...wrap(`State: ${details?.status ?? "unknown"}`, width).map(row => theme.fg("muted", row)),
+        ...executionConfigRows(config, expanded, width, theme),
+        ...(expanded ? result.content.filter(block => block.type === "text").flatMap(block =>
+          wrap(block.text, width).map(row => theme.fg(renderContext.isError ? "error" : "toolOutput", row))) : []),
+      ]);
     },
 
     // ---- Execute ----
