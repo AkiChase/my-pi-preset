@@ -11,7 +11,8 @@ Implementation approval includes scoped local commits by the main session unless
 No separate commit approval or repeated checkpoint questions are needed. Commit each verified implementation stage
 as it completes. This does not authorize push, rewriting existing history, archive, unrelated work, installation or dependency fetching.
 Task creation or initialization alone is not implementation approval.
-Choose implementation and review executors separately. Prefer direct main-session implementation for
+Choose research, implementation and review executors separately. Handle small lookups directly; delegate
+independently useful code or technical research to `trellis-research`. Prefer direct main-session implementation for
 well-scoped work; delegate when it meaningfully reduces context load, enables independent work or the user requests it.
 
 ## Planning Artifacts

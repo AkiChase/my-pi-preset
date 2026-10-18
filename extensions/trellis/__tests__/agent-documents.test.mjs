@@ -110,6 +110,13 @@ test('task material rules reserve research for findings and keep optional eviden
  assert.match(research, /Do not clean up historical task materials/);
 });
 
+test('research executor guidance stays in existing workflow and planning entry points', () => {
+ const workflow = read('resources/templates/workflow.md');
+ assert.match(workflow, /Choose research, implementation and review executors separately/);
+ assert.match(workflow, /Handle small lookups directly; delegate\s+independently useful code or technical research to `trellis-research`/);
+ assert.match(read('skills/trellis-brainstorm/SKILL.md'), /Inspect available evidence before asking questions, choosing the research executor under the project workflow/);
+});
+
 test("bundled roles are directly maintained; no generator or upstream-anchor requirement remains", () => {
   assert.equal(existsSync(new URL('scripts/sync-agents.mjs', root)), false);
   for (const role of ['implement', 'check', 'research']) assert.match(agent(role).text, /Directly maintained package source/);
