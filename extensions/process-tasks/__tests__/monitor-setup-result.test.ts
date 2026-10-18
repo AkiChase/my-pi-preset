@@ -1,3 +1,4 @@
+import { monitorInput } from "./monitor-input.ts";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -49,7 +50,7 @@ for (const boundary of ["silence shutdown", "immediate deadline"] as const) {
         try {
             const params = { ws: { url: "ws://offline.test" }, description: boundary,
                 ...(boundary === "silence shutdown" ? { wake_absent_ms: 10 } : { timeout_ms: 10 }) };
-            const pending = h.execute("monitor", params);
+            const pending = h.execute("monitor", monitorInput(params));
             if (boundary === "silence shutdown") {
                 await assert.rejects(pending, /Monitor setup cancelled/);
                 assert.ok(closing, "the initial silence notification must trigger shutdown");
@@ -106,7 +107,7 @@ void it("default first window allows startup then submission-triggered shutdown 
     };
     try {
         for (const description of ["one", "two"]) {
-            const result = await h.execute("monitor", { ws: { url: "ws://offline.test" }, description });
+            const result = await h.execute("monitor", monitorInput({ ws: { url: "ws://offline.test" }, description }));
             assert.match(result.content[0]!.text ?? "", /started/);
         }
         Socket.instances[0]!.emit("first"); Socket.instances[1]!.emit("second");

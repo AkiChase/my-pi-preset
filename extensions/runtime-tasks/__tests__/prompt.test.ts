@@ -1,3 +1,4 @@
+import { validateToolArguments } from "@earendil-works/pi-ai";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { dirname, join } from "node:path";
@@ -35,6 +36,18 @@ test("registered split tools and monitor contribute one group each through actua
     for (const example of processRules.matchAll(/: (\{"action"[^\n]+\})/g)) {
       const args = JSON.parse(example[1]!);
       assert.deepEqual(Object.keys(args), Object.keys(JSON.parse(JSON.stringify(tools.find(t => t.name === "process_manage")!.parameters)).properties));
+    }
+    const monitorRules = toolGuidelines.monitor!.join("\n");
+    assert.match(monitorRules, /Provide every field/);
+    assert.doesNotMatch(monitorRules, /optional protocols|omitted means|Omit the unused/i);
+    const monitor = tools.find(t => t.name === "monitor")!;
+    const examples = [...prompt.matchAll(/(?:Command|WebSocket): (\{[^\n]+\})/g)];
+    assert.equal(examples.length, 2);
+    for (const example of examples) {
+      const args = JSON.parse(example[1]!);
+      assert.deepEqual(Object.keys(args), Object.keys(JSON.parse(JSON.stringify(monitor.parameters)).properties));
+      if (args.ws) assert.deepEqual(Object.keys(args.ws), ["url", "protocols"]);
+      assert.doesNotThrow(() => validateToolArguments(monitor as never, { id: "example", name: "monitor", arguments: args } as never));
     }
     assert.match(prompt, /Peer index/); assert.match(prompt, /Peer guideline/);
     assert.doesNotMatch(prompt, /task_manage/);

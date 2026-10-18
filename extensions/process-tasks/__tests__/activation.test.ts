@@ -1,3 +1,4 @@
+import { monitorInput } from "./monitor-input.ts";
 import { processInput } from "../../runtime-tasks/__tests__/process-input.ts";
 import assert from "node:assert/strict";
 import { it } from "node:test";
@@ -40,7 +41,7 @@ void it("shutdown stops fg/bg/command monitor/pending/attach and owned timers de
     try {
         const foreground = h.execute("bash", { command: ignoring });
         await h.execute("bash", { run_in_background: true, command: ignoring });
-        await h.execute("monitor", { command: "trap '' TERM; printf 'first\n'; printf 'pending\n'; while true; do sleep 0.1; done", description: "watch" });
+        await h.execute("monitor", monitorInput({ command: "trap '' TERM; printf 'first\n'; printf 'pending\n'; while true; do sleep 0.1; done", description: "watch" }));
         const jobs = [...h.reg.jobs.values()];
         await until(() => jobs.every((job) => readFileSync(job.logPath, "utf8").length > 0));
         const retrieval = h.execute("process_manage", processInput({ action: "wait", task_id: jobs[1]!.id }));
@@ -60,7 +61,7 @@ void it("shutdown stops fg/bg/command monitor/pending/attach and owned timers de
         assert.equal(h.reg.notificationRetries.size, 0); assert.equal(h.source.list().length, 0);
         await sleep(40); assert.equal(h.messages.length, beforeMessages, "silent stop must not flush monitor pending");
         for (const name of ["bash", "bash", "monitor", "process_manage"]) {
-            const params = name === "monitor" ? { command: "echo late", description: "late" } : name === "process_manage" ? processInput({ action: "list" }) : { command: "echo late" };
+            const params = name === "monitor" ? monitorInput({ command: "echo late", description: "late" }) : name === "process_manage" ? processInput({ action: "list" }) : { command: "echo late" };
             if (name === "process_manage") assert.match((await h.execute(name, params)).content[0].text!, /closed/);
             else await assert.rejects(h.execute(name, params), /closed/);
         }
@@ -125,7 +126,7 @@ void it("WS monitor silent shutdown closes its source and late socket frames can
     const dir = mkdtempSync(join(tmpdir(), "process-ws-close-"));
     const h = processActivation(dir), fresh = processActivation(dir);
     try {
-        await h.execute("monitor", { ws: { url: "ws://offline.test" }, description: "offline socket" });
+        await h.execute("monitor", monitorInput({ ws: { url: "ws://offline.test" }, description: "offline socket" }));
         Socket.instance.emit("message", { data: "first" });
         Socket.instance.emit("message", { data: "pending" });
         const sent = h.messages.length;
@@ -186,7 +187,7 @@ void it("reentrant add publication shutdown cancels monitor before opening a soc
     let closing: Promise<void> | undefined;
     h.source.subscribe(() => { if (h.lifecycle.active) closing = h.lifecycle.shutdown(); });
     try {
-        await assert.rejects(h.execute("monitor", { ws: { url: "ws://offline.test" }, description: "reentrant" }), /cancelled/);
+        await assert.rejects(h.execute("monitor", monitorInput({ ws: { url: "ws://offline.test" }, description: "reentrant" })), /cancelled/);
         await closing;
         assert.equal(h.lifecycle.phase, "closed"); assert.equal(Socket.opens, 0);
         assert.equal(h.reg.totalStarted, 1); assert.equal(h.reg.killedCount, 1);
@@ -233,7 +234,7 @@ for (const throws of [false, true]) {
             if (throws) throw failure;
         });
         try {
-            await assert.rejects(h.execute("monitor", { ws: { url: "ws://offline.test" }, description: "reentrant UI" }),
+            await assert.rejects(h.execute("monitor", monitorInput({ ws: { url: "ws://offline.test" }, description: "reentrant UI" })),
                 throws ? failure : /cancelled/);
             await closing;
             const job = [...h.reg.jobs.values()][0]!;

@@ -1,3 +1,4 @@
+import { monitorInput } from "./monitor-input.ts";
 import { processInput } from "../../runtime-tasks/__tests__/process-input.ts";
 import { registerManagementTool } from "../../runtime-tasks/tools.ts";
 import { EventEmitter } from "node:events";
@@ -222,8 +223,8 @@ test("factory batches command and WS; session fallback cancels old windows; batc
     const context = { ...uiCtx, cwd: dir };
     try {
         await h.handlers.get("session_start")!({}, context);
-        await h.tools.get("monitor")!.execute("command", { command: "printf 'command event\\n'; sleep 1", description: "command source" }, undefined, undefined, context);
-        await h.tools.get("monitor")!.execute("ws", { ws: { url: "ws://offline.test" }, description: "socket source" }, undefined, undefined, context);
+        await h.tools.get("monitor")!.execute("command", monitorInput({ command: "printf 'command event\\n'; sleep 1", description: "command source" }), undefined, undefined, context);
+        await h.tools.get("monitor")!.execute("ws", monitorInput({ ws: { url: "ws://offline.test" }, description: "socket source" }), undefined, undefined, context);
         Socket.instances[0]!.emit("socket event\u001b]52;c;payload\u0007");
         await sleep(300);
         assert.equal(h.messages.length, 1, "one host delivery across command and WS");
@@ -237,7 +238,7 @@ test("factory batches command and WS; session fallback cancels old windows; batc
         }
         Socket.instances[0]!.emit("old pending must vanish");
         await h.handlers.get("session_start")!({}, context);
-        await h.tools.get("monitor")!.execute("new-ws", { ws: { url: "ws://offline.test" }, description: "new socket" }, undefined, undefined, context);
+        await h.tools.get("monitor")!.execute("new-ws", monitorInput({ ws: { url: "ws://offline.test" }, description: "new socket" }), undefined, undefined, context);
         Socket.instances[1]!.emit("new epoch event");
         await sleep(300);
         assert.equal(h.messages.length, 2);
@@ -275,14 +276,14 @@ test("factory fallback reset inside deadline decision schedules new source and s
     try {
         await h.handlers.get("session_start")!({}, context);
         for (const description of ["deadline one", "deadline two"]) {
-            await h.tools.get("monitor")!.execute(description, { ws: { url: "ws://offline.test" }, description, timeout_ms: 200 }, undefined, undefined, context);
+            await h.tools.get("monitor")!.execute(description, monitorInput({ ws: { url: "ws://offline.test" }, description, timeout_ms: 200 }), undefined, undefined, context);
         }
         for (const socket of Socket.instances) socket.emit("old pending");
         off = h.backend.source.subscribe(() => {
             if (!h.backend.source.list().some(view => view.status === "stopped")) return;
             off();
             reset = h.handlers.get("session_start")!({}, context);
-            fresh = h.tools.get("monitor")!.execute("fresh", { ws: { url: "ws://offline.test" }, description: "fresh epoch" }, undefined, undefined, context);
+            fresh = h.tools.get("monitor")!.execute("fresh", monitorInput({ ws: { url: "ws://offline.test" }, description: "fresh epoch" }), undefined, undefined, context);
             Socket.instances[2]!.emit("fresh output");
         });
         t.mock.timers.tick(200); await reset; await fresh;
@@ -333,9 +334,9 @@ test("actual factory retains hundreds of terminals beyond admission: bounded sin
         monitorBatchOverflow: { sourceCount: number; omittedSources: number; manifestPath?: string } } };
     const run = async (factory: ReturnType<typeof startExtension>, label: string, count = 350) => {
         for (let i = 0; i < count; i++) {
-            const result = await factory.tools.get("monitor")!.execute(`${label}-${i}`, {
+            const result = await factory.tools.get("monitor")!.execute(`${label}-${i}`, monitorInput({
                 ws: { url: "ws://offline.test" }, description: `${label} ${i} ` + "中文".repeat(400),
-            }, undefined, undefined, context);
+            }), undefined, undefined, context);
             assert.match(result.content[0]!.text, /Monitor .* started/);
             const socket = Socket.instances.at(-1)!;
             socket.emit("message", { data: `original ${label} ${i}\u001b]52;c;unsafe\u0007` });
@@ -372,7 +373,7 @@ test("actual factory retains hundreds of terminals beyond admission: bounded sin
         t.mock.timers.tick(60000); assert.equal(h.messages.length, 1); assert.equal(other.messages.length, 1);
         await h.handlers.get("session_start")!({}, context); manifestFail = true;
         await run(h, "failed");
-        await h.tools.get("monitor")!.execute("live", { ws: { url: "ws://offline.test" }, description: "listener survives manifest failure" }, undefined, undefined, context);
+        await h.tools.get("monitor")!.execute("live", monitorInput({ ws: { url: "ws://offline.test" }, description: "listener survives manifest failure" }), undefined, undefined, context);
         const live = Socket.instances.at(-1)!; live.emit("message", { data: "pending live activity" });
         t.mock.timers.tick(200); assert.equal(h.messages.length, 2); assert.equal(live.closes, 0);
         const failed = h.messages[1] as unknown as Message;

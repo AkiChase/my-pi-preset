@@ -1,3 +1,4 @@
+import { monitorInput } from "./monitor-input.ts";
 import { describe, it, before, after, test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -57,7 +58,7 @@ void describe("monitor tool — validation", () => {
     void it("rejects when neither command nor ws is given", async () => {
         const { tool, ctx } = makeHarness();
         await assert.rejects(
-            () => tool.execute("t1", { description: "x" }, undefined, undefined, ctx),
+            () => tool.execute("t1", monitorInput({ description: "x" }), undefined, undefined, ctx),
             /needs a `command` or a `ws`/
         );
     });
@@ -68,7 +69,7 @@ void describe("monitor tool — validation", () => {
             () =>
                 tool.execute(
                     "t2",
-                    { command: "echo hi", ws: { url: "ws://x" }, description: "x" },
+                    monitorInput({ command: "echo hi", ws: { url: "ws://x" }, description: "x" }),
                     undefined,
                     undefined,
                     ctx
@@ -80,7 +81,7 @@ void describe("monitor tool — validation", () => {
     void it("rejects a blank description", async () => {
         const { tool, ctx } = makeHarness();
         await assert.rejects(
-            () => tool.execute("t3", { command: "echo hi", description: "   " }, undefined, undefined, ctx),
+            () => tool.execute("t3", monitorInput({ command: "echo hi", description: "   " }), undefined, undefined, ctx),
             /description` must be a non-empty string/
         );
     });
@@ -91,7 +92,7 @@ void describe("monitor tool — command lifecycle", () => {
         const { tool, ctx, messages } = makeHarness();
         const res = await tool.execute(
             "t4",
-            { command: "printf 'line-A\\nline-B\\n'", description: "test stream" },
+            monitorInput({ command: "printf 'line-A\\nline-B\\n'", description: "test stream" }),
             undefined,
             undefined,
             ctx
@@ -193,13 +194,13 @@ for (const key of ["timeout_ms", "wake_absent_ms"] as const) {
     for (const value of [0, -1, NaN, Infinity]) {
         test(`AC11: ${key}=${value} rejected before WS construction or registry insertion`, async () => {
             const h = makeHarness(); const before = FakeWS.instances.length;
-            await assert.rejects(() => h.tool.execute("invalid", { command: "echo must-not-run", description: "invalid", [key]: value },
+            await assert.rejects(() => h.tool.execute("invalid", monitorInput({ command: "echo must-not-run", description: "invalid", [key]: value }),
                 undefined, undefined, h.ctx), /finite positive/);
             assert.equal(h.reg.totalStarted, 0); assert.equal(h.reg.jobs.size, 0); assert.equal(FakeWS.instances.length, before);
         });
     }
 }
-test("AC16: tool schema has optional timeout/silence and no persistent", () => {
+test("AC16: tool schema has required nullable timeout/silence and no persistent", () => {
     const h = makeHarness(); const keys = h.tool.parameters!.properties;
     assert.ok("timeout_ms" in keys); assert.ok("wake_absent_ms" in keys); assert.ok(!("persistent" in keys));
 });
@@ -208,7 +209,7 @@ test("source constructor failure rolls back started count and registry", async t
     globalThis.WebSocket = class { constructor() { throw new Error("constructor failed"); } } as unknown as typeof WebSocket;
     t.after(() => { globalThis.WebSocket = original; });
     const h = makeHarness();
-    await assert.rejects(() => h.tool.execute("fail", { ws: { url: "ws://local.invalid" }, description: "x" }, undefined, undefined, h.ctx), /constructor failed/);
+    await assert.rejects(() => h.tool.execute("fail", monitorInput({ ws: { url: "ws://local.invalid" }, description: "x" }), undefined, undefined, h.ctx), /constructor failed/);
     assert.equal(h.reg.jobs.size, 0); assert.equal(h.reg.totalStarted, 0); assert.equal(h.reg.jobAborts.size, 0);
 });
 test("AC4/5/6/12/19: WS empty/multiline/omitted messages each reset activity; diagnostics and late messages don't recover", async t => {
@@ -220,7 +221,7 @@ test("AC4/5/6/12/19: WS empty/multiline/omitted messages each reset activity; di
     let tool!: CapturedTool;
     registerMonitorTool({ registerTool(def: CapturedTool) { tool = def; }, sendMessage(m: typeof messages[number]) { messages.push(m); } } as never, reg);
     const ctx = makeHarness().ctx;
-    await tool.execute("ws", { ws: { url: "ws://local.invalid" }, description: "ws activity", wake_absent_ms: 1000 }, undefined, undefined, ctx);
+    await tool.execute("ws", monitorInput({ ws: { url: "ws://local.invalid" }, description: "ws activity", wake_absent_ms: 1000 }), undefined, undefined, ctx);
     const ws = FakeWS.instances.at(-1)!;
     ws.dispatch("message", { data: "" }); t.mock.timers.tick(200); assert.equal(messages.length, 1);
     for (let i = 0; i < 5; i++) { t.mock.timers.tick(i === 0 ? 700 : 900); ws.dispatch("message", { data: "abcdef\nmore\nlast" }); }
@@ -241,7 +242,7 @@ test("AC17/19: real stderr-only source exceeds shared log cap, stops with one co
     let tool!: CapturedTool;
     registerMonitorTool({ registerTool(def: CapturedTool) { tool = def; }, sendMessage(m: typeof sent[number]) { sent.push(m); } } as never, reg);
     t.after(() => { for (const job of reg.jobs.values()) terminateJobSilently(reg, job); });
-    await tool.execute("stderr-cap", { command: "while true; do printf 'stderr-output-0123456789\\n' >&2; sleep 0.01; done", description: "stderr cap" }, undefined, undefined, makeHarness().ctx);
+    await tool.execute("stderr-cap", monitorInput({ command: "while true; do printf 'stderr-output-0123456789\\n' >&2; sleep 0.01; done", description: "stderr cap" }), undefined, undefined, makeHarness().ctx);
     const job = [...reg.jobs.values()][0]!; await job.donePromise; await sleep(250);
     const terminals = sent.filter(m => m.customType === EVENT.taskNotification);
     assert.equal(terminals.length, 1); assert.match(terminals[0]!.content, /log size exceeded 100 bytes/);
@@ -263,8 +264,8 @@ test("AC18: tool startup wiring failure closes WS/log fd and rolls back all runt
         publish();
         if ([...h.reg.jobs.values()].some(job => job.stop)) throw new Error("registry wiring failed");
     });
-    await assert.rejects(() => h.tool.execute("ui-fail", { ws: { url: "ws://local.invalid" }, description: "ui failure",
-        wake_absent_ms: 1000 }, undefined, undefined, h.ctx), /registry wiring failed/);
+    await assert.rejects(() => h.tool.execute("ui-fail", monitorInput({ ws: { url: "ws://local.invalid" }, description: "ui failure",
+        wake_absent_ms: 1000 }), undefined, undefined, h.ctx), /registry wiring failed/);
     assert.equal(closes, 1); assert.equal(closedFds.length, 1);
     assert.equal(h.reg.jobs.size, 0); assert.equal(h.reg.totalStarted, 0); assert.equal(h.reg.jobAborts.size, 0);
     const ws = FakeWS.instances.at(-1)!;
@@ -272,4 +273,42 @@ test("AC18: tool startup wiring failure closes WS/log fd and rolls back all runt
     t.mock.timers.tick(100000); await Promise.resolve();
     assert.equal(h.messages.length, 0); assert.equal(closes, 1); assert.equal(closedFds.length, 1);
     assert.equal(h.reg.completedCount + h.reg.failedCount + h.reg.killedCount, 0);
+});
+
+test("registered WS envelopes preserve null defaults, empty protocols and preference order", async t => {
+    t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1000 });
+    const original = globalThis.WebSocket; globalThis.WebSocket = FakeWS as unknown as typeof WebSocket;
+    t.after(() => { globalThis.WebSocket = original; t.mock.timers.reset(); });
+    for (const protocols of [null, [], ["second", "first"]]) {
+        const h = makeHarness();
+        const input = monitorInput({ ws: { url: "ws://local.invalid", protocols }, description: "defaults" });
+        const snapshot = structuredClone(input);
+        const result = await h.tool.execute("defaults", input, undefined, undefined, h.ctx);
+        const job = [...h.reg.jobs.values()][0]!;
+        const ws = FakeWS.instances.at(-1)!;
+        assert.equal(ws.protocols, protocols === null ? undefined : protocols);
+        assert.deepEqual(input, snapshot);
+        assert.match(result.content[0]!.text, /no deadline/);
+        t.mock.timers.tick(36_000_000);
+        assert.equal(job.status, "running"); assert.equal(h.messages.length, 0);
+        terminateJobSilently(h.reg, job); await Promise.resolve();
+        assert.equal(h.reg.jobAborts.size, 0);
+    }
+});
+
+test("registered fractional time controls retain exact deadline and silence values", async t => {
+    t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1000 });
+    const original = globalThis.WebSocket; globalThis.WebSocket = FakeWS as unknown as typeof WebSocket;
+    t.after(() => { globalThis.WebSocket = original; t.mock.timers.reset(); });
+    const h = makeHarness();
+    await h.tool.execute("fraction", monitorInput({ ws: { url: "ws://local.invalid" },
+        description: "fraction", timeout_ms: 10.5, wake_absent_ms: 2.5 }), undefined, undefined, h.ctx);
+    const job = [...h.reg.jobs.values()][0]!;
+    t.after(() => terminateJobSilently(h.reg, job));
+    t.mock.timers.tick(3); t.mock.timers.tick(200);
+    await Promise.resolve();
+    assert.equal(job.status, "killed");
+    const message = h.messages[0] as unknown as { content: string };
+    assert.match(message.content, /timeout after 10\.5ms/);
+    assert.equal(h.reg.jobAborts.size, 0);
 });
