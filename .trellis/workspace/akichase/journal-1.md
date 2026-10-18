@@ -1121,3 +1121,43 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Next Steps
 
 - 资源部署未执行；本次不推送。
+
+
+## Session 35: 完成 npm test 资源占用优化
+<!-- trellis-session: v=2 fp=692babed7d9a462b -->
+
+**Date**: 2026-10-18
+**Task**: 完成 npm test 资源占用优化
+**Branch**: `main`
+
+### Summary
+
+完成已批准的测试减重范围并归档任务：保持单一 npm test 入口与文件并发 8，减少重复初始化、原生查询和 CLI 启动；最终已记录的成功全量为 1416/1416（72.10s wall / 355.83 CPU s）。已明确保留限制：force-exit 不能证明自然资源释放，真实 provider/TUI 未运行；如需进一步生产初始化或 query 性能优化，须另建并批准范围。
+
+### Main Changes
+
+- 固定测试文件并发为 8，并移除已批准的 GC 与忙循环专项测试。
+- 将大量重复的 Trellis/sync/memory 测试下沉为纯函数或代表性 smoke，保留关键真实 Git、安全和 runtime 覆盖。
+- 减少 managed worktree query 的冗余 Git 调用。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f7e395b` | test: cap file concurrency and remove GC probes |
+| `c4d0db8` | test: streamline resource-intensive test coverage |
+| `7d1efff` | perf: reduce Git calls in worktree queries |
+| `508e439` | Remove exact pnpm version pin |
+
+### Testing
+
+- [OK] npm test：1416/1416 通过；72.10s wall / 355.83 CPU s（最终已记录成功全量）。
+- [OK] 最终 typecheck 通过；Python worktree 38/38、deployed CLI/dispatch smoke 7/7 通过。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 若继续优化资源占用，先单独批准生产 query/初始化性能改造范围。
