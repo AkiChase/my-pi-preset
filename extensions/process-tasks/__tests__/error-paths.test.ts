@@ -1,3 +1,4 @@
+import { bashInput } from "./bash-input.ts";
 import { processInput } from "../../runtime-tasks/__tests__/process-input.ts";
 import { createBashToolDefinition } from "@earendil-works/pi-coding-agent";
 import { test, type TestContext } from "node:test";
@@ -96,7 +97,7 @@ for (const failureMode of ["show-and-clear", "clear-only", "poller-stop"] as con
                 if (timer === pollTimer) { pollTimer = undefined; throw new Error("poller stop failed after clearing timer"); }
             });
         }
-        const result = h.tools.get("bash")!.execute("hint", { command: "printf ready; tail -f /dev/null" }, undefined, undefined, h.ctx);
+        const result = h.tools.get("bash")!.execute("hint", bashInput({ command: "printf ready; tail -f /dev/null" }), undefined, undefined, h.ctx);
         // Attach the rejection handler before advancing the quick-window timer.
         const settled = result.then(value => ({ value, error: undefined }), error => ({ value: undefined, error }));
         const job = [...h.reg.jobs.values()][0]!;
@@ -129,7 +130,7 @@ for (const failureMode of ["show-and-clear", "clear-only", "poller-stop"] as con
 
 test("foreground execution error survives a failing final source publication", async t => {
     const h = harness(t);
-    const result = h.tools.get("bash")!.execute("error", { command: "printf primary-command-error; exit 7" }, undefined, undefined, h.ctx);
+    const result = h.tools.get("bash")!.execute("error", bashInput({ command: "printf primary-command-error; exit 7" }), undefined, undefined, h.ctx);
     const changed = h.reg.changed.bind(h.reg);
     t.mock.method(h.reg, "changed", () => {
         if (h.reg.coordinator.waitCount === 0) throw new Error("secondary final publication error");
@@ -158,8 +159,8 @@ test("bash explicit background setup failure silently stops the spawned process 
             statusCalls++; controller = [...h.reg.jobAborts.values()][0];
             done = [...h.reg.jobs.values()][0]?.donePromise; throw failure;
         });
-        const params = { command: "tail -f /dev/null", run_in_background: true };
-        await assert.rejects(h.tools.get("bash")!.execute("setup", params, undefined, undefined, h.ctx), error => error === failure);
+        const params = { command: "tail -f /dev/null", background_after_seconds: 0 };
+        await assert.rejects(h.tools.get("bash")!.execute("setup", bashInput(params), undefined, undefined, h.ctx), error => error === failure);
         const job = [...h.reg.jobs.values()][0]!;
         assert.equal(statusCalls, 1, "failure must occur on the initial render after lifecycle wiring");
         assert.ok(controller?.signal.aborted);

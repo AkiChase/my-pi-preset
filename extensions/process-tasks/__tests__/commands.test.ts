@@ -45,18 +45,20 @@ void describe("formatConfigReport", () => {
         });
         assert.match(out, /Config file: none/);
         assert.match(out, /Overridden: nothing/);
+        assert.doesNotMatch(out, /timeoutMs|PROCESS_TASKS_TIMEOUT_MS/);
+        assert.match(out, /logDir → PROCESS_TASKS_LOG_DIR/);
     });
 
     void it("lists only the overridden keys, with their defaults", () => {
         // A full dump would bury the one line the user is looking for.
-        const reg = new BackgroundRegistry({ ...DEFAULTS, timeoutMs: 600_000 });
+        const reg = new BackgroundRegistry({ ...DEFAULTS, stallThresholdMs: 600_000 });
         const out = formatConfigReport({
             reg,
             configPath: "/tmp/agent/process-tasks.json",
             warnings: [],
         });
         assert.match(out, /Config file: \/tmp\/agent\/process-tasks\.json/);
-        assert.match(out, /timeoutMs: 600000 {2}\(default 120000\)/);
+        assert.match(out, /stallThresholdMs: 600000 {2}\(default 45000\)/);
         assert.ok(!out.includes("maxConcurrentJobs"));
     });
 
@@ -64,8 +66,8 @@ void describe("formatConfigReport", () => {
         const out = formatConfigReport({
             reg: new BackgroundRegistry(),
             configPath: undefined,
-            warnings: ["timeoutMs: expected a number"],
+            warnings: ["stallThresholdMs: expected a number"],
         });
-        assert.match(out, /Warnings:\n {2}• timeoutMs: expected a number/);
+        assert.match(out, /Warnings:\n {2}• stallThresholdMs: expected a number/);
     });
 });

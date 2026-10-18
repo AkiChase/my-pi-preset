@@ -58,7 +58,7 @@ export function formatConfigReport(args: {
 
     lines.push(
         "",
-        "Every key can also be set as an environment variable — timeoutMs → PROCESS_TASKS_TIMEOUT_MS —",
+        "Every key can also be set as an environment variable — logDir → PROCESS_TASKS_LOG_DIR —",
         "which takes precedence over the file."
     );
     return lines.join("\n");

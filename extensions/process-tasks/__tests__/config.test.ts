@@ -41,8 +41,8 @@ void describe("loadConfig — no file", () => {
 
 void describe("loadConfig — valid file", () => {
     void it("overrides only the keys present", () => {
-        const { config, warnings, path } = load('{"timeoutMs": 600000}');
-        assert.equal(config.timeoutMs, 600_000);
+        const { config, warnings, path } = load('{"stallThresholdMs": 600000}');
+        assert.equal(config.stallThresholdMs, 600_000);
         assert.equal(config.maxConcurrentJobs, DEFAULTS.maxConcurrentJobs);
         assert.deepEqual(warnings, []);
         assert.ok(path?.endsWith(CONFIG_FILENAME));
@@ -78,9 +78,9 @@ void describe("loadConfig — malformed input never throws", () => {
         assert.match(warnings.join("\n"), /could not read/);
     });
     void it("falls back and warns on a non-numeric number", () => {
-        const { config, warnings } = load('{"timeoutMs": "soon"}');
-        assert.equal(config.timeoutMs, DEFAULTS.timeoutMs);
-        assert.match(warnings.join("\n"), /timeoutMs: expected a number/);
+        const { config, warnings } = load('{"stallThresholdMs": "soon"}');
+        assert.equal(config.stallThresholdMs, DEFAULTS.stallThresholdMs);
+        assert.match(warnings.join("\n"), /stallThresholdMs: expected a number/);
     });
     void it("falls back and warns on an out-of-range number", () => {
         const { config, warnings } = load('{"monitorMaxLinesPerEvent": 0}');
@@ -117,7 +117,7 @@ void describe("loadConfig — malformed input never throws", () => {
 
 void describe("loadConfig — environment overrides", () => {
     void it("derives the variable name from the key", () => {
-        assert.equal(envNameFor("timeoutMs"), "PROCESS_TASKS_TIMEOUT_MS");
+        assert.equal(envNameFor("stallThresholdMs"), "PROCESS_TASKS_STALL_THRESHOLD_MS");
         assert.equal(envNameFor("logDir"), "PROCESS_TASKS_LOG_DIR");
         assert.equal(
             envNameFor("monitorMaxLinesPerEvent"),
@@ -125,21 +125,21 @@ void describe("loadConfig — environment overrides", () => {
         );
     });
     void it("takes precedence over the file", () => {
-        const { config } = load('{"timeoutMs": 300000}', {
-            PROCESS_TASKS_TIMEOUT_MS: "90000",
+        const { config } = load('{"stallThresholdMs": 300000}', {
+            PROCESS_TASKS_STALL_THRESHOLD_MS: "90000",
         });
-        assert.equal(config.timeoutMs, 90_000);
+        assert.equal(config.stallThresholdMs, 90_000);
     });
     void it("applies without a file", () => {
         const { config } = load(undefined, { PROCESS_TASKS_LOG_DIR: "/var/tmp/bg" });
         assert.equal(config.logDir, "/var/tmp/bg");
     });
     void it("warns and keeps the file value when the variable is invalid", () => {
-        const { config, warnings } = load('{"timeoutMs": 300000}', {
-            PROCESS_TASKS_TIMEOUT_MS: "nope",
+        const { config, warnings } = load('{"stallThresholdMs": 300000}', {
+            PROCESS_TASKS_STALL_THRESHOLD_MS: "nope",
         });
-        assert.equal(config.timeoutMs, 300_000);
-        assert.match(warnings.join("\n"), /PROCESS_TASKS_TIMEOUT_MS: timeoutMs: expected a number/);
+        assert.equal(config.stallThresholdMs, 300_000);
+        assert.match(warnings.join("\n"), /PROCESS_TASKS_STALL_THRESHOLD_MS: stallThresholdMs: expected a number/);
     });
 });
 
@@ -156,4 +156,18 @@ void it("does not read legacy backend shortcut keys or environment overrides", (
     assert.ok(!("shortcutBackground" in config));
     assert.ok(!("shortcutTaskPanel" in config));
     assert.equal(warnings.length, 2);
+});
+
+void it("retires timeoutMs file/env settings with warnings and never rewrites the user's file", () => {
+    const agentDir = mkdtempSync(join(dir, "retired-"));
+    const path = join(agentDir, CONFIG_FILENAME);
+    const contents = '{"timeoutMs":600000,"monitorFlushMs":0}';
+    writeFileSync(path, contents);
+    const result = loadConfig(agentDir, { PROCESS_TASKS_TIMEOUT_MS: "0" });
+    assert.equal("timeoutMs" in result.config, false);
+    assert.equal("timeoutMs" in DEFAULTS, false);
+    assert.equal(result.config.monitorFlushMs, 0);
+    assert.match(result.warnings.join("\n"), /unknown key "timeoutMs"/);
+    assert.match(result.warnings.join("\n"), /PROCESS_TASKS_TIMEOUT_MS is retired and unsupported/);
+    assert.equal(readFileSync(path, "utf8"), contents);
 });

@@ -1,3 +1,4 @@
+import { bashInput } from "../../process-tasks/__tests__/bash-input.ts";
 import { processInput } from "../../runtime-tasks/__tests__/process-input.ts";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -56,7 +57,7 @@ void it("one shared /bg releases mixed shell/agent launch and retrieval waits wi
     registerManagementFixture(pi, reg);
     try {
         const shellParent = new AbortController(), agentParent = new AbortController();
-        const shellLaunch = tools.get("bash")!.execute("mixed-shell", { command: "printf 'shell-before\\n'; tail -f /dev/null" }, shellParent.signal, undefined, ctx);
+        const shellLaunch = tools.get("bash")!.execute("mixed-shell", bashInput({ command: "printf 'shell-before\\n'; tail -f /dev/null" }), shellParent.signal, undefined, ctx);
         const job = [...reg.jobs.values()][0]!;
         const id = manager.spawn(pi, ctx as ExtensionContext, "general-purpose", "mixed agent", {
             description: "mixed agent", isBackground: false, blocking: true, signal: agentParent.signal,

@@ -1,3 +1,4 @@
+import { bashInput } from "./bash-input.ts";
 /**
  * The `bash` override's parameter schema and its model-visible error contract.
  *
@@ -103,129 +104,71 @@ function hostError(tool: ToolDef, args: unknown): Error | undefined {
 }
 
 void describe("bash parameter schema — host validation", () => {
-    it("accepts a minimal call and the documented optional fields", () => {
+    it("requires exactly three nonnullable fields, without schema defaults", () => {
         const { tool } = harness();
-        for (const args of [
-            { command: "true" },
-            { command: "true", background_after_seconds: 30 },
-            { command: "true", run_in_background: true },
-            { command: "true", description: "why" },
-        ]) {
-            assert.doesNotThrow(() => hostValidate(tool, args), `rejected ${JSON.stringify(args)}`);
-        }
-    });
-
-    it("rejects a misspelled optional field instead of silently ignoring it", () => {
-        const { tool } = harness();
-        // The defect this closes: with an open object the typo passed validation
-        // and the command ran with the *configured* background_after_seconds, so the model's
-        // intent was discarded without a word.
-        const err = hostError(tool, { command: "true", timeuot: 1 });
-        assert.ok(err, "the typo must be rejected");
-        assert.match(err.message, /timeuot/);
-    });
-
-    it("rejects each documented way of getting background_after_seconds wrong, naming the field", () => {
-        const { tool } = harness();
-        for (const background_after_seconds of [0, -1, 1.5e300]) {
-            const err = hostError(tool, { command: "true", background_after_seconds });
-            assert.ok(err, `background_after_seconds=${background_after_seconds} must be rejected`);
-            assert.match(err.message, /background_after_seconds/);
-        }
-    });
-
-    it("accepts the built-in tool's maximum background_after_seconds and rejects one second more", () => {
-        const { tool } = harness();
-        assert.doesNotThrow(() => hostValidate(tool, { command: "true", background_after_seconds: MAX_BACKGROUND_AFTER_SECONDS }));
-        // Above the built-in's `MAX_TIMEOUT_MS`, `setTimeout` wraps and the timer
-        // fires immediately: a request to wait half an hour would return at once.
-        assert.throws(() => hostValidate(tool, { command: "true", background_after_seconds: MAX_BACKGROUND_AFTER_SECONDS + 1 }));
-    });
-
-    it("requires command and reports its absence by field name", () => {
-        const { tool } = harness();
-        const err = hostError(tool, {});
-        assert.ok(err, "command is required");
-        assert.match(err.message, /command/);
-    });
-
-    it("coerces a numeric command rather than rejecting it (host behavior, not ours)", () => {
-        const { tool } = harness();
-        // Documented so it is not mistaken for a gap: the host coerces scalars to
-        // the declared type before the tool sees them, so `command: 42` arrives as
-        // "42". `isBlankCommand` in execute() is what rejects an empty result.
-        assert.deepEqual(hostValidate(tool, { command: 42 }), { command: "42" });
-    });
-
-    it("is a closed object at the top level", () => {
-        const { tool } = harness();
-        const schema = JSON.parse(JSON.stringify(tool.parameters)) as {
-            additionalProperties?: unknown;
-            properties: Record<string, { description?: string }>;
-        };
+        const schema = JSON.parse(JSON.stringify(tool.parameters));
+        assert.deepEqual(schema.required, ["command", "background_after_seconds", "description"]);
         assert.equal(schema.additionalProperties, false);
-        // Every field the model can send carries a description — an undocumented
-        // knob is one the model has to guess at.
-        for (const [key, value] of Object.entries(schema.properties)) {
-            assert.equal(typeof value.description, "string", `${key} has no description`);
-            assert.notEqual(value.description, "", `${key} has an empty description`);
+        assert.deepEqual(Object.keys(schema.properties), schema.required);
+        for (const field of schema.required) {
+            assert.equal(schema.properties[field].default, undefined);
+            assert.notEqual(schema.properties[field].type, "null");
+            assert.ok(schema.properties[field].description);
+            const args = bashInput({ command: "true" }) as Record<string, unknown>;
+            delete args[field];
+            assert.match(hostError(tool, args)!.message, new RegExp(field));
+        }
+        for (const seconds of [-1, 0, 0.125, MAX_BACKGROUND_AFTER_SECONDS]) {
+            assert.deepEqual(hostValidate(tool, bashInput({ command: "true", background_after_seconds: seconds })), bashInput({ command: "true", background_after_seconds: seconds }));
+        }
+        assert.match(JSON.parse(JSON.stringify(bashParamSchema(DEFAULTS))).properties.background_after_seconds.description, /-1.*0.*positive/);
+        for (const seconds of [-2, Infinity, MAX_BACKGROUND_AFTER_SECONDS + 1]) assert.ok(hostError(tool, bashInput({ command: "true", background_after_seconds: seconds })));
+        for (const key of ["run_in_background", "notify", "timeout", "timeuot"]) for (const value of [false, null, true]) {
+            assert.match(hostError(tool, { ...bashInput({ command: "true" }), [key]: value })!.message, new RegExp(key));
         }
     });
-
-    it("quotes the configured background_after_seconds default in the background_after_seconds description", () => {
-        const schema = JSON.parse(JSON.stringify(bashParamSchema({ ...DEFAULTS, timeoutMs: 5_000 }))) as {
-            properties: Record<string, { description?: string }>;
-        };
-        assert.match(schema.properties.background_after_seconds!.description!, /default: 5\b/);
-    });
-
-    it("advertises its defaults in the schema, and the host never fills them", () => {
+    it("records actual host scalar conversions separately from strict direct admission", () => {
         const { tool } = harness();
-        const schema = JSON.parse(JSON.stringify(tool.parameters)) as {
-            properties: Record<string, { default?: unknown }>;
-        };
-        // `default` is model-facing documentation only: the host's Value.Convert
-        // does not apply it, so execute() must keep applying the real threshold.
-        assert.equal(schema.properties.run_in_background!.default, false);
-        assert.equal(schema.properties.background_after_seconds!.default, DEFAULTS.timeoutMs / 1000);
-        assert.deepEqual(hostValidate(tool, { command: "true" }), { command: "true" });
-
-        const configured = JSON.parse(JSON.stringify(bashParamSchema({ ...DEFAULTS, timeoutMs: 5_000 }))) as {
-            properties: Record<string, { default?: unknown }>;
-        };
-        assert.equal(configured.properties.background_after_seconds!.default, 5);
-        // A configured threshold can never advertise a default its own maximum
-        // rejects; NUMERIC_BOUNDS caps timeoutMs at 24h, far below the ceiling.
-        assert.ok((configured.properties.background_after_seconds!.default as number) <= MAX_BACKGROUND_AFTER_SECONDS);
+        for (const value of [null, false, 0, 0.125, true, undefined]) {
+            const expected = value === undefined ? "" : String(value);
+            const args = { ...bashInput({ command: "true" }), description: value };
+            assert.deepEqual(hostValidate(tool, args), { ...args, description: expected });
+        }
+        for (const [value, expected] of [[null, 0], [false, 0], ["", 0], ["0.125", 0.125], [true, 1], [undefined, 0]] as const) {
+            assert.deepEqual(hostValidate(tool, { ...bashInput({ command: "true" }), background_after_seconds: value }), bashInput({ command: "true", background_after_seconds: expected }));
+        }
+        assert.deepEqual(hostValidate(tool, { ...bashInput({ command: "true" }), command: 42 }), bashInput({ command: "42" }));
+        assert.ok(hostError(tool, bashInput({ command: "" })));
     });
 });
 
 void describe("bash runtime checks — defense in depth behind the schema", () => {
-    it("rejects an out-of-range background_after_seconds even when execute() is called directly", async () => {
+    it("rejects malformed raw shapes/types/domains before cwd, log or spawn effects without mutation", async () => {
         const h = harness();
-        // A direct SDK/codemode caller can bypass the host validator; the check
-        // must not live only in the schema.
-        await assert.rejects(
-            () => h.tool.execute("dl", { command: "true", background_after_seconds: MAX_BACKGROUND_AFTER_SECONDS + 1 }, undefined, undefined, h.ctx),
-            /must not exceed/
-        );
-        assert.equal(h.reg.totalStarted, 0, "a rejected background_after_seconds must not start a job");
-        assert.equal(h.reg.jobs.size, 0);
+        const good = bashInput({ command: "true" });
+        const invalid: unknown[] = [null, false, [], "true", 42, { ...good, [Symbol("unknown")]: 1 }];
+        for (const field of Object.keys(good)) {
+            const missing = { ...good } as Record<string, unknown>; delete missing[field]; invalid.push(missing);
+            for (const value of [null, undefined, false, {}, []]) invalid.push({ ...good, [field]: value });
+        }
+        for (const command of ["", " \n\t", 0, 42]) invalid.push({ ...good, command });
+        for (const seconds of ["0", "-1", "0.125", -2, -0.5, NaN, Infinity, -Infinity, MAX_BACKGROUND_AFTER_SECONDS + 0.001]) invalid.push({ ...good, background_after_seconds: seconds });
+        for (const description of [0, 42]) invalid.push({ ...good, description });
+        for (const key of ["run_in_background", "timeout", "notify", "typo"]) for (const value of [false, null, undefined]) invalid.push({ ...good, [key]: value });
+        for (const args of invalid) {
+            if (args && typeof args === "object") Object.freeze(args);
+            const before = args && typeof args === "object" ? Object.getOwnPropertyDescriptors(args) : args;
+            await assert.rejects(h.tool.execute("invalid", args, undefined, undefined, { get cwd() { throw new Error("cwd must not be read"); } }), /bash|command|description|background_after_seconds/i);
+            if (args && typeof args === "object") assert.deepEqual(Object.getOwnPropertyDescriptors(args), before);
+            assert.equal(h.reg.totalStarted, 0); assert.equal(h.reg.jobs.size, 0);
+        }
+        const inherited = Object.create(good);
+        await assert.rejects(h.tool.execute("inherited", inherited, undefined, undefined, h.ctx), /must be provided/);
     });
-
-    it("rejects unknown parameters for direct execute callers before spawn", async () => {
+    it("rejects the removed mode with a correctable error", async () => {
         const h = harness();
-        await assert.rejects(() => h.tool.execute("typo", { command: "true", timeuot: 1 }, undefined, undefined, h.ctx), /timeuot/);
+        await assert.rejects(h.tool.execute("legacy", { ...bashInput({ command: "true" }), run_in_background: false }, undefined, undefined, h.ctx), /Unknown bash parameter 'run_in_background'.*background_after_seconds=0/);
         assert.equal(h.reg.totalStarted, 0);
-    });
-
-    it("rejects removed notify before spawn", async () => {
-        const h = harness();
-        await assert.rejects(
-            () => h.tool.execute("n", { command: "true", notify: true }, undefined, undefined, h.ctx),
-            /Unknown bash parameter 'notify'/
-        );
-        assert.equal(h.reg.jobs.size, 0);
     });
 });
 
@@ -236,6 +179,7 @@ void describe("bash structuredContent — the inherited output schema", () => {
         // has to satisfy it on every path because codemode resolves a declared
         // outputSchema to `structuredContent`.
         const { tool } = harness(createBashToolDefinition(dir));
+        assert.equal(Reflect.get(tool, "prepareArguments"), undefined, "no inherited legacy argument conversion");
         const schema = tool.outputSchema as { properties?: Record<string, unknown> } | undefined;
         assert.ok(schema, "the inherited outputSchema must still be attached");
         assert.deepEqual(
@@ -248,7 +192,7 @@ void describe("bash structuredContent — the inherited output schema", () => {
         const h = harness();
         for (const command of ["printf ok", "printf bad; exit 7", "tail -f /dev/null"]) {
             const controller = new AbortController();
-            const pending = h.tool.execute(`s-${command}`, { command }, controller.signal, undefined, h.ctx);
+            const pending = h.tool.execute(`s-${command}`, bashInput({ command }), controller.signal, undefined, h.ctx);
             const job = [...h.reg.jobs.values()].at(-1) as Job;
             spawnedPids.push(job.pid);
             if (command.startsWith("tail")) controller.abort();
@@ -277,7 +221,7 @@ void describe("bash structuredContent — the inherited output schema", () => {
         const h = harness();
         const result = await h.tool.execute(
             "bg",
-            { command: "tail -f /dev/null", run_in_background: true },
+            bashInput({ command: "tail -f /dev/null", background_after_seconds: 0 }),
             undefined,
             undefined,
             h.ctx
@@ -299,7 +243,7 @@ void describe("bash structuredContent — the inherited output schema", () => {
         // 1 MiB + slack, written by the command itself so the size is real.
         const result = await h.tool.execute(
             "big",
-            { command: "head -c 1050000 /dev/zero | tr '\\0' 'x'" },
+            bashInput({ command: "head -c 1050000 /dev/zero | tr '\\0' 'x'" }),
             undefined,
             undefined,
             h.ctx
@@ -314,7 +258,7 @@ void describe("bash structuredContent — the inherited output schema", () => {
 
     it("treats a spontaneous signal as failure, not explicit cancellation", async () => {
         const h = harness();
-        const result = await h.tool.execute("signal", { command: "printf before; kill -TERM $$" }, undefined, undefined, h.ctx);
+        const result = await h.tool.execute("signal", bashInput({ command: "printf before; kill -TERM $$" }), undefined, undefined, h.ctx);
         assert.equal(result.isError, true);
         assert.match(result.content[0]!.text, /SIGTERM/);
         assert.match(result.content[0]!.text, /143/);
@@ -324,7 +268,7 @@ void describe("bash structuredContent — the inherited output schema", () => {
 
     it("does not mistake multibyte output for truncation", async () => {
         const h = harness();
-        const result = await h.tool.execute("utf8", { command: "printf '中文😀'" }, undefined, undefined, h.ctx);
+        const result = await h.tool.execute("utf8", bashInput({ command: "printf '中文😀'" }), undefined, undefined, h.ctx);
         const sc = result.structuredContent as Record<string, unknown>;
         assert.equal(sc.output, "中文😀");
         assert.equal(sc.truncated, false);
@@ -333,7 +277,7 @@ void describe("bash structuredContent — the inherited output schema", () => {
 
     it("flags bounded output when a foreground run is detached", async () => {
         const h = harness();
-        const pending = h.tool.execute("detach-big", { command: "tail -f /dev/null" }, undefined, undefined, h.ctx);
+        const pending = h.tool.execute("detach-big", bashInput({ command: "tail -f /dev/null" }), undefined, undefined, h.ctx);
         const job = [...h.reg.jobs.values()].at(-1) as Job;
         spawnedPids.push(job.pid);
         writeFileSync(job.logPath, "x".repeat(1050000));
@@ -348,7 +292,7 @@ void describe("bash structuredContent — the inherited output schema", () => {
 
     it("does not claim truncation for a small run", async () => {
         const h = harness();
-        const result = await h.tool.execute("small", { command: "printf tiny" }, undefined, undefined, h.ctx);
+        const result = await h.tool.execute("small", bashInput({ command: "printf tiny" }), undefined, undefined, h.ctx);
         const sc = result.structuredContent as Record<string, unknown>;
         assert.equal(sc.truncated, false);
         assert.equal(sc.full_output_path, undefined);
@@ -360,10 +304,10 @@ void describe("bash terminate on slot exhaustion", () => {
     it("reports the concurrency limit before spawning, so no job is left behind", async () => {
         const h = harness();
         h.reg.config.maxConcurrentJobs = 1;
-        await h.tool.execute("a", { command: "tail -f /dev/null", run_in_background: true }, undefined, undefined, h.ctx);
+        await h.tool.execute("a", bashInput({ command: "tail -f /dev/null", background_after_seconds: 0 }), undefined, undefined, h.ctx);
         spawnedPids.push(([...h.reg.jobs.values()][0] as Job).pid);
         await assert.rejects(
-            () => h.tool.execute("b", { command: "true", run_in_background: true }, undefined, undefined, h.ctx),
+            () => h.tool.execute("b", bashInput({ command: "true", background_after_seconds: 0 }), undefined, undefined, h.ctx),
             (err: Error) => err.message.length > 0
         );
         assert.equal(h.reg.jobs.size, 1, "the rejected call must not register a job");

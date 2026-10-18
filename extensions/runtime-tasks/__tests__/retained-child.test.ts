@@ -1,3 +1,4 @@
+import { bashInput } from "../../process-tasks/__tests__/bash-input.ts";
 import { processInput } from "./process-input.ts";
 import { completeToolCall } from "../../agent-tasks/__tests__/tool-inputs.ts";
 import { executionId } from "../execution-id.ts";
@@ -75,7 +76,7 @@ function fixture(configPatch: Partial<AgentConfig> = {}) {
   const call = (session: AgentSession, name: string, args: Record<string, unknown>, signal?: AbortSignal) => {
     const tool = session.agent.state.tools.find(tool => tool.name === name);
     assert.ok(tool, `${name} must be present in actual active SDK tools: ${session.getActiveToolNames()}`);
-    return tool.execute("offline-tool", name === "process_manage" ? processInput(args as { action: string }) : ["subagent_run", "agent_manage"].includes(name) ? completeToolCall(tool.parameters, args) : args, signal);
+    return tool.execute("offline-tool", name === "process_manage" ? processInput(args as { action: string }) : ["subagent_run", "agent_manage"].includes(name) ? completeToolCall(tool.parameters, args) : name === "bash" ? bashInput(args as Parameters<typeof bashInput>[0]) : args, signal);
   };
   return { root, cwd, other, ctx, manager, calls, start, call, owner: () => owner!, onComplete: (callback: typeof completed) => { completed = callback; },
     async close() {
@@ -109,7 +110,7 @@ for (const different of [false, true]) test(`actual retained child composite res
     await until(() => f.calls.length === 5);
     for (const forbidden of [parent, sibling, b.agent_id]) assert.equal(meta(await f.call(session, "agent_manage", { action: "output", execution_id: executionId({ taskId: forbidden, runId: "1" }, "subagent") })).error_code, "stale");
     assert.equal(meta(await f.call(siblingSession, "agent_manage", { action: "stop", execution_id: a.execution_id })).error_code, "stale");
-    const local = launch(await f.call(session, "bash", { command: "printf CHILD_LOCAL", run_in_background: true }));
+    const local = launch(await f.call(session, "bash", { command: "printf CHILD_LOCAL", background_after_seconds: 0 }));
     assert.match(text(await f.call(session, "process_manage", { action: "wait", task_id: local.task_id })), /CHILD_LOCAL/);
     assert.equal(meta(await f.call(siblingSession, "process_manage", { action: "output", task_id: local.task_id })).error_code, "not_found");
     f.onComplete(record => { if (record.id === a.agent_id && record.runId === "1") f.manager.resumeRun(a.agent_id, "nested resumed"); });
@@ -168,7 +169,7 @@ for (const mode of ["noExtensions", "excluded", "deny", "isolated", "nestedOff",
     if (["noExtensions", "excluded", "deny", "isolated"].includes(mode)) assert.equal(names.includes("bash"), false, "no local process capability revival");
     if (!nested) {
       if (mode === "nestedOff") {
-        const local = launch(await f.call(session, "bash", { command: "printf NESTED_OFF", run_in_background: true }));
+        const local = launch(await f.call(session, "bash", { command: "printf NESTED_OFF", background_after_seconds: 0 }));
         assert.match(text(await f.call(session, "process_manage", { action: "wait", task_id: local.task_id })), /NESTED_OFF/);
       }
       return;

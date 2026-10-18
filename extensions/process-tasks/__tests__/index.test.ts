@@ -1,3 +1,4 @@
+import { bashInput } from "./bash-input.ts";
 import { monitorInput } from "./monitor-input.ts";
 import { processInput } from "../../runtime-tasks/__tests__/process-input.ts";
 import { registerManagementTool } from "../../runtime-tasks/tools.ts";
@@ -131,7 +132,7 @@ void describe("session_start — registry is born empty (no revival)", () => {
         const h = startExtension();
         await h.handlers.get("session_start")!({}, uiCtx);
         const bash = h.tools.get("bash")!;
-        await bash.execute("switch-test", { command: WATCH_CMD, run_in_background: true }, undefined, undefined, uiCtx);
+        await bash.execute("switch-test", bashInput({ command: WATCH_CMD, background_after_seconds: 0 }), undefined, undefined, uiCtx);
         assert.ok(liveMarkedProcesses() > 0);
         await h.handlers.get("session_start")!({ reason: "new" }, uiCtx);
         await sleep(200);
@@ -153,7 +154,7 @@ void describe("session_shutdown — kills running tasks on ANY reason", () => {
             const bash = h.tools.get("bash")!;
             const started = await bash.execute(
                 "t2",
-                { command: WATCH_CMD, run_in_background: true },
+                bashInput({ command: WATCH_CMD, background_after_seconds: 0 }),
                 undefined,
                 undefined,
                 uiCtx

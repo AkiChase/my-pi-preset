@@ -33,9 +33,9 @@ void it("foundation config ignores old names; real agent discovery retains proje
     writeFileSync(join(agentDir, "bg-tasks.json"), '{"timeoutMs":60000}');
     assert.equal(CONFIG_FILENAME, "process-tasks.json");
     assert.deepEqual(loadConfig(agentDir, { BG_TASKS_TIMEOUT_MS: "70000" }).config, DEFAULTS);
-    writeFileSync(join(agentDir, CONFIG_FILENAME), '{"timeoutMs":80000}');
-    assert.equal(loadConfig(agentDir, { BG_TASKS_TIMEOUT_MS: "70000" }).config.timeoutMs, 80000);
-    assert.equal(loadConfig(agentDir, { PROCESS_TASKS_TIMEOUT_MS: "90000" }).config.timeoutMs, 90000);
+    writeFileSync(join(agentDir, CONFIG_FILENAME), '{"stallThresholdMs":80000}');
+    assert.equal(loadConfig(agentDir, { BG_TASKS_TIMEOUT_MS: "70000" }).config.stallThresholdMs, 80000);
+    assert.equal(loadConfig(agentDir, { PROCESS_TASKS_STALL_THRESHOLD_MS: "90000" }).config.stallThresholdMs, 90000);
 
     const definition = (description: string) => `---\nname: offline-reviewer\ndescription: ${description}\ntools: read, grep\n---\nReview without spawning.\n`;
     writeFileSync(join(agentDir, "agents", "global.md"), definition("global"));

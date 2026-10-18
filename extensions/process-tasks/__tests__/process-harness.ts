@@ -1,3 +1,4 @@
+import { bashInput } from "./bash-input.ts";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import type { ExtensionAPI, ExtensionToolContext, SessionShutdownEvent } from "@earendil-works/pi-coding-agent";
@@ -47,7 +48,7 @@ export function processActivation(dir: string, config: Partial<ProcessTasksConfi
     startRegistrySweep(reg);
     return { coordinator, lifecycle, reg, source, tools, messages, context,
         execute(name: string, params: unknown, signal?: AbortSignal) {
-            return tools.get(name)!.execute(`${name}-${reg.totalStarted}`, params, signal, undefined, context);
+            return tools.get(name)!.execute(`${name}-${reg.totalStarted}`, name === "bash" ? bashInput(params as Parameters<typeof bashInput>[0]) : params, signal, undefined, context);
         },
         async emit(event: SessionShutdownEvent) { assert.equal(event.type, "session_shutdown"); await lifecycle.shutdown(); },
     };

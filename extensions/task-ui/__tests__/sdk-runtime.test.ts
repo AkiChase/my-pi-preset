@@ -1,3 +1,4 @@
+import { bashInput } from "../../process-tasks/__tests__/bash-input.ts";
 import { processInput } from "../../runtime-tasks/__tests__/process-input.ts";
 import { completeToolCall } from "../../agent-tasks/__tests__/tool-inputs.ts";
 import type { TSchema } from "typebox";
@@ -89,8 +90,8 @@ void it("actual SDK runtime new/resume/fork/import/quit creates fresh factories;
         const session = { ...partialSession, extensionRunner: runner } as unknown as AgentSession;
         const result = { session, backend, coordinator, lifecycle, tools, messages, ctx,
             counts: () => ({ agentRuns, agentStops }),
-            execute(name: string, params: unknown) { const tool = tools.get(name)!; return tool.execute(name, name === "subagent_run" ? completeToolCall(tool.parameters, params as Record<string, unknown>) : params, undefined, undefined, ctx); },
-            launchForeground(command: string) { foreground = tools.get("bash")!.execute("fg", { command }, parent.signal, undefined, ctx); return foreground; },
+            execute(name: string, params: unknown) { const tool = tools.get(name)!; return tool.execute(name, name === "subagent_run" ? completeToolCall(tool.parameters, params as Record<string, unknown>) : name === "bash" ? bashInput(params as Parameters<typeof bashInput>[0]) : params, undefined, undefined, ctx); },
+            launchForeground(command: string) { foreground = tools.get("bash")!.execute("fg", bashInput({ command }), parent.signal, undefined, ctx); return foreground; },
         };
         activations.push(result);
         return result;
@@ -204,7 +205,7 @@ void it("actual SDK AgentSession.reload invokes old shutdown before activation r
         _buildRuntime() { order.push("create"); fresh = bothActivation(); },
     };
     try {
-        await old.execute("bash", { run_in_background: true, command: "tail -f /dev/null" });
+        await old.execute("bash", { background_after_seconds: 0, command: "tail -f /dev/null" });
         const pid = [...old.reg.jobs.values()][0]!.pid;
         await old.execute("subagent_run", completeToolCall((old.tools.get("subagent_run")! as unknown as { parameters: TSchema }).parameters, { subagent_type: "general-purpose", description: "reload", prompt: "offline", run_in_background: true }));
         await AgentSession.prototype.reload.call(seam as unknown as AgentSession);

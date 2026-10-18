@@ -21,8 +21,6 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 export interface ProcessTasksConfig {
-    /** Foreground commands auto-background after this long. */
-    timeoutMs: number;
     /** Where job logs are written. */
     logDir: string;
     maxConcurrentJobs: number;
@@ -49,7 +47,6 @@ export interface ProcessTasksConfig {
 /** Every default in one place. Frozen: a caller that mutates this would change
  *  the fallback for every later load, including inside tests. */
 export const DEFAULTS: ProcessTasksConfig = Object.freeze({
-    timeoutMs: 120_000,
     logDir: "/tmp/pi-bg",
     maxConcurrentJobs: 16,
     maxLogBytes: 100 * 1024 * 1024,
@@ -74,7 +71,6 @@ type NumericKey = {
 /** Bounds are sanity rails, not taste: they reject values that would wedge the
  *  extension (a 0ms poll spins a core; a 1-byte log cap kills every job). */
 const NUMERIC_BOUNDS: Record<NumericKey, { min: number; max: number }> = {
-    timeoutMs: { min: 1_000, max: 24 * 3_600_000 },
     maxConcurrentJobs: { min: 1, max: 256 },
     maxLogBytes: { min: 64 * 1024, max: 100 * 1024 * 1024 * 1024 },
     outputPreviewChars: { min: 200, max: 1_000_000 },
@@ -94,7 +90,7 @@ const ALL_KEYS: readonly (keyof ProcessTasksConfig)[] = [
     "logDir",
 ];
 
-/** `timeoutMs` → `PROCESS_TASKS_TIMEOUT_MS`. One rule, no lookup table to drift. */
+/** `logDir` → `PROCESS_TASKS_LOG_DIR`. One rule, no lookup table to drift. */
 export function envNameFor(key: keyof ProcessTasksConfig): string {
     return `PROCESS_TASKS_${key.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toUpperCase()}`;
 }
@@ -193,6 +189,9 @@ export function loadConfig(
     const warnings: string[] = [];
     const path = join(agentDir, CONFIG_FILENAME);
     const file = readConfigFile(path, warnings);
+    if (env.PROCESS_TASKS_TIMEOUT_MS !== undefined) {
+        warnings.push("PROCESS_TASKS_TIMEOUT_MS is retired and unsupported — ignored; supply background_after_seconds explicitly on each bash call.");
+    }
 
     if (file) {
         for (const key of Object.keys(file)) {

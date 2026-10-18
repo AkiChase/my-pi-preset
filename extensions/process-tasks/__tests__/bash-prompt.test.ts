@@ -1,6 +1,7 @@
 import { it } from "node:test";
 import assert from "node:assert/strict";
 import { createBashToolDefinition } from "@earendil-works/pi-coding-agent";
+import { validateToolArguments } from "@earendil-works/pi-ai";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -19,7 +20,7 @@ it("registered bash replaces inherited guidance in the actual SDK system prompt"
     let tool!: Parameters<ExtensionAPI["registerTool"]>[0];
     const original = createBashToolDefinition(process.cwd());
     registerBashTool({ registerTool: (def: typeof tool) => { tool = def; } } as never,
-        new BackgroundRegistry({ ...DEFAULTS, timeoutMs: 5500 }),
+        new BackgroundRegistry({ ...DEFAULTS, logDir: "/tmp/explicit-bash" }),
         { ...original, promptSnippet: "OLD_BASH_INDEX", promptGuidelines: ["OLD_BASH_GUIDANCE"] });
     assert.equal(tool.promptGuidelines!.length, 1);
     const prompt = buildSystemPrompt({ cwd: process.cwd(), selectedTools: ["bash", "peer"],
@@ -28,7 +29,16 @@ it("registered bash replaces inherited guidance in the actual SDK system prompt"
     assert.match(prompt, /<tools>[\s\S]*- bash: Run finite shell commands/);
     assert.match(prompt, /<rules>[\s\S]*- Bash usage:\n  -/);
     assert.equal(prompt.split("Bash usage:").length - 1, 1);
-    assert.match(prompt, /default: 5\.5s/);
+    assert.match(prompt, /background_after_seconds=-1/);
+    assert.match(prompt, /Set 0.*immediately/);
+    assert.doesNotMatch(prompt, /run_in_background|default:/);
+    const examples = [...prompt.matchAll(/(?:Foreground|Immediate background|Background after 10s \(interactive\)): (\{[^\n]+\})/g)];
+    assert.equal(examples.length, 3);
+    for (const example of examples) {
+        const args = JSON.parse(example[1]!);
+        assert.deepEqual(Object.keys(args), ["command", "background_after_seconds", "description"]);
+        assert.doesNotThrow(() => validateToolArguments(tool, { type: "toolCall", id: "example", name: "bash", arguments: args }));
+    }
     assert.match(prompt, /Peer index/); assert.match(prompt, /Peer guideline/);
     assert.doesNotMatch(prompt, /OLD_BASH|notify parameter|timeout parameter/);
     const disabled = buildSystemPrompt({ cwd: process.cwd(), selectedTools: ["peer"],

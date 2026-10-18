@@ -25,7 +25,7 @@ test("registered bash identity survives foreground completion, explicit backgrou
 
     for (const command of ["printf completed", "printf failed; exit 7"]) {
       const beforeMessages = f.messages.length;
-      const background = await f.execute("bash", { command, run_in_background: true });
+      const background = await f.execute("bash", { command, background_after_seconds: 0 });
       const bg = identity(background); assert.ok(isLaunchMetadata(bg)); assert.equal(bg.mode, "background");
       await until(() => ["completed", "failed"].includes(f.reg.jobs.get(bg.task_id)!.status));
       assert.equal(f.messages.length, beforeMessages + 1, "background success and failure each notify automatically");
@@ -48,7 +48,7 @@ test("registered bash identity survives foreground completion, explicit backgrou
 test("registered process manager retains search counts/context, byte pages and cumulative stats while rejecting cross-type fields", async () => {
   const dir = mkdtempSync(join(tmpdir(), "runtime-process-actions-")), f = processActivation(dir);
   try {
-    const launched = await f.execute("bash", { command: "printf log", run_in_background: true });
+    const launched = await f.execute("bash", { command: "printf log", background_after_seconds: 0 });
     const id = identity(launched).task_id;
     await until(() => f.reg.jobs.get(id)?.status === "completed");
     const job = f.reg.jobs.get(id)!;

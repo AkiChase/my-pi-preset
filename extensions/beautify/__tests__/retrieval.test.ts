@@ -63,7 +63,7 @@ test("actual backend stop summaries report observed status without inventing a r
   const dir = mkdtempSync(join(tmpdir(), "beautify-stop-truth-")), f = processActivation(dir);
   try {
     const finished = await f.execute("bash", { command: "printf complete" }) as unknown as { details: { runtimeLaunch: { task_id: string } } };
-    const running = await f.execute("bash", { command: "tail -f /dev/null", run_in_background: true }) as unknown as { details: { runtimeLaunch: { task_id: string } } };
+    const running = await f.execute("bash", { command: "tail -f /dev/null", background_after_seconds: 0 }) as unknown as { details: { runtimeLaunch: { task_id: string } } };
     for (const [id, requested, observed] of [[finished.details.runtimeLaunch.task_id, false, "completed"], [running.details.runtimeLaunch.task_id, true, "killed"], [running.details.runtimeLaunch.task_id, false, "killed"]] as const) {
       const args = processInput({ action: "stop", task_id: id });
       const result = await f.execute("process_manage", args) as unknown as Result;
@@ -204,7 +204,7 @@ test("actual registered process task_manage produces seven action envelopes with
     const job = createRunningJob({ id: "testjob", command: "echo (x)", pid: 0, logPath: path, toolCallId: "fake-log" }); add(f.reg, job);
     await validate({ action: "list" }); await validate({ action: "output", task_id: job.id, offset: 1, limit: 8 });
     await validate({ action: "search", pattern: "needle", task_id: job.id }); await validate({ action: "status", task_id: job.id });
-    const launched = await f.execute("bash", { command: "while true; do sleep 1; done", run_in_background: true });
+    const launched = await f.execute("bash", { command: "while true; do sleep 1; done", background_after_seconds: 0 });
     const id = launched.content[0]!.text!.match(/ID: ([^.]+)\./)![1]!;
     let partial: Result | undefined;
     const controller = new AbortController();

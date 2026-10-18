@@ -40,7 +40,7 @@ void it("shutdown stops fg/bg/command monitor/pending/attach and owned timers de
     const h = processActivation(dir);
     try {
         const foreground = h.execute("bash", { command: ignoring });
-        await h.execute("bash", { run_in_background: true, command: ignoring });
+        await h.execute("bash", { background_after_seconds: 0, command: ignoring });
         await h.execute("monitor", monitorInput({ command: "trap '' TERM; printf 'first\n'; printf 'pending\n'; while true; do sleep 0.1; done", description: "watch" }));
         const jobs = [...h.reg.jobs.values()];
         await until(() => jobs.every((job) => readFileSync(job.logPath, "utf8").length > 0));
@@ -94,7 +94,7 @@ void it("TERM-killed group leader cannot strand its TERM-ignoring descendant", {
     const h = processActivation(dir);
     try {
         // The leader accepts TERM, its descendant does not. Child writes its own PID.
-        await h.execute("bash", { run_in_background: true, command: "bash -c 'trap \"\" TERM; echo $$ > child.pid; while true; do sleep 0.1; done' & wait" });
+        await h.execute("bash", { background_after_seconds: 0, command: "bash -c 'trap \"\" TERM; echo $$ > child.pid; while true; do sleep 0.1; done' & wait" });
         const job = [...h.reg.jobs.values()][0]!;
         await until(() => {
             try { return Number(readFileSync(join(dir, "child.pid"), "utf8")) > 0; } catch { return false; }
@@ -160,8 +160,8 @@ void it("throwing backend stop hook cannot prevent actual kill or sibling cleanu
     const dir = mkdtempSync(join(tmpdir(), "process-stop-throw-"));
     const h = processActivation(dir);
     try {
-        await h.execute("bash", { run_in_background: true, command: "tail -f /dev/null" });
-        await h.execute("bash", { run_in_background: true, command: "tail -f /dev/null" });
+        await h.execute("bash", { background_after_seconds: 0, command: "tail -f /dev/null" });
+        await h.execute("bash", { background_after_seconds: 0, command: "tail -f /dev/null" });
         const jobs = [...h.reg.jobs.values()];
         jobs[0]!.stop = () => { throw new Error("stop hook failure"); };
         await h.lifecycle.shutdown();

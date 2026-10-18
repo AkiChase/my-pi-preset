@@ -1,3 +1,4 @@
+import { bashInput } from "./bash-input.ts";
 import { registerBashTool } from "../tools/bash.ts";
 import { createBashToolDefinition } from "@earendil-works/pi-coding-agent";
 import { describe, it } from "node:test";
@@ -75,14 +76,14 @@ void describe("bash explicit background — rejects a backgrounded sleep wait", 
     void it("blocks an embedded sleep in explicit background mode", async () => {
         const { tool, ctx } = bashBg();
         await assert.rejects(
-            () => tool.execute("t1", { run_in_background: true, command: "cd /repo; sleep 600; cat log" }, undefined, undefined, ctx),
+            () => tool.execute("t1", bashInput({ background_after_seconds: 0, command: "cd /repo; sleep 600; cat log" }), undefined, undefined, ctx),
             /Blocked: sleep 600.*process_manage action='wait'/s
         );
     });
 
     void it("still allows a real backgrounded command", async () => {
         const { tool, ctx } = bashBg();
-        const res = await tool.execute("t2", { run_in_background: true, command: "echo hi" }, undefined, undefined, ctx);
+        const res = await tool.execute("t2", bashInput({ background_after_seconds: 0, command: "echo hi" }), undefined, undefined, ctx);
         assert.ok(res, "non-sleep command runs");
     });
 });

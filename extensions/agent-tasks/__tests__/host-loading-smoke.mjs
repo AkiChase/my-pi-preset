@@ -1,3 +1,4 @@
+import { bashInput } from "../../process-tasks/__tests__/bash-input.ts";
 // Invoked in disposable cwd/agent dirs by loading.test.ts. Use the real cached
 // host loader: Pi 1.1.0 replaces its jiti graph when the resource cwd changes.
 import { processInput } from "../../runtime-tasks/__tests__/process-input.ts";
@@ -66,7 +67,7 @@ const close = async (result) => {
 const assertRoot = (result) => {
   const ext = result.extensions[0];
   assert.deepEqual([...ext.tools.keys()].sort(), rootToolNames);
-  assert.ok(ext.tools.get("bash").definition.parameters.properties.run_in_background);
+  assert.ok(ext.tools.get("bash").definition.parameters.properties.background_after_seconds); assert.equal(ext.tools.get("bash").definition.parameters.properties.run_in_background, undefined);
   assert.equal(ext.toolRenderers.length, 1);
   assert.equal(ext.toolRenderers[0]("bash", () => undefined).renderShell, "default");
   assert.ok(ext.commands.has("agents"));
@@ -126,7 +127,7 @@ try {
     const call = (args) => manage.execute("probe", { execution_id: null, kind: null, verbose: null, ...args }, undefined, undefined, ctx);
     assert.match((await call({ action: "list" })).content[0].text, /agent_id=owned/);
     assert.equal((await call({ action: "output", execution_id: "exec_" + Buffer.from(JSON.stringify(["root-or-sibling", "1"])).toString("base64url") })).details.runtimeManagement.error_code, "stale");
-    const launch = await ext.tools.get("bash").definition.execute("local", { command: "printf CHILD", run_in_background: true }, undefined, undefined, ctx);
+    const launch = await ext.tools.get("bash").definition.execute("local", bashInput({ command: "printf CHILD", background_after_seconds: 0 }), undefined, undefined, ctx);
     const identity = launch.details.runtimeLaunch;
     assert.match(launch.content[0].text, new RegExp(`task_id=${identity.task_id}`));
     // Spawn deliberately unrefs its child; this standalone driver owns a bounded keepalive.

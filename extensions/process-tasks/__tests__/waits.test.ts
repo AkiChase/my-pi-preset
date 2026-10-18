@@ -1,3 +1,4 @@
+import { bashInput } from "./bash-input.ts";
 import { processInput } from "../../runtime-tasks/__tests__/process-input.ts";
 import { it } from "node:test";
 import assert from "node:assert/strict";
@@ -55,7 +56,7 @@ void it("early /bg before two seconds returns immediately; same PID/log survive 
     const h = harness();
     try {
         const signal = new AbortController();
-        const result = h.tools.get("bash")!.execute("launch", { command: "printf ready; tail -f /dev/null" }, signal.signal, undefined, h.ctx);
+        const result = h.tools.get("bash")!.execute("launch", bashInput({ command: "printf ready; tail -f /dev/null" }), signal.signal, undefined, h.ctx);
         const job = [...h.reg.jobs.values()][0]!;
         const before = h.source.list()[0]!;
         assert.equal(before.executionMode, "foreground");
@@ -81,7 +82,7 @@ for (const command of ["printf final-log", "printf failed-log; exit 7"]) {
     void it(`foreground finalization preserves terminal record/log: ${command}`, async () => {
         const h = harness();
         try {
-            const result = h.tools.get("bash")!.execute("launch", { command }, undefined, undefined, h.ctx);
+            const result = h.tools.get("bash")!.execute("launch", bashInput({ command }), undefined, undefined, h.ctx);
             const job = [...h.reg.jobs.values()][0]!;
             const returned = await result;
             assert.equal((returned as { isError?: boolean }).isError === true, command.includes("exit 7"));
@@ -103,7 +104,7 @@ void it("genuine launch signal and source silent stop retain final logs and rele
     try {
         for (const action of ["abort", "stop"] as const) {
             const signal = new AbortController();
-            const result = h.tools.get("bash")!.execute(action, { command: "printf before-kill; tail -f /dev/null" }, signal.signal, undefined, h.ctx);
+            const result = h.tools.get("bash")!.execute(action, bashInput({ command: "printf before-kill; tail -f /dev/null" }), signal.signal, undefined, h.ctx);
             const job = [...h.reg.jobs.values()].at(-1)!;
             await new Promise((resolve) => setTimeout(resolve, 50));
             if (action === "abort") signal.abort();
@@ -125,7 +126,7 @@ void it("genuine launch signal and source silent stop retain final logs and rele
 void it("bash waiting threshold retains auto-background behavior inside the quick window", async () => {
     const h = harness();
     try {
-        const result = await h.tools.get("bash")!.execute("threshold", { command: "tail -f /dev/null", background_after_seconds: 0.05 }, undefined, undefined, h.ctx);
+        const result = await h.tools.get("bash")!.execute("threshold", bashInput({ command: "tail -f /dev/null", background_after_seconds: 0.05 }), undefined, undefined, h.ctx);
         assert.match(result.content[0]!.text!, /\nCommand running in background/);
         assert.equal(h.source.list()[0]!.executionMode, "background");
         assert.equal(h.reg.totalStarted, 1);
@@ -265,7 +266,7 @@ void it("foreground setup failure rolls back the process and wait but preserves 
             if (h.reg.jobAborts.size && !failed) { failed = true; throw new Error("source unavailable"); }
             changed();
         };
-        await assert.rejects(h.tools.get("bash")!.execute("failure", { command: "tail -f /dev/null" }, undefined, undefined, h.ctx), /source unavailable/);
+        await assert.rejects(h.tools.get("bash")!.execute("failure", bashInput({ command: "tail -f /dev/null" }), undefined, undefined, h.ctx), /source unavailable/);
         const job = [...h.reg.jobs.values()][0]!;
         assert.equal(job.status, "killed");
         assert.ok(!processExists(job.pid));

@@ -1,3 +1,4 @@
+import { bashInput } from "./bash-input.ts";
 import { describe, it, after } from "node:test";
 import assert from "node:assert/strict";
 import { BackgroundRegistry } from "../state.ts";
@@ -56,7 +57,7 @@ void describe("bash tool — Claude Code tool-result strings", () => {
         const { tool, reg, ctx } = harness();
         const res = await tool.execute(
             "t1",
-            { command: "tail -f /dev/null", run_in_background: true, description: "my job" },
+            bashInput({ command: "tail -f /dev/null", background_after_seconds: 0, description: "my job" }),
             undefined,
             undefined,
             ctx
@@ -73,7 +74,7 @@ void describe("bash tool — Claude Code tool-result strings", () => {
         const { tool, reg, ctx } = harness();
         const pending = tool.execute(
             "t2",
-            { command: "tail -f /dev/null" },
+            bashInput({ command: "tail -f /dev/null" }),
             undefined,
             undefined,
             ctx
@@ -93,7 +94,7 @@ void describe("bash tool — Claude Code tool-result strings", () => {
         const { tool, reg, ctx } = harness();
         const res = await tool.execute(
             "t3",
-            { command: "tail -f /dev/null", background_after_seconds: 1 },
+            bashInput({ command: "tail -f /dev/null", background_after_seconds: 1 }),
             undefined,
             undefined,
             ctx
@@ -108,7 +109,7 @@ void describe("bash tool — Claude Code tool-result strings", () => {
 
     void it("allowed sleep backgrounds without a termination marker", async () => {
         const { tool, reg, ctx } = harness();
-        const res = await tool.execute("t4", { command: "sleep 0.2", background_after_seconds: 0.01 }, undefined, undefined, ctx);
+        const res = await tool.execute("t4", bashInput({ command: "sleep 0.2", background_after_seconds: 0.01 }), undefined, undefined, ctx);
         const job = onlyJob(reg);
         spawnedPids.push(job.pid);
         assert.match(res.content[0].text, /Command running in background/);
@@ -120,7 +121,7 @@ void describe("bash tool — Claude Code tool-result strings", () => {
         const { tool, reg, ctx, messages } = harness();
         await tool.execute(
             "t5",
-            { command: "tail -f /dev/null", run_in_background: true },
+            bashInput({ command: "tail -f /dev/null", background_after_seconds: 0 }),
             undefined,
             undefined,
             ctx

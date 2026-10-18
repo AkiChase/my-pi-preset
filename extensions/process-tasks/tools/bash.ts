@@ -2,7 +2,7 @@
  * `bash` tool override.
  *
  * Single file-descriptor backend (no tmux):
- *   - run_in_background=true spawns immediately and returns a job handle
+ *   - background_after_seconds=0 spawns immediately and returns a job handle
  *   - foreground commands race completion against backgrounding
  *   - a 2s quick-completion window delays only progress UI, never explicit detach
  *   - Ctrl+Shift+B (manual) or the foreground waiting timer move a command to background
@@ -41,7 +41,6 @@ import {
     assertJobSlot,
     detectBlockedSleep,
     SLEEP_WAIT_GUIDANCE,
-    isBlankCommand,
     requireExistingCwd,
     startBackgroundJob,
     terminateJobSilently,
@@ -49,7 +48,7 @@ import {
 import { markOutcomeSurfaced } from "../notify.ts";
 import { processTaskIdentity } from "../source.ts";
 import { textBlock } from "../format.ts";
-import { bashParamSchema, MAX_BACKGROUND_AFTER_SECONDS } from "./bash-params.ts";
+import { bashParamSchema, parseBashArguments } from "./bash-params.ts";
 
 /** UI context + cwd is all this tool needs from the host context. */
 type LaunchDetails = BashToolDetails & { runtimeLaunch: RuntimeLaunchMetadata };
@@ -105,41 +104,25 @@ export function registerBashTool(
         promptGuidelines: [
             `Bash usage:
   - Use bash for finite shell commands. Use monitor for ongoing event streams or per-event notifications.
-  - Commands run in the foreground by default. Keep short commands in the foreground. Set run_in_background=true to start in the background immediately.
-  - In interactive mode, background_after_seconds controls how long to wait before backgrounding a still-running command (default: ${reg.config.timeoutMs / 1000}s). It does not terminate the command. Do not combine it with run_in_background=true. Use /bg to release a current wait without stopping execution.
-  - In non-interactive mode, foreground commands wait until completion; background_after_seconds is not supported. Background tasks remain session-owned and are stopped when the session closes.
+  - Provide all three fields: command (nonblank string), background_after_seconds (number), and description (string; empty is valid). No field accepts null.
+  - Set background_after_seconds=-1 to wait until completion or manual /bg. Set 0 to start in the background immediately. A finite positive value is an interactive waiting threshold in seconds, not a termination deadline; maximum 2147483.647. Use /bg to release a current wait without stopping execution.
+  - Non-interactive mode supports -1 and 0 only; positive waiting thresholds are rejected. Background tasks remain session-owned and are stopped when the session closes.
   - Foreground completion returns a tool result; background completion sends a notification automatically unless its final result has already been delivered. Do not poll list/status merely to detect completion.
   - A background launch result means started, not successfully completed. Keep the returned task_id. Use process_manage status/output/wait/stop to inspect, read, await, or stop the bash task; set task_type to null in these targeted calls. process_manage also manages monitor tasks; use agent_manage for subagent/workflow executions.
   - Never use sleep merely to wait for a task. Use process_manage action="wait", or a condition loop that exits when ready.
   - Examples:
-    Foreground: {"command":"git status --short","description":"Inspect working tree"}
-    Immediate background: {"command":"npm test","run_in_background":true,"description":"Run tests"}
+    Foreground: {"command":"git status --short","background_after_seconds":-1,"description":"Inspect working tree"}
+    Immediate background: {"command":"npm test","background_after_seconds":0,"description":"Run tests"}
     Background after 10s (interactive): {"command":"npm test","background_after_seconds":10,"description":"Run tests"}`,
         ],
         parameters: bashParamSchema(reg.config),
+        // The built-in argument preparation belongs to its old parameter contract.
+        // The override admits only its own complete, explicit request.
+        prepareArguments: undefined,
 
         async execute(toolCallId, params, signal, onUpdate, ctx) {
-            const p = params as {
-                command: string;
-                background_after_seconds?: number;
-                run_in_background?: boolean;
-                description?: string;
-            };
+            const p = parseBashArguments(params, reg.nonInteractive);
             const bashCtx = ctx as BashCtx;
-            for (const key of Object.keys(p)) {
-                if (!["command", "background_after_seconds", "run_in_background", "description"].includes(key)) {
-                    const correction = key === "timeout" ? " Use background_after_seconds for the interactive foreground waiting period, not an execution deadline."
-                        : key === "notify" ? " Background completion is reported automatically." : "";
-                    throw new Error(`Unknown bash parameter '${key}'. Accepted fields: command, background_after_seconds, run_in_background, description.${correction}`);
-                }
-            }
-            if (p.background_after_seconds !== undefined) {
-                if (!Number.isFinite(p.background_after_seconds) || p.background_after_seconds <= 0 || p.background_after_seconds > MAX_BACKGROUND_AFTER_SECONDS)
-                    throw new Error(`background_after_seconds must be finite, greater than 0 and must not exceed ${MAX_BACKGROUND_AFTER_SECONDS} seconds.`);
-                if (p.run_in_background === true) throw new Error("background_after_seconds cannot be combined with run_in_background=true.");
-                if (reg.nonInteractive) throw new Error("background_after_seconds is unsupported in non-interactive mode; omit it to wait until completion.");
-            }
-            if (isBlankCommand(p.command)) throw new Error("Command is empty.");
             requireExistingCwd(bashCtx.cwd);
 
             const sleepMatch = detectBlockedSleep(p.command);
@@ -150,7 +133,7 @@ export function registerBashTool(
             assertJobSlot(reg);
 
             // Explicit background mode — spawn and return immediately.
-            if (p.run_in_background) {
+            if (p.background_after_seconds === 0) {
                 return spawnBackground({
                     toolCallId,
                     command: p.command,
@@ -167,7 +150,7 @@ export function registerBashTool(
                 toolCallId,
                 command: p.command,
                 name: p.description,
-                backgroundAfterMs: (p.background_after_seconds ?? reg.config.timeoutMs / 1000) * 1000,
+                backgroundAfterMs: p.background_after_seconds * 1000,
                 signal,
                 onUpdate,
                 ctx: bashCtx,
@@ -253,7 +236,7 @@ async function runForeground(args: {
         renderSidebar(reg, ctx);
 
         // The waiting threshold only detaches, never terminates execution.
-        if (!lease.settled && !reg.nonInteractive) timeoutTimer = setTimeout(() => {
+        if (!lease.settled && backgroundAfterMs > 0) timeoutTimer = setTimeout(() => {
             if (reg.foreground.has(toolCallId)) requestPause("timeout");
         }, backgroundAfterMs);
         timeoutTimer?.unref();

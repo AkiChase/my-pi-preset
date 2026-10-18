@@ -153,7 +153,7 @@ test("production composition registers only backend tools and native presentatio
     inputHistory(h.pi); const unified = await loadUnified(); await unified(h.pi); beautify(h.pi as unknown as ExtensionAPI);
     assert.deepEqual(h.tools.map((tool: { name: string }) => tool.name).sort(), ["agent_manage", "bash", "monitor", "process_manage", "subagent_message", "subagent_run", "subagent_workflow"]);
     const bash = h.tools.find((tool: { name: string }) => tool.name === "bash");
-    assert.ok(bash.parameters.properties.run_in_background); assert.match(bash.promptSnippet, /background|timeout/i);
+    assert.ok(bash.parameters.properties.background_after_seconds); assert.equal(bash.parameters.properties.run_in_background, undefined); assert.match(bash.promptSnippet, /background|timeout/i);
     await h.fire("session_start"); h.editor.handleInput(up); assert.equal(h.editor.getText(), "production history"); assert.match(plain(h.editor.render(80).join("\n")), /❯/);
   } finally { await h.fire("session_shutdown"); h.dispose(); }
 });
