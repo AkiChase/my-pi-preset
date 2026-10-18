@@ -1274,3 +1274,40 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Next Steps
 
 - 如需扩展终端验收，可另行验证 Tooling、Asking、Compacting、Retry 和物理 IME。
+
+
+## Session 39: 主对话工具呈现与解除等待命令收尾
+<!-- trellis-session: v=2 fp=82d599b246993809 -->
+
+**Date**: 2026-10-18
+**Task**: 主对话工具呈现与解除等待命令收尾
+**Branch**: `main`
+
+### Summary
+
+托管worktree完成主对话描述/摘要、Workflow折叠展开与实际宽度、bash工具处理计时及task-detach无旧别名。合并main保留phase-status，最终831/831自然退出、TS通过、全量1466/1466；用户接受后移除worktree并归档。
+
+### Main Changes
+
+- 资源更新独立提交51acb4d；无下载/安装/个人reload/push，分支保留，其他任务改动保留。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a28889b` | Prioritize task descriptions actions and narrow-screen statistics |
+| `3b146e9` | Fold workflow summaries and render expanded progress at actual width |
+| `c47e69b` | Show live tool handling time and rename global task detach command |
+| `8a9a3bc` | Merge tool presentation and task detach improvements |
+
+### Testing
+
+- [OK] 自审非独立审查；真实视觉/provider未做。失败断言、merge计数修复及cleanup诊断事实留在implement，raw自有目录已定向清理。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 父Panel规划须按已完成主对话范围重新核对，不将本任务当旧共享接口承诺验收。
