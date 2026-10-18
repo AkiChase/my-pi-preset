@@ -50,7 +50,7 @@ checkpoint `cef4126 fix: require explicit memory list parameters`，6精确文�
 
 host限制：query null/false/0转字符串，offset null/false/空串/undefined转0；query undefined转空串，缺字段仍拒绝。direct入口严格拒绝原始null/错误类型，固定MemoryError在getOrigin前；不改SDK或其他Memory工具。真实provider/物理终端NOT_RUN。没有docs/README/spec本任务修改；旧bash参数/timeoutMs声明保持只读并记录，不声称文档当前准确。
 
-所有原始材料/tmp/bash-explicit-Urfqt6已由main核验（实施/独立review日志与exit文件、host probe），两个阶段和代理均终态；仅清理本owned目录，失败事实/重跑关系保留在本文件。任务保持in_progress等用户验收，不归档/不安装reloadpush；并行未提交改动不触碰。最终git diff --check通过。
+所有原始材料/tmp/bash-explicit-Urfqt6已由main核验（实施/独立review日志与exit文件、host probe），两个阶段和代理均终态；仅清理本owned目录，失败事实/重跑关系保留在本文件。用户已明确验收并授权收尾（“收尾吧”）。本次仅归档和journal；SDK原始值转换限制、真实provider/物理终端NOT_RUN及docs/spec旧表述待另行授权清理的事实保留。无安装/reload/push或历史重写，并行改动保留。最终git diff --check通过。
 
 ## 规划结果
 
