@@ -1,0 +1,4 @@
+{"file":".trellis/spec/development/index.md","reason":"Independent review of resource and tool contracts without scope expansion"}
+{"file":".trellis/spec/testing/index.md","reason":"Actual-host tests, resource isolation, natural exit and evidence limitations"}
+{"file":".trellis/tasks/archive/2026-10/10-18-tool-default-semantics-guidance/research/builtin-skill-loading.md","reason":"SDK and child loading evidence; apply latest approved policy instead of obsolete noSkills blocker"}
+{"file":".trellis/tasks/archive/2026-10/10-18-tool-default-semantics-guidance/research/skill-preview-zh.md","reason":"Content coverage preview; latest PRD/design overrides ordinary Skill disable linkage"}

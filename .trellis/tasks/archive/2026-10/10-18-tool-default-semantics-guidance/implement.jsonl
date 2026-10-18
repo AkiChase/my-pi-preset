@@ -1,0 +1,5 @@
+{"file":".trellis/spec/development/index.md","reason":"Execution/resource ownership, tool guidance, packaging and preservation constraints"}
+{"file":".trellis/spec/testing/index.md","reason":"Real host resource/registration tests, isolation and evidence reporting"}
+{"file":".trellis/spec/guides/index.md","reason":"Shared planning and boundary checklist entry"}
+{"file":".trellis/tasks/archive/2026-10/10-18-tool-default-semantics-guidance/research/builtin-skill-loading.md","reason":"Verified SDK resource discovery and child-loader evidence; disabled-skill blockers superseded by PRD/design user decision"}
+{"file":".trellis/tasks/archive/2026-10/10-18-tool-default-semantics-guidance/research/skill-preview-zh.md","reason":"Approved content preview; noSkills linkage prose superseded by latest PRD/design"}
