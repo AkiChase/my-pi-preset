@@ -1345,3 +1345,42 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Next Steps
 
 - 无待办；未 push，其他任务改动保持原样。
+
+
+## Session 41: Task Panel 重设计交付与归档
+<!-- trellis-session: v=2 fp=11fa68ca3d98a6d5 -->
+
+**Date**: 2026-10-19
+**Task**: Task Panel 重设计交付与归档
+**Branch**: `main`
+
+### Summary
+
+完成三阶段 Panel 重设计，独立审查和隔离 installed Pi 终端验证后，用户接受披露限制并批准合回 main 与归档。
+
+### Main Changes
+
+- 全屏上下分区列表/详情、真实父子树、常驻原生滚动和只读 Agent/workflow 根概览；独立 shell hint 删除、共享等待说明保留执行契约。
+- main ff-only集成，任务归档873fbe4；仅清理已核验无活动进程的本轮临时目录，两个独立规划任务保持。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2a8d466` | feat: unify task panel presentation and tree selection |
+| `dd44fcc` | feat: add fullscreen native-scrolling task panel |
+| `10c361f` | feat: add read-only agent overview and unify wait hints |
+| `8dffd29` | test: record isolated installed task panel validation |
+
+### Testing
+
+- [OK] 最终 strict PASS；452+41+392 定向自然退出；1479 full forced PASS。Corepack离线阻断保留，直接已有入口重跑。
+- [OK] Pi1.3.0/tmux3.6a 隔离 regular/fullscreen、140/80/40列、明暗/动态resize/输入恢复 PASS；wheel为模拟终端鼠标输入，physical mouse/人工像素/IME/provider NOT_RUN，用户接受限制。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 后续选择 running-task-summary 或 subagent-parent-messaging；不自动实施、同步、reload 或 push。
