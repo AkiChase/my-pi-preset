@@ -1199,3 +1199,40 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Next Steps
 
 - 执行配置回显与渲染任务仍planning，未激活或实施。
+
+
+## Session 37: 执行配置回显与工具渲染完成
+<!-- trellis-session: v=2 fp=8af72fe17d13b1fa -->
+
+**Date**: 2026-10-18
+**Task**: 执行配置回显与工具渲染完成
+**Branch**: `main`
+
+### Summary
+
+三阶段实现并独立审查：Agent真实配置快照/阶段/差异、现有beautify卡片配置显示、Monitor最小配置与Process范围统计。用户接受后归档，清空绑定，保留并行改动。
+
+### Main Changes
+
+- bash执行/启动/renderer未改；全部raw输出在核验后定向清理，无下载或安装。既有fixture cleanup诊断定位与失败重跑记录保留于implement。
+- archive旧未tracked source path自动提交失败，核对仅本任务归档材料后补交；未改CLI或纳入并行脚本。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1f60edb` | Return authoritative agent execution configuration snapshots |
+| `361110b` | Display agent execution configuration in existing tool cards |
+| `445c0bc` | Expose monitor configuration and process retrieval metadata |
+
+### Testing
+
+- [OK] 最终777/777自然退出，类型检查通过，全量1453/1453 force-exit；真实视觉/provider/远端WS/个人reload未做。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 只读审阅剩余planning任务并建议顺序，不启动其他任务。
