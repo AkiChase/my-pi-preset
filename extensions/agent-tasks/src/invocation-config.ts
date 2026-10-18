@@ -15,7 +15,7 @@ export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhig
 export const thinkingParamShape = {
   thinking: nullableControl(
     StringEnum(THINKING_LEVELS, {
-      description: `Thinking level: ${THINKING_LEVELS.join(", ")}. Set null to use configuration/defaults. Agent-file configuration takes precedence.`,
+      description: `Thinking level: ${THINKING_LEVELS.join(", ")}. Null uses agent configuration, otherwise child session settings/defaults. Agent-file configuration takes precedence over calls.`,
     }),
   ),
 };
@@ -60,7 +60,7 @@ const isolationParamShape = {
   isolation: nullableControl(
     Type.Union([Type.Literal("off"), Type.Literal("worktree")], {
       description:
-        'Isolation mode. Set null to use configuration/defaults. Default "off". "off" runs the agent in the current checkout. "worktree" creates a temporary git worktree so the agent works on an isolated copy of the repo (a copy cannot see uncommitted or staged changes in the main checkout).',
+        'Isolation mode. Null uses configuration, otherwise "off". "off" runs the agent in the current checkout. "worktree" creates a temporary git worktree so the agent works on an isolated copy of the repo (a copy cannot see uncommitted or staged changes in the main checkout).',
     }),
   ),
 };

@@ -170,7 +170,15 @@ void it("actual registered Agent tools contribute one official SDK rule group an
             const prompt = buildSystemPrompt({ cwd: f.cwd, selectedTools: [...selectedTools, "peer"], toolSnippets: { ...snippets, peer: "Peer index" }, toolGuidelines: { ...guidelines, peer: ["Peer guideline"] } });
             for (const heading of ["Subagent_run usage:", "Subagent_message usage:", "Subagent_workflow usage:"]) assert.equal(prompt.split(heading).length - 1, 1);
             assert.match(prompt, /set resume to null for a new agent/);
-            assert.match(prompt, new RegExp(`execution defaults to ${backgroundByDefault ? "background" : "foreground"}`));
+            assert.match(prompt, /run_in_background:null uses the configured execution mode/);
+            assert.doesNotMatch(prompt, /execution defaults to background|execution defaults to foreground/);
+            const schema = JSON.parse(JSON.stringify(f.paramSchema("subagent_run"))) as { properties: Record<string, { description?: string }> };
+            assert.match(schema.properties.model!.description!, /agent configuration, otherwise the parent session model/);
+            assert.match(schema.properties.thinking!.description!, /child session settings\/defaults/);
+            assert.match(schema.properties.resume!.description!, /execution mode is resolved again/);
+            assert.match(schema.properties.inherit_context!.description!, /parent conversation text/);
+            assert.doesNotMatch(schema.properties.inherit_context!.description!, /fork/);
+            assert.match(schema.properties.run_in_background!.description!, /null uses configuration/);
             assert.match(prompt, /Peer index/); assert.match(prompt, /Peer guideline/);
             assert.doesNotMatch(prompt, /OLD_CUSTOM_TEMPLATE|toolDescriptionMode|\{\{typeList\}\}/);
             assert.ok(definitions.every(tool => tool.description.length < 150));

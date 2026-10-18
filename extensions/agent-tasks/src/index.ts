@@ -1,3 +1,4 @@
+import { registerBuiltinSkills } from "./builtin-skills.ts";
 import { nullableControl } from "../../shared/tool-arguments.ts";
 import { createToolCallHeading } from "../../beautify/tool-call-heading.ts";
 import { executionId } from "../../runtime-tasks/execution-id.ts";
@@ -335,6 +336,7 @@ export interface AgentTasksOptions {
 }
 
 export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
+  registerBuiltinSkills(pi);
   // Child AgentSessions load normal extensions. Re-entering this extension there
   // would create another manager and leak handlers. Nested orchestration is
   // injected as scoped custom tools by the existing manager instead.
@@ -1553,28 +1555,28 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       model: nullableControl(
         Type.String({
           description:
-            'Model override. Accepts "provider/modelId" or fuzzy name (e.g. "haiku", "sonnet"). Set null to use the agent type\'s default.',
+            'Model override. Accepts "provider/modelId" or fuzzy name (e.g. "haiku", "sonnet"). Null uses agent configuration, otherwise the parent session model. Agent-file configuration takes precedence over calls.',
         }),
       ),
       ...thinkingParam(),
       run_in_background: nullableControl(
         Type.Boolean({
-          description: `Execution mode; set null to use configuration/defaults. Default without an agent-file pin: ${getBackgroundByDefault() ? "background" : "foreground"}. Agent-file configuration takes precedence. Background returns execution identity; foreground waits for results.`,
+          description: "Execution mode; null uses configuration. Agent-file configuration takes precedence over true/false requests. Background returns execution identity; foreground waits for results.",
         }),
       ),
       resume: nullableControl(
         Type.String({
-          description: "Real agent_id of a finished agent. Set null for new agents; an empty string is invalid. With resume, set new-agent fields to null; prompt and run_in_background remain applicable; stored session settings are retained.",
+          description: "Real agent_id of a finished agent. Set null for new agents; an empty string is invalid. With resume, set new-agent fields to null; prompt and run_in_background remain applicable. Session settings are retained; this execution mode is resolved again.",
         }),
       ),
       isolated: nullableControl(
         Type.Boolean({
-          description: "Set null to use configuration/defaults. If true, agent gets no extension/MCP tools — only built-in tools.",
+          description: "Null uses configuration, otherwise false. If true, agent gets no extension/MCP tools — only built-in tools.",
         }),
       ),
       inherit_context: nullableControl(
         Type.Boolean({
-          description: "Set null to use configuration/defaults. If true, fork parent conversation into the agent. Default: false (fresh context).",
+          description: "Null uses configuration, otherwise false (fresh context). If true, add parent conversation text to the prompt.",
         }),
       ),
       ...isolationParam(isWorktreeIsolationEnabled()),

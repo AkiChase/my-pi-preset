@@ -49,7 +49,7 @@ const processGuidance = `Process_manage usage:
   - Examples:
     Read log: {"action":"output","task_id":"<task_id>","task_type":null,"offset":0,"limit":null,"pattern":null,"ignore_case":null,"context":null}
     Await task: {"action":"wait","task_id":"<task_id>","task_type":null,"offset":null,"limit":null,"pattern":null,"ignore_case":null,"context":null}
-    Search logs: {"action":"search","task_id":null,"task_type":"bash","offset":null,"limit":null,"pattern":"ERROR","ignore_case":null,"context":null}
+    Search logs: {"action":"search","task_id":null,"task_type":"bash","offset":null,"limit":null,"pattern":"ERROR","ignore_case":false,"context":0}
     Stop observation: {"action":"stop","task_id":"<monitor_task_id>","task_type":null,"offset":null,"limit":null,"pattern":null,"ignore_case":null,"context":null}`;
 const agentGuidance = `Agent_manage usage:
   - Manage executions started by subagent_run or subagent_workflow, not process logs or Agent conversation control. Use process_manage for bash/monitor; subagent_message for messages; subagent_run for Agent resume; subagent_workflow for workflow replay.
@@ -60,7 +60,7 @@ const agentGuidance = `Agent_manage usage:
     output/wait: execution_id and verbose if needed; kind must be null.
   - kind filters list to subagent/workflow. Copy execution_id from launch/list; do not construct it or substitute agent_id. agent_id identifies a conversation for messaging/resume; execution_id identifies one execution. Do not provide non-null values outside the selected action.
   - Agent resume produces a new execution_id. New calls with the previous execution_id fail as stale; they never operate on the resumed execution. A wait already admitted remains bound to its original execution. Workflow replay creates a separate execution with a new ID.
-  - output returns current output/progress or a final result; wait awaits the whole execution. verbose is only for subagent output/wait and requests formatted detail, not an unlimited trace. Set verbose to null for workflow.
+  - output returns current output/progress or a final result; wait awaits the whole execution. verbose is only for subagent output/wait and requests additional conversation, not an unlimited trace. Set verbose to null for workflow.
   - /bg or cancellation releases a wait without stopping execution. stop requests cancellation; it may still be draining. Stopping a workflow also stops its owned agents, not independent siblings. Visible owned children cannot necessarily be managed directly by another owner.
   - Successful terminal output/wait delivery reports that execution's result and avoids duplicate completion notifications; list/status do not consume it. Completion is notified automatically; do not poll solely to detect completion.
   - Examples:
@@ -143,12 +143,12 @@ export function managementTool(group: ManagementGroup, capabilities: readonly Ru
     action: StringEnum(TASK_ACTIONS), task_id: nullableControl(Type.String({ description: "Task identity from bash/monitor launch or list; non-null for targeted actions, null when unused." })),
     task_type: nullableControl(StringEnum(TASK_LOG_TYPES, { description: "Filter list/stats/search to bash or monitor; null for no filter or other actions." })),
     offset: nullableControl(Type.Number({ minimum: 0, multipleOf: 1, description: "Output log byte offset; null for tail, 0 for start; null for other actions." })),
-    limit: nullableControl(Type.Number({ minimum: 1, multipleOf: 1, description: "Output/wait log byte budget; null for default or other actions." })),
+    limit: nullableControl(Type.Number({ minimum: 1, multipleOf: 1, description: "Output/wait log byte budget; null uses the configured budget; null for other actions." })),
     pattern: nullableControl(Type.String({ description: "Non-empty search regex; null for other actions." })), ignore_case: nullableControl(Type.Boolean({ description: "Search case-insensitivity; null for default false or other actions." })),
     context: nullableControl(Type.Number({ minimum: 0, multipleOf: 1, description: "Search context lines; null for default 0 or other actions." })),
   }, { additionalProperties: false }) : Type.Object({
     action: StringEnum(["list", "status", "output", "wait", "stop"] as const), execution_id: nullableControl(Type.String({ description: "Execution handle from launch/list; non-null for targeted actions, null for list." })),
-    kind: nullableControl(StringEnum(["subagent", "workflow"] as const, { description: "List filter; null for no filter or other actions." })), verbose: nullableControl(Type.Boolean({ description: "Formatted detail for subagent output/wait; null when unused or for workflow." })),
+    kind: nullableControl(StringEnum(["subagent", "workflow"] as const, { description: "List filter; null for no filter or other actions." })), verbose: nullableControl(Type.Boolean({ description: "Additional conversation for subagent output/wait; null is equivalent to false. Must be null for workflow or other actions." })),
   }, { additionalProperties: false });
   let closed = false;
   const close = () => { closed = true; facade.close(); };

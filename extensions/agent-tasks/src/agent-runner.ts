@@ -918,7 +918,7 @@ export async function runAgent(
     ctx.model, ctx.modelRegistry, agentConfig?.model,
   );
 
-  // Resolve thinking level: explicit option > agent config > undefined (inherit)
+  // Resolve thinking: explicit option > agent config > child session settings/defaults.
   const thinkingLevel = options.thinkingLevel ?? agentConfig?.thinking;
 
   const disallowedSet = agentConfig?.disallowedTools

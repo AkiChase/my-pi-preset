@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { managementTool } from "../tools.ts";
+import { managementTool, parseProcessManagementParams } from "../tools.ts";
 import { registerBashTool } from "../../process-tasks/tools/bash.ts";
 import { registerMonitorTool } from "../../process-tasks/tools/monitor.ts";
 import { BackgroundRegistry } from "../../process-tasks/state.ts";
@@ -35,8 +35,16 @@ test("registered split tools and monitor contribute one group each through actua
     assert.doesNotMatch(processRules, /\? means optional|Omit fields|Do not pass fields/);
     for (const example of processRules.matchAll(/: (\{"action"[^\n]+\})/g)) {
       const args = JSON.parse(example[1]!);
-      assert.deepEqual(Object.keys(args), Object.keys(JSON.parse(JSON.stringify(tools.find(t => t.name === "process_manage")!.parameters)).properties));
+      const process = tools.find(t => t.name === "process_manage")!;
+      assert.deepEqual(Object.keys(args), Object.keys(JSON.parse(JSON.stringify(process.parameters)).properties));
+      assert.doesNotThrow(() => validateToolArguments(process as never, { id: "example", name: process.name, arguments: args } as never));
+      assert.doesNotThrow(() => parseProcessManagementParams(args));
+      if (args.action === "search") { assert.equal(args.ignore_case, false); assert.equal(args.context, 0); }
     }
+    assert.match(JSON.parse(JSON.stringify(tools.find(t => t.name === "process_manage")!.parameters)).properties.limit.description, /configured budget/);
+    assert.match(JSON.parse(JSON.stringify(tools.find(t => t.name === "agent_manage")!.parameters)).properties.verbose.description, /Additional conversation.*null is equivalent to false/);
+    assert.match(toolGuidelines.agent_manage!.join("\n"), /requests additional conversation/);
+    assert.doesNotMatch(processRules, /verbose/);
     const monitorRules = toolGuidelines.monitor!.join("\n");
     assert.match(monitorRules, /Provide every field/);
     assert.doesNotMatch(monitorRules, /optional protocols|omitted means|Omit the unused/i);

@@ -206,7 +206,7 @@ export function createWorkflowHost(deps: WorkflowHostOptions): WorkflowHost {
         const dispatch = resolveSpawnType(request.agentType);
         if (!dispatch.ok) return { ok: false, error: dispatch.message };
 
-        // Same precedence as the subagent_run tool: the caller's model wins, the agent
+        // Unlike top-level subagent_run, the workflow's explicit model wins, the agent
         // definition's is next, and the parent's is the floor. A model the script
         // named and we cannot resolve is an error; one the definition named falls
         // back to the parent silently, because the script never asked for it.
@@ -317,8 +317,8 @@ export function createWorkflowHost(deps: WorkflowHostOptions): WorkflowHost {
               ...(model !== undefined ? { model } : {}),
               // Validated worker-side against the same list pi accepts, so the
               // cast asserts what the boundary has already checked. Left unset,
-              // the agent definition's `thinking` (then the parent's) still wins —
-              // same precedence as `model` above.
+              // the agent definition's `thinking`, otherwise child session
+              // settings/defaults, decides the level; parent thinking is not copied.
               ...(request.effort !== undefined ? { thinkingLevel: request.effort as ThinkingLevel } : {}),
               // Seeded with the REQUEST, not the outcome. The manager overwrites
               // the effective half at session creation; without a seed there is

@@ -176,13 +176,13 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
       prompt: Type.String({ description: "Self-contained task for the nested agent." }),
       description: nullableControl(Type.String({ description: "Required non-null for new agents; null with resume: short task description." })),
       subagent_type: nullableControl(Type.String({ description: `Required non-null for new agents; null with resume. Allowed types: ${availableIn(loadRegistry()).join(", ") || "none"}.` })),
-      model: nullableControl(Type.String({ description: "Provider/model override; set null to use configuration/defaults." })),
+      model: nullableControl(Type.String({ description: "Provider/model override; null uses agent configuration, otherwise the parent session model. Agent-file configuration takes precedence over calls." })),
       // Same enum as the top-level tool, from the same source: a typo here would
       // otherwise be cast straight to a ThinkingLevel and quietly do nothing.
       ...thinkingParam(),
       run_in_background: nullableControl(
         Type.Boolean({
-          description: "Defaults to false for nested spawns — the call blocks and returns the child's result inline. Set true only for work you will collect later with agent_manage; a detached child is stopped when you finish.",
+          description: "Null uses agent configuration, otherwise nested new agents run foreground. Background requires an available owned agent_manage; collect results before finishing. With resume, set null; execution waits inline.",
         }),
       ),
       resume: nullableControl(Type.String({ description: "Real agent_id of a finished owned child; set null for new agents, not an empty string. With resume, set all other control fields to null; execution waits inline." })),

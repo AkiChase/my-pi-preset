@@ -15,22 +15,22 @@ export function runToolGuidance(options: RunGuidanceOptions): string[] {
   const spawnExtras = `${options.isolation ? ", isolation" : ""}${options.scheduling ? ", schedule" : ""}`;
   const modeRule = options.nested
     ? "New nested agents default to foreground unless their configuration overrides it. Background launch requires an available owned agent_manage tool, and owned children are stopped when their parent finishes. Nested resume is always foreground; set run_in_background to null with resume."
-    : `Without an agent-file pin, run_in_background:null uses the configured default: execution defaults to ${options.backgroundByDefault ? "background" : "foreground"}. Use foreground when your next action depends on the result; otherwise do useful independent work while background execution runs.`;
+    : "Without an agent-file pin, run_in_background:null uses the configured execution mode. Use foreground when your next action depends on the result; otherwise do useful independent work while background execution runs.";
   return [`Subagent_run usage:
   - Use specialized agents for substantial independent work or broad exploration. Use direct tools for small work whose target is already known. Do not duplicate delegated investigation.
   - Give a self-contained prompt with the goal, relevant context, constraints, permission to edit or research only, and the expected result. Inspect actual changes and verification before reporting success; a delegated summary is not proof.
-  - Provide every field exposed by this tool. Set unused control fields to null. Null means not specified and does not select a mode or override agent configuration. Unknown or disabled fields remain invalid even when null.
+  - Provide every field exposed by this tool. Set unused control fields to null. Configuration controls set to null use configuration/defaults; resume:null selects a new agent. Unknown or disabled fields remain invalid even when null.
   - Non-null arguments by mode:
     New: prompt, description, subagent_type; configurable ${options.nested ? "" : "name, "}model, thinking, run_in_background, isolated, inherit_context${spawnExtras}.
     Resume: prompt, resume${options.nested ? "" : "; configurable run_in_background"}.
     Set fields outside the selected mode to null. Required strings must be non-empty; description is a short, specific UI summary for new agents only.
   - Available permitted agent types:
 ${options.agentTypes.split("\n").map(line => `    ${line}`).join("\n")}
-  - Resume uses the real agent_id of a finished, resumable agent and retains its type, name and stored session settings. A non-null resume selects resume mode; set resume to null for a new agent. An empty string is invalid. Set new-agent fields to null when resuming. Use subagent_message for a running agent.
+  - Resume uses the real agent_id of a finished, resumable agent and retains its type, name and stored session settings; top-level execution mode is resolved again, while nested resume waits inline. A non-null resume selects resume mode; set resume to null for a new agent. An empty string is invalid. Set new-agent fields to null when resuming. Use subagent_message for a running agent.
   - Agent-file configuration takes precedence over call parameters. Null control values use configuration/defaults. Results state explicit requests overridden by configuration; do not assume a requested value became effective.
   - ${modeRule}
   - A background launch means accepted or queued, not completed. Copy agent_id for messaging/resume and execution_id for agent_manage status/output/wait/stop. Do not substitute IDs. Foreground returns inline results; releasing a wait does not stop execution.
-  - Background completion is notified automatically. Do not poll or sleep solely to detect it, and never invent pending results. Summarize actual results for the user.
+  - ${options.nested ? "Collect owned background results with agent_manage before finishing; do not rely on top-level completion notifications." : "Background completion is notified automatically."} Do not poll or sleep solely to detect completion, and never invent pending results. Summarize actual results for the user.
 ${options.isolation ? '  - isolation selects Git working-directory isolation: off uses the current checkout, worktree uses a temporary copy that cannot see uncommitted changes. Follow project worktree authorization. isolated is different: it disables extension/MCP tools.\n' : ""}${options.scheduling ? '  - Use schedule only for explicitly requested delayed/recurring execution. It creates a scheduled definition, not a current execution; it cannot combine with resume, inherit_context or run_in_background:false.\n' : ""}  - Examples:
     New: ${newExample}
     Resume: ${resumeExample}`];

@@ -105,6 +105,14 @@ describe("package.json pi.extensions", () => {
     assert.equal(Object.hasOwn(manifest, "skills"), false);
   });
 
+  it("ships the plugin-owned manual internally without an independent pi.skills declaration", () => {
+    assert.equal(Object.hasOwn(manifest, "skills"), false);
+    assert.equal(packageJson.files, undefined, "no package allowlist excludes internal resources");
+    for (const file of ["SKILL.md", "references/delegation.md", "references/workflow-api.md", "references/patterns.md"]) {
+      assert.ok(existsSync(join(root, "extensions/agent-tasks/skills/subagents", file)), file);
+    }
+  });
+
   it("covers the resource types this repo ships", () => {
     // A pi manifest switches off convention discovery for the types it does not list, so a
     // new skills/ or prompts/ directory is silently ignored until it is declared here.
