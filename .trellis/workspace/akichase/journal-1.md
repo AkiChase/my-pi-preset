@@ -1086,3 +1086,38 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Status
 
 [OK] **Completed**
+
+
+## Session 34: 补齐 research 执行者选择
+<!-- trellis-session: v=2 fp=9d4e5daa811bbe93 -->
+
+**Date**: 2026-10-18
+**Task**: 补齐 research 执行者选择
+**Branch**: `main`
+
+### Summary
+
+以最少文案补齐 workflow 的 research 执行者选择，并在 brainstorm 证据检查步骤关联规则；同步资源哈希，任务已归档。
+
+### Main Changes
+
+- 不新增流程章节，不改角色、dispatch 或部署副本；保留并行工作区改动。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d67ee2f` | docs(trellis): include research in executor selection |
+| `c0b02fc` | docs(trellis): record research routing checkpoint |
+
+### Testing
+
+- [OK] 针对性文档、skill 资源、workflow 阶段提取和模板维护测试 32/32 通过；提交前 PRD 末尾空行检查失败已修复并重跑通过。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 资源部署未执行；本次不推送。

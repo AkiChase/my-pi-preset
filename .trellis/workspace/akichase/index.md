@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 33
+- **Total Sessions**: 34
 - **Last Active**: 2026-10-18
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1088 | Active |
+| `journal-1.md` | ~1123 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 34 | 2026-10-18 | 补齐 research 执行者选择 | `d67ee2f`, `c0b02fc` | `main` |
 | 33 | 2026-10-18 | 完成 bash 与 memory_list 显式参数契约 | `55ad847`, `cef4126`, `c543657`, `b4cfbed` | `main` |
 | 32 | 2026-10-18 | 完成 Monitor nullable 来源契约 | `9c459c2`, `bd8c0b5`, `3b558fc` | `main` |
 | 31 | 2026-10-18 | 完成 process_manage nullable 参数契约 | `ebfabce`, `e6588f5`, `ec32f4d` | `main` |
