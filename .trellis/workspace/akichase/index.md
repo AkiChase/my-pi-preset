@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 31
+- **Total Sessions**: 32
 - **Last Active**: 2026-10-18
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1015 | Active |
+| `journal-1.md` | ~1053 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 32 | 2026-10-18 | 完成 Monitor nullable 来源契约 | `9c459c2`, `bd8c0b5`, `3b558fc` | `main` |
 | 31 | 2026-10-18 | 完成 process_manage nullable 参数契约 | `ebfabce`, `e6588f5`, `ec32f4d` | `main` |
 | 30 | 2026-10-17 | 修复 Agent 工具 nullable 契约 | `301672d`, `b7e20f2`, `6b021c6`, `3534a7e`, `d00dc9b` | `main` |
 | 29 | 2026-10-17 | 统一工具可选参数说明与诊断 | `f69497c`, `fa33cb6`, `4e36472` | `main` |

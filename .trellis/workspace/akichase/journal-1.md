@@ -1013,3 +1013,41 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Next Steps
 
 - 评估并执行下一个已规划 nullable 契约任务。
+
+
+## Session 32: 完成 Monitor nullable 来源契约
+<!-- trellis-session: v=2 fp=32e4a24e7c93a9f3 -->
+
+**Date**: 2026-10-18
+**Task**: 完成 Monitor nullable 来源契约
+**Branch**: `main`
+
+### Summary
+
+完成 Monitor 顶层与 ws.protocols required-nullable 改造，经独立审查后验收归档；保留 SDK 输入转换限制及历史文档受众审查结果。
+
+### Main Changes
+
+- 保持严格来源 XOR、协议数组和内部生命周期；模型指引与注册 fixtures 同步。
+- 未修改 docs/spec；历史受众错位问题仅记录，未执行清理。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9c459c2` | fix: require nullable Monitor source controls |
+| `bd8c0b5` | docs: record Monitor nullable verification and host limits |
+| `3b558fc` | chore(task): archive 10-17-monitor-nullable-source-contract |
+
+### Testing
+
+- [OK] 独立聚焦142/142、自然退出集成570/570、最终回归38/38、pnpm check1436/1436及diff检查通过。
+- [OK] SDK可能将原始0/false转为null；真实provider/网络WS、物理终端NOT_RUN。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 只读查看 Bash 与 Memory nullable 控制字段任务，规划前确认授权。
