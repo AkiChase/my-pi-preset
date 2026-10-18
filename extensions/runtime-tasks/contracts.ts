@@ -1,4 +1,4 @@
-import { copyAgentExecutionConfig, isAgentExecutionConfig, type AgentExecutionConfig } from "./execution-config.ts";
+import { copyAgentExecutionConfig, copyMonitorExecutionConfig, isAgentExecutionConfig, isMonitorExecutionConfig, type ExecutionConfig } from "./execution-config.ts";
 import type { AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { TaskView } from "../task-ui/types.ts";
 
@@ -30,7 +30,7 @@ export interface RuntimeTaskMetadata {
   readonly status?: TaskView["status"];
   readonly raw_status?: string;
   readonly wait_outcome?: "waiting" | "completed" | "released" | "cancelled";
-  readonly executionConfig?: AgentExecutionConfig;
+  readonly executionConfig?: ExecutionConfig;
   readonly stats?: Readonly<Record<string, number>>;
   readonly range?: Readonly<{ start: number; end: number; size: number; omitted_before: number; omitted_after: number }>;
   readonly count?: number;
@@ -62,7 +62,7 @@ export function isRuntimeTaskMetadata(value: unknown): value is RuntimeTaskMetad
   if (value.wait_outcome !== undefined && (!outcomes.includes(value.wait_outcome as string) || value.action !== "wait")) return false;
   if (value.error_code !== undefined && !errors.includes(value.error_code as string)) return false;
   if (value.count !== undefined && !safeCount(value.count)) return false;
-  if (value.executionConfig !== undefined && (value.task_type !== "subagent" || !isAgentExecutionConfig(value.executionConfig))) return false;
+  if (value.executionConfig !== undefined && !(value.task_type === "subagent" ? isAgentExecutionConfig(value.executionConfig) : value.task_type === "monitor" && isMonitorExecutionConfig(value.executionConfig))) return false;
   if (value.stats !== undefined && (!object(value.stats) || Object.entries(value.stats).some(([key, n]) =>
     fractionalStats.includes(key) ? typeof n !== "number" || !Number.isFinite(n) || n < 0 : !countStats.includes(key) || !safeCount(n)))) return false;
   if (value.error_code === undefined && ["status", "output", "wait", "stop"].includes(value.action as string) && value.task_id === undefined) return false;
@@ -126,7 +126,7 @@ export function runtimeTaskType(view: Pick<TaskView, "kind">): RuntimeTaskType {
 
 export function taskResult(text: string, metadata: Omit<RuntimeTaskMetadata, "version">): RuntimeTaskResult {
   const runtimeTask = Object.freeze({ version: 1 as const, ...metadata,
-    ...(metadata.executionConfig ? { executionConfig: copyAgentExecutionConfig(metadata.executionConfig) } : {}),
+    ...(metadata.executionConfig ? { executionConfig: metadata.task_type === "subagent" ? copyAgentExecutionConfig(metadata.executionConfig) : metadata.task_type === "monitor" ? copyMonitorExecutionConfig(metadata.executionConfig) : undefined } : {}),
     ...(metadata.stats ? { stats: Object.freeze({ ...metadata.stats }) } : {}),
     ...(metadata.range ? { range: Object.freeze({ ...metadata.range }) } : {}),
   });

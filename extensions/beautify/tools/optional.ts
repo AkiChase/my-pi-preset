@@ -56,6 +56,7 @@ export function optionalRenderers(name: string, original: ToolRenderers | undefi
         ...(ctx.expanded && meta.stats ? wrap(`State: ${meta.stats}`, width).map(row => theme.fg("muted", row)) : []),
         ...executionConfigRows(meta.executionConfig!, ctx.expanded, width, theme),
       ]));
+      if (ctx.expanded && meta.expandedRows?.length) children.push(component(width => meta.expandedRows!.flatMap(line => wrap(line, width).map(row => theme.fg("muted", row)))));
       if (result && ctx.expanded) children.push(component(width => wrap(text(result), width).map(line => theme.fg(ctx.isError ? "error" : "toolOutput", line))));
     } else {
       if (phase === "call" || !cell.callDelegated) {

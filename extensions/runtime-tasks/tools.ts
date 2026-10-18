@@ -1,11 +1,11 @@
-import { isAgentExecutionConfig, type AgentExecutionConfig } from "./execution-config.ts";
+import { isAgentExecutionConfig, isMonitorExecutionConfig, type ExecutionConfig } from "./execution-config.ts";
 import { nullableControl, parseControlArguments } from "../shared/tool-arguments.ts";
 import { createToolCallHeading } from "../beautify/tool-call-heading.ts";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { AgentToolUpdateCallback } from "@earendil-works/pi-agent-core";
 import { Type, StringEnum } from "@earendil-works/pi-ai";
 import { createRuntimeTaskFacade, type RuntimeTaskCapability } from "./facade.ts";
-import { TASK_ACTIONS, TASK_LOG_TYPES, type RuntimeTaskParams, type RuntimeTaskResult, type RuntimeTaskDetails } from "./contracts.ts";
+import { TASK_ACTIONS, TASK_LOG_TYPES, isRuntimeTaskMetadata, type RuntimeTaskParams, type RuntimeTaskResult, type RuntimeTaskDetails } from "./contracts.ts";
 import { executionId, parseExecutionId } from "./execution-id.ts";
 
 export function isManagementDetails(value: unknown): value is ManagementDetails {
@@ -26,14 +26,16 @@ export function isManagementDetails(value: unknown): value is ManagementDetails 
   if (v.count !== undefined && (!Number.isSafeInteger(v.count) || Number(v.count) < 0)) return false;
   if (v.error_code === undefined && ["status", "output", "wait", "stop"].includes(v.action) && v[v.group === "process" ? "task_id" : "execution_id"] === undefined) return false;
   if (v.range !== undefined) {
+    if (v.group !== "process" || !["output", "wait"].includes(v.action) || !TASK_LOG_TYPES.includes(v.task_type as "bash")) return false;
     const r = v.range as Record<string, unknown>;
-    if (!r || typeof r !== "object" || Object.keys(r).length !== 5 || ["start", "end", "size", "omitted_before", "omitted_after"].some(k => !Number.isSafeInteger(r[k]) || Number(r[k]) < 0)) return false;
+    if (!r || typeof r !== "object" || Array.isArray(r) || Object.keys(r).length !== 5 || ["start", "end", "size", "omitted_before", "omitted_after"].some(k => !Number.isSafeInteger(r[k]) || Number(r[k]) < 0)) return false;
     if (Number(r.start) > Number(r.end) || Number(r.end) > Number(r.size) || r.omitted_before !== r.start || r.omitted_after !== Number(r.size) - Number(r.end)) return false;
   }
-  if (v.executionConfig !== undefined && (v.group !== "agent" || v.kind !== "subagent" ||
-    (v.execution_id !== undefined && (typeof v.execution_id !== "string" || !v.execution_id.startsWith("exec_"))) ||
-    !isAgentExecutionConfig(v.executionConfig))) return false;
-  if (v.stats !== undefined && (!v.stats || typeof v.stats !== "object" || Object.values(v.stats).some(n => typeof n !== "number" || !Number.isFinite(n) || n < 0))) return false;
+  if (v.executionConfig !== undefined && !(v.group === "process" ? typeof v.task_id === "string" && v.task_id.length > 0 && v.task_type === "monitor" && isMonitorExecutionConfig(v.executionConfig)
+    : v.kind === "subagent" && (v.execution_id === undefined || (typeof v.execution_id === "string" && v.execution_id.startsWith("exec_"))) && isAgentExecutionConfig(v.executionConfig))) return false;
+  // The expanded process card now displays these keys: retain the same public
+  // whitelist/count semantics as the backend envelope, not arbitrary numbers.
+  if (v.stats !== undefined && !isRuntimeTaskMetadata({ version: 1, action: "stats", stats: v.stats })) return false;
   return true;
 }
 
@@ -82,7 +84,7 @@ export type ManagementGroup = "process" | "agent";
 export interface ManagementDetails { runtimeManagement: { version: 2; group: ManagementGroup; action: string;
   task_id?: string; task_type?: string; execution_id?: string; kind?: string; agent_id?: string;
   title?: string; status?: string; raw_status?: string; error_code?: string; wait_outcome?: string;
-  executionConfig?: AgentExecutionConfig;
+  executionConfig?: ExecutionConfig;
   count?: number; range?: RuntimeTaskDetails["runtimeTask"]["range"]; stats?: Readonly<Record<string, number>> } }
 const fields = {
   process: { list: ["task_type"], stats: ["task_type"], status: ["task_id"], stop: ["task_id"], output: ["task_id", "offset", "limit"], wait: ["task_id", "limit"], search: ["pattern", "task_id", "task_type", "ignore_case", "context"] },

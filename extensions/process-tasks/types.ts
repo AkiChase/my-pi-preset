@@ -47,6 +47,7 @@ export const JOB_ID_PREFIX: Record<JobKind, string> = {
 };
 
 export interface Job {
+    readonly executionConfig?: import("../runtime-tasks/execution-config.ts").MonitorExecutionConfig;
     id: string;
     name?: string;
     command: string;

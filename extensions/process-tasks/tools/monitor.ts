@@ -1,3 +1,5 @@
+import { copyMonitorExecutionConfig, monitorExecutionSummary } from "../../runtime-tasks/execution-config.ts";
+import { createToolCallHeading } from "../../beautify/tool-call-heading.ts";
 import { launchMetadata, launchText } from "../../runtime-tasks/launch.ts";
 // Monitor tool: event-arrival notifications, bounded batching, optional silence wakes.
 
@@ -72,6 +74,7 @@ export function registerMonitorTool(pi: ExtensionAPI, reg: BackgroundRegistry): 
     pi.registerTool({
         name: "monitor",
         label: "monitor",
+        renderCall: (args, theme, context) => createToolCallHeading({ name: "monitor", detail: args.description, theme, context }),
         description: "Start a command or WebSocket observation task with batched event notifications.",
         promptSnippet: "Observe event streams; manage the returned task through process_manage",
         promptGuidelines: [
@@ -81,7 +84,7 @@ export function registerMonitorTool(pi: ExtensionAPI, reg: BackgroundRegistry): 
   - timeout_ms is a finite positive total observation deadline in milliseconds, or null for no deadline. wake_absent_ms is an independent finite positive silence threshold, or null for no silence reminder: remind once per silent period, keep observing, and notify when events resume. Silence is not completion or success.
   - Startup returns task_id and the log path, not a completed result. Events arrive as batched notifications. Use process_manage output/search for logs, wait for observation to end, or stop to end it. Cancelling/releasing wait does not stop observation. Session closure stops owned tasks.
   - stdout and stderr are both observed; complete lines count as activity, partial lines do not wake the agent. stderr text alone is not failure. command | grep filters stdout only; command 2>&1 | grep filters both. Flush pipeline stages per line with grep --line-buffered or awk fflush().
-  - WebSocket messages, including empty messages, count as activity. Notifications are batched, not one per message/line. Monitors share a ${reg.config.monitorFlushMs}ms cadence; first/timely events batch within min(200ms, configured interval). A zero interval sends source-callback batches without this delay.
+  - WebSocket messages, including empty messages, count as activity. Notifications are batched, not one per message/line. Monitors use the configured batch interval; startup results show the adopted batch configuration, not an exact delivery cadence; first/timely events batch within min(200ms, configured interval). A zero interval sends source-callback batches without this delay.
   - Observation ends when the main command/source ends or fails, or the deadline is reached. It does not wait for descendant output after the main shell exits. Terminal reason and pending output are combined; explicit stop/session shutdown is silent, and an already reported result is not notified again.
   - Notifications are bounded previews. Read omitted output through process_manage or its log path. Oversized batches expose omitted-source counts and a JSONL manifest of source/log metadata; read it to locate omitted sources. Manifest failures are explicit, not automatic retries.
   - Examples:
@@ -138,6 +141,9 @@ export function registerMonitorTool(pi: ExtensionAPI, reg: BackgroundRegistry): 
             const job = createRunningJob({
                 id, name: description, command: hasWs ? `ws ${p.ws!.url}` : p.command!,
                 pid: 0, logPath, toolCallId: _toolCallId, kind: "monitor",
+                executionConfig: copyMonitorExecutionConfig({ kind: "monitor", mode: "background",
+                    timeout_ms: p.timeout_ms ?? null, wake_absent_ms: p.wake_absent_ms ?? null,
+                    batch_interval_ms: reg.config.monitorFlushMs }),
             });
             add(reg, job);
             // Publication can synchronously close admission before a source
@@ -175,10 +181,10 @@ export function registerMonitorTool(pi: ExtensionAPI, reg: BackgroundRegistry): 
                     textBlock(
                         `${launchText(launchMetadata("monitor", id, id, "background"))}\nMonitor ${id} started — ${sourceDesc}, ${deadlineDesc}. ` +
                             `Events ("${description}") will arrive as notifications. ` +
-                            `Output: ${logPath}`
+                            `Output: ${logPath}\n` + monitorExecutionSummary(job.executionConfig)
                     ),
                 ],
-                details: { runtimeLaunch: launchMetadata("monitor", id, id, "background") },
+                details: { runtimeLaunch: launchMetadata("monitor", id, id, "background"), executionConfig: copyMonitorExecutionConfig(job.executionConfig) },
             };
         },
     });

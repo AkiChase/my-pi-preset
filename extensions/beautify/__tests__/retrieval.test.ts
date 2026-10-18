@@ -175,7 +175,7 @@ test("actual loader optional absence/dynamic next, no tools registered, unrelate
   try {
     assert.deepEqual(loaded.errors, []); assert.equal(loaded.extensions[0].tools.size, 0);
     const runner = resolver(loaded, dir);
-    for (const name of ["write", "subagent_run", "subagent_workflow", "subagent_message", "jobs", "get_subagent_result", "bash_bg", "monitor", "ls", "ask_user_question"]) { const original = { renderShell: "self" }; assert.equal(runner.resolveToolRenderers(name, () => original), original); }
+    for (const name of ["write", "subagent_run", "subagent_workflow", "subagent_message", "jobs", "get_subagent_result", "bash_bg", "ls", "ask_user_question"]) { const original = { renderShell: "self" }; assert.equal(runner.resolveToolRenderers(name, () => original), original); }
     for (const original of [undefined, { renderShell: "self", renderCall: () => new Text("DYNAMIC", 0, 0), renderResult: () => new Text("RESULT", 0, 0) }]) {
       const renderer = runner.resolveToolRenderers("task_manage", () => original);
       const component = new ToolExecutionComponent("task_manage", "history", { foreign: true }, {}, renderer, screen, dir);

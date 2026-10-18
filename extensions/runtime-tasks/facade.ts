@@ -1,4 +1,4 @@
-import { copyAgentExecutionConfig, agentExecutionSummary } from "./execution-config.ts";
+import { copyAgentExecutionConfig, copyMonitorExecutionConfig, executionSummary } from "./execution-config.ts";
 import { launchMetadata, launchText } from "./launch.ts";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { AgentToolUpdateCallback } from "@earendil-works/pi-agent-core";
@@ -41,7 +41,7 @@ export function createRuntimeTaskFacade(initial: readonly RuntimeTaskCapability[
       const { entry, capability } = matches[0];
       const view = entry.view;
       const reliableStats = Object.fromEntries(Object.entries(view.stats).flatMap(([key, value]) => typeof value === "number" && Number.isFinite(value) && value >= 0 && !["exitCode"].includes(key) ? [[key, value] as const] : []));
-      const metadata = { ...(view.kind === "agent" && view.executionConfig ? { executionConfig: copyAgentExecutionConfig(view.executionConfig) } : {}), stats: reliableStats, action: params.action, task_type: runtimeTaskType(view), task_id: view.taskId, run_id: view.runId, title: view.title, status: view.status, raw_status: entry.rawStatus };
+      const metadata = { ...((view.kind === "agent" || view.kind === "monitor") && view.executionConfig ? { executionConfig: view.kind === "agent" ? copyAgentExecutionConfig(view.executionConfig) : copyMonitorExecutionConfig(view.executionConfig) } : {}), stats: reliableStats, action: params.action, task_type: runtimeTaskType(view), task_id: view.taskId, run_id: view.runId, title: view.title, status: view.status, raw_status: entry.rawStatus };
       if (params.run_id !== undefined && params.run_id !== view.runId)
         return taskResult(`Stale run_id ${params.run_id}; current run_id=${view.runId}.`, { ...metadata, error_code: "stale" });
       if (!entry.manageable) return taskResult("This task belongs to another owner; manage its owner instead.", { ...metadata, error_code: "forbidden" });
@@ -52,7 +52,7 @@ export function createRuntimeTaskFacade(initial: readonly RuntimeTaskCapability[
       if (params.action === "status") return taskResult([
         launchText(launchMetadata(metadata.task_type, view.taskId, view.runId, "background")),
         `${view.title}: ${view.status} (raw_status=${entry.rawStatus})`,
-        agentExecutionSummary(metadata.executionConfig).trimEnd(),
+        executionSummary(metadata.executionConfig).trimEnd(),
         `mode=${view.executionMode} wait_count=${view.waitCount}`,
         `capabilities=${JSON.stringify(view.capabilities)}`,
         `stats=${JSON.stringify(view.stats)}`,

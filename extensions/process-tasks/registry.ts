@@ -28,7 +28,7 @@ export function errPathFor(reg: BackgroundRegistry, jobId: string): string {
 
 export function createRunningJob(args: {
     id: string; command: string; pid: number; logPath: string; toolCallId: string;
-    name?: string; kind?: JobKind; isBackgrounded?: boolean;
+    name?: string; kind?: JobKind; isBackgrounded?: boolean; executionConfig?: Job["executionConfig"];
 }): Job {
     return {
         ...args,

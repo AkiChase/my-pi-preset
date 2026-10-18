@@ -14,6 +14,7 @@ const { buildSystemPrompt } = await import(pathToFileURL(join(dirname(entry), "c
   buildSystemPrompt(options: { cwd: string; selectedTools: string[]; hiddenTools?: string[]; toolSnippets: Record<string, string>; toolGuidelines: Record<string, string[]> }): string;
 };
 test("registered split tools and monitor contribute one group each through actual SDK prompt assembly", () => {
+  let staticMonitorRules: string[] | undefined;
   for (const cadence of [0, 3500]) {
     const tools: Parameters<ExtensionAPI["registerTool"]>[0][] = [];
     const registry = new BackgroundRegistry({ ...DEFAULTS, monitorFlushMs: cadence });
@@ -23,10 +24,13 @@ test("registered split tools and monitor contribute one group each through actua
     tools.push(managementTool("process", []).tool, managementTool("agent", []).tool);
     const toolSnippets = Object.fromEntries(tools.map(t => [t.name, t.promptSnippet!]));
     const toolGuidelines = Object.fromEntries(tools.map(t => [t.name, t.promptGuidelines!]));
+    if (staticMonitorRules) assert.deepEqual(toolGuidelines.monitor, staticMonitorRules);
+    staticMonitorRules = toolGuidelines.monitor;
     const selectedTools = tools.map(t => t.name);
     const prompt = buildSystemPrompt({ cwd: process.cwd(), selectedTools: [...selectedTools, "peer"], toolSnippets: { ...toolSnippets, peer: "Peer index" }, toolGuidelines: { ...toolGuidelines, peer: ["Peer guideline"] } });
     for (const heading of ["Process_manage usage:", "Agent_manage usage:", "Monitor usage:", "Bash usage:"]) assert.equal(prompt.split(heading).length - 1, 1);
-    assert.match(prompt, new RegExp(`${cadence}ms cadence`));
+    assert.match(prompt, /configured batch interval; startup results show the adopted batch configuration/);
+    assert.doesNotMatch(toolGuidelines.monitor!.join("\n"), new RegExp(`${cadence}ms cadence`));
     assert.match(prompt, /process_manage manages both/); assert.match(prompt, /execution_id/);
     assert.match(prompt, /set task_type to null in these targeted calls/);
     assert.doesNotMatch(prompt, /do not include task_type in these targeted calls/);

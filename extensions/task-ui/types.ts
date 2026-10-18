@@ -24,7 +24,7 @@ export interface TaskView extends TaskIdentity {
     readonly waitCount: number;
     readonly startedAt?: number;
     readonly endedAt?: number;
-    readonly executionConfig?: import("../runtime-tasks/execution-config.ts").AgentExecutionConfig;
+    readonly executionConfig?: import("../runtime-tasks/execution-config.ts").ExecutionConfig;
     readonly stats: Readonly<{
         pid?: number; exitCode?: number; durationMs?: number;
         tokens?: number; inputTokens?: number; outputTokens?: number; cost?: number;

@@ -60,3 +60,34 @@ export function agentExecutionSummary(value: unknown): string {
   const differences = config.differences?.map(d => `${d.field} requested ${JSON.stringify(d.requested)}, effective ${JSON.stringify(d.actual)}${d.reason ? ` (${d.reason})` : ""}`) ?? [];
   return `Execution config${config.phase === "resolved" ? " (pending session confirmation)" : " (session-effective)"}: ${fields.join(", ") || "settings unknown"}.${differences.length ? ` Differences: ${differences.join("; ")}.` : ""}\n`;
 }
+
+/** Monitor startup display data. Batch configuration is not an exact delivery cadence. */
+export interface MonitorExecutionConfig {
+  readonly kind: "monitor";
+  readonly mode: "background";
+  readonly timeout_ms: number | null;
+  readonly wake_absent_ms: number | null;
+  readonly batch_interval_ms: number;
+}
+export type ExecutionConfig = AgentExecutionConfig | MonitorExecutionConfig;
+export function isMonitorExecutionConfig(value: unknown): value is MonitorExecutionConfig {
+  if (!object(value) || value.kind !== "monitor" || value.mode !== "background" ||
+    Object.keys(value).length !== 5 || Object.keys(value).some(k => !["kind", "mode", "timeout_ms", "wake_absent_ms", "batch_interval_ms"].includes(k))) return false;
+  const positive = (v: unknown) => typeof v === "number" && Number.isFinite(v) && v > 0;
+  return (value.timeout_ms === null || positive(value.timeout_ms)) &&
+    (value.wake_absent_ms === null || positive(value.wake_absent_ms)) &&
+    typeof value.batch_interval_ms === "number" && Number.isFinite(value.batch_interval_ms) && value.batch_interval_ms >= 0;
+}
+export function copyMonitorExecutionConfig(value: unknown): MonitorExecutionConfig | undefined {
+  return isMonitorExecutionConfig(value) ? Object.freeze({ ...value }) : undefined;
+}
+export function copyExecutionConfig(value: unknown): ExecutionConfig | undefined {
+  return copyAgentExecutionConfig(value) ?? copyMonitorExecutionConfig(value);
+}
+export function monitorExecutionSummary(value: unknown): string {
+  const config = copyMonitorExecutionConfig(value);
+  return config ? `Monitor config: mode=background, timeout=${config.timeout_ms === null ? "no deadline" : `${config.timeout_ms}ms`}, silence reminder=${config.wake_absent_ms === null ? "disabled" : `${config.wake_absent_ms}ms`}, startup batch configuration=${config.batch_interval_ms}ms (first/timely events may arrive earlier).\n` : "";
+}
+export function executionSummary(value: unknown): string {
+  return agentExecutionSummary(value) || monitorExecutionSummary(value);
+}

@@ -1,9 +1,19 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { AGENT_CONFIG_FIELDS, copyAgentExecutionConfig, type AgentExecutionConfig } from "../runtime-tasks/execution-config.ts";
+import { AGENT_CONFIG_FIELDS, copyAgentExecutionConfig, copyMonitorExecutionConfig, type ExecutionConfig } from "../runtime-tasks/execution-config.ts";
 import { wrap } from "./layout.ts";
 
 /** Pure display of an already verified, historical execution snapshot. */
-export function executionConfigRows(value: AgentExecutionConfig, expanded: boolean, width: number, theme: Theme): string[] {
+export function executionConfigRows(value: ExecutionConfig, expanded: boolean, width: number, theme: Theme): string[] {
+  const monitor = copyMonitorExecutionConfig(value);
+  if (monitor) {
+    const timeout = monitor.timeout_ms === null ? "no deadline" : `${monitor.timeout_ms}ms`;
+    const wake = monitor.wake_absent_ms === null ? "disabled" : `${monitor.wake_absent_ms}ms`;
+    const lines = expanded ? ["Monitor execution config", "  mode: background", `  timeout: ${timeout}`,
+      `  silence reminder: ${wake}`, `  startup batch configuration: ${monitor.batch_interval_ms}ms`,
+      "  First/timely events may arrive earlier; not an exact delivery cadence."]
+      : [`mode: background · timeout: ${timeout} · silence reminder: ${wake}`];
+    return lines.flatMap(line => wrap(line, width).map(row => theme.fg("muted", row)));
+  }
   const config = copyAgentExecutionConfig(value);
   if (!config) return [];
   const phase = config.phase === "resolved" ? "resolved · pending session confirmation" : "session-effective";

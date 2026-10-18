@@ -5,6 +5,7 @@ import { bashRenderers } from "./tools/bash.ts";
 import { findRenderers } from "./tools/find.ts";
 import { grepRenderers } from "./tools/grep.ts";
 import { optionalRenderers } from "./tools/optional.ts";
+import { monitorContract } from "./tools/monitor.ts";
 import { managementContract } from "./tools/management.ts";
 import { registerAppearance } from "./editor/owner.ts";
 export default function beautify(pi: ExtensionAPI): void {
@@ -13,6 +14,7 @@ export default function beautify(pi: ExtensionAPI): void {
   pi.registerToolRenderer((name, next) => {
     if (Object.hasOwn(tools, name)) return tools[name as keyof typeof tools];
     if (name === "process_manage" || name === "agent_manage") return optionalRenderers(name, next(), managementContract(name === "process_manage" ? "process" : "agent"));
+    if (name === "monitor") return optionalRenderers(name, next(), monitorContract);
     return next();
   });
   registerAppearance(pi);

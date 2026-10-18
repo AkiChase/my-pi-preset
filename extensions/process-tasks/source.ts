@@ -1,3 +1,4 @@
+import { copyMonitorExecutionConfig } from "../runtime-tasks/execution-config.ts";
 import type { BackgroundRegistry } from "./state.ts";
 import type { TaskDetail, TaskDetailRequest, TaskIdentity, TaskSource, TaskView } from "../task-ui/types.ts";
 import { taskKey } from "../task-ui/types.ts";
@@ -44,6 +45,7 @@ export function createProcessTaskSource(reg: BackgroundRegistry): TaskSource {
                     waitCount: reg.coordinator.countWaits(identity),
                     startedAt: job.startTime,
                     endedAt: job.endedAt,
+                    ...(job.kind === "monitor" && job.executionConfig ? { executionConfig: copyMonitorExecutionConfig(job.executionConfig) } : {}),
                     stats: Object.freeze({ pid: job.pid, exitCode: job.exitCode, durationMs: (job.endedAt ?? Date.now()) - job.startTime }),
                     artifacts: Object.freeze([Object.freeze({ kind: "log" as const, path: job.logPath })]),
                     capabilities: Object.freeze({ stop: !isTerminalStatus(job.status), details: true }),

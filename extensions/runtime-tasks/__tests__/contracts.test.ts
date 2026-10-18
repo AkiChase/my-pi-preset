@@ -143,3 +143,34 @@ test("execution config is optional, closed, group-specific and deeply immutable 
   assert.match(status.content[0]!.type === "text" ? status.content[0]!.text : "", /pending session confirmation.*thinking=off.*mode=foreground/);
   assert.equal(backend, 0, "status remains a side-effect-free facade projection");
 });
+
+test("monitor snapshots are closed, explicit-null, independently copied and kind-specific", async () => {
+  const { copyMonitorExecutionConfig, isMonitorExecutionConfig } = await import("../execution-config.ts");
+  const { isManagementDetails } = await import("../tools.ts");
+  const config = { kind: "monitor", mode: "background", timeout_ms: null, wake_absent_ms: 1.5, batch_interval_ms: 0 };
+  assert.ok(isMonitorExecutionConfig(config));
+  for (const patch of [{ command: "private" }, { url: "private" }, { protocols: [] }, { auth: {} }, { phase: "resolved" },
+    { timeout_ms: undefined }, { wake_absent_ms: undefined }, { mode: "foreground" }, { timeout_ms: 0 }, { wake_absent_ms: NaN },
+    { timeout_ms: Infinity }, { batch_interval_ms: -1 }, { batch_interval_ms: "100" }])
+    assert.equal(isMonitorExecutionConfig({ ...config, ...patch }), false);
+  const snapshot = copyMonitorExecutionConfig(config)!;
+  config.batch_interval_ms = 123;
+  assert.equal(snapshot.batch_interval_ms, 0); assert.ok(Object.isFrozen(snapshot));
+  const result = taskResult("monitor", { action: "output", task_type: "monitor", task_id: "m", run_id: "m", executionConfig: snapshot });
+  assert.ok(isRuntimeTaskMetadata(result.details.runtimeTask));
+  assert.notEqual(result.details.runtimeTask.executionConfig, snapshot);
+  for (const task_type of ["bash", "workflow", "subagent"]) assert.equal(isRuntimeTaskMetadata({ ...result.details.runtimeTask, task_type }), false);
+  const publicMeta = { version: 2, group: "process", action: "output", task_type: "monitor", task_id: "m", executionConfig: snapshot };
+  assert.ok(isManagementDetails({ runtimeManagement: publicMeta }));
+  for (const patch of [{ task_type: "bash" }, { group: "agent" }, { task_id: undefined }, { task_id: "" }, { executionConfig: { kind: "agent", phase: "resolved" } }])
+    assert.equal(isManagementDetails({ runtimeManagement: { ...publicMeta, ...patch } }), false);
+  // Newly displayed range/statistics must not admit foreign keys or inapplicable
+  // pages that the internal runtime envelope itself rejects.
+  for (const stats of [[], { PRIVATE_METADATA_KEY: 123 }, { pid: 1.5 }, { pid: Number.MAX_SAFE_INTEGER + 1 }, { duration_ms: Infinity }])
+    assert.equal(isManagementDetails({ runtimeManagement: { ...publicMeta, stats } }), false);
+  assert.ok(isManagementDetails({ runtimeManagement: { ...publicMeta, stats: { pid: 1, duration_ms: 1.5 } } }));
+  const range = { start: 0, end: 2, size: 3, omitted_before: 0, omitted_after: 1 };
+  assert.ok(isManagementDetails({ runtimeManagement: { ...publicMeta, range } }));
+  for (const patch of [{ action: "status" }, { action: "stop" }, { task_type: undefined }])
+    assert.equal(isManagementDetails({ runtimeManagement: { ...publicMeta, executionConfig: undefined, range, ...patch } }), false);
+});

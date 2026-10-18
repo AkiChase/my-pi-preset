@@ -1,3 +1,4 @@
+import { copyMonitorExecutionConfig, monitorExecutionSummary } from "../runtime-tasks/execution-config.ts";
 import { statSync } from "node:fs";
 import type { RuntimeTaskCapability } from "../runtime-tasks/facade.ts";
 import { runtimeTaskType, taskResult, type RuntimeTaskMetadata, type RuntimeTaskParams } from "../runtime-tasks/contracts.ts";
@@ -13,25 +14,27 @@ import { searchAction } from "./search.ts";
 /** Uses the same registry and lifecycle as execution, never UI detail truncation. */
 export function createProcessManagement(reg: BackgroundRegistry, source: TaskSource): RuntimeTaskCapability {
   const lookup = (identity: TaskIdentity) => identity.sourceId === "process" && identity.runId === identity.taskId && !reg.closed ? reg.jobs.get(identity.taskId) : undefined;
-  const metadata = (identity: TaskIdentity, params: RuntimeTaskParams): Omit<RuntimeTaskMetadata, "version"> => {
-    const job = lookup(identity);
+  const metadata = (identity: TaskIdentity, params: RuntimeTaskParams, capturedJob?: import("./types.ts").Job): Omit<RuntimeTaskMetadata, "version"> => {
+    const job = capturedJob?.kind === "monitor" ? capturedJob : lookup(identity);
     return { action: params.action, task_type: job?.kind === "monitor" ? "monitor" : "bash", task_id: identity.taskId, run_id: identity.runId,
+      ...(job?.kind === "monitor" && job.executionConfig ? { executionConfig: copyMonitorExecutionConfig(job.executionConfig) } : {}),
       stats: job ? { pid: job.pid, duration_ms: Math.max(0, (job.endedAt ?? Date.now()) - job.startTime) } : undefined,
       title: job?.name ?? job?.command, raw_status: job?.status,
       status: job?.status === "pending" ? "queued" : job?.status === "killed" ? "stopped" : job?.status };
   };
   const output = (identity: TaskIdentity, params: RuntimeTaskParams, consume: boolean) => {
     const job = lookup(identity);
-    const meta = metadata(identity, params);
+    const meta = metadata(identity, params, job);
     if (!job) return taskResult("Process task is no longer available.", { ...meta, error_code: "closed" });
     let size: number;
-    try { const stat = statSync(job.logPath); if (!stat.isFile()) throw new Error("Not a log file"); size = stat.size; } catch { return taskResult(`Cannot read log: ${job.logPath}. Task status=${job.status}.`, { ...meta, error_code: "log_error" }); }
+    try { const stat = statSync(job.logPath); if (!stat.isFile()) throw new Error("Not a log file"); size = stat.size; } catch { return taskResult(monitorExecutionSummary(meta.executionConfig) + `Cannot read log: ${job.logPath}. Task status=${job.status}.`, { ...meta, error_code: "log_error" }); }
     const slice = size === 0 ? { text: "", start: 0, end: 0, size: 0 } : readLogSlice(job.logPath, { offset: params.offset, limit: params.limit ?? reg.config.outputPreviewChars });
-    if (!slice) return taskResult(`Cannot read log: ${job.logPath}. Task status=${job.status}.`, { ...meta, error_code: "log_error" });
+    if (!slice) return taskResult(monitorExecutionSummary(meta.executionConfig) + `Cannot read log: ${job.logPath}. Task status=${job.status}.`, { ...meta, error_code: "log_error" });
     if (consume && isTerminalStatus(job.status)) markOutcomeSurfaced(job, reg);
     return taskResult([
       `task_type=${meta.task_type} task_id=${job.id} status=${meta.status} raw_status=${job.status}`,
       `Output for ${job.name ?? job.command} — bytes ${slice.start}-${slice.end} of ${slice.size}. Log: ${job.logPath}`,
+      monitorExecutionSummary(meta.executionConfig).trimEnd(),
       slice.start ? `[${slice.start} earlier bytes omitted; offset=0]` : "",
       slice.text || "(no output)",
       slice.end < slice.size ? `[${slice.size - slice.end} more bytes; offset=${slice.end}]` : "",
@@ -50,19 +53,19 @@ export function createProcessManagement(reg: BackgroundRegistry, source: TaskSou
     search,
     async execute(identity, params, signal, onUpdate, ctx) {
       const job = lookup(identity);
-      if (!job) return taskResult("Process task is no longer available.", { ...metadata(identity, params), error_code: "closed" });
+      if (!job) return taskResult("Process task is no longer available.", { ...metadata(identity, params, job), error_code: "closed" });
       if (params.action === "output") return output(identity, params, true);
       if (params.action === "search") {
         const result = await search(params, ctx);
-        if (reg.closed || reg.jobs.get(job.id) !== job) return taskResult("Process search scope is closed or replaced.", { ...metadata(identity, params), error_code: "closed" });
-        return taskResult(result.content.filter(block => block.type === "text").map(block => block.text).join("\n"), { ...metadata(identity, params), count: result.details.runtimeTask.count, error_code: result.details.runtimeTask.error_code });
+        if (reg.closed || reg.jobs.get(job.id) !== job) return taskResult("Process search scope is closed or replaced.", { ...metadata(identity, params, job), error_code: "closed" });
+        return taskResult(result.content.filter(block => block.type === "text").map(block => block.text).join("\n"), { ...metadata(identity, params, job), count: result.details.runtimeTask.count, error_code: result.details.runtimeTask.error_code });
       }
       if (params.action === "stop") {
         const requested = !isTerminalStatus(job.status);
         if (requested) terminateJobSilently(reg, job);
-        return taskResult(`task_type=${runtimeTaskType({ kind: job.kind ?? "shell" })} task_id=${job.id}\nStop ${requested ? "requested" : "not needed"}; observed status=${job.status}. Actual execution may still be draining.`, metadata(identity, params));
+        return taskResult(`task_type=${runtimeTaskType({ kind: job.kind ?? "shell" })} task_id=${job.id}\nStop ${requested ? "requested" : "not needed"}; observed status=${job.status}. Actual execution may still be draining.`, metadata(identity, params, job));
       }
-      if (params.action !== "wait") return taskResult("Unsupported process action.", { ...metadata(identity, params), error_code: "unsupported" });
+      if (params.action !== "wait") return taskResult("Unsupported process action.", { ...metadata(identity, params, job), error_code: "unsupported" });
       ensureCompletionPromise(job);
       const terminal = job.donePromise;
       job.attachCount = (job.attachCount ?? 0) + 1;
@@ -77,12 +80,12 @@ export function createProcessManagement(reg: BackgroundRegistry, source: TaskSou
       let poller: ReturnType<typeof streamLog> | undefined;
       try {
         if (!lease.settled) {
-          onUpdate?.(taskResult(`task_id=${job.id}\nWaiting for entire task to finish.`, { ...metadata(identity, params), wait_outcome: "waiting" }));
-          poller = streamLog(job.logPath, update => onUpdate?.(taskResult(update.content.map(block => block.text).join("\n"), { ...metadata(identity, params), wait_outcome: "waiting" })));
+          onUpdate?.(taskResult(monitorExecutionSummary(job.executionConfig) + `task_id=${job.id}\nWaiting for entire task to finish.`, { ...metadata(identity, params, job), wait_outcome: "waiting" }));
+          poller = streamLog(job.logPath, update => onUpdate?.(taskResult(monitorExecutionSummary(job.executionConfig) + update.content.map(block => block.text).join("\n"), { ...metadata(identity, params, job), wait_outcome: "waiting" })));
         }
         const outcome = await lease.result;
-        if (reg.closed || reg.jobs.get(job.id) !== job) return taskResult("Process activation is closed.", { ...metadata(identity, params), error_code: "closed", wait_outcome: "cancelled" });
-        if (outcome.kind !== "completed") return taskResult(`task_id=${job.id}\nWait ${outcome.kind === "detached" ? "released" : "cancelled"}; target unchanged.`, { ...metadata(identity, params), wait_outcome: outcome.kind === "detached" ? "released" : "cancelled" });
+        if (reg.closed || reg.jobs.get(job.id) !== job) return taskResult(monitorExecutionSummary(job.executionConfig) + "Process activation is closed.", { ...metadata(identity, params, job), error_code: "closed", wait_outcome: "cancelled" });
+        if (outcome.kind !== "completed") return taskResult(monitorExecutionSummary(job.executionConfig) + `task_id=${job.id}\nWait ${outcome.kind === "detached" ? "released" : "cancelled"}; target unchanged.`, { ...metadata(identity, params, job), wait_outcome: outcome.kind === "detached" ? "released" : "cancelled" });
         const result = completedOutput ?? output(identity, params, true);
         return taskResult(result.content.filter(block => block.type === "text").map(block => block.text).join("\n"), { ...result.details.runtimeTask, wait_outcome: "completed" });
       } finally { poller?.stop(); if (!lease.settled) lease.dispose(); }
