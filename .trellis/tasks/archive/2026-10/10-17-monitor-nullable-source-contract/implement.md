@@ -57,6 +57,6 @@ S1 实现完成并通过独立审查。产品仅 tools/monitor.ts；7个tracked�
 
 限制：direct parser严格拒绝原始非法值；SDK可能在execute前将原始0/false/undefined转换null、string位置null转字符串null。入口无法恢复原始值，故不得宣称host raw拒绝0；AC4据实标注此局限，不引入未批准SDK/helper改造。本任务本地实现/检查完成，但此严格host输入验收差距必须向用户报告；若要求彻底解决须另行评审授权。真实provider/网络WS、物理终端NOT_RUN。独立lint未配置。
 
-本阶段checkpoint：`9c459c2 fix: require nullable Monitor source controls`，仅8个精确产品/测试文件。main已核验独立日志摘要及空tsc日志、实施原始日志与probe。终态后仅清理owned临时目录 /tmp/monitor-nullable-UB9SzF 与 reviewer /tmp/monitor-check-XCbImX。任务保持in_progress等待用户验收，不归档、不清理历史文档；并行改动保留。
+本阶段checkpoint：`9c459c2 fix: require nullable Monitor source controls`，仅8个精确产品/测试文件。main已核验独立日志摘要及空tsc日志、实施原始日志与probe。终态后仅清理owned临时目录 /tmp/monitor-nullable-UB9SzF 与 reviewer /tmp/monitor-check-XCbImX。任务已获用户验收与收尾授权（“收尾吧，然后我们看下个task”）；用户已知SDK转换限制，真实provider/网络WS和物理终端仍NOT_RUN。本次收尾仅归档与journal，历史docs/spec问题不清理，并行改动保留。
 
 规划阶段：没有执行产品测试，没有改产品代码。首次定位renderer误猜路径 `extensions/beautify/tools/launch.ts` 不存在；随后搜索实际tools目录未发现Monitor特有parser，不将其列为实现owner。
