@@ -220,7 +220,15 @@ void it("beautify actual session_start before Down and real panel focus/nav/clos
     const dir = mkdtempSync(join(tmpdir(), "task-down-beautify-"));
     const h = harness();
     const starts: Array<(event: unknown, ctx: ExtensionContext) => unknown> = [], shuts: Array<(event: unknown, ctx: ExtensionContext) => unknown> = [];
+    const bus = new Map<string, Set<(payload: unknown) => void>>();
     const rawPi = {
+        events: {
+            on(name: string, handler: (payload: unknown) => void) {
+                const listeners = bus.get(name) ?? new Set(); listeners.add(handler); bus.set(name, listeners);
+                return () => { listeners.delete(handler); };
+            },
+            emit(name: string, payload: unknown) { for (const handler of bus.get(name) ?? []) handler(payload); },
+        },
         on(name: string, callback: (event: unknown, ctx: ExtensionContext) => unknown) {
             const list = name === "session_start" ? starts : name === "session_shutdown" ? shuts : [];
             list.push(callback); return () => { const index = list.indexOf(callback); if (index >= 0) list.splice(index, 1); };

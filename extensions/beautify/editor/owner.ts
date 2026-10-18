@@ -2,8 +2,9 @@ import { CustomEditor, type ExtensionAPI, type ExtensionContext } from "@earendi
 import type { EditorComponent, TUI } from "@earendil-works/pi-tui";
 import { preserveHandoff, type LiveEditor } from "../../editor-handoff/index.ts";
 import { decorateAppearance } from "./appearance.ts";
+import type { PhaseDecorator } from "./phase-status.ts";
 type Factory = NonNullable<Parameters<ExtensionContext["ui"]["setEditorComponent"]>[0]>;
-interface Resources { ctx: ExtensionContext; leases: Set<() => void>; seen: WeakSet<EditorComponent> }
+interface Resources { ctx: ExtensionContext; tui: TUI; phase?: PhaseDecorator; leases: Set<() => void>; seen: WeakSet<EditorComponent> }
 interface Cell { value?: Resources }
 function decorate(cell: Cell, editor: EditorComponent): EditorComponent {
   const resources = cell.value;
@@ -11,7 +12,10 @@ function decorate(cell: Cell, editor: EditorComponent): EditorComponent {
   for (const release of resources.leases) release();
   resources.leases.clear();
   const dispose = decorateAppearance(editor as CustomEditor);
-  const release = () => { dispose(); resources.seen.delete(editor); };
+  let disposePhase: (() => void) | undefined;
+  try { disposePhase = resources.phase?.(editor as CustomEditor, resources.ctx, resources.tui); }
+  catch { console.error("[beautify] Phase status unavailable; keeping native status."); }
+  const release = () => { disposePhase?.(); dispose(); resources.seen.delete(editor); };
   resources.seen.add(editor); resources.leases.add(release);
   return editor;
 }
@@ -27,7 +31,7 @@ function factory(cell: Cell, previous: Factory | undefined, transaction: { edito
     return editor;
   };
 }
-export function registerAppearance(pi: ExtensionAPI): () => void {
+export function registerAppearance(pi: ExtensionAPI, phase?: PhaseDecorator): () => void {
   const cell: Cell = {};
   let closed = false, installed = false;
   const close = () => {
@@ -59,7 +63,7 @@ export function registerAppearance(pi: ExtensionAPI): () => void {
       previous = ctx.ui.getEditorComponent();
       // Descriptor preflight happens while the existing UI is mounted. Padding decoration
       // precedes shielding, so both owners' synchronous handoffs preserve native layout.
-      cell.value = { ctx, seen: new WeakSet(), leases: new Set() };
+      cell.value = { ctx, tui: screen, phase, seen: new WeakSet(), leases: new Set() };
       decorate(cell, editor);
       restore = preserveHandoff(editor);
       transaction.editor = editor;

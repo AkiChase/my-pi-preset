@@ -46,7 +46,14 @@ export function harness() {
   const ui = InteractiveMode.prototype.createExtensionUIContext.call(host);
   const ctx = { mode: 'tui', ui } as unknown as ExtensionContext;
   const events = new Map<string, Set<(event: unknown, ctx: ExtensionContext) => unknown>>();
-  const pi = { on(name: string, fn: (event: unknown, ctx: ExtensionContext) => unknown) {
+  const bus = new Map<string, Set<(payload: unknown) => void>>();
+  const pi = { events: {
+    on(name: string, handler: (payload: unknown) => void) {
+      const listeners = bus.get(name) ?? new Set(); listeners.add(handler); bus.set(name, listeners);
+      return () => { listeners.delete(handler); };
+    },
+    emit(name: string, payload: unknown) { for (const handler of bus.get(name) ?? []) handler(payload); },
+  }, on(name: string, fn: (event: unknown, ctx: ExtensionContext) => unknown) {
     const handlers = events.get(name) ?? new Set(); events.set(name, handlers); handlers.add(fn); return () => handlers.delete(fn);
   } } as unknown as ExtensionAPI;
   async function emit(name: string) { for (const fn of [...(events.get(name) ?? [])]) await fn({}, ctx); }

@@ -8,6 +8,7 @@ import { optionalRenderers } from "./tools/optional.ts";
 import { monitorContract } from "./tools/monitor.ts";
 import { managementContract } from "./tools/management.ts";
 import { registerAppearance } from "./editor/owner.ts";
+import { registerPhaseStatus } from "./editor/phase-status.ts";
 export default function beautify(pi: ExtensionAPI): void {
   const highlighter = new Highlighter();
   const tools = { read: readRenderers(highlighter), bash: bashRenderers, find: findRenderers, grep: grepRenderers };
@@ -17,6 +18,6 @@ export default function beautify(pi: ExtensionAPI): void {
     if (name === "monitor") return optionalRenderers(name, next(), monitorContract);
     return next();
   });
-  registerAppearance(pi);
+  registerAppearance(pi, registerPhaseStatus(pi));
   pi.on("session_shutdown", () => highlighter.dispose());
 }

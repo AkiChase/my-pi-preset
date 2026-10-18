@@ -1,0 +1,13 @@
+{"file":".trellis/spec/development/index.md","reason":"Extension ownership, public API, editor preservation and lifecycle contracts"}
+{"file":".trellis/spec/testing/index.md","reason":"Actual host regression, natural exit, isolation and evidence limits"}
+{"file":"extensions/beautify/editor/phase-state.ts","reason":"New phase reducer"}
+{"file":"extensions/beautify/editor/phase-status.ts","reason":"New public indicator receiver and resource owner"}
+{"file":"extensions/beautify/editor/owner.ts","reason":"Live editor integration"}
+{"file":"extensions/beautify/index.ts","reason":"Plugin composition"}
+{"file":"extensions/beautify/__tests__/phase-status.test.ts","reason":"Focused regression coverage"}
+{"file":"extensions/beautify/__tests__/harness.mjs","reason":"Actual SDK harness and test-only introspection boundaries"}
+{"file":"extensions/editor-handoff/index.ts","reason":"Descriptor ownership and handoff reuse"}
+{"file":"docs/extensions/beautify.md","reason":"Owning user documentation"}
+{"file":"extensions/task-ui/__tests__/editor.test.ts","reason":"Beautify integration fixture now includes public event bus"}
+{"file":"extensions/at-path-completion/__tests__/harness.ts","reason":"Autocomplete integration fake ExtensionAPI event bus"}
+{"file":"extensions/agent-tasks/__tests__/host-loading-smoke.mjs","reason":"Actual host loader phase observer and teardown registration assertions"}

@@ -44,7 +44,8 @@ const registryKey = Symbol.for("pi-subagents:manager");
 const rootToolNames = ["subagent_run", "subagent_workflow", "bash", "agent_manage", "process_manage", "monitor", "subagent_message"].sort();
 const childToolNames = ["bash", "agent_manage", "process_manage", "monitor"].sort();
 const rootOnlyEvents = ["input", "session_before_switch"];
-const removedOverviewEvents = ["tool_execution_start"];
+// Beautify owns one phase observer; no legacy task-overview observer is registered.
+const phaseEvents = ["tool_execution_start", "tool_execution_end", "message_update"];
 const liveLoads = new Set();
 const shutdown = async (extensions) => {
   for (const e of extensions ?? []) {
@@ -72,7 +73,7 @@ const assertRoot = (result) => {
   assert.equal(ext.toolRenderers[0]("bash", () => undefined).renderShell, "default");
   assert.ok(ext.commands.has("agents"));
   for (const event of rootOnlyEvents) assert.equal(ext.handlers.get(event)?.length, 1, `root owns ${event}`);
-  for (const event of removedOverviewEvents) assert.equal(ext.handlers.has(event), false, `no legacy overview ${event}`);
+  for (const event of phaseEvents) assert.equal(ext.handlers.get(event)?.length, 1, `only Beautify owns ${event}`);
   return ext;
 };
 const assertChild = (result, rootExt, label) => {
@@ -82,10 +83,11 @@ const assertChild = (result, rootExt, label) => {
     assert.equal(ext.tools.has(name), false, `${label}: no ${name}`);
   }
   assert.equal(ext.commands.has("agents"), false, `${label}: no root manager command`);
-  for (const event of [...rootOnlyEvents, ...removedOverviewEvents]) assert.equal(ext.handlers.has(event), false, `${label}: no root manager ${event}`);
-  // Composition, foreground widget client, appearance/highlighter and path continuation teardown.
-  assert.equal(rootExt.handlers.get("session_shutdown")?.length, 5);
-  assert.equal(ext.handlers.get("session_shutdown")?.length, 5);
+  for (const event of rootOnlyEvents) assert.equal(ext.handlers.has(event), false, `${label}: no root manager ${event}`);
+  for (const event of phaseEvents) assert.equal(ext.handlers.get(event)?.length, 1, `${label}: local Beautify phase observer`);
+  // Composition, foreground widget client, phase status, appearance/highlighter and path continuation teardown.
+  assert.equal(rootExt.handlers.get("session_shutdown")?.length, 6);
+  assert.equal(ext.handlers.get("session_shutdown")?.length, 6);
   for (const event of ["session_start"]) {
     assert.equal(ext.handlers.get(event)?.length, rootExt.handlers.get(event)?.length - 1, `${label}: no agent ${event}`);
   }
