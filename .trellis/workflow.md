@@ -16,6 +16,48 @@ well-scoped work; delegate when it meaningfully reduces context load, enables in
 
 ## Planning Artifacts
 
+### Task Material Boundaries
+
+| Path | Purpose |
+| --- | --- |
+| `prd.md` | Goals, scope, acceptance criteria and authorization boundaries |
+| `design.md` | Design decisions, interfaces and trade-offs |
+| `implement.md` | Implementation stages, progress, commit checkpoints and evidence links |
+| `research/*.md` | Research findings persisted by the research agent only |
+| `evidence/` | Selected long-term evidence, not raw execution output |
+| Role JSONL | Curated context references, not reports or logs |
+
+`research/` is not a general task attachment directory. Do not write implementation summaries,
+progress or authorization records, review reports, test logs, screenshots or temporary scripts there.
+Implement/check agents and the main session must not write their own reports into `research/`.
+The main session verifies research findings and integrates adopted conclusions into design/planning artifacts;
+its own task analysis belongs in those artifacts, with retained supporting evidence under `evidence/`.
+Read-only exploration without a task still requires neither task creation nor persistence.
+
+Create an owned run directory outside the repository in the system temporary directory (for example,
+with `mktemp -d`) before collecting execution output. Raw stdout/stderr, full event streams, bulk terminal
+text/ANSI captures, temporary drivers/launch scripts, debug fingerprints and duplicate interim reports
+belong there by default, not in task `evidence/` or a repository `.tmp/` directory.
+Keep raw materials needed for diagnosis until main has checked the failure and any rerun. Children return
+concise results, unresolved issues and temporary paths main needs to inspect; do not copy raw output into
+the repository just for handoff. Reports are optional, not required per role or stage.
+Main records final commands, environment, exit codes, results, failure causes and rerun relationships,
+and unrun limitations preferably in `implement.md` (or the PRD for lightweight work). Preserve failure
+facts; a later PASS must not erase earlier failures, but preserving those facts does not require permanent
+retention of every raw output. Final records must be self-contained, not depend only on temporary links
+that will be deleted. Only main-selected minimal, sanitized material for unresolved issues or valuable
+long-term reproduction belongs in `evidence/`; state its purpose before authorizing persistence.
+Within existing execution or wrap-up authorization, remove only this run's owned temporary directory
+once main has verified the materials and no active process still uses it. If diagnosis is unresolved,
+ownership/authorization is uncertain, or cleanup fails, retain the needed material and report why and
+where; do not claim cleanup succeeded. Never broadly clean system temporary files or another session.
+These rules govern new outputs. Do not move, delete, rename or repair references in historical tasks without
+separate approval; report historical misclassification without automatically cleaning it up.
+Authorized research writes use Markdown under `research/`; retained evidence uses existing textual formats under `evidence/`.
+Format checks are not author authentication or semantic classification; historical reference reads remain supported.
+
+### Planning and Dispatch Context
+
 Lightweight tasks may use a PRD alone; complex tasks need `prd.md`, `design.md`, `implement.md`.
 For multi-stage implementation, identify independently verifiable stages and commit checkpoints in `implement.md`;
 a lightweight single-stage task can record its checkpoint in the PRD. Record any explicit no-commit instruction.
@@ -28,7 +70,9 @@ this only bypasses the CLI's empty-manifest gate, not approval, spec reading or 
 `task.py validate` still reports empty manifests; do not describe that result as full validation success.
 If dispatch becomes necessary later, curate that role's context before dispatching.
 Parent/child links are organization, not a dependency scheduler. Execute in the approved order.
-Session-scoped pointers never infer another session. `deactivate` clears only your session binding, not task status.
+Session-scoped pointers never infer another session. `task.py active <task>` binds only the caller without
+changing task status/branch or running hooks; multiple sessions may bind the same task. It is not implementation
+approval. `deactivate` clears only your session binding, not task status.
 
 ## Phase Index
 
@@ -74,12 +118,26 @@ Only work the approved scope; preserve parallel changes.
 Complete one independently verifiable implementation stage, then perform 2.2 before starting the next stage.
 Do not accumulate all stages for a single final commit unless the user requested that approach or opted out of commits.
 
-When dispatching, start with `Active task: <path>`, context id and role. Bind the child to its independent
-session key without calling start or hooks. Load role JSONL references and artifacts unless a complete injection
-marker is present in the task-context block. Read omitted materials within the task store boundary.
+Dispatch uses the host-validated exact four-line header: `Active task: <path>`, `Trellis context id: <id>`,
+`Trellis agent: <role>`, `Trellis authority: <JSON>`, then a blank line. Authority supplies absolute source
+material/task/spec/workflow paths and a separate execution root; text alone does not authorize them.
+Bind the child to its independent source runtime session key without calling start or hooks. No task/spec
+execution copy is prepared. Git-checkout `.trellis` stays unchanged and is never a material fallback.
+Every role fully reads source PRD, optional design/implement and workflow, then implement/check reads its
+selected source JSONL and all references (research has no implement/check manifest requirement).
+Resolve relative material rows from sourceRoot and code/tests from executionRoot. Paginate until complete;
+paths/hashes are not bodies, full-read proof or a complete-injection shortcut. Missing/invalid source paths
+are blockers, never permission to use target copies. Main verifies obsolete references and repairs them
+within existing material-maintenance authorization before requery/re-dispatch; no material synchronization
+or old-binding conversion. Actual conflicts, scope changes or unapproved writes require a decision.
+Source task/spec/workflow materials are read-only for children by default. Main owns integration/lifecycle;
+children return results/evidence. Explicit path-scoped authorization may allow implement/check evidence
+under the source task evidence/ or research findings under source research/, not arbitrary source writes.
+For every delegated execution, including ordinary agents, specify repository-external temporary output
+and concise returned results; evidence write permission is not a request to persist every intermediate file.
 Prefer `trellis_dispatch` from the source host: unbound tasks execute in the shared source directory,
 with a short concurrency warning and main-coordinated file scope. Bound tasks require approved managed
-preparation and must not use ordinary Agent or temporary isolation to bypass their binding. Read the
+preparation and must not use ordinary subagent_run or temporary isolation to bypass their binding. Read the
 package-local worktree protocol from the session overview on demand.
 Delegation alone does not require creating a worktree; existing managed bindings retain their execution constraints.
 An already-running role works directly, never recursively dispatches. Sub-agents must not commit, install or finish.
@@ -131,7 +189,10 @@ do not manufacture a spec edit for every task. Keep project rules in project spe
 This is the final Git review, not the first opportunity to commit. Inspect completed stage commits and remaining
 task changes; commit verified final integration fixes or other scoped remaining work unless the user opted out.
 Do not recreate, squash, rebase or amend earlier history without explicit approval. A single-stage task may need only one commit.
-Preserve unrelated staged work. Approval of task implementation includes its scoped local commits, not unrelated changes.
+Preserve unrelated staged work. Before any commit that includes a task directory, inspect tracked and
+untracked new materials, keep the minimum useful retained set and consolidate duplicate summaries;
+being inside this task does not make a file worth committing. Apply the Task Material Boundaries above.
+Approval of task implementation includes its scoped local commits, not unrelated changes.
 Never push without explicit approval. Task creation and initialization alone do not authorize implementation or commits.
 If the user requested no commits, leave changes uncommitted and report their state; implementation and verification can still be delivered.
 
@@ -142,6 +203,8 @@ Session end does not imply task completion or lifecycle approval. Authorization 
 covers applicable archive, deactivation, journal recording and local commits of those wrap-up changes;
 do not ask for each action separately or repeat already-granted finish-work authorization. Respect explicit
 user restrictions; archive only after acceptance. Journal records deliberate summaries, respecting configuration.
+Lifecycle commands may include the whole task directory: perform the same retention review before
+journal or archive, including untracked files, and authorized cleanup of owned temporary output.
 Lifecycle commands auto-commit according to `session_auto_commit` by default; never implicitly commit product
 code or unrelated changes. Use `--no-commit` for an explicit no-commit instruction or an unsafe mixed parallel
 scope; safely separate authorized wrap-up changes or report the blocker. Do not bypass disabled auto-commit

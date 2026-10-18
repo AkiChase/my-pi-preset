@@ -11,52 +11,51 @@ from .records import (
     resolve_base, runtime, same_identity, source_for, source_lock, task_slug,
     validate_branch, worktree_directory,
 )
-from .materials import (
-    prepare, task_record, validate_ready, validate_context, material_graph,
-    initialize_snapshot, material_summary, require_fresh, refresh_plan, collect_plan,
-    collection_candidates, plan_preview, apply_files, store_snapshot, cleanup_snapshots,
-)
+from .materials import prepare, task_record, validate_ready, source_materials, role_name, ROLES
+from .diagnostics import DiagnosticError, issues_for
+
 
 
 def checked_binding(source, task):
     b = read_binding(source["root"], task)
     if b and (b["sourceRoot"] != source["root"] or b["repositoryIdentity"] != source["commonDir"] or b["taskDir"] != task):
-        raise ValueError("Authoritative binding identity does not match source/task")
+        raise DiagnosticError("binding_identity_invalid", "Authoritative binding identity does not match source/task")
     return b
 
 
 def require_identity(b, source):
     problems = binding_problems(b, source)
     if problems:
-        raise ValueError("; ".join(problems))
+        raise DiagnosticError("binding_identity_invalid", "; ".join(problems))
 
 
-def query(cwd, task=None, ready=False):
+def query(cwd, task=None, ready=False, role=None):
     # Read-only, including when called while the host already holds the lock.
+    if ready and task is None:
+        raise DiagnosticError("invalid_task", "Ready query requires an explicit task")
+    if ready and role is None:
+        raise DiagnosticError("invalid_role", "Ready query requires an explicit role")
+    if role is not None:
+        role_name(role)
     source, local = source_for(cwd)
-    result = dict(source=source, local=local)
+    result = dict(source=source, local=local, issues=[])
     if task is not None:
         b = checked_binding(source, task)
         result["binding"] = b
         if b:
             require_identity(b, source)
-        if ready:
-            if not b or b["preparationState"] != "ready":
-                raise ValueError("No ready worktree binding; create/adopt then prepare first")
-            if task_record(source["root"], task).get("status") != "in_progress":
-                raise ValueError("Source task is not approved/in_progress for managed execution")
-            validate_ready(b)
-        if b and b.get('materials'):
+        if ready and (not b or b["preparationState"] != "ready"):
+            raise DiagnosticError("binding_not_ready", "No ready worktree binding; create/adopt then prepare first", role=role)
+        if role is not None:
             try:
-                result['materials'] = material_summary(b)
+                if task_record(source["root"], task).get("status") != "in_progress":
+                    raise DiagnosticError("source_not_approved", "Source task is not approved/in_progress for execution", role=role)
+                result["materials"] = validate_ready(b, role) if ready else source_materials(source["root"], task, role, approved=True)
             except (ValueError, OSError, UnicodeError) as error:
                 if ready:
                     raise
-                result['materials'] = dict(state='invalid', error=str(error)[:4096])
-        if ready:
-            if 'materials' not in result:
-                raise ValueError('Missing material snapshot; prepare a new worktree (no migration)')
-            require_fresh(result['materials'])
+                result["issues"] = issues_for(error)
+                result["materials"] = dict(state="invalid", role=role, issues=result["issues"])
     return result
 
 
@@ -129,13 +128,12 @@ def remove(b, cwd, integrated_into, confirm):
             tip = git(b["worktreePath"], ["rev-parse", "HEAD"])
             git(b["sourceRoot"], ["merge-base", "--is-ancestor", tip, saved])
             git(b["sourceRoot"], ["worktree", "remove", "--", b["worktreePath"]])
-        cleanup_snapshots(b)
         for file in (binding_file(b["sourceRoot"], b["taskDir"]), execution_file(b)):
             file.unlink(missing_ok=True)
     return dict(binding=b, preview=not confirm, ignored=ignored, note=f"{'Removed/unbound' if confirm else 'Removal preview'}. Ignored files at risk:\n{ignored or '(none)'}. No branch deleted.")
 
 
-def manage(action, cwd, task, confirm=False, path=None, branch=None, base=None, integrated_into=None, files=None):
+def manage(action, cwd, task, confirm=False, path=None, branch=None, base=None, integrated_into=None, role=None):
     source, local = source_for(cwd)
     task_slug(task)
     b = checked_binding(source, task)
@@ -146,76 +144,21 @@ def manage(action, cwd, task, confirm=False, path=None, branch=None, base=None, 
         status = git(b["worktreePath"], ["status", "--short"]) if not problems else None
         execution = read_execution(b)
         verification = "not verified"
-        materials = None
-        if not problems and b.get('materials'):
-            try:
-                materials = material_summary(b)
-            except (ValueError, OSError, UnicodeError) as error:
-                materials = dict(state='invalid', error=str(error)[:4096])
+        materials = {}
+        if not problems:
+            for selected_role in ROLES:
+                try:
+                    materials[selected_role] = prepare(b, selected_role)
+                except (ValueError, OSError, UnicodeError) as error:
+                    materials[selected_role] = dict(state="invalid", role=selected_role, issues=issues_for(error))
         if execution and execution.get("role") == "trellis-check" and execution["state"] == "completed":
             try:
-                current = materials and materials['state'] == 'valid' and not materials['sourceDrift']['count'] and not materials['conflicts']['count'] and execution.get('materialRevision') == materials['revision'] and execution.get('finalSnapshot') == snapshot(b)
-                verification = "check ended on current snapshot and material revision (inspect its report; not automatic acceptance)" if current else "check snapshot/material lineage stale or unavailable"
+                check = materials.get("check", {})
+                current = check.get("state") == "valid" and execution.get("sourceFingerprint") == check["sourceFingerprint"] and execution.get("finalSnapshot") == snapshot(b)
+                verification = "check ended on current snapshot and source check fingerprint (inspect its report; not automatic acceptance)" if current else "check snapshot/source requirements stale or unavailable"
             except (ValueError, OSError):
                 verification = "check snapshot unavailable"
-        return dict(binding=b, problems=problems, gitStatus=status, execution=execution, materials=materials, note=f"Preparation: {b['preparationState']}. Execution: {execution['state'] if execution else 'none'}. {verification}.")
-    if action in ('refresh', 'collect'):
-        if not b:
-            raise ValueError('Task has no worktree binding')
-        def plan_for(binding):
-            require_identity(binding, repository(source['root']))
-            if binding['preparationState'] != 'ready' or active_execution(binding):
-                raise ValueError('Refresh/collect require ready and no active/unknown execution')
-            if task_record(source['root'], task).get('status') != 'in_progress':
-                raise ValueError('Source task must remain in_progress')
-            validate_context(binding)  # Do not reject a repairable old target reference graph.
-            return refresh_plan(binding) if action == 'refresh' else collect_plan(binding, files)
-        files = files or []
-        if action == 'collect' and not files:
-            if confirm:
-                raise ValueError('Collect confirmation requires explicit --file selections')
-            plan_for(b)
-            return dict(binding=b, preview=True, candidates=collection_candidates(b), note='Select task-local files with --file; review preview/diff before approved --confirm. task.json is never collected.')
-        plan = plan_for(b)
-        preview = plan_preview(plan)
-        if not confirm:
-            return dict(binding=b, preview=True, **preview, note='Material plan preview; review hashes/files. Confirmation recomputes under lock, not a persisted reservation.')
-        with source_lock(source['root']):
-            b = fresh_binding(source, task, b)
-            plan = plan_for(b)
-            preview = plan_preview(plan)
-            if plan['conflicts'] or plan['errors']:
-                raise ValueError('Material conflicts/invalid prospective graph: ' + ', '.join(preview['conflicts']['paths'] + plan['errors']) + f" ({preview['conflicts']['count']} conflicts)")
-            # All validation precedes any material write. External editors are not locked.
-            prior_materials = b.get('materials')
-            try:
-                destination = b['worktreePath'] if action == 'refresh' else b['sourceRoot']
-                apply_files(destination, task, plan['overlay'], plan['actions'], 'target' if action == 'refresh' else 'source')
-                validate_ready(b)
-                if task_record(b['sourceRoot'], task).get('status') != 'in_progress':
-                    raise ValueError('Source lifecycle changed during material operation')
-                from .materials import digest, file_hash
-                if action == 'refresh':
-                    if digest(material_graph(b['sourceRoot'], task)) != plan['beforeSource'] or material_graph(b['worktreePath'], task) != plan['prospectiveTarget']:
-                        raise ValueError('Source/target materials changed during refresh')
-                else:
-                    if digest(material_graph(b['worktreePath'], task)) != plan['beforeTarget'] or material_graph(b['sourceRoot'], task) != plan['prospectiveSource']:
-                        raise ValueError('Source/target materials changed during collect')
-                for a in plan['actions']:
-                    expected = a['source'] if action == 'refresh' else a['target']
-                    if a['path'] in plan['overlay'] and file_hash(destination, task, a['path']) != (None if plan['overlay'][a['path']] is None else expected):
-                        raise ValueError('Written material changed before snapshot publication')
-                if plan['changed'] or plan.get('collectionChanged'):
-                    store_snapshot(b, plan['accepted'], plan['ancestors'], advance=plan['changed'])
-                publish(b)
-            except Exception as error:
-                if prior_materials is not None:
-                    b['materials'] = prior_materials
-                b['preparationState'] = 'error'
-                b['lastError'] = str(error)
-                publish(b)
-                raise
-            return dict(binding=b, **plan_preview(plan), note=f'{action.title()} completed; no start/hooks, commit, merge or archive. Inspect reports; no automatic acceptance.')
+        return dict(binding=b, problems=problems, gitStatus=status, execution=execution, materials=materials, issues=[item for value in materials.values() for item in value.get("issues", [])], note=f"Preparation: {b['preparationState']}. Execution: {execution['state'] if execution else 'none'}. {verification}.")
     if action in ("prepare", "remove", "recover"):
         if not b:
             raise ValueError("Task has no worktree binding; create or adopt first")
@@ -252,43 +195,40 @@ def manage(action, cwd, task, confirm=False, path=None, branch=None, base=None, 
                 return dict(binding=b, note="Recovered to unprepared; run prepare before dispatch.")
         require_identity(b, source)
         if active_execution(b):
-            raise ValueError("Task worktree has an active/unknown execution")
+            raise DiagnosticError("execution_active", "Task worktree has an active/unknown execution")
+        selected_role = role_name(role or "implement")
         if b["preparationState"] == "ready":
-            validate_ready(b)
-            require_fresh(material_summary(b))
-            return dict(binding=b, reused=True, note="Already prepared; validated without synchronization. Use explicit refresh for source updates.")
+            materials = validate_ready(b, selected_role)
+            return dict(binding=b, reused=True, materials=materials, issues=[], note="Already prepared; current source role materials validated without synchronization or target lifecycle writes.")
         if b["preparationState"] in ("error", "creating", "preparing"):
-            raise ValueError("Preparation state requires explicit recover first")
-        preview = prepare(b)
+            raise DiagnosticError("preparation_invalid", "Preparation state requires explicit recover first")
+        preview = prepare(b, selected_role)
         if not confirm:
-            return dict(binding=b, preview=True, files=preview["files"], note="Copy selected task materials: " + ", ".join(preview["files"]) + ". Runs target task.py start (records branch, runs configured after_start hooks). Source task must already be in_progress; source lifecycle is unchanged.")
+            return dict(binding=b, preview=True, materials=preview, issues=[], note="Validate source-authoritative role materials and target execution configuration; writes ignored runtime records only. No task copies, target start/hooks or agents.")
         with source_lock(source["root"]):
             b = fresh_binding(source, task, b)
             require_identity(b, repository(source["root"]))
             if active_execution(b) or b["preparationState"] != "unprepared":
-                raise ValueError("Execution/preparation state changed before preparation")
+                raise DiagnosticError("preparation_changed", "Execution/preparation state changed before preparation")
+            delivered = prepare(b, selected_role)
+            if delivered["sourceFingerprint"] != preview["sourceFingerprint"]:
+                raise DiagnosticError("material_changed", "Source role materials changed since preview; retry", role=selected_role)
             b["preparationState"] = "preparing"
-            b["preparedFiles"] = preview["hashes"]
             atomic_json(binding_file(source["root"], task), b)
             try:
-                delivered = material_graph(b['sourceRoot'], task)
-                prepared = prepare(b, True)
-                if material_graph(b['sourceRoot'], task) != delivered:
-                    raise ValueError('Source materials changed during preparation')
-                if b.get('materials'):
-                    require_fresh(material_summary(b))
-                else:
-                    initialize_snapshot(b, delivered)
+                materials = prepare(b, selected_role)
+                if materials["sourceFingerprint"] != delivered["sourceFingerprint"]:
+                    raise DiagnosticError("material_changed", "Source materials changed during preparation", role=selected_role)
+                require_identity(b, repository(source["root"]))
                 b["preparationState"] = "ready"
-                b["preparedFiles"] = prepared["hashes"]
                 b.pop("lastError", None)
             except Exception as error:
                 b["preparationState"] = "error"
-                b["lastError"] = str(error)
+                b["lastError"] = str(error)[:4096].replace("\0", "")
                 raise
             finally:
                 publish(b)
-            return dict(binding=b, note="Ready: task materials and independent target context validated. No agent dispatched.")
+            return dict(binding=b, materials=materials, issues=[], note="Ready: source role materials and target execution configuration validated. No target task/start/hooks or agent dispatched.")
     if action not in ("create", "adopt"):
         raise ValueError("Unsupported worktree action")
     if active_source_execution(source, task):
@@ -365,7 +305,7 @@ def manage(action, cwd, task, confirm=False, path=None, branch=None, base=None, 
         elif not any(r["path"] == str(destination) and r["branch"] == branch for r in fresh["worktrees"]):
             raise ValueError("Worktree changed before adoption")
         id = str(uuid.uuid4())
-        b = dict(version=1, bindingId=id, taskDir=task, sourceRoot=root, worktreePath=str(destination), repositoryIdentity=source["commonDir"], branch=branch, baseCommit=base_commit, contextId="pi-wt-" + id, preparationState="creating", createdAt=now())
+        b = dict(version=2, bindingId=id, taskDir=task, sourceRoot=root, worktreePath=str(destination), repositoryIdentity=source["commonDir"], branch=branch, baseCommit=base_commit, contextId="pi-wt-" + id, preparationState="creating", createdAt=now())
         atomic_json(binding_file(root, task), b)
         try:
             if action == "create":

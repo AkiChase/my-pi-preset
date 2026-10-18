@@ -114,7 +114,7 @@ def _skip_indented_body(lines: list[str], start: int, indent: int) -> int:
 
 
 def _parse_yaml_block(
-    lines: list[str], start: int, min_indent: int, target: dict, source: str
+    lines: list[str], start: int, min_indent: int, target: dict, source: str, issues: list | None = None
 ) -> int:
     i = start
     current_list: list | None = None
@@ -155,12 +155,16 @@ def _parse_yaml_block(
 
             key, _, value = stripped.partition(":")
             key = key.strip()
+            if key in target and issues is not None:
+                issues.append({"line": i + 1, "reason": "duplicate key; last declaration wins"})
             value = _strip_inline_comment(value).strip()
             was_quoted = len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'")
 
             if not was_quoted:
                 reason = _unsupported_value(key, value)
                 if reason is not None:
+                    if issues is not None:
+                        issues.append({"line": i + 1, "reason": reason})
                     _warn_unsupported(source, i + 1, line, reason)
                     current_list = None
                     i = _skip_indented_body(lines, i + 1, indent)
@@ -187,17 +191,19 @@ def _parse_yaml_block(
                     if next_indent > indent:
                         nested: dict = {}
                         target[key] = nested
-                        i = _parse_yaml_block(lines, i + 1, next_indent, nested, source)
+                        i = _parse_yaml_block(lines, i + 1, next_indent, nested, source, issues)
                     else:
                         target[key] = {}
                         i += 1
         else:
+            if issues is not None:
+                issues.append({"line": i + 1, "reason": "line ignored by the YAML subset"})
             i += 1
 
     return i
 
 
-def parse_simple_yaml(content: str, source: str = "config.yaml") -> dict:
+def parse_simple_yaml(content: str, source: str = "config.yaml", *, issues: list | None = None) -> dict:
     """Parse simple YAML with nested dict support (no dependencies).
 
     Supports:
@@ -223,7 +229,7 @@ def parse_simple_yaml(content: str, source: str = "config.yaml") -> dict:
     """
     lines = content.splitlines()
     result: dict = {}
-    _parse_yaml_block(lines, 0, 0, result, source)
+    _parse_yaml_block(lines, 0, 0, result, source, issues)
     return result
 
 

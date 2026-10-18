@@ -11,6 +11,7 @@ Usage:
     python3 task.py add-context <dir> <file> <path> [reason] # Add jsonl entry
     python3 task.py validate <dir>              # Validate jsonl files
     python3 task.py list-context <dir>          # List jsonl entries
+    python3 task.py active <dir>                # Bind only this session; no task lifecycle changes
     python3 task.py start <dir>                 # Set active task, record current branch
     python3 task.py current [--source] [--json] # Show active task
     python3 task.py deactivate                  # Clear only this session's binding (not task completion)
@@ -82,7 +83,7 @@ from common.task_context import (
 
 
 # =============================================================================
-# Command: start / deactivate
+# Command: active / start / deactivate
 # =============================================================================
 
 def _record_start_state(
@@ -169,6 +170,39 @@ def _record_start_state(
             "set-branch <task> <feature-branch>",
             file=sys.stderr,
         )
+
+
+def cmd_active(args: argparse.Namespace) -> int:
+    """Bind an existing task only to this session, without lifecycle effects."""
+    repo_root = get_repo_root()
+    try:
+        if not resolve_context_key():
+            raise ValueError("Session identity required; set TRELLIS_CONTEXT_ID before active")
+        previous = resolve_active_task(repo_root)
+        if previous.error:
+            raise ValueError(f"{previous.error}; inspect or deactivate the invalid binding first")
+        full_path = resolve_task_dir(args.dir, repo_root)
+        if full_path is None:
+            return 1
+        from common.task_records import read_task_record
+        _, error = read_task_record(full_path, repo_root)
+        if error:
+            raise ValueError(error)
+        task_dir = full_path.relative_to(repo_root.resolve()).as_posix()
+        if previous.valid and previous.task_path == task_dir:
+            print(f"Already active: {task_dir}")
+            print(f"Source: {previous.source}")
+            return 0
+        active = set_active_task(task_dir, repo_root)
+        if not active:
+            raise ValueError("Failed to set current task")
+    except (OSError, RuntimeError, ValueError) as error:
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
+    print(f"Current task set to: {task_dir}")
+    print(f"Source: {active.source}")
+    print("Only this session's binding changed; task status and hooks are unchanged.")
+    return 0
 
 
 def cmd_start(args: argparse.Namespace) -> int:
@@ -496,6 +530,7 @@ Usage:
   python3 task.py add-context <dir> <jsonl> <path> [reason]  Add entry to jsonl
   python3 task.py validate <dir>                     Validate jsonl files
   python3 task.py list-context <dir>                 List jsonl entries
+  python3 task.py active <dir>                       Bind only this session; no status/branch/hooks changes
   python3 task.py start <dir>                        Set active task; records the checked-out branch when unset
   python3 task.py current [--source]                 Show active task
   python3 task.py deactivate                        Clear only this session's binding (not task completion)
@@ -538,6 +573,7 @@ Examples:
   python3 task.py create "Child task" --description "Session cookie handling" --slug child --parent .trellis/tasks/01-21-parent
   python3 task.py add-context <dir> implement .trellis/spec/cli/backend/auth.md "Auth guidelines"
   python3 task.py set-branch <dir> task/add-login
+  python3 task.py active .trellis/tasks/01-21-add-login
   python3 task.py start .trellis/tasks/01-21-add-login
   python3 task.py current --source
   python3 task.py deactivate
@@ -643,6 +679,14 @@ def main() -> int:
     p_listctx = subparsers.add_parser("list-context", help="List context entries")
     p_listctx.add_argument("dir", help="Task directory")
 
+    # active
+    p_active = subparsers.add_parser(
+        "active",
+        help="Bind an existing task only to this session",
+        description="Bind an existing task only to this session. Does not change task status or branch, run hooks, or affect other sessions.",
+    )
+    p_active.add_argument("dir", help="Task directory or name")
+
     # start
     p_start = subparsers.add_parser("start", help="Set active task")
     p_start.add_argument("dir", help="Task directory")
@@ -741,6 +785,7 @@ def main() -> int:
         "add-context": cmd_add_context,
         "validate": cmd_validate,
         "list-context": cmd_list_context,
+        "active": cmd_active,
         "start": cmd_start,
         "current": cmd_current,
         "deactivate": cmd_deactivate,

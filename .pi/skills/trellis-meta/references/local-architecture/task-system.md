@@ -1,0 +1,3 @@
+# Task System
+
+Tasks live under `.trellis/tasks/` with valid task.json, PRD and curated role JSONL. Session context selects only its own pointer. `task.py active <task>` binds an existing task without status/branch changes, hooks or implementation approval; multiple sessions may bind the same task. It never clears another session. `task.py deactivate` clears only that session binding without completing status, archiving the task or recording a journal. Its lifecycle hook is `after_deactivate`; work wrap-up remains the separate `trellis-finish-work` skill. Use exact task paths and real command help; invalid bindings authorize no material reads/hooks/Git.

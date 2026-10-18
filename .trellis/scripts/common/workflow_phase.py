@@ -70,7 +70,11 @@ def get_phase_index() -> str:
     ``get_step`` on demand. ``[workflow-state:STATUS]`` tag blocks are
     consumed by the per-turn hook, so they're stripped from this output.
     """
-    text = _read_workflow()
+    return phase_index_from_text(_read_workflow())
+
+
+def phase_index_from_text(text: str) -> str:
+    """Shared pure consumer; diagnostics supplies a bounded text snapshot."""
     lines = text.splitlines()
 
     start: int | None = None

@@ -102,15 +102,15 @@ def _load_config(repo_root: Path | None = None) -> dict:
     return parsed if isinstance(parsed, dict) else {}
 
 
-def get_session_commit_message(repo_root: Path | None = None) -> str:
+def get_session_commit_message(repo_root: Path | None = None, *, snapshot: dict | None = None) -> str:
     """Get the commit message for auto-committing session records."""
-    config = _load_config(repo_root)
+    config = _load_config(repo_root) if snapshot is None else snapshot
     return config.get("session_commit_message", DEFAULT_SESSION_COMMIT_MESSAGE)
 
 
-def get_max_journal_lines(repo_root: Path | None = None) -> int:
+def get_max_journal_lines(repo_root: Path | None = None, *, snapshot: dict | None = None) -> int:
     """Get the maximum lines per journal file."""
-    config = _load_config(repo_root)
+    config = _load_config(repo_root) if snapshot is None else snapshot
     value = config.get("max_journal_lines", DEFAULT_MAX_JOURNAL_LINES)
     try:
         return int(value)
@@ -118,7 +118,7 @@ def get_max_journal_lines(repo_root: Path | None = None) -> int:
         return DEFAULT_MAX_JOURNAL_LINES
 
 
-def get_session_auto_commit(repo_root: Path | None = None) -> bool:
+def get_session_auto_commit(repo_root: Path | None = None, *, snapshot: dict | None = None) -> bool:
     """Whether scripts should auto-stage + auto-commit session/task changes.
 
     Governs both ``add_session.py:_auto_commit_workspace`` and
@@ -133,14 +133,14 @@ def get_session_auto_commit(repo_root: Path | None = None) -> bool:
     aliases ``true / false / yes / no / 1 / 0 / on / off`` (case-insensitive).
     Invalid values fall back to ``True`` with a stderr warning.
     """
-    config = _load_config(repo_root)
+    config = _load_config(repo_root) if snapshot is None else snapshot
     raw = config.get("session_auto_commit", DEFAULT_SESSION_AUTO_COMMIT)
     return coerce_config_bool(
         raw, DEFAULT_SESSION_AUTO_COMMIT, "session_auto_commit"
     )
 
 
-def get_codex_dispatch_mode(repo_root: Path | None = None) -> str:
+def get_codex_dispatch_mode(repo_root: Path | None = None, *, snapshot: dict | None = None) -> str:
     """Return Codex dispatch mode.
 
     Default is ``auto``, which dispatches Trellis sub-agents and uses native
@@ -152,7 +152,7 @@ def get_codex_dispatch_mode(repo_root: Path | None = None) -> str:
     place that emits a warning for invalid values; hook readers fail safely
     without producing per-turn warning noise.
     """
-    config = _load_config(repo_root)
+    config = _load_config(repo_root) if snapshot is None else snapshot
     codex = config.get("codex")
     if codex is None:
         return DEFAULT_CODEX_DISPATCH_MODE
@@ -181,7 +181,7 @@ DEFAULT_CONTEXT_INJECTION_MAX_ARTIFACT_BYTES = 65536
 DEFAULT_CONTEXT_INJECTION_MAX_TOTAL_BYTES = 131072
 
 
-def get_context_injection_limits(repo_root: Path | None = None) -> dict[str, int]:
+def get_context_injection_limits(repo_root: Path | None = None, *, snapshot: dict | None = None) -> dict[str, int]:
     """Return sub-agent context injection byte limits.
 
     Reads the ``context_injection:`` section of ``.trellis/config.yaml``:
@@ -201,7 +201,7 @@ def get_context_injection_limits(repo_root: Path | None = None) -> dict[str, int
         "max_total_bytes": DEFAULT_CONTEXT_INJECTION_MAX_TOTAL_BYTES,
     }
 
-    config = _load_config(repo_root)
+    config = _load_config(repo_root) if snapshot is None else snapshot
     section = config.get("context_injection")
     if not isinstance(section, dict):
         return defaults
@@ -235,7 +235,7 @@ def get_context_injection_limits(repo_root: Path | None = None) -> dict[str, int
 DEFAULT_PROMPT_INJECTION_SKIP_KEYWORD = "no-trellis"
 
 
-def get_prompt_injection_config(repo_root: Path | None = None) -> dict[str, str]:
+def get_prompt_injection_config(repo_root: Path | None = None, *, snapshot: dict | None = None) -> dict[str, str]:
     """Return per-turn prompt injection config.
 
     Reads the ``prompt_injection:`` section of ``.trellis/config.yaml``:
@@ -250,7 +250,7 @@ def get_prompt_injection_config(repo_root: Path | None = None) -> dict[str, str]
     """
     defaults = {"skip_keyword": DEFAULT_PROMPT_INJECTION_SKIP_KEYWORD}
 
-    config = _load_config(repo_root)
+    config = _load_config(repo_root) if snapshot is None else snapshot
     section = config.get("prompt_injection")
     if not isinstance(section, dict):
         return defaults
@@ -262,7 +262,7 @@ def get_prompt_injection_config(repo_root: Path | None = None) -> dict[str, str]
     return result
 
 
-def get_hooks(event: str, repo_root: Path | None = None) -> list[str]:
+def get_hooks(event: str, repo_root: Path | None = None, *, snapshot: dict | None = None) -> list[str]:
     """Get hook commands for a lifecycle event.
 
     Args:
@@ -276,7 +276,7 @@ def get_hooks(event: str, repo_root: Path | None = None) -> list[str]:
     Returns:
         List of shell commands to execute, empty if none configured.
     """
-    config = _load_config(repo_root)
+    config = _load_config(repo_root) if snapshot is None else snapshot
     hooks = config.get("hooks")
     if hooks is None:
         return []
@@ -308,7 +308,7 @@ def get_hooks(event: str, repo_root: Path | None = None) -> list[str]:
 # =============================================================================
 
 
-def get_packages(repo_root: Path | None = None) -> dict[str, dict] | None:
+def get_packages(repo_root: Path | None = None, *, snapshot: dict | None = None) -> dict[str, dict] | None:
     """Get monorepo package declarations.
 
     Returns:
@@ -318,7 +318,7 @@ def get_packages(repo_root: Path | None = None) -> dict[str, dict] | None:
     Example return:
         {"cli": {"path": "packages/cli"}, "docs-site": {"path": "docs-site", "type": "submodule"}}
     """
-    config = _load_config(repo_root)
+    config = _load_config(repo_root) if snapshot is None else snapshot
     packages = config.get("packages")
     if not isinstance(packages, dict):
         return None
@@ -329,18 +329,18 @@ def get_packages(repo_root: Path | None = None) -> dict[str, dict] | None:
     return filtered
 
 
-def get_default_package(repo_root: Path | None = None) -> str | None:
+def get_default_package(repo_root: Path | None = None, *, snapshot: dict | None = None) -> str | None:
     """Get the default package name from config.
 
     Returns:
         Package name string, or None if not configured.
     """
-    config = _load_config(repo_root)
+    config = _load_config(repo_root) if snapshot is None else snapshot
     value = config.get("default_package")
     return str(value) if value else None
 
 
-def get_submodule_packages(repo_root: Path | None = None) -> dict[str, str]:
+def get_submodule_packages(repo_root: Path | None = None, *, snapshot: dict | None = None) -> dict[str, str]:
     """Get packages that are git submodules.
 
     Returns:
@@ -350,7 +350,7 @@ def get_submodule_packages(repo_root: Path | None = None) -> dict[str, str]:
     Example return:
         {"docs-site": "docs-site"}
     """
-    packages = get_packages(repo_root)
+    packages = get_packages(repo_root, snapshot=snapshot)
     if packages is None:
         return {}
     return {
@@ -360,7 +360,7 @@ def get_submodule_packages(repo_root: Path | None = None) -> dict[str, str]:
     }
 
 
-def get_git_packages(repo_root: Path | None = None) -> dict[str, str]:
+def get_git_packages(repo_root: Path | None = None, *, snapshot: dict | None = None) -> dict[str, str]:
     """Get packages that have their own independent git repository.
 
     These are sub-directories with their own .git (not submodules),
@@ -381,7 +381,7 @@ def get_git_packages(repo_root: Path | None = None) -> dict[str, str]:
 
         {"backend": "iqs"}
     """
-    packages = get_packages(repo_root)
+    packages = get_packages(repo_root, snapshot=snapshot)
     if packages is None:
         return {}
     return {
@@ -391,30 +391,30 @@ def get_git_packages(repo_root: Path | None = None) -> dict[str, str]:
     }
 
 
-def is_monorepo(repo_root: Path | None = None) -> bool:
+def is_monorepo(repo_root: Path | None = None, *, snapshot: dict | None = None) -> bool:
     """Check if the project is configured as a monorepo (has packages in config)."""
-    return get_packages(repo_root) is not None
+    return get_packages(repo_root, snapshot=snapshot) is not None
 
 
-def get_spec_base(package: str | None = None, repo_root: Path | None = None) -> str:
+def get_spec_base(package: str | None = None, repo_root: Path | None = None, *, snapshot: dict | None = None) -> str:
     """Get the spec directory base path relative to .trellis/.
 
     Single-repo: returns "spec"
     Monorepo with package: returns "spec/<package>"
     Monorepo without package: returns "spec" (caller should specify package)
     """
-    if package and is_monorepo(repo_root):
+    if package and is_monorepo(repo_root, snapshot=snapshot):
         return f"spec/{package}"
     return "spec"
 
 
-def validate_package(package: str, repo_root: Path | None = None) -> bool:
+def validate_package(package: str, repo_root: Path | None = None, *, snapshot: dict | None = None) -> bool:
     """Check if a package name is valid in this project.
 
     Single-repo (no packages configured): always returns True.
     Monorepo: returns True only if package exists in config.yaml packages.
     """
-    packages = get_packages(repo_root)
+    packages = get_packages(repo_root, snapshot=snapshot)
     if packages is None:
         return True  # Single-repo, no validation needed
     return package in packages
@@ -423,6 +423,7 @@ def validate_package(package: str, repo_root: Path | None = None) -> bool:
 def resolve_package(
     task_package: str | None = None,
     repo_root: Path | None = None,
+    *, snapshot: dict | None = None,
 ) -> str | None:
     """Resolve package from inferred sources with validation.
 
@@ -436,7 +437,7 @@ def resolve_package(
         CLI --package should be validated separately by the caller
         (fail-fast with available packages list on error).
     """
-    packages = get_packages(repo_root)
+    packages = get_packages(repo_root, snapshot=snapshot)
     if packages is None:
         return None  # Single-repo, no package needed
 
@@ -450,7 +451,7 @@ def resolve_package(
         )
 
     # Try default_package
-    default = get_default_package(repo_root)
+    default = get_default_package(repo_root, snapshot=snapshot)
     if default:
         if default in packages:
             return default
@@ -462,7 +463,7 @@ def resolve_package(
     return None
 
 
-def get_spec_scope(repo_root: Path | None = None) -> list[str] | str | None:
+def get_spec_scope(repo_root: Path | None = None, *, snapshot: dict | None = None) -> list[str] | str | None:
     """Get session.spec_scope configuration.
 
     Returns:
@@ -470,7 +471,7 @@ def get_spec_scope(repo_root: Path | None = None) -> list[str] | str | None:
         str: "active_task" to use current task's package.
         None: No scope configured (scan all packages).
     """
-    config = _load_config(repo_root)
+    config = _load_config(repo_root) if snapshot is None else snapshot
     session = config.get("session")
     if not isinstance(session, dict):
         return None

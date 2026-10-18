@@ -602,12 +602,12 @@ def cmd_create(args: argparse.Namespace) -> int:
     # Auto-activate the new task so the per-turn breadcrumb fires planning
     # state. Best-effort: gracefully degrade if no session identity (CLI run
     # outside an AI session) — the task is still created, the user can run
-    # task.py start later. Pointer is session-scoped so this never affects
+    # task.py active later. Pointer is session-scoped so this never affects
     # other AI sessions.
     if getattr(args, "no_start", False):
         print(
             colored(
-                "Skipped session activation (--no-start); run task.py start when ready.",
+                "Skipped session activation (--no-start); use task.py active to bind or start after implementation approval.",
                 Colors.YELLOW,
             ),
             file=sys.stderr,
@@ -677,7 +677,7 @@ def cmd_create(args: argparse.Namespace) -> int:
             "      list available specs: python3 .trellis/scripts/get_context.py --mode packages",
             file=sys.stderr,
         )
-    print("  - Use /trellis:continue or phase context to decide the next step", file=sys.stderr)
+    print("  - Use /skill:trellis-start or phase context to decide the next step", file=sys.stderr)
     print("", file=sys.stderr)
 
     # Output relative path for script chaining

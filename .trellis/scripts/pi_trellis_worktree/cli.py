@@ -6,6 +6,7 @@ import sys
 
 from .manager import manage, query
 from .records import text
+from .diagnostics import issues_for
 
 
 class Once(argparse.Action):
@@ -34,21 +35,21 @@ def value(raw):
 def parser():
     p = Parser(description="Persistent task worktrees: create → prepare → trellis_dispatch (Pi host). Mutations preview by default; --confirm requires prior user approval.")
     sub = p.add_subparsers(dest="action", required=True, parser_class=Parser)
-    help_text = dict(create="Create a directory from a pinned commit, leave unprepared", adopt="Adopt an existing registered branch-backed worktree", status="Inspect binding, preparation and execution (read-only)", prepare="Copy selected task materials and run target start/hooks", refresh="Reconcile source task materials using hash-only B/S/T; no start/hooks", collect="Explicitly collect selected target task files; never task.json", recover="Reset preparation/release only dead-owner execution", remove="Remove a clean integrated worktree without force/branch deletion")
+    help_text = dict(create="Create a directory from a pinned commit, leave unprepared", adopt="Adopt an existing registered branch-backed worktree", status="Inspect binding and source readiness per role (read-only)", prepare="Validate source role materials/configuration; ignored runtime only, no task copy/start/hooks", recover="Reset preparation/release only dead-owner execution", remove="Remove a clean integrated worktree without force/branch deletion")
     for action, description in help_text.items():
         s = sub.add_parser(action, help=description, description=description)
         s.add_argument("--task", required=True, type=value, action=Once, help="Existing .trellis/tasks/<full-slug> (explicit; no pointer fallback)")
         s.add_argument("--cwd", default=os.getcwd(), type=value, action=Once, help="Project directory (default process cwd; never switches parent Pi)")
         s.add_argument("--json", nargs=0, default=False, action=Once, help="One machine-readable object on stdout")
         if action != "status":
-            s.add_argument("--confirm", nargs=0, default=False, action=Once, help="Execute only after user approval of preview")
+            s.add_argument("--confirm", nargs=0, default=False, action=Once, help="Execute within existing user-approved scope; preview is not authorization")
         if action in ("create", "adopt"):
             s.add_argument("--base", type=value, action=Once, help="Commit reference (default source HEAD / adopted target HEAD)")
             s.add_argument("--branch", type=value, action=Once)
         if action == "adopt":
             s.add_argument("--path", required=True, type=value, action=Once, help="Existing registered worktree, source-relative or absolute")
-        if action == 'collect':
-            s.add_argument('--file', dest='files', type=value, action='append', help='Explicit current-task project-relative regular file; repeat for dependencies (no glob/all/deletions)')
+        if action == 'prepare':
+            s.add_argument('--role', choices=('implement', 'check', 'research'), action=Once, help='Source material role (default implement); other role manifests do not block it')
         if action == "remove":
             s.add_argument("--integrated-into", type=value, action=Once, help="User-approved commit reference preserving target HEAD; required for existing target")
     return p
@@ -70,8 +71,8 @@ def main(argv=None):
                 for key in ("taskDir", "sourceRoot", "worktreePath", "branch", "baseCommit"):
                     print(f"{key}: {plan[key]}")
             print(result["note"])
-            if result.get('actions') or result.get('candidates'):
-                print(json.dumps({k: result[k] for k in ('actions', 'omitted', 'conflicts', 'errors', 'candidates') if k in result}, ensure_ascii=False, indent=2))
+            if result.get("issues"):
+                print(json.dumps(result["issues"], ensure_ascii=False, indent=2))
         return 0
     except SystemExit as error:
         if error.code and machine:
@@ -80,7 +81,7 @@ def main(argv=None):
     except Exception as error:
         print(str(error), file=sys.stderr)
         if machine:
-            print(json.dumps(dict(ok=False, error=str(error)), ensure_ascii=False))
+            print(json.dumps(dict(ok=False, error=str(error), issues=issues_for(error)), ensure_ascii=False))
         return 1
 
 
@@ -89,12 +90,13 @@ def query_main():
     p = Parser()
     p.add_argument("--cwd", required=True, type=value, action=Once)
     p.add_argument("--task", type=value, action=Once)
-    p.add_argument("--ready", action="store_true")
+    p.add_argument("--ready", nargs=0, default=False, action=Once)
+    p.add_argument("--role", choices=('implement', 'check', 'research'), action=Once)
     try:
         args = p.parse_args()
-        print(json.dumps(dict(ok=True, **query(args.cwd, args.task, args.ready))))
+        print(json.dumps(dict(ok=True, **query(args.cwd, args.task, args.ready, args.role))))
         return 0
     except Exception as error:
         print(str(error), file=sys.stderr)
-        print(json.dumps(dict(ok=False, error=str(error))))
+        print(json.dumps(dict(ok=False, error=str(error), issues=issues_for(error))))
         return 1

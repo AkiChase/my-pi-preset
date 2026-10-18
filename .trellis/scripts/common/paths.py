@@ -96,6 +96,17 @@ def _read_developer_file(dev_file: Path) -> str | None:
     except (OSError, IOError):
         return None
 
+    return developer_from_text(content)
+
+
+def developer_from_text(content: str | None, env_name: str = "") -> str | None:
+    """Parse an identity snapshot with the ordinary runtime precedence."""
+    if env_name:
+        if not safe_segment(env_name):
+            raise ValueError("Invalid TRELLIS_DEVELOPER; expected a safe single directory segment")
+        return env_name.strip()
+    if content is None:
+        return None
     for line in content.splitlines():
         if line.startswith("name="):
             name = line.split("=", 1)[1]
@@ -132,9 +143,7 @@ def get_developer(repo_root: Path | None = None) -> str | None:
     """
     env_name = os.environ.get(ENV_DEVELOPER, "")
     if env_name:
-        if not safe_segment(env_name):
-            raise ValueError("Invalid TRELLIS_DEVELOPER; expected a safe single directory segment")
-        return env_name.strip()
+        return developer_from_text(None, env_name)
 
     if repo_root is None:
         repo_root = get_repo_root()
