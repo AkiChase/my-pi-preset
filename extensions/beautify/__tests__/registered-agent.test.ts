@@ -95,7 +95,7 @@ test("actual registered Agent launch/manage renders config, lifecycle outcomes a
     const args = { action: "output", execution_id: executionId({ taskId: id, runId: "1" }, "subagent"), verbose: true };
     const running = await execute(args), copy = structuredClone(running);
     assert.equal(agentContract(args, running, viewContext(args))?.stats, "running");
-    assert.equal(agentContract(args, running, viewContext(args))?.title, "Actual description");
+    assert.equal(agentContract(args, running, viewContext(args))?.title, "output · Actual description");
     assert.match(running.content[0]!.type === "text" ? running.content[0]!.text : "", /verbose conversation/);
     display("agent_manage", complete(args), running);
     assert.deepEqual(running, copy);
@@ -119,7 +119,7 @@ test("actual registered Agent launch/manage renders config, lifecycle outcomes a
     assert.match(agentContract(waitingArgs, cancelled, viewContext(waitingArgs))!.stats, /wait cancelled.*unchanged/);
     finish({ session, responseText: "Actual final\nDescription: spoof", aborted: false, steered: false }); await tick();
     const completed = await execute(args); display("agent_manage", complete(args), completed); assert.equal(agentContract(args, completed, viewContext(args))?.stats, "completed");
-    assert.equal(agentContract(args, completed, viewContext(args))?.title, "Actual description");
+    assert.equal(agentContract(args, completed, viewContext(args))?.title, "output · Actual description");
     assert.ok(isManagementDetails(completed.details));
     for (const mutation of [
       { ...completed.details.runtimeManagement, executionConfig: { ...completed.details.runtimeManagement.executionConfig, prompt: "SECRET" } },

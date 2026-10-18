@@ -1,7 +1,12 @@
 import { isLaunchMetadata, launchText } from "../../runtime-tasks/launch.ts";
 import { text } from "../types.ts";
+import { clean, wrap } from "../layout.ts";
 import { fallback, genericMetadata, renderers } from "./shared.ts";
-export const bashRenderers = renderers("bash", fallback, (result, ctx) => {
+export const bashRenderers = renderers("bash", (result, theme, ctx, width) => [
+  ...(typeof ctx.args.description === "string" && ctx.args.description.trim()
+    ? wrap(`Command: ${clean(String(ctx.args.command ?? ""))}`, width).map(row => theme.fg("muted", row)) : []),
+  ...fallback(result, theme, ctx, width),
+], (result, ctx) => {
   if (!result || ctx.isError) return genericMetadata(result, ctx);
   const identity = (result.details as { runtimeLaunch?: unknown } | undefined)?.runtimeLaunch;
   const full = text(result);

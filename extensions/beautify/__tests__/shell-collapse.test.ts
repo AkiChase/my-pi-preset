@@ -34,7 +34,14 @@ for (const fixture of fixtures) {
   test(`actual host ${fixture.name} call/result compose synchronously to one collapsed row`, () => {
     const component = new ToolExecutionComponent(fixture.name, fixture.name, fixture.args, { outputPad: 2 }, fixture.renderer, screen, "/fixture");
     component.updateResult({ content: [{ type: "text", text: fixture.output }], details: undefined, isError: false });
-    for (const width of [8, 20, 40, 80, 120]) assert.equal(effective(component.render(width)).length, 1);
+    for (const width of [8, 20, 40, 80, 120]) {
+      const rows = effective(component.render(width));
+      if (fixture.name !== "bash" || width >= 40) assert.equal(rows.length, 1);
+      else {
+        assert.ok(rows.every(row => visibleWidth(row) <= Math.max(width, 5)));
+        assert.match(rows.map(plain).join("\n").replace(/\s/g, ""), /2outputlines/);
+      }
+    }
     component.setExpanded(true);
     assert.ok(effective(component.render(120)).length > 1);
   });

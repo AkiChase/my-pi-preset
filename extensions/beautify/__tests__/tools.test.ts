@@ -14,7 +14,7 @@ import { bashRenderers } from "../tools/bash.ts";
 import { findRenderers } from "../tools/find.ts";
 import { grepRenderers } from "../tools/grep.ts";
 import { parseMatch, highlightMatch } from "../tools/grep.ts";
-import { middlePath, readNotice, searchNotice, splitView } from "../layout.ts";
+import { middlePath, readNotice, searchNotice, splitView, toolHeading } from "../layout.ts";
 import type { RenderContext } from "../types.ts";
 import { loadExtensions, resolver, ToolExecutionComponent, KeybindingsManager, themeSdk } from "./renderer-host.mjs";
 const theme = themeSdk.theme as Theme;
@@ -139,6 +139,20 @@ test("built-in tool identity precedes details across pending/results, expansion 
     assert.match(plain(result(bashRenderers, "body", { command: "npm test", run_in_background: true }, { expanded: false }).render(120).join("\n")), /^bash  npm test  background/);
     assert.match(plain(result(findRenderers, "a.ts", { pattern: "*.ts", path: "src" }, { expanded: false }).render(120).join("\n")), /^find  \*\.ts in src/);
   } finally { highlighter.dispose(); }
+});
+
+test("task headings preserve measurements on narrow terminals and bash descriptions retain commands", () => {
+  for (const name of ["bash", "subagent_run", "agent_manage", "process_manage", "monitor", "subagent_workflow"]) {
+    const rows = toolHeading(name, "检查".repeat(40), "", "running · 18s · 12.4k", 30, theme, false).map(plain);
+    assert.ok(rows.length > 1);
+    assert.ok(rows[0]!.startsWith(name));
+    assert.match(rows.join("\n"), /running · 18s · 12\.4k/);
+    assert.ok(rows.every(row => visibleWidth(row) <= 30));
+  }
+  const args = { command: "printf first\\nsecond", description: "运行测试", background_after_seconds: -1 };
+  assert.match(plain(result(bashRenderers, "ok", args, { expanded: false }).render(100).join("\n")), /bash  运行测试/);
+  assert.match(plain(result(bashRenderers, "ok", args, { expanded: true }).render(100).join("\n")), /Command: printf first/);
+  assert.equal(args.command, "printf first\\nsecond");
 });
 
 test("notice parsing is exact, unknown text/control data is retained safely and path offset stays atomic", () => {

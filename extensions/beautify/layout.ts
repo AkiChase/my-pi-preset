@@ -59,6 +59,14 @@ export function toolHeading(name: string, detail: string, suffix: string, stats:
   // Identity is a separate field: middle-path clipping may only shorten details.
   const identity = clipPlain(name, width);
   const room = width - visibleWidth(identity) - 2;
+  const taskTool = ["bash", "subagent_run", "subagent_workflow", "agent_manage", "process_manage", "monitor"].includes(name);
+  const safeStats = clean(stats).replace(/\n/g, "\\n");
+  // Task state/measurements must not silently disappear behind long labels.
+  // Other tool headings retain their existing path-oriented compact contract.
+  if (taskTool && safeStats && visibleWidth(safeStats) + 2 + Math.min(12, visibleWidth(detail + suffix)) > room) {
+    const heading = identity + (room > 0 && (detail || suffix) ? "  " + middlePath(clean(detail).replace(/\n/g, "\\n"), room, suffix) : "");
+    return [theme.fg("accent", heading), ...wrap(`  ${safeStats}`, width).map(row => theme.fg("muted", row))];
+  }
   if (room < 1) return [theme.fg("accent", identity)];
   const rest = summary(detail, suffix, stats, room, theme, secondary, showHint)[0]!;
   return [theme.fg("accent", identity) + (visibleWidth(rest) ? "  " + rest : "")];

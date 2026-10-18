@@ -30,7 +30,7 @@ export function managementContract(group: ManagementGroup): RetrievalContract {
       ...(m.range ? ["Log range (bytes)", ...Object.entries(m.range).map(([key, value]) => `  ${key}: ${value}`)] : []),
       ...(m.stats && Object.keys(m.stats).length ? ["Statistics", ...Object.entries(m.stats).map(([key, value]) => `  ${key}: ${value}`)] : []),
     ] : [];
-    return { expandedRows, title: m.title ?? title, stats, secondary: [m.task_type ?? m.kind, m.task_id ?? m.execution_id].filter(Boolean).join(" · "),
+    return { expandedRows, title: m.title?.trim() ? `${args.action} · ${m.title}` : title, stats, secondary: [m.task_type ?? m.kind, m.task_id ?? m.execution_id].filter(Boolean).join(" · "),
       ...(m.executionConfig ? { executionConfig: copyExecutionConfig(m.executionConfig) } : {}) };
   };
 }
