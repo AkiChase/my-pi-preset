@@ -17,7 +17,10 @@ test("real host discovers, binds and reads the plugin manual independently of or
     assert.equal(result.error, undefined);
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
     const report = JSON.parse(result.stdout.trim()) as Record<string, unknown>;
-    for (const key of ["startup", "reload", "noSkills", "packageFilter", "collision", "missing", "moved", "nativeRead"]) assert.equal(report[key], true, key);
+    for (const key of ["startup", "reload", "noSkills", "packageFilter", "collision", "missing", "moved", "nativeRead", "referenceCoverage", "readerGates"]) assert.equal(report[key], true, key);
     assert.equal(report.childPolicies, 7);
+    const counts = report.indexCounts as { chars: number; nonblankLines: number };
+    assert.ok(counts.chars > 0 && counts.chars < 1500);
+    assert.ok(counts.nonblankLines > 0 && counts.nonblankLines < 15);
   } finally { rmSync(box, { recursive: true, force: true }); }
 });

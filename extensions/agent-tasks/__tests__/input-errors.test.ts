@@ -169,7 +169,7 @@ void it("actual registered Agent tools contribute one official SDK rule group an
             const selectedTools = definitions.map(tool => tool.name);
             const prompt = buildSystemPrompt({ cwd: f.cwd, selectedTools: [...selectedTools, "peer"], toolSnippets: { ...snippets, peer: "Peer index" }, toolGuidelines: { ...guidelines, peer: ["Peer guideline"] } });
             for (const heading of ["Subagent_run usage:", "Subagent_message usage:", "Subagent_workflow usage:"]) assert.equal(prompt.split(heading).length - 1, 1);
-            assert.match(prompt, /set resume to null for a new agent/);
+            assert.match(prompt, /Set resume to null for a new agent/i);
             assert.match(prompt, /run_in_background:null uses the configured execution mode/);
             assert.doesNotMatch(prompt, /execution defaults to background|execution defaults to foreground/);
             const schema = JSON.parse(JSON.stringify(f.paramSchema("subagent_run"))) as { properties: Record<string, { description?: string }> };
@@ -179,6 +179,12 @@ void it("actual registered Agent tools contribute one official SDK rule group an
             assert.match(schema.properties.inherit_context!.description!, /parent conversation text/);
             assert.doesNotMatch(schema.properties.inherit_context!.description!, /fork/);
             assert.match(schema.properties.run_in_background!.description!, /null uses configuration/);
+            assert.match(prompt, /automatically reading the Subagents Skill is NEVER opt-in/);
+            assert.match(prompt, /currently discovered, model-invocable subagents Skill/);
+            assert.match(prompt, /do not guess paths or APIs/);
+            assert.match(prompt, /Running an existing user-requested script still uses this basic contract/);
+            assert.doesNotMatch(prompt, /opts\?:|DEFAULT TO pipeline|const DIMENSIONS|const seen = new Set|budget\.remaining|100% cache hit/);
+            assert.ok(guidelines.subagent_workflow!.join("\n").length < 3500);
             assert.match(prompt, /Peer index/); assert.match(prompt, /Peer guideline/);
             assert.doesNotMatch(prompt, /OLD_CUSTOM_TEMPLATE|toolDescriptionMode|\{\{typeList\}\}/);
             assert.ok(definitions.every(tool => tool.description.length < 150));
@@ -186,6 +192,40 @@ void it("actual registered Agent tools contribute one official SDK rule group an
             assert.equal(Object.hasOwn(props, "schedule"), false); assert.equal(Object.hasOwn(props, "isolation"), false);
             const hidden = buildSystemPrompt({ cwd: f.cwd, selectedTools, hiddenTools: selectedTools, toolSnippets: snippets, toolGuidelines: guidelines });
             assert.doesNotMatch(hidden, /Subagent_run usage:|Subagent_message usage:|Subagent_workflow usage:/);
+        } finally { await f.close(); }
+    }
+});
+
+void it("short root/nested rules preserve feature gates, modes, owned lifecycle and admitted examples", async () => {
+    for (const enabled of [false, true]) {
+        const f = await factory({ schedulingEnabled: enabled, worktreeIsolation: enabled, workflowsEnabled: enabled });
+        try {
+            assert.equal(f.tools.has("subagent_workflow"), enabled);
+            for (const [nested, tool] of [[false, f.tools.get("subagent_run")!], [true, f.nested()[0]!]] as const) {
+                const rules = tool.promptGuidelines!.join("\n");
+                const props = Reflect.get(tool.parameters, "properties");
+                assert.equal(Object.hasOwn(props, "isolation"), enabled);
+                assert.equal(Object.hasOwn(props, "schedule"), enabled && !nested);
+                assert.equal(Object.hasOwn(props, "name"), !nested);
+                assert.equal(rules.includes("isolation selects Git"), enabled);
+                assert.equal(rules.includes("Use schedule only"), enabled && !nested);
+                assert.match(rules, /takes precedence over applicable call parameters/);
+                assert.match(rules, /agent_id.*execution_id/);
+                if (nested) {
+                    assert.match(rules, /Nested resume waits inline; run_in_background must be null/);
+                    assert.match(rules, /owned children are stopped/);
+                    assert.match(rules, /Collect owned background results.*before finishing/);
+                    assert.doesNotMatch(rules, /Background completion is notified automatically/);
+                } else assert.match(rules, /This execution mode is resolved again/);
+                for (const example of rules.matchAll(/(?:New|Resume): (\{[^\n]+\})/g)) {
+                    const args = JSON.parse(example[1]!);
+                    args.subagent_type = args.resume ? null : "general-purpose";
+                    validateToolArguments(tool, { type: "toolCall", id: "example", name: tool.name, arguments: args });
+                    assert.doesNotThrow(() => parseAgentToolArguments(args, { nested, isolation: enabled, scheduling: enabled && !nested }));
+                }
+                const prompt = buildSystemPrompt({ cwd: f.cwd, selectedTools: [tool.name], toolSnippets: { [tool.name]: tool.promptSnippet! }, toolGuidelines: { [tool.name]: tool.promptGuidelines! } });
+                assert.equal(prompt.split("Subagent_run usage:").length - 1, 1);
+            }
         } finally { await f.close(); }
     }
 });

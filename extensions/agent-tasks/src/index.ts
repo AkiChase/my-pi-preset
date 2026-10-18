@@ -1535,7 +1535,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     label: "subagent_run",
     description: "Start or resume an autonomous agent for delegated work.",
     promptSnippet: "Launch autonomous sub-agents for complex multi-step tasks",
-    promptGuidelines: runToolGuidance({ nested: false, backgroundByDefault: getBackgroundByDefault(), isolation: isWorktreeIsolationEnabled(), scheduling: isSchedulingEnabled(), agentTypes: buildTypeListText() }),
+    promptGuidelines: runToolGuidance({ nested: false, isolation: isWorktreeIsolationEnabled(), scheduling: isSchedulingEnabled(), agentTypes: buildTypeListText() }),
     parameters: Type.Object({
       prompt: Type.String({
         description: "The task for the agent to perform.",
@@ -2411,7 +2411,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     label: "subagent_workflow",
     description: "Run a workflow script with explicit user orchestration authorization.",
     promptSnippet: "Run a deterministic script that orchestrates many subagents",
-    promptGuidelines: workflowToolGuidance(buildTypeListText()),
+    promptGuidelines: workflowToolGuidance(),
     parameters: Type.Object({
       script: nullableControl(
         Type.String({

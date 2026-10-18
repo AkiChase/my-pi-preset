@@ -2,9 +2,13 @@
 import assert from "node:assert/strict";
 import { cpSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createAgentSession, DefaultResourceLoader, ModelRuntime, SessionManager, SettingsManager } from "@earendil-works/pi-coding-agent";
 
+const { buildSystemPrompt } = await import(pathToFileURL(join(dirname(fileURLToPath(import.meta.resolve('@earendil-works/pi-coding-agent'))), 'core/system-prompt.js')).href);
+const longMarkers = [/opts\?:/, /DEFAULT TO pipeline/, /const DIMENSIONS/, /const seen = new Set/, /budget\.remaining/, /100% cache hit/];
+const counts = text => ({ chars: text.length, nonblankLines: text.split('\n').filter(line => line.trim()).length });
+let indexCounts;
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const box = process.cwd();
 const agentDir = process.env.PI_CODING_AGENT_DIR;
@@ -80,12 +84,33 @@ try {
   assert.doesNotMatch(session.systemPrompt, /# Delegation and coordination|# Workflow API|# Orchestration patterns/);
   // Read body only via the actual permitted SDK read tool.
   const skill = assertSkill(loader);
+  const entryText = readFileSync(skill.filePath, 'utf8');
+  const referenceTexts = Object.fromEntries(['delegation', 'workflow-api', 'patterns'].map(name => [name, readFileSync(join(skill.baseDir, `references/${name}.md`), 'utf8')]));
+  for (const marker of longMarkers) assert.doesNotMatch(entryText, marker, 'entry is routing, not tutorial');
+  for (const hook of ['### agent', '### pipeline', '### parallel', '### log and phase', '### args', '### budget', '### workflow', '## Replay', '## Runtime boundaries']) assert.ok(referenceTexts['workflow-api'].includes(hook), hook);
+  for (const option of ['label?', 'phase?', 'schema?', 'model?', 'effort?', 'isolation?', 'agentType?', 'gate?', 'resume?']) assert.ok(referenceTexts['workflow-api'].includes(option), option);
+  for (const pattern of ['find-flaky-tests', 'PURE LITERAL', 'StructuredOutput', 'JSON.parse', '4096', '1000', 'max(1, min(16', 'child session settings/defaults', 'Explicit model takes precedence', 'Explicit effort takes precedence', 'eval and Function', 'workflow.jsonl']) assert.ok(referenceTexts['workflow-api'].includes(pattern), pattern);
+  for (const example of ['const DIMENSIONS', 'dedupeByFileAndLine', 'while (bugs.length < 10)', "resume: 'fix'", 'const seen = new Set', 'dry < 2', "['correctness','security','repro']", 'Default to refuted=true', 'Judge panel', 'Multi-modal sweep', 'Completeness critic', 'No silent caps']) assert.ok(referenceTexts.patterns.includes(example), example);
+  const indexPrompt = buildSystemPrompt({ cwd: box, selectedTools: ['read'], skills: [skill] });
+  const index = indexPrompt.slice(indexPrompt.indexOf('<available_skills>'), indexPrompt.indexOf('</available_skills>') + '</available_skills>'.length);
+  assert.match(index, /<name>subagents<\/name>/);
+  for (const marker of longMarkers) assert.doesNotMatch(index, marker);
+  indexCounts = counts(index);
+  assert.doesNotMatch(buildSystemPrompt({ cwd: box, selectedTools: ['subagent_run'], skills: [skill] }), /<name>subagents<\/name>/);
+  const disabled = { ...skill, disableModelInvocation: true };
+  assert.doesNotMatch(buildSystemPrompt({ cwd: box, selectedTools: ['read'], skills: [disabled] }), /<name>subagents<\/name>/);
+  const hiddenReader = buildSystemPrompt({ cwd: box, selectedTools: ['read'], hiddenTools: ['read'], skills: [skill] });
+  assert.match(hiddenReader, /<name>subagents<\/name>/, 'permitted hidden reader keeps native index');
   const read = session.agent.state.tools.find(t => t.name === 'read');
   const result = await read.execute('read-manual', { path: skill.filePath });
   assert.match(result.content[0].text, /# Subagents/);
   assert.match(result.content[0].text, /references\/workflow-api.md/);
   const referenceResult = await read.execute('read-reference', { path: join(skill.baseDir, 'references/delegation.md') });
   assert.match(referenceResult.content[0].text, /# Delegation and coordination/);
+  for (const name of ['workflow-api', 'patterns']) {
+    const response = await read.execute(`read-${name}`, { path: join(skill.baseDir, `references/${name}.md`) });
+    assert.ok(response.content[0].text.includes(referenceTexts[name].split('\n')[0]));
+  }
   session.setActiveToolsByName([]);
   assert.doesNotMatch(session.systemPrompt, /<name>subagents<\/name>/, 'no reader means no skill index');
   session.setActiveToolsByName(['read']);
@@ -151,5 +176,5 @@ try {
   writeFileSync(movedEntry, `export { default } from './extensions/agent-tasks/src/index.ts';`);
   const moved = await open({ noSkills: true, additionalExtensionPaths: [movedEntry] });
   try { assertSkill(moved.loader, movedRoot); } finally { await shutdown(moved.session); }
-  console.log(JSON.stringify({ startup: true, reload: true, childPolicies: 7, noSkills: true, packageFilter: true, collision: true, missing: true, moved: true, nativeRead: true }));
+  console.log(JSON.stringify({ startup: true, reload: true, childPolicies: 7, noSkills: true, packageFilter: true, collision: true, missing: true, moved: true, nativeRead: true, referenceCoverage: true, readerGates: true, indexCounts }));
 } finally { await shutdown(session); }

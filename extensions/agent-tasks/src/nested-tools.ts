@@ -171,7 +171,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
       "Launch a child-safe nested subagent for bounded delegated work. " +
       "Only use agent types allowed by this parent agent; nesting is depth-limited.",
     promptSnippet: "Start or resume an owned nested agent",
-    promptGuidelines: runToolGuidance({ nested: true, backgroundByDefault: false, isolation: isWorktreeIsolationEnabled(), scheduling: false, agentTypes: availableIn(loadRegistry()).join(", ") || "none" }),
+    promptGuidelines: runToolGuidance({ nested: true, isolation: isWorktreeIsolationEnabled(), scheduling: false, agentTypes: availableIn(loadRegistry()).join(", ") || "none" }),
     parameters: Type.Object({
       prompt: Type.String({ description: "Self-contained task for the nested agent." }),
       description: nullableControl(Type.String({ description: "Required non-null for new agents; null with resume: short task description." })),
