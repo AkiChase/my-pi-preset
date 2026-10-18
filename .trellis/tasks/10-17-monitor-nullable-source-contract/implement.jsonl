@@ -1,0 +1,4 @@
+{"file":".trellis/spec/development/index.md","reason":"实际工具owner、schema与副作用边界；用户禁止修改spec"}
+{"file":".trellis/spec/testing/index.md","reason":"真实host验证、自然退出、隔离配置与失败记录"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"复用浅层parser不扩大递归清洗"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"模型入口与内部WS配置及生命周期边界"}

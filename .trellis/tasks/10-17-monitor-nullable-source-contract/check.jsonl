@@ -1,0 +1,4 @@
+{"file":".trellis/spec/development/index.md","reason":"公共工具schema、执行owner、纯输入校验与资源边界"}
+{"file":".trellis/spec/testing/index.md","reason":"实际host验证、自然退出与隔离验证、失败记录"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"复用浅层parser而不扩大递归清洗语义"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"模型与内部WS配置、执行及生命周期边界审查"}
