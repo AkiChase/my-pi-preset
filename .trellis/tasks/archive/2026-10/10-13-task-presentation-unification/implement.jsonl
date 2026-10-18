@@ -1,0 +1,4 @@
+{"file":".trellis/spec/development/index.md","reason":"Tool renderer ownership, safe layout and execution preservation"}
+{"file":".trellis/spec/testing/index.md","reason":"Actual SDK components, isolated natural-exit and lifecycle checks"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse current presentation owners"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Identity, snapshots and side effects"}
