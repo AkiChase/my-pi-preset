@@ -1,11 +1,16 @@
+import { copyAgentExecutionConfig, agentExecutionSummary } from "../../runtime-tasks/execution-config.ts";
 import { executionId } from "../../runtime-tasks/execution-id.ts";
 import type { RuntimeTaskCapability } from "../../runtime-tasks/facade.ts";
-import { taskResult, type RuntimeTaskMetadata } from "../../runtime-tasks/contracts.ts";
+import { taskResult as runtimeResult, type RuntimeTaskMetadata } from "../../runtime-tasks/contracts.ts";
 import type { AgentManager } from "./agent-manager.ts";
 import type { AgentRecord } from "./types.ts";
 import type { TaskCoordinator } from "../../task-ui/coordinator.ts";
 import type { TaskSource } from "../../task-ui/types.ts";
 import { registerAgentWait } from "./waits.ts";
+
+function taskResult(text: string, metadata: Omit<RuntimeTaskMetadata, "version">) {
+  return runtimeResult(agentExecutionSummary(metadata.executionConfig) + text, metadata);
+}
 
 export function createAgentManagement(options: {
   manager: AgentManager; coordinator: TaskCoordinator; source: TaskSource; active: () => boolean;
@@ -24,6 +29,7 @@ export function createAgentManagement(options: {
       const run = manager.getRun(identity.taskId);
       const initial = record ? { ...record } : undefined;
       const meta = (snapshot = initial): Omit<RuntimeTaskMetadata, "version"> => ({ action: params.action, task_type: "subagent", task_id: identity.taskId, run_id: identity.runId,
+        executionConfig: copyAgentExecutionConfig(snapshot?.executionConfig),
         stats: snapshot ? { toolUses: snapshot.toolUses, duration_ms: Math.max(0, (snapshot.completedAt ?? Date.now()) - snapshot.startedAt), turnCount: snapshot.turnCount ?? 0, ...(snapshot.lifetimeUsage ? { inputTokens: snapshot.lifetimeUsage.input, outputTokens: snapshot.lifetimeUsage.output, cost: snapshot.lifetimeUsage.cost } : {}) } : undefined,
         title: snapshot?.description, raw_status: snapshot?.status,
         status: snapshot?.status === "error" ? "failed" : snapshot?.status === "aborted" || snapshot?.status === "stopped" ? "stopped" : snapshot?.status === "steered" ? "completed" : snapshot?.status,

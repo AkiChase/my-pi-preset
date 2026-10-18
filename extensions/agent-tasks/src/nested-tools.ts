@@ -1,3 +1,4 @@
+import { copyAgentExecutionConfig, agentExecutionSummary } from "../../runtime-tasks/execution-config.ts";
 import { nullableControl } from "../../shared/tool-arguments.ts";
 import { createToolCallHeading } from "../../beautify/tool-call-heading.ts";
 import { launchMetadata, launchText } from "../../runtime-tasks/launch.ts";
@@ -18,7 +19,7 @@ import {
   resolveTypeIn,
 } from "./agent-types.ts";
 import { loadCustomAgents } from "./custom-agents.ts";
-import { formatInvocationOverrideNote, isolationParam, resolveAgentInvocationConfig, thinkingParam } from "./invocation-config.ts";
+import { isolationParam, resolveAgentInvocationConfig, thinkingParam } from "./invocation-config.ts";
 import { describeModel, resolveModel } from "./model-resolver.ts";
 import { runToolGuidance, messageToolGuidance } from "./tool-guidance.ts";
 import { parseAgentToolArguments, assertMessageToolArguments } from "./tool-contract.ts";
@@ -207,7 +208,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
         return resumed
           ? (() => {
             const identity = launchMetadata("subagent", resumed.id, resumed.runId ?? "1", "foreground");
-            return { ...textResult(`${launchText(identity)}\n${formatRecord(resumed, "inline")}`, resumed.status === "error"), details: { runtimeLaunch: identity } };
+            return { ...textResult(`${launchText(identity)}\n${agentExecutionSummary(resumed.executionConfig)}${formatRecord(resumed, "inline")}`, resumed.status === "error"), details: { runtimeLaunch: identity, executionConfig: copyAgentExecutionConfig(resumed.executionConfig) } };
           })()
           : textResult(`Failed to resume nested agent "${params.resume}".`, true);
       }
@@ -290,10 +291,13 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
         thinking: invocation.thinking,
         requestedThinking: invocation.overridden?.thinking,
         requestedModel: askedModel,
+        sessionRequestedThinking: params.thinking,
+        sessionRequestedModel: params.model !== undefined && askedModel === undefined && model ? `${model.provider}/${model.id}` : undefined,
         requestedRunInBackground: invocation.overridden?.runInBackground,
         requestedInheritContext: invocation.overridden?.inheritContext,
         requestedIsolated: invocation.overridden?.isolated,
-        requestedIsolation: invocation.overridden?.isolation,
+        requestedIsolation: invocation.overridden?.isolation ?? (params.isolation === "worktree" && !isWorktreeIsolationEnabled() ? "worktree" : undefined),
+        isolationDifferenceReason: !isWorktreeIsolationEnabled() ? "worktree-disabled" : undefined,
         maxTurns: invocation.maxTurns,
         isolated: invocation.isolated,
         inheritContext: invocation.inheritContext,
@@ -301,7 +305,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
         isolation: invocation.isolation,
       };
       const overrideNoteFor = (record: AgentRecord | undefined) =>
-        formatInvocationOverrideNote(record?.invocation ?? agentInvocation);
+        agentExecutionSummary(record?.executionConfig);
       const options: NestedSpawnOptions = {
         description: params.description!,
         model,
@@ -385,7 +389,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
           // failure as a tool error, like the synchronous throw used to.
           await context.manager.awaitStartup(id);
           const identity = launchMetadata("subagent", id, context.manager.getRecord(id)!.runId ?? "1", "background");
-          return { ...textResult(`${launchText(identity)}\n${overrideNoteFor(context.manager.getRecord(id))}Nested agent started in background.`), details: { runtimeLaunch: identity } };
+          return { ...textResult(`${launchText(identity)}\n${overrideNoteFor(context.manager.getRecord(id))}Nested agent started in background.`), details: { runtimeLaunch: identity, executionConfig: copyAgentExecutionConfig(context.manager.getRecord(id)?.executionConfig) } };
         }
 
         const { record } = await context.manager.spawnAndWait(
@@ -397,9 +401,13 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
           attachTranscript,
         );
         const identity = launchMetadata("subagent", record.id, record.runId ?? "1", "foreground");
-        return { ...textResult(`${launchText(identity)}\n${overrideNoteFor(record)}${formatRecord(record, "inline")}`, record.status === "error"), details: { runtimeLaunch: identity } };
+        return { ...textResult(`${launchText(identity)}\n${overrideNoteFor(record)}${formatRecord(record, "inline")}`, record.status === "error"), details: { runtimeLaunch: identity, executionConfig: copyAgentExecutionConfig(record.executionConfig) } };
       } catch (err) {
-        return textResult(err instanceof Error ? err.message : String(err), true);
+        const record = childId === undefined ? undefined : context.manager.getRecord(childId);
+        const identity = record ? launchMetadata("subagent", record.id, record.runId ?? "1", invocation.runInBackground ? "background" : "foreground") : undefined;
+        return { ...textResult(`${identity ? `${launchText(identity)}\n` : ""}${agentExecutionSummary(record?.executionConfig)}${err instanceof Error ? err.message : String(err)}`, true),
+          details: identity ? { runtimeLaunch: identity, executionConfig: copyAgentExecutionConfig(record?.executionConfig) } : {},
+        };
       }
     },
   });

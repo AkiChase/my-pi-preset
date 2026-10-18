@@ -28,6 +28,7 @@ import type { AgentManagerDependencies } from "../src/agent-manager.ts";
 import type { RunResult } from "../src/agent-runner.ts";
 import type { AgentRecord, NotificationDetails } from "../src/types.ts";
 import { assertNonEmptyString } from "../src/spawn-input.ts";
+import { resolvedExecutionConfig, sessionExecutionConfig } from "../src/execution-config.ts";
 import { THINKING_LEVELS, resolveAgentInvocationConfig, thinkingParam, formatInvocationOverrideNote } from "../src/invocation-config.ts";
 
 const { createNestedSubagentTools } = await import("../src/nested-tools.ts");
@@ -577,7 +578,9 @@ for (const background of [false, true]) void it(`nested ${background ? "backgrou
             assert.equal(options.model?.id, "pinned"); assert.equal(options.thinkingLevel, "high");
             const id = `child-${records.size}`;
             records.set(id, { id, runId: "1", status: "completed", result: "nested answer", parentAgentId: "parent",
-                invocation: { ...options.invocation, thinking: "low" } } as AgentRecord);
+                invocation: { ...options.invocation, thinking: "low" },
+                executionConfig: sessionExecutionConfig(resolvedExecutionConfig({ ...options.invocation, isolation: options.isolation ?? "off" }), { model: pinnedModel, thinkingLevel: "low" }),
+            } as AgentRecord);
             return id;
         },
         async spawnAndWait(pi, ctx, type, prompt, options, onSpawned) {

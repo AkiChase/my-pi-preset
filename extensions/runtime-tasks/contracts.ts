@@ -1,3 +1,4 @@
+import { copyAgentExecutionConfig, isAgentExecutionConfig, type AgentExecutionConfig } from "./execution-config.ts";
 import type { AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { TaskView } from "../task-ui/types.ts";
 
@@ -29,6 +30,7 @@ export interface RuntimeTaskMetadata {
   readonly status?: TaskView["status"];
   readonly raw_status?: string;
   readonly wait_outcome?: "waiting" | "completed" | "released" | "cancelled";
+  readonly executionConfig?: AgentExecutionConfig;
   readonly stats?: Readonly<Record<string, number>>;
   readonly range?: Readonly<{ start: number; end: number; size: number; omitted_before: number; omitted_after: number }>;
   readonly count?: number;
@@ -40,7 +42,7 @@ export type RuntimeTaskResult = AgentToolResult<RuntimeTaskDetails>;
 const statuses = ["starting", "queued", "running", "paused", "completed", "failed", "stopped"];
 const outcomes = ["waiting", "completed", "released", "cancelled"];
 const errors = ["invalid_arguments", "not_found", "stale", "ambiguous", "forbidden", "unsupported", "closed", "log_error"];
-const keys = ["version", "action", "task_type", "task_id", "run_id", "title", "status", "raw_status", "wait_outcome", "stats", "range", "count", "error_code"];
+const keys = ["version", "action", "task_type", "task_id", "run_id", "title", "status", "raw_status", "wait_outcome", "stats", "range", "count", "error_code", "executionConfig"];
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
 const fractionalStats = ["duration_ms", "durationMs", "cost", "totalDurationMs", "averageDurationMs"];
 const countStats = ["pid", "tokens", "inputTokens", "outputTokens", "toolUses", "turnCount", "maxTurns", "doneCount", "totalCount", "totalStarted", "running", "completed", "failed", "killed"];
@@ -60,6 +62,7 @@ export function isRuntimeTaskMetadata(value: unknown): value is RuntimeTaskMetad
   if (value.wait_outcome !== undefined && (!outcomes.includes(value.wait_outcome as string) || value.action !== "wait")) return false;
   if (value.error_code !== undefined && !errors.includes(value.error_code as string)) return false;
   if (value.count !== undefined && !safeCount(value.count)) return false;
+  if (value.executionConfig !== undefined && (value.task_type !== "subagent" || !isAgentExecutionConfig(value.executionConfig))) return false;
   if (value.stats !== undefined && (!object(value.stats) || Object.entries(value.stats).some(([key, n]) =>
     fractionalStats.includes(key) ? typeof n !== "number" || !Number.isFinite(n) || n < 0 : !countStats.includes(key) || !safeCount(n)))) return false;
   if (value.error_code === undefined && ["status", "output", "wait", "stop"].includes(value.action as string) && value.task_id === undefined) return false;
@@ -123,6 +126,7 @@ export function runtimeTaskType(view: Pick<TaskView, "kind">): RuntimeTaskType {
 
 export function taskResult(text: string, metadata: Omit<RuntimeTaskMetadata, "version">): RuntimeTaskResult {
   const runtimeTask = Object.freeze({ version: 1 as const, ...metadata,
+    ...(metadata.executionConfig ? { executionConfig: copyAgentExecutionConfig(metadata.executionConfig) } : {}),
     ...(metadata.stats ? { stats: Object.freeze({ ...metadata.stats }) } : {}),
     ...(metadata.range ? { range: Object.freeze({ ...metadata.range }) } : {}),
   });

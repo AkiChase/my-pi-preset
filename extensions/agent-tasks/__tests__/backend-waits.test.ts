@@ -488,3 +488,81 @@ void it("direct manager admission normalizes descriptions before records and wor
     }
   } finally { await f.close(); }
 });
+
+void it("manager snapshots resolution, actual session adjustment and resume without rewriting historical config", async () => {
+  const { isAgentExecutionConfig } = await import("../../runtime-tasks/execution-config.ts");
+  const f = fixture();
+  try {
+    const id = f.spawn(true, { thinkingLevel: "high", model: { provider: "offline", id: "first", name: "First" } as never,
+      isolated: false, inheritContext: false, isolation: "off", invocation: { thinking: "high", sessionRequestedThinking: "high", sessionRequestedModel: "offline/first", requestedIsolated: true, isolated: false } });
+    const record = f.manager.getRecord(id)!, resolved = record.executionConfig!;
+    assert.ok(isAgentExecutionConfig(resolved)); assert.equal(resolved.phase, "resolved");
+    assert.equal(resolved.thinking, "high"); assert.equal(resolved.isolated, false); assert.equal(resolved.isolation, "off");
+    const session = f.calls[0]!.session;
+    Object.defineProperty(session, "model", { configurable: true, value: { provider: "offline", id: "actual", name: "Actual" } });
+    Object.defineProperty(session, "thinkingLevel", { configurable: true, value: "off" });
+    await tick();
+    const actual = record.executionConfig!;
+    assert.equal(actual.phase, "session-effective"); assert.equal(actual.model, "offline/actual"); assert.equal(actual.thinking, "off");
+    assert.deepEqual(actual.differences?.map(d => [d.field, d.reason]), [["isolated", "agent-configuration"], ["model", "session-adjustment"], ["thinking", "session-adjustment"]]);
+    assert.equal(resolved.phase, "resolved"); assert.equal(resolved.thinking, "high");
+    const row = f.source.list().find(row => row.taskId === id)!;
+    assert.deepEqual(row.executionConfig, actual); assert.notEqual(row.executionConfig, actual);
+    f.calls[0]!.finish(); const terminal = await f.manager.getRun(id)!.terminal; await tick();
+    Object.defineProperty(session, "model", { configurable: true, value: { provider: "offline", id: "resumed", name: "Resumed" } });
+    Object.defineProperty(session, "thinkingLevel", { configurable: true, value: "low" });
+    const resumed = f.manager.resumeRun(id, "new prompt", undefined, { requestedRunInBackground: true })!;
+    assert.equal(resumed.runId, "2"); assert.equal(resumed.executionConfig?.model, "offline/resumed");
+    assert.equal(resumed.executionConfig?.thinking, "low"); assert.equal(resumed.executionConfig?.mode, "foreground");
+    assert.equal(resumed.executionConfig?.inherit_context, undefined); assert.equal(resumed.executionConfig?.isolation, undefined);
+    assert.deepEqual(resumed.executionConfig?.differences, [{ field: "mode", requested: "background", actual: "foreground", reason: "agent-configuration" }]);
+    assert.equal(resumed.invocation?.requestedThinking, undefined); assert.equal(resumed.invocation?.requestedIsolated, undefined);
+    assert.deepEqual(terminal.executionConfig, actual); assert.deepEqual(row.executionConfig, actual);
+    f.resumes[0]!.finish(); await f.manager.waitForAll(); assert.equal(f.manager.executionCount, 0);
+  } finally { await f.close(); }
+});
+
+void it("pre-session failure stays resolved and partial sessions preserve unknown actual model/thinking", async () => {
+  const f = fixture({ runAgent: async () => { throw new Error("startup failure"); } });
+  try {
+    const id = f.spawn(true, { invocation: { thinking: "off" } });
+    const terminal = await f.manager.getRun(id)!.terminal;
+    assert.equal(terminal.status, "error"); assert.equal(terminal.executionConfig?.phase, "resolved");
+    assert.equal(terminal.executionConfig?.thinking, "off"); assert.equal(terminal.executionConfig?.model, undefined);
+    await f.manager.drainExecution(); assert.equal(f.manager.executionCount, 0);
+  } finally { await f.close(); }
+  const unknown = fixture();
+  try {
+    const id = unknown.spawn(true, { thinkingLevel: "high" }); await tick();
+    assert.equal(unknown.manager.getRecord(id)?.executionConfig?.phase, "session-effective");
+    assert.equal(unknown.manager.getRecord(id)?.executionConfig?.thinking, undefined);
+    assert.equal(unknown.manager.getRecord(id)?.executionConfig?.model, undefined);
+    const row = unknown.source.list().find(view => view.taskId === id)!;
+    assert.equal(row.stats.thinking, undefined, "legacy stats must not re-advertise an unconfirmed request");
+    assert.equal(row.stats.model, undefined);
+  } finally { await unknown.close(); }
+});
+
+void it("nested background startup failure retains launch identity and resolved config", async () => {
+  const f = fixture({ worktreeEnabled: () => true, createWorktree: async () => undefined });
+  const root = mkdtempSync(join(tmpdir(), "nested-config-error-"));
+  const { mkdirSync } = await import("node:fs");
+  try {
+    mkdirSync(join(root, ".pi", "agents"), { recursive: true });
+    writeFileSync(join(root, ".pi", "agents", "worktree-child.md"), "---\nname: worktree-child\ndescription: test\nisolation: worktree\n---\nPRIVATE_PROMPT\n");
+    const tool = createNestedSubagentTools({ manager: f.manager, pi, parentAgentId: "parent", depth: 1,
+      maxSubagentDepth: 2, allowedSubagents: "all", configCwd: root })[0]!;
+    const result = await tool.execute("failure", completeToolCall(tool.parameters, { subagent_type: "worktree-child", description: "test", prompt: "test", run_in_background: true }), undefined, undefined, ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext);
+    assert.equal(result.isError, true);
+    const details = result.details as { executionConfig?: import("../../runtime-tasks/execution-config.ts").AgentExecutionConfig; runtimeLaunch?: unknown };
+    assert.equal(details.executionConfig?.phase, "resolved");
+    assert.equal(details.executionConfig?.isolation, "worktree");
+    const { isLaunchMetadata } = await import("../../runtime-tasks/launch.ts");
+    assert.ok(isLaunchMetadata(details.runtimeLaunch));
+    const content = result.content.map(block => block.type === "text" ? block.text : "").join("\n");
+    assert.match(content, /execution_id=exec_.*\nExecution config \(pending session confirmation\)/);
+    assert.doesNotMatch(JSON.stringify(details), /PRIVATE_PROMPT|prompt|settings|auth/);
+    assert.equal(f.calls.length, 0);
+    await f.manager.drainExecution(); assert.equal(f.manager.executionCount, 0);
+  } finally { await f.close(); rmSync(root, { recursive: true, force: true }); }
+});

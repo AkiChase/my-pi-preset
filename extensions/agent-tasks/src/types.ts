@@ -235,6 +235,8 @@ export interface AgentRecord {
   isBackground?: boolean;
   /** Resolved spawn params, captured for UI display. Fixed at spawn time. */
   invocation?: AgentInvocation;
+  /** Immutable, run-scoped public display snapshot. */
+  executionConfig?: import("../../runtime-tasks/execution-config.ts").AgentExecutionConfig;
   /** Nesting depth: top-level subagent = 1. */
   depth?: number;
   /**
@@ -292,11 +294,15 @@ export interface AgentInvocation {
    * neither `requested*` field is overwritten once set.
    */
   requestedThinking?: EffectiveThinkingLevel;
+  /** Explicit requests resolved to the selected value, used only for later SDK comparison. */
+  sessionRequestedThinking?: EffectiveThinkingLevel;
+  sessionRequestedModel?: string;
   /** The caller's `model` parameter, as written, when an agent file's pin won. */
   requestedRunInBackground?: boolean;
   requestedInheritContext?: boolean;
   requestedIsolated?: boolean;
   requestedIsolation?: IsolationMode;
+  isolationDifferenceReason?: "worktree-disabled";
   requestedModel?: string;
   maxTurns?: number;
   isolated?: boolean;

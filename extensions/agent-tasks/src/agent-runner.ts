@@ -466,6 +466,8 @@ export interface RunOptions {
   /** Called on streaming text deltas from the assistant response. */
   onTextDelta?: (delta: string, fullText: string) => void;
   onSessionCreated?: (session: AgentSession) => void;
+  /** Display-only owner callback after existing resolution, before SDK creation. */
+  onExecutionResolved?: (settings: { model?: Model<any>; thinking?: ThinkingLevel }) => void;
   /** Cleanup-only owner sees partial sessions BEFORE asynchronous bind. */
   onSessionOwned?: (session: AgentSession) => void;
   /** Host effects are unavailable after the manager's bounded close. */
@@ -920,6 +922,7 @@ export async function runAgent(
 
   // Resolve thinking: explicit option > agent config > child session settings/defaults.
   const thinkingLevel = options.thinkingLevel ?? agentConfig?.thinking;
+  options.onExecutionResolved?.({ model, thinking: thinkingLevel });
 
   const disallowedSet = agentConfig?.disallowedTools
     ? new Set(agentConfig.disallowedTools)

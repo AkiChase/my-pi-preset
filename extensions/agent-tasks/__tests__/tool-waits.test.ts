@@ -1093,3 +1093,51 @@ void it("actual workflow launcher and management return full answers, failed sta
     assert.equal((invalid as { isError?: boolean }).isError, true);
   } finally { await f.close(); }
 });
+
+for (const background of [false, true]) void it(`registered ${background ? "background" : "foreground"} launch and agent_manage share immutable config and short visible summary`, async () => {
+  const { isManagementDetails } = await import("../../runtime-tasks/tools.ts");
+  const { isAgentExecutionConfig } = await import("../../runtime-tasks/execution-config.ts");
+  const f = await factory({ outputTranscript: false });
+  const model = { provider: "offline", id: "known", name: "Known" };
+  f.ctx.model = model as never;
+  f.ctx.modelRegistry = { find: () => model, getAll: () => [model], getAvailable: () => [model] } as never;
+  try {
+    const agentDir = join(f.root, "agent", "agents"); mkdirSync(agentDir, { recursive: true });
+    writeFileSync(join(agentDir, "configured.md"), `---\nname: configured\ndescription: test\nmodel: offline/known\nrun_in_background: ${background}\nisolated: false\ninherit_context: false\nisolation: off\n---\nSECRET_PROMPT_DO_NOT_COPY\n`);
+    const pending = f.start(background, { subagent_type: "configured", model: "known", thinking: "high", isolated: true, inherit_context: true, isolation: "worktree" });
+    await tick();
+    const id = f.calls[0]!.options.agentId!, record = f.registry.getRecord(id)!;
+    // The stub reports unknown settings at creation; explicitly exercise the
+    // authoritative session callback before final output.
+    Object.defineProperty(f.calls[0]!.session, "model", { value: model });
+    Object.defineProperty(f.calls[0]!.session, "thinkingLevel", { value: "off" });
+    f.calls[0]!.options.onSessionCreated?.(f.calls[0]!.session);
+    if (!background) f.calls[0]!.finish("foreground result");
+    const launched = await pending;
+    const launchConfig = (launched.details as import("../src/activity.ts").AgentDetails).executionConfig!;
+    assert.ok(isAgentExecutionConfig(launchConfig));
+    assert.equal(launchConfig.isolated, false); assert.equal(launchConfig.inherit_context, false); assert.equal(launchConfig.isolation, "off");
+    assert.ok(!launchConfig.differences?.some(d => d.field === "model"), "normalizing an alias is not an override");
+    assert.doesNotMatch(JSON.stringify(launchConfig), /SECRET_PROMPT|settings|auth|sourcePath/);
+    assert.match(text(launched), /Execution config/);
+    const handle = executionId({ taskId: id, runId: record.runId! }, "subagent");
+    for (const action of ["status", "output"] as const) {
+      const result = await f.execute("agent_manage", { action, execution_id: handle });
+      assert.ok(isManagementDetails(result.details));
+      assert.deepEqual((result.details as import("../../runtime-tasks/tools.ts").ManagementDetails).runtimeManagement.executionConfig, record.executionConfig);
+      assert.match(text(result), /Execution config.*thinking=off/);
+    }
+    const updates: unknown[] = [];
+    const management = f.tools.get("agent_manage")!;
+    const waiting = management.execute("wait", completeToolCall(management.parameters, { action: "wait", execution_id: handle }), undefined, update => updates.push(update), f.ctx);
+    if (background) { assert.ok(updates.length); f.calls[0]!.finish("background result"); }
+    const result = await waiting;
+    assert.ok(isManagementDetails(result.details));
+    assert.deepEqual((result.details as import("../../runtime-tasks/tools.ts").ManagementDetails).runtimeManagement.executionConfig, record.executionConfig);
+    const stored = JSON.stringify(launchConfig);
+    const resume = f.start(true, { resume: id }); await tick();
+    f.resumes[0]!.finish(); await resume; await tick();
+    assert.equal(JSON.stringify(launchConfig), stored);
+    assert.deepEqual(record.executionConfig?.differences, background ? undefined : [{ field: "mode", requested: "background", actual: "foreground", reason: "agent-configuration" }], "only this resume mode request is applicable");
+  } finally { await f.close(); }
+});

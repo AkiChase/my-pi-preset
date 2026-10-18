@@ -103,3 +103,43 @@ test("typed failures carry the host tool error flag and survive search aggregati
   assert.equal(result.isError, true); assert.equal(result.details.runtimeTask.error_code, "log_error");
   assert.equal((await facade.execute({ action: "output", task_id: "missing" }, undefined, undefined, ctx)).isError, true);
 });
+
+test("execution config is optional, closed, group-specific and deeply immutable across public boundaries", async () => {
+  const { copyAgentExecutionConfig, isAgentExecutionConfig } = await import("../execution-config.ts");
+  const { isManagementDetails } = await import("../tools.ts");
+  const { executionId } = await import("../execution-id.ts");
+  const config = { kind: "agent", phase: "resolved", model: "offline/model", thinking: "off", mode: "foreground",
+    inherit_context: false, isolated: false, isolation: "off",
+    differences: [{ field: "isolated", requested: true, actual: false, reason: "agent-configuration" }] };
+  assert.ok(isAgentExecutionConfig(config));
+  for (const bad of [
+    { ...config, prompt: "private" }, { ...config, settings: {} }, { ...config, model: {} }, { ...config, model: "secret\nvalue" },
+    { ...config, thinking: null }, { ...config, thinking: Object.create(null) }, { ...config, mode: false }, { ...config, inherit_context: undefined, isolated: "false" },
+    { ...config, differences: [{ field: "thinking", requested: "high", actual: "low" }] },
+    { ...config, differences: [{ field: "isolated", requested: true, actual: false, prompt: "secret" }] },
+    { ...config, differences: Array(7).fill(config.differences[0]) }, { ...config, differences: [config.differences[0], config.differences[0]] },
+    { ...config, differences: [{ field: "isolated", requested: true, actual: false, reason: "guessed" }] },
+  ]) assert.equal(isAgentExecutionConfig(bad), false, JSON.stringify(bad));
+  const snapshot = copyAgentExecutionConfig(config)!;
+  assert.ok(Object.isFrozen(snapshot)); assert.ok(Object.isFrozen(snapshot.differences)); assert.ok(Object.isFrozen(snapshot.differences![0]));
+  config.differences[0]!.requested = false;
+  assert.equal(snapshot.differences![0]!.requested, true);
+  const metadata = { action: "status" as const, task_type: "subagent" as const, task_id: "x", run_id: "1", executionConfig: snapshot };
+  const result = taskResult("answer", metadata);
+  assert.ok(isRuntimeTaskMetadata(result.details.runtimeTask));
+  assert.notEqual(result.details.runtimeTask.executionConfig, snapshot);
+  for (const task_type of ["bash", "monitor", "workflow"]) assert.equal(isRuntimeTaskMetadata({ ...result.details.runtimeTask, task_type }), false);
+  const publicMeta = { version: 2, group: "agent", action: "status", execution_id: executionId({ taskId: "x", runId: "1" }, "subagent"), kind: "subagent", executionConfig: snapshot };
+  assert.ok(isManagementDetails({ runtimeManagement: publicMeta }));
+  for (const patch of [{ kind: "workflow" }, { execution_id: "wf_foreign123" }, { group: "process" }, { executionConfig: { ...snapshot, auth: "secret" } }])
+    assert.equal(isManagementDetails({ runtimeManagement: { ...publicMeta, ...patch } }), false);
+  let backend = 0;
+  const capability: RuntimeTaskCapability = { list: () => [{ view: { ...view("x"), executionConfig: snapshot }, manageable: true, rawStatus: "completed" }],
+    execute: async () => { backend++; return result; } };
+  const { tool } = managementTool("agent", [capability]);
+  const status = await tool.execute("status", { action: "status", execution_id: publicMeta.execution_id, kind: null, verbose: null }, undefined, undefined, ctx);
+  assert.ok(isManagementDetails(status.details));
+  assert.deepEqual((status.details as import("../tools.ts").ManagementDetails).runtimeManagement.executionConfig, snapshot);
+  assert.match(status.content[0]!.type === "text" ? status.content[0]!.text : "", /pending session confirmation.*thinking=off.*mode=foreground/);
+  assert.equal(backend, 0, "status remains a side-effect-free facade projection");
+});

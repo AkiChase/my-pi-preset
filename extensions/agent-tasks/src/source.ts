@@ -1,3 +1,4 @@
+import { copyAgentExecutionConfig } from "../../runtime-tasks/execution-config.ts";
 import { closeSync, fstatSync, openSync, readSync } from "node:fs";
 import { FINISHED_LINGER_MS } from "../../task-ui/model.ts";
 import type { TaskCoordinator } from "../../task-ui/coordinator.ts";
@@ -84,10 +85,12 @@ export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCo
           title: record.alias ?? record.handle ?? record.type, description: record.description, status,
           executionMode: parentKey ? "owned" as const : record.isBackground === false ? "foreground" as const : "background" as const,
           waitCount: coordinator.countWaits(identity), startedAt: record.startedAt, endedAt: record.completedAt,
+          executionConfig: copyAgentExecutionConfig(record.executionConfig),
           stats: Object.freeze({ tokens: getLifetimeTotal(record.lifetimeUsage), inputTokens: record.lifetimeUsage.input,
             outputTokens: record.lifetimeUsage.output, cost: record.lifetimeUsage.cost, toolUses: record.toolUses,
             turnCount: record.turnCount, maxTurns: record.maxTurns, activity: record.activity,
-            model: record.invocation?.modelId ?? record.invocation?.modelName, thinking: record.invocation?.thinking,
+            model: record.executionConfig ? record.executionConfig.model : record.invocation?.modelId ?? record.invocation?.modelName,
+            thinking: record.executionConfig ? record.executionConfig.thinking : record.invocation?.thinking,
             durationMs: (record.completedAt ?? Date.now()) - record.startedAt }),
           artifacts: Object.freeze(artifacts), capabilities: Object.freeze({ stop: status === "starting" || status === "running" || status === "queued", details: true }),
         });

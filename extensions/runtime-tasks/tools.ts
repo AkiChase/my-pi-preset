@@ -1,3 +1,4 @@
+import { isAgentExecutionConfig, type AgentExecutionConfig } from "./execution-config.ts";
 import { nullableControl, parseControlArguments } from "../shared/tool-arguments.ts";
 import { createToolCallHeading } from "../beautify/tool-call-heading.ts";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -12,7 +13,7 @@ export function isManagementDetails(value: unknown): value is ManagementDetails 
   const m = value.runtimeManagement;
   if (!m || typeof m !== "object" || Array.isArray(m)) return false;
   const v = m as Record<string, unknown>;
-  const allowed = ["version", "group", "action", "task_id", "task_type", "execution_id", "kind", "agent_id", "title", "status", "raw_status", "error_code", "wait_outcome", "count", "range", "stats"];
+  const allowed = ["version", "group", "action", "task_id", "task_type", "execution_id", "kind", "agent_id", "title", "status", "raw_status", "error_code", "wait_outcome", "count", "range", "stats", "executionConfig"];
   if (Object.keys(v).some(k => !allowed.includes(k)) || v.version !== 2 || (v.group !== "process" && v.group !== "agent") || typeof v.action !== "string" || !Object.hasOwn(fields[v.group], v.action)) return false;
   if (v.group === "process" && ["execution_id", "kind", "agent_id"].some(k => v[k] !== undefined)) return false;
   if (v.group === "agent" && ["task_id", "task_type", "range"].some(k => v[k] !== undefined)) return false;
@@ -29,6 +30,9 @@ export function isManagementDetails(value: unknown): value is ManagementDetails 
     if (!r || typeof r !== "object" || Object.keys(r).length !== 5 || ["start", "end", "size", "omitted_before", "omitted_after"].some(k => !Number.isSafeInteger(r[k]) || Number(r[k]) < 0)) return false;
     if (Number(r.start) > Number(r.end) || Number(r.end) > Number(r.size) || r.omitted_before !== r.start || r.omitted_after !== Number(r.size) - Number(r.end)) return false;
   }
+  if (v.executionConfig !== undefined && (v.group !== "agent" || v.kind !== "subagent" ||
+    (v.execution_id !== undefined && (typeof v.execution_id !== "string" || !v.execution_id.startsWith("exec_"))) ||
+    !isAgentExecutionConfig(v.executionConfig))) return false;
   if (v.stats !== undefined && (!v.stats || typeof v.stats !== "object" || Object.values(v.stats).some(n => typeof n !== "number" || !Number.isFinite(n) || n < 0))) return false;
   return true;
 }
@@ -78,6 +82,7 @@ export type ManagementGroup = "process" | "agent";
 export interface ManagementDetails { runtimeManagement: { version: 2; group: ManagementGroup; action: string;
   task_id?: string; task_type?: string; execution_id?: string; kind?: string; agent_id?: string;
   title?: string; status?: string; raw_status?: string; error_code?: string; wait_outcome?: string;
+  executionConfig?: AgentExecutionConfig;
   count?: number; range?: RuntimeTaskDetails["runtimeTask"]["range"]; stats?: Readonly<Record<string, number>> } }
 const fields = {
   process: { list: ["task_type"], stats: ["task_type"], status: ["task_id"], stop: ["task_id"], output: ["task_id", "offset", "limit"], wait: ["task_id", "limit"], search: ["pattern", "task_id", "task_type", "ignore_case", "context"] },

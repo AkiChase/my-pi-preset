@@ -1,3 +1,4 @@
+import { copyAgentExecutionConfig, agentExecutionSummary } from "../../runtime-tasks/execution-config.ts";
 import { registerBuiltinSkills } from "./builtin-skills.ts";
 import { nullableControl } from "../../shared/tool-arguments.ts";
 import { createToolCallHeading } from "../../beautify/tool-call-heading.ts";
@@ -41,7 +42,7 @@ export { runInChildSessionContext };
 import { type RpcHandle, registerRpcHandlers } from "./cross-extension-rpc.ts";
 import { loadCustomAgents } from "./custom-agents.ts";
 import { GroupJoinManager } from "./group-join.ts";
-import { formatInvocationOverrideNote, isolationParam, resolveAgentInvocationConfig, resolveJoinMode, THINKING_LEVELS, thinkingParam } from "./invocation-config.ts";
+import { isolationParam, resolveAgentInvocationConfig, resolveJoinMode, THINKING_LEVELS, thinkingParam } from "./invocation-config.ts";
 import { describeMention, handleBase, isReservedHandle, parseMention, resolveHandleToType, stripAgentPrefix } from "./mention.ts";
 import { runMentionClone } from "./mention-clone.ts";
 import { describeModel, type ModelRegistry, resolveModel } from "./model-resolver.ts";
@@ -96,7 +97,7 @@ import { escapeXml } from "./xml.ts";
 /** Tool execute return value for a text response. */
 function textResult(msg: string, details?: AgentDetails) {
   const identity = (details as { runtimeLaunch?: unknown } | undefined)?.runtimeLaunch;
-  return { content: [{ type: "text" as const, text: isLaunchMetadata(identity) ? `${launchText(identity)}\n${msg}` : msg }], details: details as any };
+  return { content: [{ type: "text" as const, text: isLaunchMetadata(identity) ? `${launchText(identity)}\n${agentExecutionSummary(details?.executionConfig)}${msg}` : msg }], details: details as any };
 }
 
 /**
@@ -1375,7 +1376,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     ctx: ExtensionContext,
     existing: AgentRecord,
     prompt: string,
-    opts: { outputTranscript: boolean; maxTurns?: number; toolCallId?: string },
+    opts: { outputTranscript: boolean; maxTurns?: number; toolCallId?: string; requestedRunInBackground?: boolean },
   ): Promise<AgentRecord | undefined> {
     assertActive();
     const id = existing.id;
@@ -1411,6 +1412,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     let wiringError: unknown;
     const record = manager.resumeRun(id, prompt, undefined, {
       isBackground: true,
+      requestedRunInBackground: opts.requestedRunInBackground,
       maxTurns: opts.maxTurns,
       onTurnEnd: bgCallbacks.onTurnEnd,
       onToolActivity: bgCallbacks.onToolActivity,
@@ -1791,24 +1793,19 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
         // disclose a parameter that was accepted but could not take effect (#182).
         requestedThinking: resolvedConfig.overridden?.thinking,
         requestedModel: askedModel,
+        sessionRequestedThinking: params.thinking,
+        sessionRequestedModel: params.model !== undefined && askedModel === undefined ? modelId : undefined,
         requestedRunInBackground: resolvedConfig.overridden?.runInBackground,
         requestedInheritContext: resolvedConfig.overridden?.inheritContext,
         requestedIsolated: resolvedConfig.overridden?.isolated,
-        requestedIsolation: resolvedConfig.overridden?.isolation,
+        requestedIsolation: resolvedConfig.overridden?.isolation ?? (params.isolation === "worktree" && !isWorktreeIsolationEnabled() ? "worktree" : undefined),
+        isolationDifferenceReason: !isWorktreeIsolationEnabled() ? "worktree-disabled" : undefined,
         maxTurns: effectiveMaxTurns,
         isolated,
         inheritContext,
         runInBackground,
         isolation,
       };
-      const overrideNoteFor = (rec: AgentRecord | undefined) =>
-        formatInvocationOverrideNote(resumeTarget ? {
-          ...rec?.invocation,
-          requestedModel: undefined, requestedThinking: undefined,
-          requestedRunInBackground: resolvedConfig.overridden?.runInBackground,
-          requestedInheritContext: undefined, requestedIsolated: undefined, requestedIsolation: undefined,
-          runInBackground,
-        } : rec?.invocation ?? agentInvocation);
       // Tool-result render shows the mode label too; viewer's header already does.
       const modeLabel = getPromptModeLabel(subagentType);
       const { tags: invocationTags } = buildInvocationTags(agentInvocation);
@@ -1836,7 +1833,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
        */
       const detailBaseFor = (rec: AgentRecord | undefined) => {
         if (!rec) return detailBase;
-        const identity = { runtimeLaunch: launchMetadata("subagent", rec.id, rec.runId ?? "1", rec.isBackground ? "background" : "foreground") };
+        const identity = { executionConfig: copyAgentExecutionConfig(rec.executionConfig), runtimeLaunch: launchMetadata("subagent", rec.id, rec.runId ?? "1", rec.isBackground ? "background" : "foreground") };
         if (!rec.invocation) return { ...detailBase, ...identity };
         const type = rec.type;
         const { modelName: recModelName, tags } = buildInvocationTags(rec.invocation);
@@ -1930,6 +1927,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
             outputTranscript,
             maxTurns: effectiveMaxTurns,
             toolCallId,
+            requestedRunInBackground: resolvedConfig.overridden?.runInBackground,
           });
           assertActive();
           if (!record) {
@@ -1938,7 +1936,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
 
           const isQueued = record.status === "queued";
           return textResult(
-            `${overrideNoteFor(record)}Agent ${isQueued ? "queued" : "resumed"} in background.\n` +
+            `Agent ${isQueued ? "queued" : "resumed"} in background.\n` +
             `Agent ID: ${id}\n` +
             `Type: ${existing.type}\n` +
             (record.outputFile ? `Output file: ${record.outputFile}\n` : "") +
@@ -1961,6 +1959,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
         groupJoin.forgetAgent(id);
         cancelNudge(id);
         const resumed = manager.resumeRun(id, params.prompt, signal, {
+          requestedRunInBackground: resolvedConfig.overridden?.runInBackground,
           maxTurns: effectiveMaxTurns,
           ...callbacks,
           onStarted: () => {
@@ -1976,18 +1975,18 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
         const outcome = await lease.result;
         assertActive();
         if (outcome.kind === "detached") {
-          return textResult(`${overrideNoteFor(existing)}Agent resumed in background.\nAgent ID: ${id}\nExecution ID: ${executionId(run.identity, "subagent")}\nThe same session continues; you will be notified when it completes.`,
+          return textResult(`Agent resumed in background.\nAgent ID: ${id}\nExecution ID: ${executionId(run.identity, "subagent")}\nThe same session continues; you will be notified when it completes.`,
             { ...detailBaseFor(existing), status: "background" as const, agentId: id, toolUses: existing.toolUses, tokens: "", durationMs: 0 });
         }
-        if (outcome.kind !== "completed") return errorResult(`Agent ${id} interrupted.`);
+        if (outcome.kind !== "completed") return errorResult(`Agent ${id} interrupted.`, buildDetails(detailBaseFor(existing), existing));
         const record = outcome.value;
         // A failed resume surfaces the error, plus any partial output THIS
         // resume produced (never the previous turn's answer, #144).
         if (record.status === "error") {
-          return errorResult(`${overrideNoteFor(record)}Agent failed: ${record.error}${partialOutputSuffix(record)}`, buildDetails(detailBaseFor(record), record));
+          return errorResult(`Agent failed: ${record.error}${partialOutputSuffix(record)}`, buildDetails(detailBaseFor(record), record));
         }
         return textResult(
-          overrideNoteFor(record) + (record.result?.trim() || "No output."),
+          record.result?.trim() || "No output.",
           buildDetails(detailBaseFor(record), record),
         );
       }
@@ -2073,7 +2072,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
         assertActive();
         const isQueued = record?.status === "queued";
         return textResult(
-          `${fallbackNote}${overrideNoteFor(record)}Agent ${isQueued ? "queued" : "started"} in background.\n` +
+          `${fallbackNote}Agent ${isQueued ? "queued" : "started"} in background.\n` +
           `Agent ID: ${id}\n` +
           `Type: ${displayName}\n` +
           `Description: ${params.description}\n` +
@@ -2122,7 +2121,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
           spinnerFrame: spinnerFrame % SPINNER.length,
         };
         safely(() => onUpdate?.({
-          content: [{ type: "text", text: `${fgState.toolUses} tool uses...` }],
+          content: [{ type: "text", text: `${agentExecutionSummary(details.executionConfig)}${fgState.toolUses} tool uses...` }],
           details: details as any,
         }));
       };
@@ -2200,11 +2199,11 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
         const outcome = await lease.result;
         assertActive();
         if (outcome.kind === "detached") {
-          return textResult(`${fallbackNote}${overrideNoteFor(live)}Agent continuing in background.\nAgent ID: ${fgId}\nExecution ID: ${executionId(run.identity, "subagent")}\n` +
+          return textResult(`${fallbackNote}Agent continuing in background.\nAgent ID: ${fgId}\nExecution ID: ${executionId(run.identity, "subagent")}\n` +
             (live.outputFile ? `Output file: ${live.outputFile}\n` : "") + "The same execution continues; you will be notified when it completes.",
             { ...detailBaseFor(live), toolUses: live.toolUses, tokens: "", durationMs: 0, status: "background" as const, agentId: fgId });
         }
-        if (outcome.kind !== "completed") return errorResult(`Agent ${fgId} interrupted.`);
+        if (outcome.kind !== "completed") return errorResult(`Agent ${fgId} interrupted.`, buildDetails(detailBaseFor(live), live));
         record = outcome.value;
       } finally {
         inlineActive = false;
@@ -2221,7 +2220,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
 
       if (record.status === "error") {
         // Error headline + any partial output the run produced before failing.
-        return errorResult(`${fallbackNote}${overrideNoteFor(record)}Agent failed: ${record.error}${partialOutputSuffix(record)}`, details);
+        return errorResult(`${fallbackNote}Agent failed: ${record.error}${partialOutputSuffix(record)}`, details);
       }
 
       const durationMs = (record.completedAt ?? Date.now()) - record.startedAt;
@@ -2232,7 +2231,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
         if (costText) statsParts.push(costText);
       }
       return textResult(
-        `${fallbackNote}${overrideNoteFor(record)}Agent completed in ${formatMs(durationMs)} (${statsParts.join(", ")})${getForegroundOutcomeNote(record.status)}.\n\n` +
+        `${fallbackNote}Agent completed in ${formatMs(durationMs)} (${statsParts.join(", ")})${getForegroundOutcomeNote(record.status)}.\n\n` +
         (record.result?.trim() || "No output."),
         details,
       );

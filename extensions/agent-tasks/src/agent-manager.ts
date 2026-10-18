@@ -1,3 +1,5 @@
+import { resolvedExecutionConfig, sessionExecutionConfig } from "./execution-config.ts";
+import { copyAgentExecutionConfig } from "../../runtime-tasks/execution-config.ts";
 /**
  * agent-manager.ts — Tracks agents, background execution, resume support.
  *
@@ -334,6 +336,8 @@ interface SpawnOptions {
 }
 
 interface ResumeOptions {
+  /** Only this run's evidenced mode override, never prior spawn requests. */
+  requestedRunInBackground?: boolean;
   maxTurns?: number;
   onTurnEnd?: (turnCount: number) => void;
   /**
@@ -499,6 +503,7 @@ export class AgentManager {
     record.blocking = false;
     record.isBackground = true;
     if (record.invocation) record.invocation.runInBackground = true;
+    if (record.executionConfig) record.executionConfig = copyAgentExecutionConfig({ ...record.executionConfig, mode: "background", differences: record.executionConfig.differences?.filter(d => d.field !== "mode") });
     if (isTopLevelAgent(record)) {
       if (run.charged && run.pool !== "background") {
         if (run.pool === "foreground") this.runningForeground--;
@@ -682,6 +687,13 @@ export class AgentManager {
       // `options` has stopped being the interesting object.
       blocking: options.blocking,
       invocation: options.invocation ? { ...options.invocation, maxTurns } : undefined,
+      executionConfig: resolvedExecutionConfig({ ...options.invocation,
+        ...(options.model ? describeModel(options.model) : {}),
+        thinking: options.thinkingLevel ?? options.invocation?.thinking,
+        runInBackground: options.isBackground, inheritContext: options.inheritContext ?? false,
+        isolated: options.isolated ?? false,
+        isolation: options.isolation === "worktree" && (this.dependencies.worktreeEnabled ?? isWorktreeIsolationEnabled)() ? "worktree" : "off",
+      }),
       depth: options.depth ?? 1,
       parentAgentId: options.parentAgentId,
       parentRunId: options.parentAgentId ? this.agents.get(options.parentAgentId)?.runId : undefined,
@@ -836,6 +848,20 @@ export class AgentManager {
     let bindManagementSession: (session: AgentSession) => void = () => {};
     const promise = (this.dependencies.runAgent ?? runAgent)(ctx, type, prompt, {
       onSessionOwned: session => this.ownSession(session, run),
+      onExecutionResolved: settings => {
+        if (!this.current(record, run) || record.abortController?.signal.aborted) return;
+        const previous = record.executionConfig;
+        const resolved = { ...previous,
+          ...(settings.model ? { model: `${settings.model.provider}/${settings.model.id}` } : {}),
+          ...(settings.thinking !== undefined ? { thinking: settings.thinking } : {}),
+        };
+        record.executionConfig = copyAgentExecutionConfig({ ...resolved,
+          differences: previous?.differences?.flatMap(d => {
+            const actual = resolved[d.field];
+            return actual !== undefined && d.requested !== actual ? [{ ...d, actual, reason: actual === d.actual ? d.reason : undefined }] : [];
+          }),
+        });
+      },
       canEmitShutdown: () => this.hostEffectsAllowed,
       pi,
       agentId: id,
@@ -959,6 +985,10 @@ export class AgentManager {
             }
           }
         }
+        record.executionConfig = sessionExecutionConfig(record.executionConfig, session, false, {
+          thinking: record.invocation?.sessionRequestedThinking ?? (options.invocation ? undefined : options.thinkingLevel),
+          model: record.invocation?.sessionRequestedModel ?? (!options.invocation && options.model ? `${options.model.provider}/${options.model.id}` : undefined),
+        });
         // Flush any steers that arrived before the session was ready
         if (record.pendingSteers?.length) {
           const steers = record.pendingSteers;
@@ -1210,7 +1240,22 @@ export class AgentManager {
     const record = this.agents.get(id);
     if (this.admissionClosed || !record?.session || this.isRunActive(id)) return undefined;
     record.isBackground = !!options.isBackground;
-    if (record.invocation) record.invocation.runInBackground = record.isBackground;
+    if (record.invocation) {
+      const { requestedModel: _model, requestedThinking: _thinking, requestedRunInBackground: _mode,
+        requestedInheritContext: _context, requestedIsolated: _isolated, requestedIsolation: _isolation,
+        isolationDifferenceReason: _reason, sessionRequestedThinking: _sessionThinking, sessionRequestedModel: _sessionModel, ...retained } = record.invocation;
+      record.invocation = { ...retained, runInBackground: record.isBackground,
+        requestedRunInBackground: options.requestedRunInBackground,
+        ...(record.session.model ? describeModel(record.session.model) : { modelId: undefined, modelName: undefined }),
+        thinking: record.session.thinkingLevel,
+      };
+    }
+    record.executionConfig = sessionExecutionConfig(record.executionConfig, record.session, true);
+    const mode = record.isBackground ? "background" : "foreground";
+    const requestedMode = options.requestedRunInBackground === undefined ? undefined : options.requestedRunInBackground ? "background" : "foreground";
+    record.executionConfig = copyAgentExecutionConfig({ ...record.executionConfig, mode, inherit_context: undefined, isolation: undefined,
+      differences: requestedMode !== undefined && requestedMode !== mode ? [{ field: "mode", requested: requestedMode, actual: mode, reason: "agent-configuration" }] : undefined,
+    });
     record.blocking = !options.isBackground;
     record.result = undefined; record.error = undefined; record.completedAt = undefined;
     record.activity = undefined; record.turnCount = 0;

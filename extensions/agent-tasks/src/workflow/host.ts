@@ -331,7 +331,8 @@ export function createWorkflowHost(deps: WorkflowHostOptions): WorkflowHost {
               // therefore always got what it asked for. Seeding a `requestedModel`
               // would describe a precedence this path does not have.
               invocation: {
-                ...(request.effort !== undefined ? { thinking: request.effort as ThinkingLevel } : {}),
+                ...(request.effort !== undefined ? { thinking: request.effort as ThinkingLevel, sessionRequestedThinking: request.effort as ThinkingLevel } : {}),
+                ...(request.model !== undefined && model ? { sessionRequestedModel: `${model.provider}/${model.id}` } : {}),
               },
               // Fires once the child's session exists, which is where the model
               // and the clamped thinking level first become knowable.

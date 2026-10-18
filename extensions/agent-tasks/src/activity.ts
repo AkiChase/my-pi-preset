@@ -12,6 +12,7 @@ export interface AgentDetails {
   displayName: string; description: string; subagentType: string; toolUses: number; tokens: string; durationMs: number;
   status: "queued" | "running" | "completed" | "steered" | "aborted" | "stopped" | "error" | "background";
   activity?: string; spinnerFrame?: number; modelName?: string; tags?: string[]; turnCount?: number; maxTurns?: number;
+  executionConfig?: import("../../runtime-tasks/execution-config.ts").AgentExecutionConfig;
   cost?: number; agentId?: string; error?: string;
 }
 export function fgPreservingNestedStyles(theme: Theme, color: string, text: string): string {
