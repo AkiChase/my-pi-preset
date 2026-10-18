@@ -25,7 +25,7 @@ void describe("commands", () => {
             },
         });
 
-        assert.ok(!commands.has("bg"), "shared controls own /bg");
+        assert.ok(!commands.has("task-detach"), "shared controls own /task-detach");
         assert.ok(!commands.has("bg-list"), "no legacy alias");
         assert.ok(commands.has("process-tasks-version"));
         assert.ok(commands.has("process-tasks-config"));

@@ -1,0 +1,36 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { createToolClock } from "../tool-clock.ts";
+import type { RenderContext } from "../types.ts";
+
+test("display clock tracks processing events, redraws quiet calls, freezes and clears", t => {
+  t.mock.timers.enable({ apis: ["setInterval"] });
+  let now = 0;
+  t.mock.method(performance, "now", () => now);
+  const handlers = new Map<string, (event: { toolCallId?: string; toolName?: string; parentToolCallId?: string }) => void>();
+  const pi = { on(name: string, handler: (event: object) => void) { handlers.set(name, handler); return () => handlers.delete(name); } } as unknown as ExtensionAPI;
+  const clock = createToolClock(pi);
+  let redraws = 0;
+  const ctx = { toolCallId: "a", invalidate: () => { redraws++; } } as RenderContext;
+  assert.equal(clock.display(ctx), undefined);
+  handlers.get("tool_execution_start")!({ toolName: "bash", toolCallId: "a" });
+  assert.equal(clock.display(ctx), "0.0s handling");
+  now = 2000; t.mock.timers.tick(1000);
+  assert.equal(redraws, 1);
+  assert.equal(clock.display(ctx), "2.0s handling");
+  handlers.get("tool_execution_start")!({ toolName: "bash", toolCallId: "a" });
+  now = 3000;
+  handlers.get("tool_execution_end")!({ toolName: "bash", toolCallId: "a" });
+  assert.equal(clock.display(ctx), "3.0s handling");
+  now = 9000; t.mock.timers.tick(1000);
+  assert.equal(clock.display(ctx), "3.0s handling");
+  assert.equal(redraws, 2);
+  handlers.get("session_start")!({});
+  assert.equal(clock.display(ctx), undefined);
+  handlers.get("tool_execution_start")!({ toolName: "bash", toolCallId: "a", parentToolCallId: "parent" });
+  assert.equal(clock.display(ctx), undefined);
+  handlers.get("session_shutdown")!({});
+  handlers.get("tool_execution_start")!({ toolName: "bash", toolCallId: "late" });
+  assert.equal(clock.display({ ...ctx, toolCallId: "late" }), undefined);
+});

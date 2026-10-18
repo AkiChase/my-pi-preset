@@ -274,7 +274,7 @@ void it("resume foreground uses new run controller/admission and the same sessio
   } finally { await f.close(); }
 });
 
-void it("multiple retrieval leases count independently; cancellation and /bg never stop or consume execution", async () => {
+void it("multiple retrieval leases count independently; cancellation and /task-detach never stop or consume execution", async () => {
   const f = fixture();
   try {
     const id = f.spawn(true), run = f.manager.getRun(id)!, parent = new AbortController();

@@ -18,7 +18,7 @@ export function bashParamSchema(config: ProcessTasksConfig) {
         background_after_seconds: Type.Number({
             minimum: -1,
             maximum: MAX_BACKGROUND_AFTER_SECONDS,
-            description: `Seconds before backgrounding: -1 waits until completion or manual /bg; 0 starts immediately in background; a finite positive value waits then detaches without terminating execution (interactive only). Maximum ${MAX_BACKGROUND_AFTER_SECONDS}. Output is saved to ${config.logDir}/<jobId>.log.`,
+            description: `Seconds before backgrounding: -1 waits until completion or manual /task-detach; 0 starts immediately in background; a finite positive value waits then detaches without terminating execution (interactive only). Maximum ${MAX_BACKGROUND_AFTER_SECONDS}. Output is saved to ${config.logDir}/<jobId>.log.`,
         }),
         description: Type.String({ description: "Short description of what this command does; an empty string is valid" }),
     }, { additionalProperties: false });

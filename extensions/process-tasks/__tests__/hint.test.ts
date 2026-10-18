@@ -115,12 +115,12 @@ void describe("background hint", () => {
         assert.match(calls[0]!.content?.[1] ?? "", /^\(alt\+b to run/);
     });
 
-    void it("falls back to /bg when the chord is unbound", () => {
+    void it("falls back to /task-detach when the chord is unbound", () => {
         const r = new BackgroundRegistry(DEFAULTS, undefined, { ...UI_DEFAULTS, shortcutBackground: [] });
         const { calls, ctx } = makeCtx(r);
         foreground(r, "t1", "sleep 30");
         showBackgroundHint(r, ctx, "t1");
-        assert.match(calls[0]!.content?.[1] ?? "", /^\(\/bg to run/);
+        assert.match(calls[0]!.content?.[1] ?? "", /^\(\/task-detach to run/);
     });
 
     void it("stays up until the last parallel command is gone", () => {

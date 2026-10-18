@@ -50,7 +50,7 @@ const processGuidance = `Process_manage usage:
     search: pattern, task_id/task_type/ignore_case/context if needed
   - Copy task_id from launch/list. task_type filters only bash/monitor. Fields outside the selected action's list must be null.
   - output reads a bounded tail page by default; offset=0 reads from the start. offset/limit count bytes; wait accepts limit for its final log page. Use returned ranges to continue reading. Search uses a regex, optional case-insensitivity, and context lines.
-  - wait waits for the whole task; for monitor, observation must end, not merely emit an event. /bg or cancellation releases only the wait. stop requests execution cancellation; execution may still be draining afterward.
+  - wait waits for the whole task; for monitor, observation must end, not merely emit an event. /task-detach or cancellation releases only the wait. stop requests execution cancellation; execution may still be draining afterward.
   - Successful terminal output/wait delivery reports the result and avoids a duplicate completion notification. list/status/search do not consume results. Completion is notified automatically; do not poll solely to detect completion.
   - Examples:
     Read log: {"action":"output","task_id":"<task_id>","task_type":null,"offset":0,"limit":null,"pattern":null,"ignore_case":null,"context":null}
@@ -67,7 +67,7 @@ const agentGuidance = `Agent_manage usage:
   - kind filters list to subagent/workflow. Copy execution_id from launch/list; do not construct it or substitute agent_id. agent_id identifies a conversation for messaging/resume; execution_id identifies one execution. Do not provide non-null values outside the selected action.
   - Agent resume produces a new execution_id. New calls with the previous execution_id fail as stale; they never operate on the resumed execution. A wait already admitted remains bound to its original execution. Workflow replay creates a separate execution with a new ID.
   - output returns current output/progress or a final result; wait awaits the whole execution. verbose is only for subagent output/wait and requests additional conversation, not an unlimited trace. Set verbose to null for workflow.
-  - /bg or cancellation releases a wait without stopping execution. stop requests cancellation; it may still be draining. Stopping a workflow also stops its owned agents, not independent siblings. Visible owned children cannot necessarily be managed directly by another owner.
+  - /task-detach or cancellation releases a wait without stopping execution. stop requests cancellation; it may still be draining. Stopping a workflow also stops its owned agents, not independent siblings. Visible owned children cannot necessarily be managed directly by another owner.
   - Successful terminal output/wait delivery reports that execution's result and avoids duplicate completion notifications; list/status do not consume it. Completion is notified automatically; do not poll solely to detect completion.
   - Examples:
     List workflows: {"action":"list","execution_id":null,"kind":"workflow","verbose":null}
