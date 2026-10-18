@@ -1,0 +1,4 @@
+{"file":".trellis/spec/development/index.md","reason":"Execution ownership, metadata and rendering contracts"}
+{"file":".trellis/spec/testing/index.md","reason":"Isolated actual owner and natural-exit verification"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse authoritative execution projection"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Identity and side-effect preservation"}

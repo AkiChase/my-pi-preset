@@ -1,0 +1,4 @@
+{"file":".trellis/spec/development/index.md","reason":"Cross-module execution results and rendering invariants"}
+{"file":".trellis/spec/testing/index.md","reason":"Independent evidence and isolated tests"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Owner reuse and no speculative framework"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Identity, lifecycle and result consumption"}
