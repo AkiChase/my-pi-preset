@@ -10,12 +10,12 @@ Task composition 把命令进程、Monitor、子 Agent 和 workflow 放进同一
 | --- | --- |
 | `/tasks` 或 `Shift+Down` | 打开 Task Panel |
 | 空输入框中的 `Down` | 有可查看任务、输入框持有焦点且没有补全或浮层时打开面板 |
-| `/bg` 或 `Ctrl+Shift+B` | 解除所有当前任务等待，执行继续 |
+| `/task-detach` 或 `Ctrl+Shift+B` | 解除所有当前任务等待，执行继续 |
 | `/agents` | 管理 Agent 类型、定时任务、workflow 和设置 |
 | `/process-tasks-version` | 查看当前加载的进程扩展版本和路径 |
 | `/process-tasks-config` | 查看进程配置的覆盖项及加载警告 |
 
-`/bg` 的作用是“现在不等了”，不是停止任务。前台命令或 Agent 转后台时继续原来的执行，ID、进程和会话不变；正在等待后台结果时，则只结束这次等待。它能同时解除多个等待，不只是当前面板选中的一项。
+`/task-detach` 的作用是“现在不等了”，不是停止任务。前台命令或 Agent 转后台时继续原来的执行，ID、进程和会话不变；正在等待后台结果时，则只结束这次等待。它能同时解除多个等待，不只是当前面板选中的一项。
 
 普通消息提交仍由 Pi 排队或作为 steering 处理，不会自动让命令转后台。
 
@@ -47,11 +47,13 @@ Task composition 把命令进程、Monitor、子 Agent 和 workflow 放进同一
 
 | 工具 | 常用参数及行为 |
 | --- | --- |
-| `bash` | `command` 执行有限命令；默认前台等待，`run_in_background: true` 立即后台；`background_after_seconds` 是交互模式前台等待后转后台的秒数，不是终止期限，不能与立即后台组合；`description` 是简短说明 |
+| `bash` | `command`执行有限命令；`background_after_seconds: -1`等待完成或手动解除等待，`0`立即后台，正数为交互模式等待后转后台秒数，不是终止期限；`description`必须提供字符串，可为空 |
 | `process_manage` | 查看或停止 Bash／Monitor 任务 |
 | `monitor` | 持续观察命令或 WebSocket，详见 [Monitor](monitor.md) |
 
-交互模式下，前台命令默认等待 120 秒后转后台，可用 `background_after_seconds` 设置正数秒数（允许小数，最大 `2147483.647`）。这个阈值只解除前台等待，命令继续运行，不会终止命令。非交互模式默认等前台命令完成，显式传入该参数会在启动前报错。立即后台无需等待阈值。
+`background_after_seconds`必须显式提供：`-1`等待完成或手动解除等待，`0`立即后台，正数设置交互等待阈值（允许小数，最大`2147483.647`）。非交互模式只接受`-1`或`0`。转后台只结束等待，不终止命令。
+
+主对话bash工具块优先显示非空description，展开保留完整命令。实时`handling`计时从工具处理开始到返回，包含准备/校验，不等同进程运行时长；安静调用也更新，返回后冻结。Workflow折叠仅整体摘要，展开查看阶段、子任务统计和日志。
 
 前台完成通过工具结果返回；后台完成自动通知，最终结果已被读取或等待取得时不会重复通知。后台启动结果只表示已启动，不代表命令成功完成。后台任务仍属于当前会话，会话关闭时停止。想给持续观察设置总截止，用 Monitor 的 `timeout_ms`。
 

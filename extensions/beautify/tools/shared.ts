@@ -10,7 +10,7 @@ export function title(name: string, args: Args): string {
     const mode = args.run_in_background === true ? "  background"
       : args.background_after_seconds !== undefined ? `  background after ${args.background_after_seconds}s`
       : args.timeout !== undefined ? `  timeout ${args.timeout}s` : "";
-    return clean(String(args.command ?? "")) + mode;
+    return clean(typeof args.description === "string" && args.description.trim() ? args.description.trim() : String(args.command ?? "")) + mode;
   }
   if (name === "read") return clean(String(args.path ?? ""));
   return `${clean(String(args.pattern ?? ""))}${args.path ? ` in ${clean(String(args.path))}` : ""}`;

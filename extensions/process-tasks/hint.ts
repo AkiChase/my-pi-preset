@@ -24,7 +24,7 @@ import { formatDuration, oneLine } from "./format.ts";
  * advertising a key the user remapped away is worse than saying nothing.
  */
 export function backgroundHintKey(reg: BackgroundRegistry): string {
-    return reg.uiConfig.shortcutBackground[0] ?? "/bg";
+    return reg.uiConfig.shortcutBackground[0] ?? "/task-detach";
 }
 
 /**

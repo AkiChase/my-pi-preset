@@ -52,7 +52,7 @@ function harness() {
     return { dir, reg, tools, messages, ctx, source, cleanup, fakeJob };
 }
 
-void it("early /bg before two seconds returns immediately; same PID/log survive subsequent parent abort", { timeout: 10_000 }, async () => {
+void it("early /task-detach before two seconds returns immediately; same PID/log survive subsequent parent abort", { timeout: 10_000 }, async () => {
     const h = harness();
     try {
         const signal = new AbortController();
@@ -251,7 +251,7 @@ void it("factory injection registers one source, no shared controls; standalone 
     coordinator.dispose();
     commands.length = 0;
     const standalone = processTasks(pi as never);
-    assert.deepEqual(commands, ["bg", "tasks", "process-tasks-version", "process-tasks-config"]);
+    assert.deepEqual(commands, ["task-detach", "tasks", "process-tasks-version", "process-tasks-config"]);
     assert.deepEqual(shortcuts, ["ctrl+shift+b", "shift+down"]);
     assert.equal(standalone.coordinator.waitCount, 0);
     await handlers.get("session_shutdown")!();

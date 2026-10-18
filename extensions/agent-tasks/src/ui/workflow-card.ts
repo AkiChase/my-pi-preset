@@ -31,7 +31,9 @@
  * arranges what that module returns.
  */
 
-import { stripTerminalSequences, Text, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { stripTerminalSequences, truncateToWidth, visibleWidth, type Component } from "@earendil-works/pi-tui";
+import { clean, toolHeading, wrap } from "../../../beautify/layout.ts";
+import type { Theme as HostTheme } from "@earendil-works/pi-coding-agent";
 import type { WorkflowEntryData } from "../workflow/entry.ts";
 import type { WorkflowMeta } from "../workflow/meta.ts";
 import {
@@ -437,8 +439,27 @@ export function styleWorkflowCardLines(lines: readonly WorkflowCardLine[], theme
 }
 
 /** The card as a component, for a tool result or a session entry renderer. */
-export function renderWorkflowCard(input: WorkflowCardInput, theme: Theme): Text {
-  return new Text(styleWorkflowCardLines(layoutWorkflowCard(input), theme).join("\n"), 0, 0);
+export function renderWorkflowCard(input: WorkflowCardInput, theme: Theme, expanded = true): Component {
+  return {
+    invalidate() {},
+    render(width) {
+      if (width < 1) return [];
+      const groups = buildPhaseGroups(input.progress, input.meta?.phases);
+      const head = header(input.task, input.meta, groups, input.agentCount ?? 0, input.now ?? Date.now());
+      const description = clean(head.subtext).trim() || clean(head.name);
+      const statsText = `${input.task.status} · ${head.stats}`;
+      const title = toolHeading("subagent_workflow", description, "", statsText, width, theme as HostTheme, false);
+      if (!expanded) return title;
+      const body = layoutWorkflowCard({ ...input, width, showToolTitle: false });
+      // The component owns the heading; retain the original tree/log body only.
+      const offset = head.subtext ? 2 : 1;
+      return [
+        ...title,
+        ...wrap(`Description: ${description}`, width).map(row => theme.fg("muted", row)),
+        ...styleWorkflowCardLines(body.slice(offset).map(line => clampLine(line.map(segment => ({ ...segment, text: clean(segment.text).replace(/\n/g, "\\n") })), width)), theme),
+      ];
+    },
+  };
 }
 
 /**
@@ -449,7 +470,7 @@ export function renderWorkflowCard(input: WorkflowCardInput, theme: Theme): Text
  * says what it is. Returns undefined for an entry with no data, which is what
  * pi's renderer contract wants for "nothing to draw".
  */
-export function renderWorkflowEntryCard(data: WorkflowEntryData | undefined, theme: Theme): Text | undefined {
+export function renderWorkflowEntryCard(data: WorkflowEntryData | undefined, theme: Theme): Component | undefined {
   if (!data) return undefined;
   return renderWorkflowCard(
     {

@@ -12,7 +12,7 @@ void it("registers only shared commands and the two default chords", async () =>
     const pi = { registerCommand: (name: string, def: { handler: (args: string, ctx: unknown) => Promise<void> }) => commands.set(name, def),
         registerShortcut: (key: string) => keys.push(key) };
     assert.deepEqual(registerTaskControls(pi as never, coordinator, DEFAULTS, async () => { opened++; }), []);
-    assert.deepEqual([...commands.keys()], ["bg", "tasks"]);
+    assert.deepEqual([...commands.keys()], ["task-detach", "tasks"]);
     assert.deepEqual(keys, ["ctrl+shift+b", "shift+down"]);
     let aborted = 0;
     const notices: string[] = [];
@@ -21,14 +21,14 @@ void it("registers only shared commands and the two default chords", async () =>
         identity: { sourceId: taskId === "agent" ? "agent" : "process", taskId, runId: "1" }, label: taskId,
         kind: taskId === "retrieval" ? "retrieval" : "launch",
     }));
-    await commands.get("bg")!.handler("", ctx);
+    await commands.get("task-detach")!.handler("", ctx);
     assert.equal(coordinator.waitCount, 0);
     for (const lease of leases) assert.equal((await lease.result).kind, "detached");
     assert.equal(aborted, 0);
     await commands.get("tasks")!.handler("", ctx);
     assert.equal(opened, 1);
-    await commands.get("bg")!.handler("", ctx);
-    assert.match(notices.at(-1)!, /No task waits/);
+    await commands.get("task-detach")!.handler("", ctx);
+    assert.match(notices.at(-1)!, /No current task waits/);
 });
 
 void it("remaps/unbinds chords and isolates SDK rejections", () => {

@@ -137,7 +137,7 @@ export class TaskPanel implements Component {
             const label = row ? `${row.view.key === selected?.key ? "●" : " "} ${"  ".repeat(Math.min(row.depth, 8))}${row.group ? this.model.isCollapsed(row.view.key) ? "▸" : "▾" : "·"} ${row.view.kind} ${oneLine(row.view.title)} [${row.view.status}]` : "";
             result.push(border("│") + fit(this.args.theme.fg(row?.view.key === selected?.key ? "accent" : "muted", label), left) + border("│") + fit(details[i] ?? "", right) + border("│"));
         }
-        result.push(fullRow(oneLine(this.feedback) || "↑↓/jk · PgUp/PgDn · Home/End · ←→ groups"), fullRow(`Tab focus · x stop selected · c copy path · Esc close · ${this.args.config.shortcutBackground.join("/") || "/bg"} detach`), border(`╰${"─".repeat(inner)}╯`));
+        result.push(fullRow(oneLine(this.feedback) || "↑↓/jk · PgUp/PgDn · Home/End · ←→ groups"), fullRow(`Tab focus · x stop selected · c copy path · Esc close · ${this.args.config.shortcutBackground.join("/") || "/task-detach"} detach`), border(`╰${"─".repeat(inner)}╯`));
         return result.map(line => truncateToWidth(line, width));
     }
     invalidate(): void { this.output.invalidate(); }

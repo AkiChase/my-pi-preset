@@ -73,7 +73,7 @@ const assertRoot = (result) => {
   assert.equal(ext.toolRenderers[0]("bash", () => undefined).renderShell, "default");
   assert.ok(ext.commands.has("agents"));
   for (const event of rootOnlyEvents) assert.equal(ext.handlers.get(event)?.length, 1, `root owns ${event}`);
-  for (const event of phaseEvents) assert.equal(ext.handlers.get(event)?.length, 1, `only Beautify owns ${event}`);
+  for (const event of phaseEvents) assert.equal(ext.handlers.get(event)?.length, event === "message_update" ? 1 : 2, `phase status and tool clock own ${event}`);
   return ext;
 };
 const assertChild = (result, rootExt, label) => {
@@ -84,10 +84,10 @@ const assertChild = (result, rootExt, label) => {
   }
   assert.equal(ext.commands.has("agents"), false, `${label}: no root manager command`);
   for (const event of rootOnlyEvents) assert.equal(ext.handlers.has(event), false, `${label}: no root manager ${event}`);
-  for (const event of phaseEvents) assert.equal(ext.handlers.get(event)?.length, 1, `${label}: local Beautify phase observer`);
-  // Composition, foreground widget client, phase status, appearance/highlighter and path continuation teardown.
-  assert.equal(rootExt.handlers.get("session_shutdown")?.length, 6);
-  assert.equal(ext.handlers.get("session_shutdown")?.length, 6);
+  for (const event of phaseEvents) assert.equal(ext.handlers.get(event)?.length, event === "message_update" ? 1 : 2, `${label}: local phase status and display clock`);
+  // Composition, widget, phase status, appearance/highlighter, clock and path teardown.
+  assert.equal(rootExt.handlers.get("session_shutdown")?.length, 7);
+  assert.equal(ext.handlers.get("session_shutdown")?.length, 7);
   for (const event of ["session_start"]) {
     assert.equal(ext.handlers.get(event)?.length, rootExt.handlers.get(event)?.length - 1, `${label}: no agent ${event}`);
   }

@@ -24,7 +24,7 @@ const { AgentManager } = await import("../../agent-tasks/src/agent-manager.ts");
 const { registerAgentWait } = await import("../../agent-tasks/src/waits.ts");
 const { createAgentTaskSource } = await import("../../agent-tasks/src/source.ts");
 
-void it("one shared /bg releases mixed shell/agent launch and retrieval waits without replacing execution", { timeout: 10_000 }, async () => {
+void it("one shared /task-detach releases mixed shell/agent launch and retrieval waits without replacing execution", { timeout: 10_000 }, async () => {
     const dir = mkdtempSync(join(tmpdir(), "mixed-task-waits-"));
     const coordinator = new TaskCoordinator();
     const reg = new BackgroundRegistry({ ...DEFAULTS, logDir: dir }, coordinator);
