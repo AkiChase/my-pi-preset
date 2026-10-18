@@ -115,10 +115,21 @@ sdk-runtime fake pi.on 已补实际 unsubscribe，原五次诊断消失；full �
 - 配置全量 `node --test --test-concurrency=8 --test-force-exit 'extensions/**/__tests__/*.test.ts' 'extensions/**/__tests__/*.test.mjs' 'scripts/*.test.mjs'` exit0，1479/1479；forced不证明自然清理。数量较阶段2下降因删除hint专有suite，并新增overview负例，不删执行合同覆盖。
 - `git diff --check`/相关docs本地链接/manifest引用存在性通过。没有独立lint脚本；pnpm check未重试既有Corepack阻断，link helper未运行（已有SDKlink已核实）。最终日志无offStart诊断，故障注入日志不等于产品失败。
 
-main已核验overview/owner/tests、实际process执行路径diff、docs/spec与最终日志；原始证据仍在 /tmp/panel-redesign.Bqxo0J/stage3-implement 和 stage3-check，含首次失败/defect-probe，不入repo。真实installed bundled terminal/物理wheel/视觉IME/provider NOT_RUN。阶段3 checkpoint待记录。
+main已核验overview/owner/tests、实际process执行路径diff、docs/spec与最终日志；原始证据仍在 /tmp/panel-redesign.Bqxo0J/stage3-implement 和 stage3-check，含首次失败/defect-probe，不入repo。真实installed bundled terminal/物理wheel/视觉IME/provider NOT_RUN。阶段3 checkpoint 10c361f（feat: add read-only agent overview and unify wait hints）。
+
+## 真实安装宿主验收记录
+用户明确批准隔离真实Pi终端验收，不含在线provider/个人配置。独立trellis-check在owned /tmp/panel-redesign.Bqxo0J/terminal-validation 使用 installed bundled Pi1.3.0、Node24.14.1、tmux3.6a执行；main完整读取report/主矩阵/补充矩阵及实际pane/ANSI/启动脚本/清理证据，未发现确认产品defect，未改产品。
+
+启动使用每次唯一 `tmux -L panel-validation-<driver-pid>`；CLI `env -i` 显式PATH、临时HOME/PI_CODING_AGENT_DIR/cwd/session、PI_OFFLINE=1、PI_TELEMETRY=0、TERM=xterm-256color，`pi --offline --no-extensions -e <checkout>/extensions/widget-display.ts -e <owned>/fixture.ts --no-mcp --no-skills --no-context-files --no-prompt-templates --no-themes --no-tools --use-theme dark|light --tui-mode regular|fullscreen --session-dir <owned>`。fixture导入真实当前TaskCoordinator/Lifecycle/UI owner/controls/editor，只提供synthetic metadata，不运行full composition/backend或模型。已核实installed terminal支持PI_TUI_WRITE_LOG。
+
+最终主driver exit0，六组 regular/fullscreen×140 dark/80 light/40 dark；补充driver exit0，两组fullscreen140 dark/40 light。真实宿主加载、全屏隐藏底层编辑器文本、常驻native scrollbar、真实多级树折叠、Enter/detail/End/Esc返回、完整CJK/ANSI清理命令与阶段、80×24→40×15→12×3→恢复动态resize、根概览五项/hidden、空态、重复开关、关闭后原文本及追加FOCUS输入均PASS（文本/ANSI证据，不是像素截图）。Fullscreen SGR输入验证正文wheel、刷新不拉回、选中identity不变、header/footer边界消费PASS，明确为 simulated terminal mouse input，不是physical human mouse。
+
+首次主driver exit1是fixture注册宿主保留Ctrl+O/Ctrl+B；改为真实产品Shift+Down及Ctrl+Shift+B。第二次窄屏等待完整grandchild title错误，按实际安全截断后的树分支判断；第三次六组成功。补充前三次失败分别是详情正确保留End位置（reopen需Home）、Home确保选中root而非heading、40列耗时变化不应比较整行；修fixture稳定identity断言，第四次通过。初始异常run未完成normal-quit证据，不记PASS；最终六+两run均/quit exit0、有source disposal/session shutdown标记。main核验最终PID全部消失、独立server全部no-server，无owned后台执行残留。原始失败/重跑材料外部保留，不复制repo。
+
+NOT_RUN：physical human mouse、像素/人工视觉/物理IME、任意插件组合、online provider、full composition真实bash>2s/混合wait/detach/reset/reload（已有自动化定向覆盖，不称此次terminal覆盖）。本次无新增产品，因此复用最终严格/自动化检查，不机械重跑。
 
 ## 最终验收缺口
-三个产品阶段及独立审查、静态/自动化验证已完成；AC2/AC3真实终端覆盖/焦点恢复/物理Fullscreen wheel尚未获授权运行，不能据fixture称完全验收。不自动同步/reload/push/merge main/归档。保留in_progress与源任务绑定，待真实验证决策；已有临时目录保留供后续诊断和宿主验证，不提前删除。
+三个产品阶段及独立审查、静态/自动化验证、上述真实installed终端脚本验收已完成。剩余physical human mouse及人工视觉判断未运行，不能冒充完全物理验收；下一步由用户接受已披露限制或进行人工验收。未经批准不合并main/归档/同步/reload/push。当前in_progress与任务绑定保留，owned临时目录暂留供人工复核。
 
 ## 尚未运行与材料维护
 本轮只维护现有规划与用户批准的合并关联，无产品测试、真实宿主测试、派发、start、commit 或 archive。旧 research 保留原文作为历史观察，不迁移/清理；现有角色 manifest 需执行前刷新，不能宣称 context validation 已通过。原 overview 材料在 merged/ 下，原 planning 值是合并前历史状态；meta 明确 merged_into/disposition，根级待办已退出，不伪造 completed。
