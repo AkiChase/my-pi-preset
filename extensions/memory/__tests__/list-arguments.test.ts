@@ -30,7 +30,9 @@ it("memory_list schema is required, nonnullable, closed and has no defaults", ()
     assert.throws(() => host(args), new RegExp(field));
   }
   assert.throws(() => host(listInput({ unknown: null })), /unknown/);
-  for (const query of ["😀".repeat(161), "bad\nquery", "bad\n", "bad\r", "bad\u0085query"]) assert.throws(() => host(listInput({ query })), /query/);
+  for (const query of ["😀".repeat(161)]) assert.throws(() => host(listInput({ query })), /query/);
+  // Control characters no longer fail schema validation; the direct-call test covers their rejection.
+  for (const query of ["bad\nquery", "bad\n", "bad\r", "bad\u0085query"]) assert.deepEqual(host(listInput({ query })).query, query);
   for (const offset of [-1, Number.MAX_SAFE_INTEGER + 1, 1.5, "1.5"]) assert.throws(() => host(listInput({ offset })), /offset/);
   for (const limit of [0, 51, 1.5, "1.5"]) assert.throws(() => host(listInput({ limit })), /limit/);
   for (const args of [listInput(), listInput({ query: "😀".repeat(160), offset: Number.MAX_SAFE_INTEGER, limit: 50 }), listInput({ limit: 1 })]) assert.deepEqual(host(args), args);
@@ -57,7 +59,7 @@ it("direct malformed list calls fail safely before origin or reads and do not mu
     const missing = listInput(); delete missing[field]; invalid.push(missing);
     for (const value of [null, undefined, false, {}, []]) invalid.push(listInput({ [field]: value }));
   }
-  for (const query of [0, "😀".repeat(161), ...[0, 10, 31, 127, 128, 159].map(code => `x${String.fromCharCode(code)}`)]) invalid.push(listInput({ query }));
+  for (const query of [0, "😀".repeat(161), "bad\nquery", "bad\n", "bad\r", "bad\u0085query", ...[0, 10, 31, 127, 128, 159].map(code => `x${String.fromCharCode(code)}`)]) invalid.push(listInput({ query }));
   for (const offset of [-1, 0.1, "0", NaN, Infinity, -Infinity, Number.MAX_SAFE_INTEGER + 1]) invalid.push(listInput({ offset }));
   for (const limit of [0, -1, 51, 0.1, "20", NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) invalid.push(listInput({ limit }));
   invalid.push(listInput({ RAW_FIELD_SECRET: null }), { ...listInput(), [Symbol("RAW_SYMBOL_SECRET")]: null });

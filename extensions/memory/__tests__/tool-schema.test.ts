@@ -7,6 +7,13 @@
  * and then fails with a message about a limit the caller was never told about.
  * `description` was declared `maxLength: 320` against a 160-codepoint policy, and
  * `query` 320 against a 160-character one.
+ *
+ * One documented exception: `query` declares `maxLength` only, and its "no control
+ * characters" rule is enforced at `execute`. Expressing a character set needs `pattern`,
+ * and every consumer compiles that regex — including provider-side schema validators that
+ * reject lookaround, where one unsupported construct fails the whole request. The rule
+ * therefore stays visible in the field description and in the execute error instead of
+ * the schema.
  */
 import assert from "node:assert/strict";
 import { it } from "node:test";
@@ -80,12 +87,17 @@ void it("description is bounded at the policy limit, not above it", t => {
     assert.match(err.message, /description/);
 });
 
-void it("list query is bounded at the store limit, not above it", t => {
+void it("list query keeps only the length bound; control characters are an execute concern", t => {
     const { tools } = registered(t);
     assert.equal(hostError(tools, "memory_list", listInput({ query: "q".repeat(160) })), undefined);
     const err = hostError(tools, "memory_list", listInput({ query: "q".repeat(161) }));
     assert.ok(err, "a query longer than the store accepts must be rejected");
     assert.match(err.message, /query/);
+    // Deliberate exception to "schema is never more permissive than the store": a character-set rule
+    // needs `pattern`, and provider-side schema validators reject regexes such as lookaround. The rule
+    // stays enforced at execute and is named in the field description, so no caller meets an
+    // unannounced limit.
+    assert.equal(hostError(tools, "memory_list", listInput({ query: "bad\nquery" })), undefined);
 });
 
 void it("name, revision and paging keep their declared bounds", t => {

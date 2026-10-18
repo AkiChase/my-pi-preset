@@ -10,7 +10,10 @@ export type GetOrigin = (cwd: string, signal?: AbortSignal) => ToolOrigin;
 const Name = Type.String({ maxLength: 80, pattern: "^[a-z0-9][a-z0-9_-]*$" });
 const Revision = Type.String({ pattern: "^[a-f0-9]{64}$" });
 const Description = Type.String({ maxLength: 160 });
-const Query = Type.String({ maxLength: 160, pattern: "^[^\\x00-\\x1f\\x7f-\\x9f]*(?![\\s\\S])", description: "Filter names/descriptions; empty string lists all. At most 160 Unicode codepoints, no control characters." });
+// Only the length bound is declared here. A character-set rule needs `pattern`, and a regex in the
+// schema is compiled by every consumer, including provider-side validators that reject lookaround.
+// The control-free rule is enforced at execute instead, and named in this description.
+const Query = Type.String({ maxLength: 160, description: "Filter memory names and descriptions; empty string lists all. Case-insensitive literal substring, not a regex. At most 160 Unicode codepoints; queries containing control characters are rejected." });
 function listArguments(value: unknown): { query: string; offset: number; limit: number } {
   const invalid = (): never => fail("list", "Invalid memory_list arguments: provide only query (control-free string, at most 160 Unicode codepoints), offset (non-negative safe integer), and limit (safe integer 1–50). Use query=\"\", offset=0, limit=20 for the first page.");
   let params: Record<string, unknown>;
