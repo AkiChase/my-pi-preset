@@ -150,6 +150,17 @@ NOT_RUN：产品 phase reducer/controller（尚无实现）、完整 Beautify su
 - 按 PRD 的已确认口径，自动化覆盖 AC1–AC7 的主事件/展示/计时/清理边界及 AC9 文档；AC8 实际 SDK editor/focus/undo 回归通过，但真实 TUI、物理 IME、实际 input-history plugin、在线 provider 和肉眼配色仍 NOT_RUN。没有把组件测试称为真实终端验收。代码阶段可验证并提交，最终视觉接受不自动完成/归档 task。
 - 原始临时目录保留，原因是后续真实 TUI 与首次并发 peer 加载限制尚未验证；不清理或复制 raw 到仓库。
 
+### 真实 tmux TUI 验证
+
+用户随后明确要求 tmux 验证。使用既有 tmux 3.6a、Pi 1.3.0，未连接个人 server：owned tmux server `tmux -L phase-status-25372`，会话 `phase`，regular mode，初始 100×30、动态调整至 40×30 再恢复 100×30。完整 fixture 位于 `/tmp/editor-phase-implementation.vcyok6/tmux`：独立 HOME、PI_CODING_AGENT_DIR、cwd、session 和 ANSI log；用 `env -i` 明确 PATH/TERM/PI_OFFLINE，禁用 discovery/MCP/skills/themes/context files，仅显式加载 checkout 的 `extensions/beautify.ts` 和本地 scripted provider `/tmp/editor-phase-implementation.vcyok6/phase-provider.ts`。provider 是离线 fixture，不代表在线模型质量。
+
+- 初次启动退出 0，实际屏幕确认 loaded extensions 为 `beautify.ts, phase-provider.ts`、编辑器 `❯` 和原生边框。首次 fixture 错误 `streams2.streamSimple is not a function`：临时 provider 将 streamSimple 设为 null；仅修 owned provider 为同一 stream 函数后重启独立 server，未改产品。
+- 发送真实键盘输入 `show phase status`：capture-pane 条件循环捕获 `Loading`、`Brewing`，最终 `fixture reasoning`/`fixture response` 及空闲编辑器；driver 断言三者均出现，退出 0。capture text 为 `tmux/phase-final.txt`，ANSI 为 `logs/tui.ansi`（47,460 bytes）。
+- 第二轮发送 `resize status` 后动态 resize 40×30：capture 确认窄屏 `── ⠋ Loading · 0s`、输入框和截短 cwd/footer；恢复 100×30 并等待最终 fixture response，退出 0。capture 为 `tmux/narrow-phase.txt`、`resized-final.txt`。这证明一次真实 resize 后的新窄宽 frame，不是固定宽度或组件模拟。
+- 通过发送 C-d 正常退出；验证 owned Pi/tmux session 消失后仅执行该 unique `-L` server 的 `kill-server`，server 不再 list，退出 0。未触碰个人 server/process。
+
+真实验证 PASS：Loading、Brewing、实际原生 spinner/边框、窄宽和动态 resize、正常关闭/cleanup。NOT_RUN：Tooling（fixture 未发 tool call）、Asking/实际问卷、Compacting 手动/自动成功/失败/取消、Retry/Branch Summary、dark/light theme 对比、fullscreen、物理 IME/鼠标、真实 input-history 和在线 provider。tmux 启动有 host warning `extended-keys is off`，本次普通 Enter/C-d 成功，不将 modified Enter 覆盖纳入结论。
+
 ## 提交与交付
 
 已验证代码阶段 checkpoint：`b9fc1a0` — `feat(beautify): show main-session phases in editor status`。提交仅含本任务三份规划/task 元数据/role manifests、Beautify 产品与测试、三份集成 fixture 和 owning 文档，共 15 文件；无 raw 日志。提交后 scoped 产品文件干净，其他任务的并行修改保留。任务仍 in_progress，未进行真实 TUI、最终用户接受或归档。
