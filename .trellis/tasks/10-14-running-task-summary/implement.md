@@ -61,16 +61,15 @@
 - run 中途自动压缩后晚一请求（已知限制）只在单元级 owner 测试中覆盖，未做端到端。
 - Agent/workflow 类型在 tmux 中未启动真实子 Agent；由单元与 SDK 测试覆盖格式与筛选。
 
-## 阶段 2：最终集成验收
+## 阶段 2：最终集成验收（完成）
 
-- [ ] 比较 AC1–AC9；不把 mock handler 或 UI 模拟当作真实模型输入证据。
-- [ ] 真实 SDK 离线 provider 捕获默认第 8/16 次及自定义周期请求、成功压缩后的下一请求、周期重合、隐藏消息、历史稳定和完整 system transitions。
-- [ ] 验证取消/会话切换/reload/shutdown 后无旧状态、无额外执行/通知消费；定向 tests 不用 force-exit。
-- [ ] 隔离现有 SDK 和临时 agent dir 运行类型检查及全量 suite。
-- [ ] 评估 reusable specs 更新，只写有证据的契约；具体 tool 教学不搬入用户文档。用户可见行为变化才更新已有功能页，不新增内部实现说明页面。
-- [ ] 使用已有 tmux/CLI 建立唯一测试 server 和临时 HOME/agent/cwd/session/log，env 隔离并明确加载本 checkout；使用本地 scripted provider，不调用在线 API。
-- [ ] tmux 验证真实请求中的提醒与 UI 默认隐藏、自定义周期/0、压缩后提醒、正常 quit 及 owned process cleanup；完整输入证据与 pane capture 分开，未测项目明确 NOT_RUN。
-- [ ] 技术核实/验收通过后按既有收尾授权归档并记录 journal；未满足验收不归档。
+- [x] AC1–AC9 对照（见 PRD）；证据来自真实 AgentSession 输入捕获与真实 CLI tmux，非 mock 结论。
+- [x] 默认第 8/16 次、周期 1/0、工具续轮与新 run 位置、成功压缩后下一请求、隐藏、前缀稳定、请求数精确（SDK 测试）；自定义周期 3 与压缩（tmux）。
+- [x] 关闭/会话切换：owner 单元测试（session_start 重置、shutdown 注销且不再读任务）；`sdk-runtime` 等既有生命周期测试在 `pnpm check` 中通过。定向套件自然退出。
+- [x] 隔离 `pnpm typecheck` / `pnpm check` exit 0。
+- [x] spec 更新：`development/index.md` 增加模型输入追加契约；`testing/index.md` 增加真实 AgentSession 输入捕获验证方法。
+- [x] tmux 隔离测试完成并清理（见上）。
+- [x] 提交：实施 `e4439f4`；spec 与验收记录随后提交；按收尾授权归档并记录 journal。
 
 既有环境隔离范式：
 
