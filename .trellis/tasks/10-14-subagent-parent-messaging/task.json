@@ -1,0 +1,33 @@
+{
+  "id": "subagent-parent-messaging",
+  "name": "subagent-parent-messaging",
+  "title": "子代理与父代理的中途消息",
+  "description": "为非 workflow 子代理（顶层与嵌套）预置 reply_to_parent，subagent_message 增加 reply 字段实现带 request_id 的中途问答与主动告知；对话卡片即时显示、隐藏上下文消息送达、详情页展示。不修改 agent_manage 动作，不新增阻塞状态。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "akichase",
+  "assignee": "akichase",
+  "createdAt": "2026-10-14",
+  "completedAt": null,
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "execution_after": [
+      "10-16-runtime-tool-contracts",
+      "10-16-agent-tool-contracts",
+      "10-17-agent-tool-nullable-contracts"
+    ],
+    "replanned": "2026-10-19"
+  }
+}

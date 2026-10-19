@@ -252,6 +252,11 @@ export interface AgentRecord {
   structuredRetried?: boolean;
   /** Parent agent ID for ownership-scoped nested controls. */
   parentAgentId?: string;
+  /**
+   * Mid-run parent/child message state. Present for every agent with a parent
+   * conversation (top-level and nested), absent for workflow children.
+   */
+  mailbox?: import("./parent-messaging.ts").AgentMailbox;
   /** The actual parent attempt that launched this child, stable across parent resume. */
   parentRunId?: string;
   /**

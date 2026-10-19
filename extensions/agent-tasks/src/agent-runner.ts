@@ -30,6 +30,7 @@ import { createNestedSubagentTools, getMaxSubagentDepth, type NestedAgentManager
 import { buildAgentPrompt, type PromptExtras } from "./prompts.ts";
 import { preloadSkills } from "./skill-loader.ts";
 import { createStructuredCapture, createStructuredOutputTool, structuredRetryPrompt } from "./structured-output.ts";
+import { createReplyToParentTool, type ParentChannel } from "./parent-messaging.ts";
 import type { SubagentType, ThinkingLevel } from "./types.ts";
 import type { LifetimeUsage } from "./usage.ts";
 import type { CompiledSchema } from "./workflow/json-schema.ts";
@@ -498,6 +499,12 @@ export interface RunOptions {
    * fails at the call that wrote it rather than inside the child.
    */
   structuredOutput?: CompiledSchema;
+  /**
+   * Narrow channel to the parent agent. When present the child gets the fixed
+   * `reply_to_parent` tool from its first request on. The owner omits it for
+   * children with no parent conversation (workflow runs).
+   */
+  parentChannel?: ParentChannel;
   /** Runtime bridge for opt-in child-safe nested delegation. */
   nestedRuntime?: {
     manager: NestedAgentManager;
@@ -979,6 +986,11 @@ export async function runAgent(
     ? [createStructuredOutputTool(options.structuredOutput, structuredCapture)]
     : [];
   const structuredToolNames = new Set(structuredTools.map(tool => tool.name));
+  // Host-owned like StructuredOutput: it does not depend on extension loading,
+  // `tools:` or `disallowed_tools`, and grants nothing beyond sending to the
+  // parent. Declared once here; resumed turns reuse the same session.
+  const parentTools = options.parentChannel ? [createReplyToParentTool(options.parentChannel)] : [];
+  const hostToolNames = new Set([...structuredToolNames, ...parentTools.map(tool => tool.name)]);
   // Re-admitted together at every gate below. Kept as one set so a new injected
   // tool cannot be added to some of the three gates and forgotten at the rest.
   //
@@ -990,7 +1002,7 @@ export async function runAgent(
   const readmitToolNames = new Set([
     ...[...nestedToolNames].filter(name => !disallowedSet?.has(name)),
     ...fallbackTools.map(tool => tool.name),
-    ...structuredToolNames,
+    ...hostToolNames,
   ]);
 
   // ─── Tool scoping ───────────────────────────────────────────────────────
@@ -1036,8 +1048,8 @@ export async function runAgent(
       // Not filtered through `disallowedSet`, unlike the nested tools above:
       // the caller asked for a schema, and removing the only tool that can
       // satisfy it would make the request unsatisfiable by construction rather
-      // than merely restricted.
-      ...structuredToolNames,
+      // than merely restricted. The parent channel is host-owned the same way.
+      ...hostToolNames,
     ];
   } else {
     // Deny the orchestration tools EXCEPT the nested ones this agent opted into —
@@ -1053,7 +1065,7 @@ export async function runAgent(
       // disallowed_tools wins even over an opt-in nested tool of the same name.
       // Not over StructuredOutput, though — see the allowlist branch above.
       for (const name of disallowedSet) {
-        if (!structuredToolNames.has(name)) denyTools.add(name);
+        if (!hostToolNames.has(name)) denyTools.add(name);
       }
     }
     sessionExcludeTools = [...denyTools];
@@ -1102,7 +1114,7 @@ export async function runAgent(
     ...(parentModelRuntime !== undefined && { modelRuntime: parentModelRuntime as never }),
     model,
     tools: sessionTools,
-    customTools: [...nestedTools, ...fallbackTools, ...structuredTools],
+    customTools: [...nestedTools, ...fallbackTools, ...structuredTools, ...parentTools],
     resourceLoader: loader,
   };
   if (sessionExcludeTools) {

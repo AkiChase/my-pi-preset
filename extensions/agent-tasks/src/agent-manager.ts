@@ -31,6 +31,7 @@ import { assignHandle, handleBase } from "./mention.ts";
 import { describeModel } from "./model-resolver.ts";
 import type { AgentInvocation, AgentRecord, AgentTombstone, IsolationMode, MentionResolution, SubagentType, ThinkingLevel } from "./types.ts";
 import { addUsage, type LifetimeUsage } from "./usage.ts";
+import { AgentMailbox, type AcceptedChildMessage, type MailboxResult, type ParentChannel, type ParentRequest } from "./parent-messaging.ts";
 import type { CompiledSchema } from "./workflow/json-schema.ts";
 import { cleanupWorktree, createWorktree, isWorktreeIsolationEnabled, } from "./worktree.ts";
 
@@ -365,6 +366,9 @@ interface ResumeOptions {
   onStarted?: () => void;
 }
 
+/** Observes accepted child messages; delivery belongs to the record's owner. */
+export type ParentMessageListener = (record: AgentRecord, accepted: AcceptedChildMessage) => void;
+
 export class AgentManager {
   private agents = new Map<string, AgentRecord>();
   private runs = new Map<string, AgentRun>();
@@ -378,7 +382,7 @@ export class AgentManager {
   private shutdownStopped = false;
   private cleanupController = new AbortController();
   private retainOwner?: (record: AgentRecord) => boolean;
-
+  private parentMessageListeners = new Set<ParentMessageListener>();
   subscribe(listener: () => void): () => void {
     if (this.admissionClosed) return () => {};
     this.listeners.add(listener);
@@ -401,6 +405,9 @@ export class AgentManager {
     this.admissionClosed = true;
     clearInterval(this.cleanupInterval);
     this.cleanupController.abort();
+    // Release reply waiters and refuse late child sends from the old activation.
+    for (const record of this.agents.values()) record.mailbox?.closeAll("shutdown");
+    this.parentMessageListeners.clear();
   }
 
   /** Finite diagnostics, never mutable execution/session references. */
@@ -462,6 +469,7 @@ export class AgentManager {
       terminal, resolve, resolveText, charged: false, settled: false, terminalResolved: false, sessions: new Set(),
     };
     this.runs.set(record.id, run);
+    record.mailbox?.startRun(record.runId);
     if (signal) {
       const stop = () => { if (this.runs.get(record.id) === run) this.abort(record.id); };
       signal.addEventListener("abort", stop, { once: true });
@@ -475,6 +483,9 @@ export class AgentManager {
     if (!run || run.terminalResolved) return;
     run.terminalResolved = true;
     run.unlinkParent?.(); run.unlinkParent = undefined;
+    // A stop resolves the terminal long before actual exit; the channel already
+    // refuses replies then, so close unanswered requests with the terminal.
+    record.mailbox?.closeRun(run.identity.runId, record.status === "stopped" ? "stopped" : "execution_ended");
     // Snapshot outcome so a later resume cannot replace an earlier wait's text.
     let terminalConversation = "";
     try { if (record.session) terminalConversation = getAgentConversation(record.session); }
@@ -700,6 +711,8 @@ export class AgentManager {
       workflowId: options.workflowId,
       maxSubagentDepth: options.maxSubagentDepth,
       rootSessionId: options.rootSessionId,
+      // Workflow children answer to a script, not a conversation: no channel.
+      mailbox: options.workflowId === undefined ? new AgentMailbox() : undefined,
     };
     this.agents.set(id, record);
     // After the insert, so `takenHandles()` already counts this record's own
@@ -873,6 +886,7 @@ export class AgentManager {
       inheritContext: options.inheritContext,
       thinkingLevel: options.thinkingLevel,
       structuredOutput: options.structuredOutput,
+      parentChannel: record.mailbox ? this.parentChannel(record) : undefined,
       resumeSessionFile: options.resumeSessionFile,
       nested: options.parentAgentId !== undefined,
       workflow: options.workflowId !== undefined,
@@ -1124,6 +1138,8 @@ export class AgentManager {
     record.startGate = undefined;
     record.activity = undefined;
     this.releaseSlot(record, run);
+    // Unanswered requests end with this execution; their waiters learn it now.
+    record.mailbox?.closeRun(run.identity.runId, record.status === "stopped" ? "stopped" : "execution_ended");
     this.resolveTerminal(record);
     this.notifyChanged();
     try { if (this.current(record, run)) this.onComplete?.(record); } catch { /* isolate completion side effects */ }
@@ -1370,6 +1386,59 @@ export class AgentManager {
     return true;
   }
 
+  /** Observe child messages accepted from any owned record. */
+  subscribeParentMessages(listener: ParentMessageListener): () => void {
+    if (this.admissionClosed) return () => {};
+    this.parentMessageListeners.add(listener);
+    return () => { this.parentMessageListeners.delete(listener); };
+  }
+
+  /**
+   * The child's only capability. Resolves the record's current execution on
+   * every send, so a resumed run is addressed correctly and a settled or
+   * superseded one is refused, without capturing the first run's identity.
+   */
+  private parentChannel(record: AgentRecord): ParentChannel {
+    return {
+      send: (text, requestId) => {
+        const run = this.runs.get(record.id);
+        const mailbox = record.mailbox;
+        if (!mailbox || !run || run.settled || run.terminalResolved || !this.current(record, run)
+          || record.status !== "running" || record.abortController?.signal.aborted) {
+          return { ok: false, error: "The parent channel is closed for this execution." };
+        }
+        const result = mailbox.accept(run.identity.runId, text, requestId);
+        if (!result.ok) return result;
+        for (const listener of [...this.parentMessageListeners]) {
+          try { listener(record, result.value); } catch { /* delivery failures belong to the owner */ }
+        }
+        this.notifyChanged();
+        return result;
+      },
+    };
+  }
+
+  /**
+   * Register a parent request against the agent's current execution. The
+   * caller delivers the question afterwards and reports failure through
+   * {@link failParentRequest}.
+   */
+  createParentRequest(id: string, question: string): MailboxResult<{ request: ParentRequest; identity: TaskIdentity }> {
+    const record = this.agents.get(id);
+    const run = this.runs.get(id);
+    if (this.admissionClosed || !record || !run) return { ok: false, error: `Agent not found: "${id}".` };
+    if (!record.mailbox) return { ok: false, error: "This agent has no parent message channel." };
+    if (run.settled || (record.status !== "running" && record.status !== "queued")) {
+      return { ok: false, error: `Agent "${id}" is not running (status: ${record.status}).` };
+    }
+    const created = record.mailbox.createRequest(run.identity.runId, question);
+    return created.ok ? { ok: true, value: { request: created.value, identity: run.identity } } : created;
+  }
+
+  failParentRequest(id: string, requestId: string): void {
+    this.agents.get(id)?.mailbox?.failRequest(requestId);
+  }
+
   getRecord(id: string): AgentRecord | undefined {
     return this.agents.get(id);
   }
@@ -1475,6 +1544,7 @@ export class AgentManager {
     // Detached before the shutdown starts, so the record leaves the map at once and
     // nothing can observe a session that is half torn down.
     record.session = undefined;
+    record.mailbox?.closeAll("shutdown");
     this.agents.delete(id);
     this.runs.delete(id);
     this.notifyChanged();
