@@ -1433,3 +1433,28 @@ Task Panel 重构完成并归档：删除 feedback 行；分区详情视图；�
 ### Status
 
 [OK] **Completed**
+
+
+## Session 44: 恢复 Trellis 小任务分流与 AGENTS 区块更新
+<!-- trellis-session: v=2 fp=f4c83454360cd7ac -->
+
+**Date**: 2026-10-19
+**Task**: 恢复 Trellis 小任务分流与 AGENTS 区块更新
+**Branch**: `main`
+
+### Summary
+
+恢复官方风格 Request Triage：小任务可在用户拒绝建 task 后直接修改且默认不提交；AGENTS 托管区块改为目录指引。Update resources 现在会备份后刷新 AGENTS.md/.gitignore 托管区块，Check project 可诊断过期、损坏或不可读区块。独立审查修复软链接/不可读根文件阻断初始化菜单的问题；Trellis 测试 355/355、类型检查通过。部署副本已刷新，安装后复核计划 unchanged、0 冲突、root-block 诊断 pass。真实过期区块 TUI 确认框文案和无任务新会话 breadcrumb 留作发布后人工观察。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8555152` | feat(trellis): restore request triage and slim AGENTS block |
+| `859d132` | feat(trellis): refresh managed root blocks during Update resources |
+| `24c5045` | chore(trellis): refresh deployed Trellis resources |
+| `c2445a2` | docs(trellis): record post-release verification |
+
+### Status
+
+[OK] **Completed**

@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 43
+- **Total Sessions**: 44
 - **Last Active**: 2026-10-19
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1435 | Active |
+| `journal-1.md` | ~1460 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 44 | 2026-10-19 | 恢复 Trellis 小任务分流与 AGENTS 区块更新 | `8555152`, `859d132`, `24c5045`, `c2445a2` | `main` |
 | 43 | 2026-10-19 | Task panel redesign | `752313b`, `247e1bd`, `d182ef3`, `0855428`, `0811ec8`, `23a5457` | `main` |
 | 42 | 2026-10-19 | 后台任务防遗忘提醒（方案 B） | `00757e0` | `main` |
 | 41 | 2026-10-19 | Task Panel 重设计交付与归档 | `2a8d466`, `dd44fcc`, `10c361f`, `8dffd29` | `main` |
