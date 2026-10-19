@@ -393,3 +393,17 @@ void it("detail renders kind-specific labelled sections without raw stats or JSO
         assert.doesNotMatch(m, /── Artifacts/);
     } finally { panel.dispose(); f.coordinator.dispose(); }
 });
+
+void it("structured conversation replaces the raw output body, with running activity", () => {
+    const row = view("agent", { stats: { activity: "reading a.ts" } });
+    const f = sourceFixture([row]);
+    f.details.set(row.key, { text: '{"type":"user","message":{"role":"user"}}', conversationTruncated: true,
+        conversation: [{ kind: "user", text: "do it" }, { kind: "assistant", text: "**done**", tools: [{ name: "read", detail: "a.ts" }] }] });
+    const h = component(f);
+    try {
+        h.panel.handleInput("\r");
+        const frame = stripTerminalSequences(h.panel.render(100).join("\n"));
+        for (const pattern of [/── Conversation · 2 messages \(latest\)/, /older messages omitted/, /User/, /do it/, /Assistant/, /done/, /⏺ read {2}a\.ts/, /▍ reading a\.ts/]) assert.match(frame, pattern);
+        assert.doesNotMatch(frame, /"type":"user"|── Output|\*\*done\*\*/);
+    } finally { h.panel.dispose(); f.coordinator.dispose(); }
+});

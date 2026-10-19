@@ -325,6 +325,12 @@ void it("source freezes all owned/workflow/queued/no-session views, reads bounde
     assert.ok(Object.isFrozen(detail));
     assert.equal(record.resultConsumed, false);
     assert.equal(f.source.detail(identity, { limit: Infinity })!.text.length, 16000);
+    assert.deepEqual(f.source.detail(identity)!.conversation ?? [], [], "non-JSON transcript yields no structured entries");
+    const liveSession = record.session; record.session = undefined;
+    writeFileSync(record.outputFile, [{ role: "user", content: "task prompt" }, { role: "assistant", content: [{ type: "text", text: "answer" }] }]
+      .map(message => JSON.stringify({ type: message.role, message })).join("\n") + "\n");
+    assert.deepEqual(f.source.detail(identity)!.conversation?.map(entry => entry.kind), ["user", "assistant"], "swept session falls back to the transcript");
+    record.session = liveSession;
     assert.equal(f.source.stop(f.manager.getRun(nested)!.identity), true);
     assert.equal(record.status, "running");
     assert.equal(f.manager.getRecord(owned)?.status, "running");

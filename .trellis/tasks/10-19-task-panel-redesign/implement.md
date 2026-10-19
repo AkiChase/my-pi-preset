@@ -60,3 +60,15 @@ tmux 真实终端：列表页、三类详情页、agent 对话（运行中 / 已
 - 验证：`PI_CODING_AGENT_DIR=<tmp> node --test extensions/task-ui/__tests__/*.test.ts extensions/process-tasks/__tests__/*.test.ts` → 455/455 PASS；`pnpm typecheck` PASS；`git diff --check` PASS。
 - 视觉检查：用 dark 主题和 fixture 直接渲染 agent / shell 详情帧（不经过 pi CLI），确认颜色和布局正常，发现并修复了长 label（`conversation`）与值之间没有空格的问题。
 - 过程失误：第一次用 tmux 截图时，渲染脚本从 SDK 公开入口导入 `getThemeByName` 失败，脚本立即退出，等待循环又没设超时，空转到被 SIGTERM 终止。已确认没有残留 tmux / node 进程；之后的临时脚本都加了 30 秒 alarm。这次的视觉检查不是真实 pi CLI 的 tmux 验证，那项留到最终验证再做。
+
+### 阶段 2（2026-10-19）
+
+- 改动：`task-ui/types.ts` 增加 `ConversationEntry`、`TaskDetail.conversation` / `conversationTruncated`；新增 `agent-tasks/src/conversation-entries.ts`（session 消息或 JSONL 尾部 256 KiB → 有界条目，丢弃不完整首行、跳过坏行）；`source.ts` 附加结构化对话，并在消息末尾不含最终答案时补上 `record.result`，失败时补 Error 提示；新增 `task-ui/conversation.ts` 渲染器（角色标签、Markdown 带缓存与失败回退、工具调用行、tool result 淡化截断、bash、运行中 `▍ activity`）；panel 有对话时用 Conversation 分区替代 Output。
+- 与 design 的偏差：
+  - 没有用 `TaskDetail.activity`，直接复用 `TaskView.stats.activity`。
+  - 截断信息改成布尔值 `conversationTruncated`：从文件中途读取时无法得知被丢掉的消息条数。
+  - 工具调用行在 task-ui 本地渲染，没有用 Beautify 的 `createToolCallHeading`：它需要完整的 `Theme`，而面板只拿到只有 fg 的 `TaskTheme`。
+- 验证：新增 `conversation-entries.test.ts`（4 个用例）、`conversation.test.ts`（2 个用例），`panel.test.ts` 和 `backend-waits.test.ts` 补了集成断言。`PI_CODING_AGENT_DIR=<tmp> node --test` 跑 task-ui、process-tasks、agent-tasks、runtime-tasks、beautify 五个目录 → 878/878 PASS；`pnpm typecheck` PASS；`git diff --check` PASS。
+- 失败与重跑：第一次跑完整套件时 `backend-waits` 有 2 个失败（"fresh panel after actual sweep…"）。原因是 session 消息里没有最终答案时，对话视图把原来 preview 会附带的 `record.result` 弄丢了，属于产品回归。补上 `withOutcome` 后重跑 878/878 PASS。
+- 过程失误：为对比基线执行过一次 `git stash`，把并行会话未提交的改动也一起暂存了，随后 `stash pop` 已恢复（`git stash list` 为空）。之后不再用 stash 做基线对比。
+- 视觉检查：用 dark 主题直接渲染对话详情帧（不经过 pi CLI），Markdown、角色、工具行、失败结果、activity 都显示正常。

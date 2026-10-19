@@ -44,8 +44,21 @@ export interface TaskDetailRequest {
     readonly limit?: number;
 }
 
+export interface ToolCallSummary { readonly name: string; readonly detail?: string }
+/** All text is external and unstyled; renderers sanitize before applying host styles. */
+export type ConversationEntry =
+    | Readonly<{ kind: "user"; text: string }>
+    | Readonly<{ kind: "assistant"; text: string; tools: readonly ToolCallSummary[] }>
+    | Readonly<{ kind: "toolResult"; name?: string; text: string; elided: number; error?: boolean }>
+    | Readonly<{ kind: "bash"; command: string; output: string; elided: number; exitCode?: number }>
+    | Readonly<{ kind: "notice"; text: string }>;
+
 export interface TaskDetail {
     readonly text: string;
+    /** Structured, bounded, unstyled conversation; renderers prefer it over `text`. */
+    readonly conversation?: readonly ConversationEntry[];
+    /** True when older conversation entries were dropped by the source bound. */
+    readonly conversationTruncated?: boolean;
     readonly path?: string;
     readonly start?: number;
     readonly end?: number;

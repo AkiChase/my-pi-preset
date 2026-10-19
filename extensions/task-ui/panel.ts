@@ -8,6 +8,7 @@ import type { TaskDetail } from "./types.ts";
 import { TaskPanelModel, type TaskRow } from "./model.ts";
 import { cleanTaskText, taskLine, taskOneLine, type TaskTheme } from "./presentation.ts";
 import { detailRange, renderDetailHeader, sectionTitle } from "./detail-view.ts";
+import { ConversationRenderer } from "./conversation.ts";
 export { cleanTaskText } from "./presentation.ts";
 const oneLine = taskOneLine;
 
@@ -37,6 +38,7 @@ export class TaskPanel implements Component {
     private refreshQueued = false;
     private cachedList?: { width: number; lines: string[] };
     private cachedDetail?: { width: number; lines: string[] };
+    private readonly conversation = new ConversationRenderer();
     private readonly copy: (text: string) => Promise<void>;
     private readonly args: TaskPanelArgs;
     constructor(args: TaskPanelArgs) {
@@ -186,11 +188,22 @@ export class TaskPanel implements Component {
         if (this.cachedDetail?.width === width) return this.cachedDetail.lines;
         const selected = this.model.selected;
         if (!selected) return [this.theme.fg("dim", "No tasks")];
-        const body = this.detail?.text
-            ? cleanTaskText(this.detail.text).split(/\r\n|\n|\r/).flatMap(part => wrapTextWithAnsi(part, Math.max(1, width)))
-            : [this.theme.fg("dim", "Output not established yet.")];
-        const lines = [...renderDetailHeader(selected, this.theme, width, this.args.now?.()), "",
-            ...sectionTitle("Output", this.theme, width, detailRange(this.detail)), ...body];
+        const header = renderDetailHeader(selected, this.theme, width, this.args.now?.());
+        const conversation = this.detail?.conversation;
+        let section: string[], body: string[];
+        if (conversation) {
+            const count = `${conversation.length} message${conversation.length === 1 ? "" : "s"}${this.detail?.conversationTruncated ? " (latest)" : ""}`;
+            section = sectionTitle("Conversation", this.theme, width, count);
+            const running = selected.status === "running" || selected.status === "starting";
+            body = this.conversation.render(conversation, width, this.theme, { truncated: this.detail?.conversationTruncated,
+                activity: running ? selected.stats.activity : undefined });
+        } else {
+            section = sectionTitle("Output", this.theme, width, detailRange(this.detail));
+            body = this.detail?.text
+                ? cleanTaskText(this.detail.text).split(/\r\n|\n|\r/).flatMap(part => wrapTextWithAnsi(part, Math.max(1, width)))
+                : [this.theme.fg("dim", "Output not established yet.")];
+        }
+        const lines = [...header, "", ...section, ...body];
         this.cachedDetail = { width, lines }; return lines;
     }
     private hints(width: number): string {
@@ -265,6 +278,6 @@ export class TaskPanel implements Component {
     dispose(): void {
         if (this.disposed) return;
         this.disposed = true; clearInterval(this.timer); this.timer = undefined; this.unsubscribe();
-        this.model.dispose(); this.detail = undefined; this.rows = []; this.invalidate();
+        this.model.dispose(); this.conversation.dispose(); this.detail = undefined; this.rows = []; this.invalidate();
     }
 }

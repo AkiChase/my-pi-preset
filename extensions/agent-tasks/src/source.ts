@@ -2,9 +2,10 @@ import { copyAgentExecutionConfig } from "../../runtime-tasks/execution-config.t
 import { closeSync, fstatSync, openSync, readSync } from "node:fs";
 import { FINISHED_LINGER_MS } from "../../task-ui/model.ts";
 import type { TaskCoordinator } from "../../task-ui/coordinator.ts";
-import { taskKey, type TaskDetail, type TaskDetailRequest, type TaskIdentity, type TaskSource, type TaskStatus, type TaskView } from "../../task-ui/types.ts";
+import { taskKey, type ConversationEntry, type TaskDetail, type TaskDetailRequest, type TaskIdentity, type TaskSource, type TaskStatus, type TaskView } from "../../task-ui/types.ts";
 import type { AgentManager } from "./agent-manager.ts";
 import { extractText } from "./context.ts";
+import { fromMessages, MAX_TEXT, readTranscriptTail } from "./conversation-entries.ts";
 import type { AgentRecord } from "./types.ts";
 import { getLifetimeTotal } from "./usage.ts";
 import { collapse } from "./workflow/progress.ts";
@@ -43,6 +44,17 @@ function fileDetail(path: string, request?: TaskDetailRequest): TaskDetail | und
       size: stat.size, omittedBefore: start, omittedAfter: stat.size - start - bytes });
   } catch { return undefined; }
   finally { if (fd !== undefined) { try { closeSync(fd); } catch { /* a failed detail read owns no runtime */ } } }
+}
+
+/** The final answer/error lives on the record; show it when the bounded messages do not end with it. */
+function withOutcome(entries: readonly ConversationEntry[], record: AgentRecord): readonly ConversationEntry[] {
+  const extra: ConversationEntry[] = [];
+  const result = record.result?.trim();
+  const last = [...entries].reverse().find(entry => entry.kind === "assistant");
+  if (result && (last?.kind !== "assistant" || last.text.trim() !== result.slice(0, MAX_TEXT).trim()))
+    extra.push(Object.freeze({ kind: "assistant" as const, text: result.slice(0, MAX_TEXT), tools: Object.freeze([]) }));
+  if (record.status === "error" && record.error) extra.push(Object.freeze({ kind: "notice" as const, text: `Error: ${record.error.slice(0, 2_000)}` }));
+  return extra.length ? Object.freeze([...entries, ...extra]) : entries;
 }
 
 export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCoordinator, workflows: ReadonlyMap<string, WorkflowTask>, options: { observe?: boolean; filter?: (record: AgentRecord) => boolean } = {}): TaskSource {
@@ -129,9 +141,12 @@ export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCo
       }
       const record = manager.getRecord(identity.taskId);
       if (!record || record.runId !== identity.runId || (options.filter && !options.filter(record))) return undefined;
+      // Structured conversation: the live session while it exists, else the transcript tail.
+      const slice = record.session ? fromMessages(record.session.messages) : record.outputFile ? readTranscriptTail(record.outputFile) : undefined;
+      const conversation = slice ? { conversation: withOutcome(slice.entries, record), conversationTruncated: slice.truncated } : {};
       if (record.outputFile) {
         const detail = fileDetail(record.outputFile, request);
-        if (detail) return detail;
+        if (detail) return Object.freeze({ ...detail, ...conversation });
       }
       // Do not materialize the full conversation: bound each extraction and the
       // assembled preview. The disk transcript, when enabled, is the paged path.
@@ -142,7 +157,7 @@ export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCo
       }
       if (!record.session) preview += `${record.status === "queued" ? "Queued" : record.starting ? "Starting" : record.status}: conversation not established.\n`;
       preview += record.error?.slice(0, MAX_DETAIL) ?? record.result?.slice(0, MAX_DETAIL) ?? "";
-      return textDetail(preview.slice(0, MAX_DETAIL), request);
+      return Object.freeze({ ...textDetail(preview.slice(0, MAX_DETAIL), request), ...conversation });
     },
     stop(identity) {
       if (disposed || identity.sourceId !== "agent") return false;

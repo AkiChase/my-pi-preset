@@ -40,7 +40,7 @@ export function taskTokens(tokens: number | undefined): string | undefined {
     return tokens >= 1_000_000 ? `${(tokens / 1_000_000).toFixed(1)}M` : tokens >= 1_000 ? `${(tokens / 1_000).toFixed(1)}k` : String(Math.floor(tokens));
 }
 
-export type TaskTheme = Pick<Theme, "fg"> & Partial<Pick<Theme, "bg">>;
+export type TaskTheme = Pick<Theme, "fg"> & Partial<Pick<Theme, "bg" | "bold">>;
 export interface TaskLineOptions { prefix?: string; children?: number; selected?: boolean; now?: number }
 
 /** One bounded task line. Protect state/wait first, then statistics, before title/indentation. */
