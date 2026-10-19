@@ -94,6 +94,18 @@ workflow 用脚本编排多步工作，可以调用 Agent，也可以不启动 A
 
 输入 `@handle 消息` 可联系对应 Agent。默认的模型模式会生成更完整的委派请求，直接模式则立即启动；可在 `/agents` 的 Settings 中调整。定时定义本身不是运行任务，实际触发的 Agent 才会出现在任务列表。
 
+## 后台任务提醒
+
+主 Agent 在长对话中可能忘记还有后台工作。有未结束的后台 Agent、workflow、命令或 Monitor 时，每隔若干次模型请求（默认 8 次，工具调用后的继续回答也算），会在请求前向对话追加一条只给模型看的简短提醒，列出类型、可用于管理工具的 ID、短名称和已运行时间。上下文压缩后也会补一条。
+
+- 提醒默认不显示在主对话中，不会唤醒空闲的模型，也不会额外发起请求。
+- 它只用于防遗忘，不是实时任务列表；模型需要当前状态时仍会用对应的管理工具查询。完成结果照常通过完成通知送达。
+- 不包含完整命令、委派内容或日志；命令没有描述时只显示类型名。任务较多时只列一部分并标明省略数量。
+- 已写入的提醒保留在历史中，不会被改写。
+- 限制：一轮工具调用中途发生自动压缩时，压缩后的提醒会晚一次请求到达。
+
+间隔在 `task-ui.json` 的 `backgroundReminderInterval` 中配置，见[面板与快捷键](#面板与快捷键)。
+
 ## 配置
 
 配置文件默认位于 `~/.pi/agent`，设置了 `PI_CODING_AGENT_DIR` 时跟随这个目录。手改配置后在 Pi 中 `/reload`；影响 Agent 功能开关的设置建议重启 Pi。
@@ -106,11 +118,14 @@ workflow 用脚本编排多步工作，可以调用 Agent，也可以不启动 A
 {
   "shortcutBackground": ["ctrl+shift+b"],
   "shortcutTaskPanel": ["shift+down"],
-  "downOpener": true
+  "downOpener": true,
+  "backgroundReminderInterval": 8
 }
 ```
 
 两个快捷键接受单个键名、数组或 `"off"`。`downOpener: false` 只关闭空输入框 Down 入口，不影响 `/tasks` 或显式面板快捷键。要改扩展快捷键，在这里改，不是在 Pi 的 `keybindings.json` 里改。
+
+`backgroundReminderInterval` 是[后台任务提醒](#后台任务提醒)的模型请求间隔，接受非负整数；`0` 关闭周期提醒，压缩后的提醒仍保留。无效值会记录警告并使用默认值 `8`。
 
 空输入框 Down 不可用时仍可用 `/tasks` 或 `Shift+Down`；第三方编辑器不一定支持这个增强。
 

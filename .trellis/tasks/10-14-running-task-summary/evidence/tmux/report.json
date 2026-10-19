@@ -1,0 +1,43 @@
+{
+  "command": "exec /usr/bin/env -i HOME=$TMPDIR/reminder-tmux-cb8tq66m/home PI_CODING_AGENT_DIR=$TMPDIR/reminder-tmux-cb8tq66m/agent REMINDER_SMOKE_ROOT=$TMPDIR/reminder-tmux-cb8tq66m PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 PATH=/Users/jyxc-dz-0101322/.pi/agent/bin:/opt/homebrew/bin:/usr/bin:/bin TERM=tmux-256color LANG=en_US.UTF-8 TMPDIR=$TMPDIR/reminder-tmux-cb8tq66m /opt/homebrew/bin/node /Users/jyxc-dz-0101322/.pi/agent/install/releases/1.3.0/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --offline --no-approve --no-extensions --no-skills --no-prompt-templates --no-context-files --no-themes --no-mcp --session-dir $TMPDIR/reminder-tmux-cb8tq66m/sessions --use-theme dark --tools bash,process_manage -e /private/tmp/reminder-run.lZCr/harness/provider.ts -e /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-composition.ts --model reminder-offline/scripted",
+  "server": "reminder-tmux-cb8tq66m",
+  "cases": [
+    {
+      "case": "request 3 (new user run): reminder just before user message",
+      "status": "PASS",
+      "last": [
+        "<background-task-reminder>\nshell | b12wn4k3f | long sleeper | 0s\n</background-ta",
+        "LOOP 2"
+      ]
+    },
+    {
+      "case": "reminder lists background shell with name, no command",
+      "status": "PASS",
+      "reminder": "<background-task-reminder>\nshell | b12wn4k3f | long sleeper | 0s\n</background-task-reminder>"
+    },
+    {
+      "case": "requests 1-2,4-5 carry no new reminder",
+      "status": "PASS"
+    },
+    {
+      "case": "after /compact the next request carries a fresh reminder as final message",
+      "status": "PASS",
+      "tail": [
+        "<background-task-reminder>\nshell | b12wn4k3f | long sleeper ",
+        "AFTER",
+        "<background-task-reminder>\nshell | b12wn4k3f | long sleeper "
+      ]
+    },
+    {
+      "case": "reminder hidden from the TUI transcript",
+      "status": "PASS"
+    }
+  ],
+  "error": null,
+  "cleanup": {
+    "natural_cli_exit": true,
+    "tail_remaining": [],
+    "own_server_stopped": true,
+    "isolated_root_removed": true
+  }
+}

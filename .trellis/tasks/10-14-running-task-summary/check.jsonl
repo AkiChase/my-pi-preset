@@ -1,0 +1,4 @@
+{"file":".trellis/spec/development/index.md","reason":"扩展执行/状态、生命周期所有权与 SDK 公开契约约束"}
+{"file":".trellis/spec/testing/index.md","reason":"真实 SDK 边界测试、隔离与自然退出要求"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"模型输入、会话持久化与后台状态跨层检查"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"复用 capabilities/executionId 而非复制状态"}

@@ -12,6 +12,8 @@ import { managementTool } from "./runtime-tasks/tools.ts";
 import { childManagement, childManagementRegistered } from "./runtime-tasks/child-handoff.ts";
 import processTasks from "./process-tasks/index.ts";
 import agentTasks, { runInChildSessionContext } from "./agent-tasks/src/index.ts";
+import { inChildSessionContext } from "./agent-tasks/src/child-context.ts";
+import { registerBackgroundReminder } from "./runtime-tasks/reminder-owner.ts";
 // Public child-marker bridge remains valid across host loader graphs and different cwd.
 export { runInChildSessionContext };
 // Composition owns execution, lifecycle and shared task UI; beautify owns presentation.
@@ -34,6 +36,8 @@ export default async function taskComposition(pi: ExtensionAPI): Promise<void> {
   pi.registerTool(process.tool);
   pi.registerTool(agent.tool);
   childManagementRegistered(agent.tool);
+  // Only the main agent is reminded; child sessions report through their owner.
+  if (!inChildSessionContext()) registerBackgroundReminder(pi, { capabilities: () => capabilities, lifecycle, interval: uiLoad.config.backgroundReminderInterval });
   pi.on("session_shutdown", async () => { await lifecycle.shutdown(); });
 
   registerDownOpener(pi, lifecycle, uiLoad.config.downOpener, uiOwner);

@@ -43,3 +43,23 @@ void it("invalid JSON/values warn without breaking defaults; array keys are boun
         assert.equal(result.warnings.length, 2);
     } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+void it("backgroundReminderInterval defaults to 8, accepts 0 and positive integers, warns and falls back otherwise", () => {
+    const dir = mkdtempSync(join(tmpdir(), "task-ui-config-"));
+    const path = join(dir, CONFIG_FILENAME);
+    try {
+        assert.equal(loadConfig(dir).config.backgroundReminderInterval, 8);
+        for (const value of [0, 1, 5, 120]) {
+            writeFileSync(path, JSON.stringify({ backgroundReminderInterval: value }));
+            const result = loadConfig(dir);
+            assert.equal(result.config.backgroundReminderInterval, value);
+            assert.deepEqual(result.warnings, []);
+        }
+        for (const value of [-1, 1.5, "8", null, true, 1e300]) {
+            writeFileSync(path, JSON.stringify({ backgroundReminderInterval: value }));
+            const result = loadConfig(dir);
+            assert.equal(result.config.backgroundReminderInterval, 8);
+            assert.equal(result.warnings.length, 1, JSON.stringify(value));
+        }
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+});

@@ -19,6 +19,8 @@ export interface TaskView extends TaskIdentity {
     readonly kind: TaskKind;
     readonly title: string;
     readonly description?: string;
+    /** Model-facing short name supplied by the caller; never derived from commands or prompts. */
+    readonly reminderTitle?: string;
     readonly status: TaskStatus;
     readonly executionMode: TaskExecutionMode;
     readonly waitCount: number;

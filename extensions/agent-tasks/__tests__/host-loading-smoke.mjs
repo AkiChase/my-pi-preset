@@ -88,8 +88,9 @@ const assertChild = (result, rootExt, label) => {
   // Composition, widget, phase status, appearance/highlighter, clock and path teardown.
   assert.equal(rootExt.handlers.get("session_shutdown")?.length, 7);
   assert.equal(ext.handlers.get("session_shutdown")?.length, 7);
+  // The agent manager and the background-task reminder are root-only session_start owners.
   for (const event of ["session_start"]) {
-    assert.equal(ext.handlers.get(event)?.length, rootExt.handlers.get(event)?.length - 1, `${label}: no agent ${event}`);
+    assert.equal(ext.handlers.get(event)?.length, rootExt.handlers.get(event)?.length - 2, `${label}: no agent ${event}`);
   }
 };
 const inChild = (ext, fn) => ext.commands.get("probe-child").handler("", { loadChild: fn });
