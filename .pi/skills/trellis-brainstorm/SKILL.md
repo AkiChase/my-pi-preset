@@ -44,7 +44,7 @@ Use a concise title from the user's request. Both the title and `--description` 
 ## Planning Flow
 
 1. Capture the user's request and initial known facts in `prd.md`.
-2. Inspect available evidence before asking questions:
+2. Inspect available evidence before asking questions, choosing the research executor under the project workflow:
    - code, tests, fixtures, and configs
    - README files, docs, existing specs, and domain notes
    - related Trellis tasks, research files, and session history when present

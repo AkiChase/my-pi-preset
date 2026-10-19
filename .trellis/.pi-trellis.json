@@ -228,7 +228,7 @@
   "templates": {
     ".trellis/workflow.md": {
       "origin": "package-default",
-      "sha256": "9ca10c78a738e2efa02b01269f2c74b2fc39a87729b021b163360d236d8359db",
+      "sha256": "8803fe50ce77dfb463143c9ae41377fdb10a2c18b273c20b310b623ba43078ef",
       "mode": 420,
       "source": "resources/templates/workflow.md"
     },
@@ -303,7 +303,7 @@
       "source": "skills/trellis-before-dev/SKILL.md"
     },
     ".pi/skills/trellis-brainstorm/SKILL.md": {
-      "sha256": "48978c62ab1b17c67f51dcb3f9d1e8ade2be1f751800340d77cee9c9a2a3268d",
+      "sha256": "183edd5f9e95e5e6c2d9a2cb4c0c12355164e181a7458a1e5571159f4a610647",
       "mode": 420,
       "source": "skills/trellis-brainstorm/SKILL.md"
     },
@@ -463,7 +463,7 @@
       "source": "skills/trellis-spec-bootstrap/SKILL.md"
     },
     ".pi/skills/trellis-start/SKILL.md": {
-      "sha256": "4d0ae6844fac3ac22d66fd273df6920f8f53815f7b05dc6b5c1117e2defe2c9b",
+      "sha256": "b8668dc31822724f145dea0ebdce3bfbedbeb4f2994595761829b22594adcf76",
       "mode": 420,
       "source": "skills/trellis-start/SKILL.md"
     },
