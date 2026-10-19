@@ -7,6 +7,7 @@ import type { TaskUIConfig } from "./config.ts";
 import type { TaskDetail } from "./types.ts";
 import { TaskPanelModel, type TaskRow } from "./model.ts";
 import { cleanTaskText, taskLine, taskOneLine, type TaskTheme } from "./presentation.ts";
+import { detailRange, renderDetailHeader, sectionTitle } from "./detail-view.ts";
 export { cleanTaskText } from "./presentation.ts";
 const oneLine = taskOneLine;
 
@@ -34,7 +35,6 @@ export class TaskPanel implements Component {
     private ensureSelected = false;
     private refreshing = false;
     private refreshQueued = false;
-    private feedback = "";
     private cachedList?: { width: number; lines: string[] };
     private cachedDetail?: { width: number; lines: string[] };
     private readonly copy: (text: string) => Promise<void>;
@@ -96,7 +96,7 @@ export class TaskPanel implements Component {
         if (visible && previous !== this.selectedLine()) this.ensureSelected = true;
         const selected = this.model.selected;
         if (selected?.key !== this.detailKey) {
-            this.detailKey = selected?.key; this.detail = undefined; this.feedback = "";
+            this.detailKey = selected?.key; this.detail = undefined;
             this.detailScroll = this.scrollView(width => this.detailBody(width));
         }
         if (selected) {
@@ -130,14 +130,12 @@ export class TaskPanel implements Component {
             return;
         }
         if (this.args.config.shortcutBackground.some(key => matchesKey(data, key as Parameters<typeof matchesKey>[1]))) {
-            const count = this.args.coordinator.detachAll();
+            // Results show through status/wait counts; a feedback row would shift the layout.
+            this.args.coordinator.detachAll();
             if (this.disposed) return;
-            this.feedback = `Released ${count} wait(s); execution continues.`;
         } else if (matchesKey(data, "x") && this.model.selected?.capabilities.stop) {
-            const selected = this.model.selected;
-            const stopped = this.args.coordinator.stop(selected);
+            this.args.coordinator.stop(this.model.selected);
             if (this.disposed) return;
-            this.feedback = stopped ? `Stop requested: ${oneLine(selected.title)}` : "Task no longer stoppable.";
         } else if (matchesKey(data, "c")) {
             const path = this.detail?.path ?? this.model.selected?.artifacts[0]?.path;
             if (path) void this.copy(path).then(() => {
@@ -184,24 +182,15 @@ export class TaskPanel implements Component {
         const lines = [...group("Agents", this.rows.filter(row => row.view.kind === "agent" || row.view.kind === "workflow")), ...group("Processes", this.rows.filter(row => row.view.kind === "shell" || row.view.kind === "monitor"))].map(line => truncateToWidth(line, width, "…"));
         this.cachedList = { width, lines }; return lines;
     }
-    private range(): string {
-        return this.detail ? `Bounded preview${this.detail.start !== undefined ? ` ${this.detail.start}–${this.detail.end} / ${this.detail.size}` : ""} · omitted before ${this.detail.omittedBefore ?? 0}, after ${this.detail.omittedAfter ?? 0}; scroll preview only` : "Bounded preview · not full file";
-    }
     private detailBody(width: number): string[] {
         if (this.cachedDetail?.width === width) return this.cachedDetail.lines;
         const selected = this.model.selected;
-        const metadata = selected ? [
-            `Title: ${cleanTaskText(selected.title)}`,
-            ...(selected.description ? [`${selected.kind === "shell" ? "Command" : "Description"}: ${cleanTaskText(selected.description)}`] : []),
-            `${selected.kind} · ${selected.status} · ${selected.executionMode} · waits ${selected.waitCount}`,
-            `Source: ${oneLine(selected.sourceId)} · ID: ${oneLine(selected.taskId)} · run ${oneLine(selected.runId)}`,
-            ...(selected.parentKey ? [`Parent: ${oneLine(selected.parentKey)}`] : []),
-            Object.entries(selected.stats).filter(([key, value]) => value !== undefined && key !== "phases").map(([key, value]) => `${key}: ${cleanTaskText(String(value))}`).join(" · "),
-            ...(selected.executionConfig ? [`Execution config: ${cleanTaskText(JSON.stringify(selected.executionConfig))}`] : []),
-            ...selected.artifacts.map(artifact => `${artifact.kind}: ${cleanTaskText(artifact.path)}`),
-            ...(selected.stats.phases ?? []).flatMap(phase => [`Phase ${phase.index}: ${cleanTaskText(phase.title)}`, ...(phase.detail ? [cleanTaskText(phase.detail)] : [])]),
-        ] : ["No tasks"];
-        const lines = [...metadata, "", this.range(), "", cleanTaskText(this.detail?.text ?? "Conversation/output not established yet.")].flatMap(line => line.split(/\r\n|\n|\r/).flatMap(part => wrapTextWithAnsi(part, Math.max(1, width))));
+        if (!selected) return [this.theme.fg("dim", "No tasks")];
+        const body = this.detail?.text
+            ? cleanTaskText(this.detail.text).split(/\r\n|\n|\r/).flatMap(part => wrapTextWithAnsi(part, Math.max(1, width)))
+            : [this.theme.fg("dim", "Output not established yet.")];
+        const lines = [...renderDetailHeader(selected, this.theme, width, this.args.now?.()), "",
+            ...sectionTitle("Output", this.theme, width, detailRange(this.detail)), ...body];
         this.cachedDetail = { width, lines }; return lines;
     }
     private hints(width: number): string {
@@ -233,8 +222,6 @@ export class TaskPanel implements Component {
     }
     private renderFrame(width: number, rows: number): string[] {
         const header = rows > 1 ? [this.theme.fg("accent", `Task Panel · ${this.page === "list" ? `Tasks (${this.rows.length})` : "Detail"}`)] : [];
-        if (rows > 4 && this.page === "detail") header.push(this.theme.fg("dim", this.range()));
-        if (rows > header.length + 2 && this.feedback) header.push(this.theme.fg("warning", oneLine(this.feedback)));
         const scroll = this.activeScroll;
         const footer = { render: () => footerLines, invalidate() {} };
         let footerLines = this.footerLines(width, rows, "");

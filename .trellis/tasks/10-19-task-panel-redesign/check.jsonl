@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/development/index.md", "reason": "Runtime ownership, tool contract, UI rendering and lifecycle rules"}
+{"file": ".trellis/spec/testing/index.md", "reason": "Test conventions and verification commands"}
+{"file": ".trellis/spec/testing/tmux.md", "reason": "Real terminal verification of panel rendering"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "TaskSource/coordinator/panel contract changes span layers"}

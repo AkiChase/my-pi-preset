@@ -50,14 +50,15 @@ void it("shared panel shows all modes, bounded details, list/detail scroll, safe
     try {
         assert.match(h.panel.render(150).join("\n"), /Agents/);
         h.panel.handleInput("\r");
-        assert.match(h.panel.render(150).join("\n"), /foreground · waits 0/);
+        assert.match(h.panel.render(150).join("\n"), /running · agent · foreground/);
         h.panel.handleInput("\u001b");
         assert.ok(f.reads.some(identity => identity.taskId === a.taskId));
         h.panel.handleInput("j");
         assert.equal(h.panel.model.selected?.key, b.key);
         h.panel.handleInput("\r");
         const rendered = h.panel.render(180).join("\n");
-        assert.match(rendered, /background · waits 2/); assert.match(rendered, /omitted before 8, after 9/); assert.match(rendered, /tokens: 12/);
+        assert.match(rendered, /queued · agent · background/); assert.match(rendered, /Waiting\s+2 waits/); assert.match(rendered, /omitted before 8, after 9/);
+        assert.match(rendered, /Tokens\s+12/); assert.match(rendered, /Activity\s+3 tool uses/); assert.doesNotMatch(rendered, /tokens: |toolUses|\{"/);
         h.panel.handleInput("\u001b[H");
         const first = h.panel.render(180).join("\n"); assert.match(first, /line 0/);
         h.panel.handleInput("j"); assert.notEqual(h.panel.render(180).join("\n"), first);
@@ -341,5 +342,54 @@ void it("wrapped fixed footer preserves selected and global actions on narrow sc
         panel.handleInput("\r");
         const detail = stripTerminalSequences(panel.render(40).join("\n"));
         assert.match(detail, /Esc Back/); assert.match(detail, /x Stop/); assert.match(detail, /c Copy/); assert.match(detail, /All waits/);
+    } finally { panel.dispose(); f.coordinator.dispose(); }
+});
+
+void it("stop and detach-all keep the header height and scroll origin fixed (no feedback row)", async () => {
+    const rows = Array.from({ length: 30 }, (_, i) => view(`row-${i}`));
+    const f = sourceFixture(rows), terminal = { rows: 12, columns: 60 };
+    const lease = f.coordinator.registerWait({ identity: rows[0], kind: "retrieval", label: "row-0" });
+    const panel = new TaskPanel({ coordinator: f.coordinator, config: DEFAULTS, layout, ctx: { ui: { notify() {} } } as unknown as ExtensionContext,
+        theme: { fg: (_color, text) => text }, keys: { matches: () => false }, tui: { terminal, requestRender() {} } as never, done() {} });
+    try {
+        for (const page of ["list", "detail"] as const) {
+            if (page === "detail") panel.handleInput("\r");
+            const before = panel.render(60).map(line => stripTerminalSequences(line));
+            panel.handleInput("x");
+            const afterStop = panel.render(60).map(line => stripTerminalSequences(line));
+            assert.deepEqual(afterStop.slice(0, 3), before.slice(0, 3), `${page}: stop must not insert a row`);
+            assert.doesNotMatch(afterStop.join("\n"), /Stop requested|no longer stoppable/);
+        }
+        panel.handleInput("\u001b[98;6u"); assert.equal((await lease.result).kind, "detached");
+        assert.doesNotMatch(panel.render(60).join("\n"), /Released/);
+        assert.equal(f.stops.length, 2);
+    } finally { panel.dispose(); f.coordinator.dispose(); }
+});
+
+void it("detail renders kind-specific labelled sections without raw stats or JSON", () => {
+    const agent = view("agent", { title: "Explore", description: "Inspect the login flow", stats: { model: "provider/model-x", thinking: "high", durationMs: 83_000,
+        turnCount: 4, maxTurns: 20, toolUses: 1, tokens: 51_234, inputTokens: 40_100, outputTokens: 11_134, cost: 0.034, activity: "reading src/a.ts" },
+        executionConfig: { kind: "agent", phase: "session-effective", model: "provider/model-x", inherit_context: true, differences: [{ field: "thinking", requested: "low", actual: "high", reason: "agent-configuration" }] } });
+    const failed = view("sh", { kind: "shell", status: "failed", title: "tests", description: "npm test", stats: { pid: 42, exitCode: 2, durationMs: 1000 },
+        artifacts: [{ kind: "log", path: "/tmp/sh.log" }] });
+    const monitor = view("mon", { kind: "monitor", description: "tail -f x", stats: { pid: 7 }, artifacts: [],
+        executionConfig: { kind: "monitor", mode: "background", timeout_ms: 600_000, wake_absent_ms: null, batch_interval_ms: 200 } });
+    const f = sourceFixture([agent, failed, monitor]);
+    const colors: string[] = [];
+    const panel = new TaskPanel({ coordinator: f.coordinator, config: DEFAULTS, layout, ctx: { ui: { notify() {} } } as unknown as ExtensionContext,
+        theme: { fg: (color, text) => { colors.push(`${color}:${text}`); return text; } }, keys: { matches: () => false }, tui: { terminal: { rows: 60, columns: 100 }, requestRender() {} } as never, done() {} });
+    const detail = (key: string) => { panel.model.select(f.coordinator.list().find(row => row.key === key)!); panel.handleInput("\r"); const text = stripTerminalSequences(panel.render(100).join("\n")); panel.handleInput("\u001b"); return text; };
+    try {
+        const a = detail(agent.key);
+        for (const pattern of [/Inspect the login flow/, /Model\s+provider\/model-x · thinking high/, /Context\s+inherits context/, /Override\s+thinking: low → high/,
+            /Time\s+1m23s/, /Activity\s+4\/20 turns · 1 tool use/, /Tokens\s+51\.2k \(in 40\.1k · out 11\.1k\)/, /Cost\s+\$0\.03/, /Now\s+reading src\/a\.ts/, /── Artifacts/, /── Output · 20–40 \/ 100/])
+            assert.match(a, pattern);
+        assert.doesNotMatch(a, /\{"|durationMs|inputTokens|Execution config/);
+        const s = detail(failed.key);
+        for (const pattern of [/failed · shell · foreground/, /PID\s+42/, /Exit\s+2/, /── Command/, /\$ npm test/, /log\s+\/tmp\/sh\.log/]) assert.match(s, pattern);
+        assert.ok(colors.includes("error:2"), "non-zero exit uses the error color");
+        const m = detail(monitor.key);
+        assert.match(m, /Monitor\s+deadline 10m · batch 200ms/);
+        assert.doesNotMatch(m, /── Artifacts/);
     } finally { panel.dispose(); f.coordinator.dispose(); }
 });
