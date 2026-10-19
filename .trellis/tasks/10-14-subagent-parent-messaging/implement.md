@@ -57,6 +57,15 @@
 - 测试：嵌套问答、父子代理结束后不唤醒、与主入口行为一致。
 - 独立审查 → 主会话核实 → scoped commit。
 
+### 阶段 3 记录（2026-10-19）
+
+- 实现：`nested-tools.ts` 将嵌套 `subagent_message` 对齐主入口的 nullable `reply` 契约。直属孙代理的已接收消息只通过正在运行的直属父 `AgentSession.sendCustomMessage({ display: false }, { triggerTurn: true, deliverAs: "steer" })` 送达；不走根 `pi`、不创建卡片。前台嵌套 launch 与 reply wait 暂存消息并附在自身工具结果中，父已结束/已恢复时仅保留 mailbox 记录。
+- 独立审查（trellis-check，execution `exec_WyIwOWMwMjQ0NC04MWM1LTQ2OCIsIjEiXQ`）：
+  - Medium（已修）：异步 ordered steering 只捕获 record，child resume 后旧 `<parent-request>` marker 可能进入新执行。现每次发送都围栏校验 admitted `runId` 和 running 状态，失败关闭请求；增加 resume race 回归。
+  - Low（已修）：嵌套问题结果及 delivery details 未使用 canonical `exec_…` identity；现统一由 `executionId` 编码。
+- 复验：审查者 focused 73/73、typecheck exit 0、`git diff --check` 无输出；主会话最终 `pnpm check` 1540/1540（临时 `PI_CODING_AGENT_DIR`）。
+- 未运行真实 provider 或 tmux 终端验证（阶段 4）；workflow child 仍刻意不支持。
+
 ## 阶段 4：文档与集成验证
 
 - 中文用户文档：实际 owning 文档（预计 `docs/extensions/task-composition.md`）说明功能与限制；不写模型参数教学。README 如有索引仅简述。

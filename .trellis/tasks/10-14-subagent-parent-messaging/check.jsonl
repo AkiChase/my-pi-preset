@@ -1,15 +1,13 @@
-{"file": ".trellis/spec/development/index.md", "reason": "Extension execution, lifecycle, tool guidance, model-visible context and UI rendering constraints"}
-{"file": ".trellis/spec/testing/index.md", "reason": "Required regression evidence for execution/notification, tool validation and task UI changes"}
-{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Child channel, backend mailbox, parent delivery and task UI cross module boundaries"}
-{"file": "extensions/agent-tasks/src/parent-messaging.ts", "reason": "Mailbox and channel contract from stage 1"}
-{"file": "extensions/agent-tasks/src/parent-delivery.ts", "reason": "New delivery: cards, hidden context messages, wait holding"}
-{"file": "extensions/agent-tasks/src/index.ts", "reason": "subagent_message reply mode, foreground/agent_manage wait attachment, notification flush ordering"}
-{"file": "extensions/agent-tasks/src/tool-contract.ts", "reason": "parseMessageToolArguments nullable reply"}
-{"file": "extensions/agent-tasks/src/tool-guidance.ts", "reason": "subagent_message usage group"}
-{"file": "extensions/agent-tasks/src/waits.ts", "reason": "Existing wait lease and notification suppression semantics"}
-{"file": "extensions/agent-tasks/src/source.ts", "reason": "Detail messages and latestMessage stat"}
-{"file": "extensions/task-ui/types.ts", "reason": "TaskMessageEntry and latestMessage contract"}
-{"file": "extensions/task-ui/detail-view.ts", "reason": "Messages section renderer"}
-{"file": "extensions/task-ui/panel.ts", "reason": "Messages section placement, list message line and selection line mapping"}
-{"file": "extensions/agent-tasks/__tests__/parent-delivery.test.ts", "reason": "Stage 2 regression tests"}
-{"file": "extensions/agent-tasks/__tests__/parent-messaging.test.ts", "reason": "Stage 1 regression tests"}
+{"file": ".trellis/spec/development/index.md", "reason": "Nested extension execution, session lifecycle, message delivery constraints"}
+{"file": ".trellis/spec/testing/index.md", "reason": "Regression and boundary verification requirements"}
+{"file": "extensions/agent-tasks/src/parent-messaging.ts", "reason": "Mailbox/request/channel contract shared by nested implementation"}
+{"file": "extensions/agent-tasks/src/parent-delivery.ts", "reason": "Shared XML and held-message formatting contract"}
+{"file": "extensions/agent-tasks/src/nested-tools.ts", "reason": "Stage 3 nested tools and parent-session-only delivery"}
+{"file": "extensions/agent-tasks/src/agent-manager.ts", "reason": "Nested ownership, parent run identity, mailbox events and lifecycle"}
+{"file": "extensions/agent-tasks/src/agent-runner.ts", "reason": "Nested tool injection lifecycle"}
+{"file": "extensions/agent-tasks/src/tool-contract.ts", "reason": "Nullable reply parser and modes"}
+{"file": "extensions/agent-tasks/src/tool-guidance.ts", "reason": "Reply-enabled subagent_message guidance"}
+{"file": "extensions/agent-tasks/__tests__/backend-waits.test.ts", "reason": "Nested manager/session test harness and new nested message coverage"}
+{"file": "extensions/agent-tasks/__tests__/input-errors.test.ts", "reason": "Nested schema and validation regression coverage"}
+{"file": "extensions/agent-tasks/__tests__/parent-messaging.test.ts", "reason": "Shared mailbox regression coverage"}
+{"file": "extensions/agent-tasks/__tests__/parent-delivery.test.ts", "reason": "Top-level delivery behavior must remain intact"}

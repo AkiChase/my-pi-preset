@@ -608,3 +608,73 @@ void it("source steer and workflow controls advertise only current windows and r
     assert.equal(wfRow().capabilities.pause, false); assert.equal(f.source.control!(wfRow(), "pause"), false);
   } finally { await f.close(); }
 });
+
+void it("nested question steering cannot leak an old request marker into a resumed child execution", async () => {
+  const f = fixture();
+  try {
+    const parentId = f.spawn(true); await tick();
+    const childId = f.manager.spawn(pi, ctx, "general-purpose", "child", { description: "child", isBackground: true, parentAgentId: parentId }); await tick();
+    const child = f.manager.getRecord(childId)!;
+    const firstSteer = deferred<void>();
+    const steers: string[] = [];
+    child.session!.steer = (async (message: string) => {
+      steers.push(message);
+      if (steers.length === 1) await firstSteer.promise;
+    }) as never;
+    const tool = createNestedSubagentTools({ manager: f.manager, pi, parentAgentId: parentId, depth: 1,
+      maxSubagentDepth: 2, allowedSubagents: "all", configCwd: ctx.cwd })[1]!;
+    const asking = tool.execute("nested-race", completeToolCall(tool.parameters, { agent_id: childId, message: "old question?", reply: "notify" }), undefined, undefined, ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext);
+    await tick();
+    assert.deepEqual(steers, ["old question?"]);
+    f.calls.find(call => call.id === childId)!.finish();
+    await f.manager.getRun(childId)!.terminal; await tick();
+    assert.ok(f.manager.resumeRun(childId, "new execution", undefined, { isBackground: true }));
+    await tick();
+    assert.equal(f.manager.getRecord(childId)!.runId, "2");
+    firstSteer.resolve();
+    const result = await asking;
+    assert.equal(result.isError, true);
+    assert.match(result.content.map(block => block.type === "text" ? block.text : "").join("\n"), /request .* was closed/i);
+    assert.deepEqual(steers, ["old question?"], "the old marker must not enter the resumed execution");
+    f.resumes[0]!.finish(); await f.manager.getRun(childId)!.terminal;
+  } finally { await f.close(); }
+});
+
+void it("nested questions use the mailbox and deliver notices/replies only to the live parent session", async () => {
+  const f = fixture();
+  try {
+    const parentId = f.spawn(true); await tick();
+    const parent = f.manager.getRecord(parentId)!;
+    assert.equal(parent.status, "running");
+    assert.ok(parent.runId);
+    const delivered: { content: string; display: boolean; options: unknown }[] = [];
+    parent.session!.sendCustomMessage = (async (message: { content: string; display: boolean }, options: unknown) => { delivered.push({ ...message, options }); }) as never;
+    const childId = f.manager.spawn(pi, ctx, "general-purpose", "child", { description: "child", isBackground: true, parentAgentId: parentId }); await tick();
+    const child = f.manager.getRecord(childId)!;
+    assert.equal(child.status, "running");
+    assert.equal(child.parentRunId, parent.runId);
+    const steers: string[] = [];
+    child.session!.steer = (async (message: string) => { steers.push(message); }) as never;
+    const tool = createNestedSubagentTools({ manager: f.manager, pi, parentAgentId: parentId, depth: 1,
+      maxSubagentDepth: 2, allowedSubagents: "all", configCwd: ctx.cwd })[1]!;
+    const asked = await tool.execute("nested-notify", completeToolCall(tool.parameters, { agent_id: childId, message: "where?", reply: "notify" }), undefined, undefined, ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext);
+    const askedText = asked.content.map(block => block.type === "text" ? block.text : "").join("\n");
+    const requestId = /Request ID: (req_\w+)/.exec(askedText)![1]!;
+    assert.match(askedText, /Execution ID: exec_/);
+    assert.deepEqual(steers, ["where?", `<parent-request request_id="${requestId}" reply_tool="reply_to_parent" />`]);
+    assert.equal(parent.status, "running"); assert.equal(parent.runId, f.manager.getRecord(parentId)!.runId); assert.ok(parent.session);
+    const channel = f.calls.find(call => call.id === childId)!.options.parentChannel!;
+    const observed: string[] = [];
+    const offObserved = f.manager.subscribeParentMessages((_record, accepted) => { observed.push(accepted.message.text); });
+    assert.equal(channel.send("src/nested.ts", requestId).ok, true);
+    assert.equal(channel.send("remember this", null).ok, true);
+    await tick();
+    offObserved();
+    assert.deepEqual(observed, ["src/nested.ts", "remember this"]);
+    assert.equal(delivered.length, 2);
+    assert.deepEqual(delivered.map(message => message.display), [false, false]);
+    assert.match(delivered[0]!.content, new RegExp(`<reply request-id="${requestId}">src/nested.ts</reply>`));
+    assert.match(delivered[1]!.content, /<notice>remember this<\/notice>/);
+    assert.deepEqual((f as unknown as { sent?: unknown[] }).sent ?? [], [], "nested messages never use the root ExtensionAPI");
+  } finally { await f.close(); }
+});

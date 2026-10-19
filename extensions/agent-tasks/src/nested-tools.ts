@@ -2,6 +2,7 @@ import { copyAgentExecutionConfig, agentExecutionSummary } from "../../runtime-t
 import { nullableControl } from "../../shared/tool-arguments.ts";
 import { createToolCallHeading } from "../../beautify/tool-call-heading.ts";
 import { launchMetadata, launchText } from "../../runtime-tasks/launch.ts";
+import { executionId } from "../../runtime-tasks/execution-id.ts";
 import type { Model } from "@earendil-works/pi-ai";
 import {
   type AgentSession,
@@ -11,6 +12,7 @@ import {
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { StringEnum } from "@earendil-works/pi-ai";
 import {
   buildAgentRegistry,
   getAgentConfigIn,
@@ -22,7 +24,9 @@ import { loadCustomAgents } from "./custom-agents.ts";
 import { isolationParam, resolveAgentInvocationConfig, thinkingParam } from "./invocation-config.ts";
 import { describeModel, resolveModel } from "./model-resolver.ts";
 import { runToolGuidance, messageToolGuidance } from "./tool-guidance.ts";
-import { parseAgentToolArguments, assertMessageToolArguments } from "./tool-contract.ts";
+import { parseAgentToolArguments, parseMessageToolArguments, type MessageToolParams, MESSAGE_REPLY_MODES } from "./tool-contract.ts";
+import { formatHeldMessages, formatSubagentMessages, SUBAGENT_MESSAGE_TYPE } from "./parent-delivery.ts";
+import type { ChildMessage, ReplyWaitOutcome } from "./parent-messaging.ts";
 import { checkModelScope } from "./model-scope.ts";
 import {
   createOutputFilePath,
@@ -94,6 +98,9 @@ export interface NestedAgentManager {
     onSpawned?: (id: string) => void,
   ): Promise<{ id: string; record: AgentRecord }>;
   getRecord(id: string): AgentRecord | undefined;
+  /** Optional lifecycle subscription supplied by AgentManager; test doubles may omit it. */
+  subscribe?(listener: () => void): () => void;
+  subscribeParentMessages?(listener: (record: AgentRecord, accepted: { message: ChildMessage; deliveredToWaiter: boolean }) => void): () => void;
   resume(id: string, prompt: string, signal?: AbortSignal): Promise<AgentRecord | undefined>;
 }
 
@@ -149,8 +156,89 @@ function formatRecord(record: AgentRecord, position: ResultPosition): string {
   return note ? `Nested agent${note}.\n\n${text}` : text;
 }
 
+
+/**
+ * Delivers grandchildren's mailbox messages into exactly one live parent-agent
+ * session. Nested delivery deliberately has no root entry/card path: the root
+ * session neither sees nor wakes for a grandchild's message.
+ */
+function createNestedDelivery(manager: NestedAgentManager, parentAgentId: string) {
+  // Schema-only test doubles intentionally omit the runtime manager surface.
+  // They cannot receive messages, so use an inert delivery rather than making
+  // tool-definition construction itself an observable manager effect.
+  if (typeof manager.getRecord !== "function") {
+    return { hold() {}, take(): readonly ChildMessage[] { return []; }, release() {}, dispose() {} };
+  }
+  const ownerRunId = manager.getRecord(parentAgentId)?.runId;
+  const held = new Map<string, ChildMessage[]>();
+  const key = (id: string, runId: string) => `${id}\u0000${runId}`;
+  const waiting = new Set<string>();
+  let disposed = false;
+  let offState: (() => void) | undefined;
+  const owner = (): AgentRecord | undefined => {
+    const record = manager.getRecord(parentAgentId);
+    return record?.status === "running" && record.runId === ownerRunId && record.session ? record : undefined;
+  };
+  const dispose = () => { if (!disposed) { disposed = true; offMessages(); offState?.(); held.clear(); waiting.clear(); } };
+  const deliver = (child: AgentRecord, messages: readonly ChildMessage[]) => {
+    const parent = owner();
+    if (!parent || !messages.length) return;
+    // Session delivery is intentionally fire-and-forget: the child message is
+    // already retained by its mailbox and a parent-session failure must not
+    // alter its acceptance result.
+    void parent.session!.sendCustomMessage({
+      customType: SUBAGENT_MESSAGE_TYPE,
+      content: formatSubagentMessages(child.id, messages[0]!.runId, messages),
+      display: false,
+      details: { agentId: child.id, executionId: executionId({ taskId: child.id, runId: messages[0]!.runId }, "subagent"), messages: messages.map(message => ({ requestId: message.requestId, seq: message.seq })) },
+    }, { triggerTurn: true, deliverAs: "steer" }).catch(() => {});
+  };
+  const release = (record: AgentRecord, runId: string) => {
+    const identity = key(record.id, runId);
+    waiting.delete(identity);
+    const messages = held.get(identity) ?? [];
+    held.delete(identity);
+    deliver(record, messages);
+  };
+  const offMessages = manager.subscribeParentMessages?.((record, accepted) => {
+    if (disposed || record.parentAgentId !== parentAgentId) return;
+    if (!owner()) { dispose(); return; }
+    if (accepted.deliveredToWaiter) return;
+    const identity = key(record.id, accepted.message.runId);
+    if (waiting.has(identity)) {
+      const messages = held.get(identity) ?? [];
+      messages.push(accepted.message); held.set(identity, messages);
+    } else deliver(record, [accepted.message]);
+  }) ?? (() => {});
+  offState = manager.subscribe?.(() => { if (!owner()) dispose(); });
+  return {
+    hold(record: AgentRecord, runId = record.runId) { if (runId) waiting.add(key(record.id, runId)); },
+    take(record: AgentRecord, runId = record.runId): readonly ChildMessage[] {
+      if (!runId) return [];
+      const identity = key(record.id, runId); waiting.delete(identity);
+      const messages = held.get(identity) ?? []; held.delete(identity); return messages;
+    },
+    release,
+    dispose,
+  };
+}
+
+function nestedWait(waiter: { promise: Promise<ReplyWaitOutcome>; cancel(): void }, signal: AbortSignal | undefined): Promise<ReplyWaitOutcome | { kind: "released" }> {
+  if (!signal) return waiter.promise;
+  if (signal.aborted) return Promise.resolve({ kind: "released" });
+  return new Promise(resolve => {
+    const abort = () => resolve({ kind: "released" });
+    signal.addEventListener("abort", abort, { once: true });
+    void waiter.promise.then(value => { signal.removeEventListener("abort", abort); resolve(value); });
+  });
+}
+
 /** Build child-safe orchestration tools scoped to one parent agent instance. */
 export function createNestedSubagentTools(context: NestedToolContext): ToolDefinition[] {
+  // Do not touch the manager while declaring schemas: host validation must be
+  // side-effect-free even for invalid nested tool calls.
+  let nestedDelivery: ReturnType<typeof createNestedDelivery> | undefined;
+  const deliveryFor = () => nestedDelivery ??= createNestedDelivery(context.manager, context.parentAgentId);
   // Agents resolve from a registry built for THIS branch's config root (under
   // worktree isolation, the copy). Never via registerAgents — that is
   // process-global state shared with the main session and every other agent.
@@ -398,10 +486,15 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
           resolvedType,
           params.prompt,
           { ...options, signal },
-          attachTranscript,
+          (id) => {
+            attachTranscript(id);
+            const child = context.manager.getRecord(id);
+            if (child?.runId) deliveryFor().hold(child, child.runId);
+          },
         );
+        const held = deliveryFor().take(record, record.runId);
         const identity = launchMetadata("subagent", record.id, record.runId ?? "1", "foreground");
-        return { ...textResult(`${launchText(identity)}\n${overrideNoteFor(record)}${formatRecord(record, "inline")}`, record.status === "error"), details: { runtimeLaunch: identity, executionConfig: copyAgentExecutionConfig(record.executionConfig) } };
+        return { ...textResult(`${launchText(identity)}\n${overrideNoteFor(record)}${formatRecord(record, "inline")}${formatHeldMessages(held)}`, record.status === "error"), details: { runtimeLaunch: identity, executionConfig: copyAgentExecutionConfig(record.executionConfig) } };
       } catch (err) {
         const record = childId === undefined ? undefined : context.manager.getRecord(childId);
         const identity = record ? launchMetadata("subagent", record.id, record.runId ?? "1", invocation.runInBackground ? "background" : "foreground") : undefined;
@@ -412,36 +505,88 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
     },
   });
 
+  const steerChains = new Map<string, Promise<unknown>>();
+  function sendInOrder(record: AgentRecord, texts: readonly string[], expectedRunId = record.runId): Promise<"queued" | "sent"> {
+    // A request belongs to the execution that admitted it. Never let an
+    // asynchronous steering chain leak it into a later resume of the same
+    // session: that later execution must receive a newly-created request id.
+    if (!expectedRunId || record.runId !== expectedRunId || record.status !== "running") {
+      return Promise.reject(new Error("The nested agent execution ended before the message could be delivered."));
+    }
+    if (!record.session) { (record.pendingSteers ??= []).push(...texts); return Promise.resolve("queued"); }
+    const previous = steerChains.get(record.id) ?? Promise.resolve();
+    const next = previous.catch(() => {}).then(async () => {
+      for (const text of texts) {
+        if (record.runId !== expectedRunId || record.status !== "running" || !record.session) {
+          throw new Error("The nested agent execution ended before the message could be delivered.");
+        }
+        await record.session.steer(text);
+      }
+      return "sent" as const;
+    });
+    const settled = next.catch(() => {});
+    steerChains.set(record.id, settled);
+    void settled.then(() => { if (steerChains.get(record.id) === settled) steerChains.delete(record.id); });
+    return next;
+  }
+
   const steerTool = defineTool({
     name: NESTED_TOOL_NAMES[1],
     label: "subagent_message",
-    description: "Send guidance to a running nested agent owned by this parent.",
-    promptSnippet: "Send additional guidance to a running owned child",
-    promptGuidelines: messageToolGuidance(),
+    description: "Send guidance or a question to a running nested agent owned by this parent.",
+    promptSnippet: "Send guidance or a question to a running owned child",
+    promptGuidelines: messageToolGuidance({ reply: true }),
     parameters: Type.Object({
       agent_id: Type.String(),
-      message: Type.String({ minLength: 1, description: "Non-blank guidance for the running nested agent." }),
+      message: Type.String({ minLength: 1, description: "Non-blank guidance or question for the running nested agent." }),
+      reply: nullableControl(StringEnum(MESSAGE_REPLY_MODES, { description: "null sends guidance; wait waits for a reply; notify delivers a reply later." })),
     }, { additionalProperties: false }),
-    execute: async (_toolCallId, params) => {
-      try { assertMessageToolArguments(params); }
+    execute: async (_toolCallId, input, signal) => {
+      let params: MessageToolParams;
+      try { params = parseMessageToolArguments(input); }
       catch (err) { return errorResult(err instanceof Error ? err.message : String(err)); }
       const record = context.manager.getRecord(params.agent_id);
       if (!ownsRecord(record, context.parentAgentId) || record.status !== "running") {
         return textResult(`Running nested agent not found or not owned by this parent: "${params.agent_id}".`, true);
       }
-      // Session not ready yet — queue the steer. The manager flushes pending
-      // steers when the session is created (same contract as the top-level tool).
-      if (!record.session) {
-        if (!record.pendingSteers) record.pendingSteers = [];
-        record.pendingSteers.push(params.message);
-        return textResult(`Steering message queued for nested agent ${params.agent_id}; processing is not confirmed.`);
+      if (params.reply === undefined) {
+        try {
+          const state = await sendInOrder(record, [params.message], record.runId);
+          return textResult(state === "queued"
+            ? `Steering message queued for nested agent ${params.agent_id}; processing is not confirmed.`
+            : `Steering message sent to nested agent ${params.agent_id}; reading or processing is not confirmed.`);
+        } catch (err) { return errorResult(`Failed to steer nested agent: ${err instanceof Error ? err.message : String(err)}`); }
       }
-      try {
-        await record.session.steer(params.message);
-      } catch (err) {
-        return textResult(`Failed to steer nested agent: ${err instanceof Error ? err.message : String(err)}`, true);
+      const runId = record.runId;
+      if (!runId) return errorResult("Nested agent has no active execution.");
+      const created = record.mailbox?.createRequest(runId, params.message);
+      if (!created?.ok) return errorResult(created?.error ?? "Nested agent has no parent mailbox.");
+      const request = created.value;
+      // Install the parent-session message observer for both notify and wait.
+      // A notify has no local waiter but its later reply still needs delivery.
+      const nestedDelivery = deliveryFor();
+      const marker = `<parent-request request_id="${request.requestId}" reply_tool="reply_to_parent" />`;
+      const waiter = params.reply === "wait" ? record.mailbox!.waitForReply(request.requestId) : undefined;
+      const headline = (state: string) => `Question ${state} for nested agent ${record.id}.\nRequest ID: ${request.requestId}\nExecution ID: ${executionId({ taskId: record.id, runId }, "subagent")}`;
+      if (waiter) nestedDelivery.hold(record, runId);
+      let state: "queued" | "sent";
+      try { state = await sendInOrder(record, [params.message, marker], runId); }
+      catch (err) {
+        record.mailbox!.failRequest(request.requestId); waiter?.cancel();
+        if (waiter) nestedDelivery.release(record, runId);
+        return errorResult(`Failed to send the question; request ${request.requestId} was closed. ${err instanceof Error ? err.message : String(err)}`);
       }
-      return textResult(`Steering message sent to nested agent ${params.agent_id}; reading or processing is not confirmed.`);
+      if (params.reply === "notify") return textResult(`${headline(state)}\nThe reply will be delivered while you continue.`);
+      const outcome = await nestedWait(waiter!, signal);
+      waiter!.cancel();
+      if (outcome.kind === "released") {
+        nestedDelivery.release(record, runId);
+        return textResult(`${headline(state)}\nWait released; the question stays open and a later reply will be delivered to you.`);
+      }
+      const held = nestedDelivery.take(record, runId);
+      if (outcome.kind === "replied") return textResult(`${headline(state)}\nReply:\n${outcome.message.text}${formatHeldMessages(held)}`);
+      if (outcome.kind === "failed") return errorResult(`${headline(state)}\nThe question could not be delivered.${formatHeldMessages(held)}`);
+      return textResult(`${headline(state)}\nThe ${outcome.reason === "shutdown" ? "session closed" : outcome.reason === "stopped" ? "execution was stopped" : "execution ended"} without a reply.${formatHeldMessages(held)}`);
     },
   });
 

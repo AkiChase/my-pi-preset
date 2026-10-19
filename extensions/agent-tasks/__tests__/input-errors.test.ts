@@ -513,7 +513,7 @@ void it("nested steering blanks and resume conflicts are refused before any mana
         for (const ready of [false, true]) {
             record.session = ready ? { async steer() { steers++; } } as unknown as AgentSession : undefined;
             for (const message of ["", " \t\n", "\u3000"]) {
-                const result = await steer!.execute("call", { agent_id: "owned", message }, undefined, undefined, f.ctx);
+                const result = await steer!.execute("call", { agent_id: "owned", message, reply: null }, undefined, undefined, f.ctx);
                 assert.equal(result.isError, true);
                 assert.match(text(result), /`message` must be a non-empty string/);
             }
