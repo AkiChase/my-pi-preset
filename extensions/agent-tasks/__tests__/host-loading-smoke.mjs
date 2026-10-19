@@ -71,7 +71,9 @@ const assertRoot = (result) => {
   assert.ok(ext.tools.get("bash").definition.parameters.properties.background_after_seconds); assert.equal(ext.tools.get("bash").definition.parameters.properties.run_in_background, undefined);
   assert.equal(ext.toolRenderers.length, 1);
   assert.equal(ext.toolRenderers[0]("bash", () => undefined).renderShell, "default");
-  assert.ok(ext.commands.has("agents"));
+  assert.ok(ext.commands.has("agents-config"));
+  assert.ok(ext.commands.has("agents-create"));
+  assert.equal(ext.commands.has("agents"), false, "legacy /agents is removed");
   for (const event of rootOnlyEvents) assert.equal(ext.handlers.get(event)?.length, 1, `root owns ${event}`);
   for (const event of phaseEvents) assert.equal(ext.handlers.get(event)?.length, event === "message_update" ? 1 : 2, `phase status and tool clock own ${event}`);
   return ext;
@@ -82,7 +84,7 @@ const assertChild = (result, rootExt, label) => {
   for (const name of ["subagent_run", "subagent_workflow", "subagent_message"]) {
     assert.equal(ext.tools.has(name), false, `${label}: no ${name}`);
   }
-  assert.equal(ext.commands.has("agents"), false, `${label}: no root manager command`);
+  for (const name of ["agents", "agents-config", "agents-create"]) assert.equal(ext.commands.has(name), false, `${label}: no root manager ${name}`);
   for (const event of rootOnlyEvents) assert.equal(ext.handlers.has(event), false, `${label}: no root manager ${event}`);
   for (const event of phaseEvents) assert.equal(ext.handlers.get(event)?.length, event === "message_update" ? 1 : 2, `${label}: local phase status and display clock`);
   // Composition, widget, phase status, appearance/highlighter, clock and path teardown.

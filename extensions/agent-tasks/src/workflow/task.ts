@@ -3,7 +3,7 @@
  *
  * A `subagent_workflow` tool call returns a task id immediately and the run continues
  * without it, so the run's state cannot live in the tool call's closure: the
- * inline card, the completion notification and (later) the `/agents → Workflows` dialog
+ * inline card, the completion notification and the Task Panel
  * all read it after `execute` has returned. This is that record, shaped after
  * Claude Code's `local_workflow` task so the fields line up with what the
  * renderers already expect.
@@ -339,7 +339,7 @@ export function resolveResumeTarget(
   if (prior.status === "running" || prior.status === "paused") {
     return {
       ok: false,
-      message: `Workflow "${id}" is still running. Stop it from /agents → Workflows before resuming it.`,
+      message: `Workflow "${id}" is still running. Stop it (agent_manage stop or x in /tasks) before resuming it.`,
     };
   }
   if (prior.journalPath === undefined) {

@@ -23,7 +23,8 @@ import { TaskCoordinator } from "../../task-ui/coordinator.ts";
  * Management is registered once by composition as agent_manage.
  *
  * Commands:
- *   /agents                 — Interactive agent management menu
+ *   /agents-config          — Agent types and settings
+ *   /agents-create          — Create a new agent type
  */
 
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
@@ -56,7 +57,7 @@ import { SubagentScheduler } from "./schedule.ts";
 import { resolveStorePath, ScheduleStore } from "./schedule-store.ts";
 import { applyAndEmitLoaded, loadSettings, type SubagentsSettings, saveAndEmitChanged } from "./settings.ts";
 import { getForegroundOutcomeNote, getStatusNote, partialOutputSuffix } from "./status-note.ts";
-import { type AgentConfig, type AgentInvocation, type AgentMentionMode, type AgentRecord, type JoinMode, type NotificationDetails, type SubagentType, type ViewerMarkdownMode } from "./types.ts";
+import { type AgentConfig, type AgentInvocation, type AgentMentionMode, type AgentRecord, type JoinMode, type NotificationDetails, type SubagentType } from "./types.ts";
 import { createMentionProvider, mentionRoster, type TypeInfo } from "./ui/agent-mention.ts";
 import {
   type AgentActivity,
@@ -75,9 +76,7 @@ import {
   type Theme,
 } from "./activity.ts";
 import { showSchedulesMenu } from "./ui/schedule-menu.ts";
-import { selectItem } from "./ui/select-item.ts";
 import { renderWorkflowCard, renderWorkflowEntryCard } from "./ui/workflow-card.ts";
-import { showWorkflowsMenu, type WorkflowMenuDeps } from "./ui/workflow-menu.ts";
 import { getLifetimeCost, getLifetimeTotal, getSessionContextPercent, type LifetimeUsage, PendingUsagePool, toReportedUsage } from "./usage.ts";
 import { decideWorkflowCollision, FOREIGN_WORKFLOW_TOOL_NAMES } from "./workflow/collisions.ts";
 import { WORKFLOW_ENTRY_TYPE, type WorkflowEntryData, workflowEntryData } from "./workflow/entry.ts";
@@ -504,24 +503,6 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
   let showCost = false;
   function isShowCostEnabled(): boolean { return showCost; }
   function setShowCost(b: boolean): void { showCost = b; }
-  /**
-   * How much of the conversation viewer renders as Markdown. Read through a
-   * getter by the viewer rather than captured like `showCost`, because the
-   * viewer's `m` key writes back here while the overlay is on screen.
-   */
-  let viewerMarkdown: ViewerMarkdownMode = "assistant";
-  function getViewerMarkdown(): ViewerMarkdownMode { return viewerMarkdown; }
-  function setViewerMarkdown(mode: ViewerMarkdownMode): void { viewerMarkdown = mode; }
-  /**
-   * The viewer's `m` key, from either entry point: set the mode and persist it,
-   * so the key and `/agents → Settings` stay one setting rather than one per
-   * entry point. `ctx` carries only the warning a failed write notifies with,
-   * and the fleet list may be acting without one.
-   */
-  function chooseViewerMarkdown(mode: ViewerMarkdownMode, ctx?: ExtensionCommandContext): void {
-    setViewerMarkdown(mode);
-    persistSettings(ctx, `Viewer markdown set to ${mode}`);
-  }
   const pendingUsage = new PendingUsagePool();
 
   // ---- Cancellable pending notifications ----
@@ -1290,7 +1271,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
   // Master switch for scripted workflows. Defaults to ON. Off means the
   // `subagent_workflow` tool is never registered: the model is not told the
   // feature exists (zero context cost) and has nothing to call. The
-  // `/agents → Workflows` view and `--subagents-workflow-file` are refused too, so
+  // `--subagents-workflow-file` flag is refused too, so
   // there is no second door into the same machinery.
   //
   // `workflowsPinned` records that the answer came from the user — a boolean in
@@ -1311,7 +1292,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
   // When enabled, the three hardcoded default agents (general-purpose, Explore,
   // Plan) are not registered. User-defined agents from project/global custom
   // agent dirs are completely unaffected — only DEFAULT_AGENTS are suppressed.
-  // Defaults to false; opt-in via `/agents → Settings` or agent-tasks.json.
+  // Defaults to false; opt-in via `/agents-config → Settings` or agent-tasks.json.
   // State lives in agent-types.ts (isDefaultsDisabled) because registerAgents
   // needs it; this wrapper just re-registers after flipping it.
   function setDisableDefaultAgents(b: boolean): void {
@@ -1507,7 +1488,6 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       setFallbackSubagent: setFallbackSubagent,
       setReportUsage,
       setShowCost,
-      setViewerMarkdown,
     },
     (event, payload) => pi.events.emit(event, payload),
   );
@@ -2700,7 +2680,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     // than saying why nothing ran.
     if (!isWorkflowsEnabled()) {
       report(
-        `--${WORKFLOW_FILE_FLAG} ignored: workflows are off. Turn them on in /agents → Settings → Workflows, ` +
+        `--${WORKFLOW_FILE_FLAG} ignored: workflows are off. Turn them on in /agents-config → Settings → Workflows, ` +
           'or set `"workflowsEnabled": true` in .pi/agent-tasks.json.',
         "warning",
       );
@@ -2854,7 +2834,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     },
   }));
 
-  // ---- /agents interactive menu ----
+  // ---- /agents-config and /agents-create ----
 
   // Directory resolution and the frontmatter edits live in agent-file-toggle.ts
   // so they are reachable from tests — this command handler is only registered
@@ -2876,88 +2856,6 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     const norm = (s: string) => s.toLowerCase().replace(/\./g, "-").replace(/-\d{8}$/, "");
     if (norm(cfg.model) === norm(resolvedFull)) return label;
     return `${label} (→ ${resolvedFull.replace(/-\d{8}$/, "")})`;
-  }
-
-  async function showAgentsMenu(ctx: ExtensionCommandContext) {
-    assertActive();
-    reloadCustomAgents();
-    const allNames = getAllTypes();
-
-    // Build select options
-    const options: string[] = [];
-
-    // Running agents entry (only if there are active agents)
-    const agents = manager.listAgents().filter(isTopLevelAgent);
-    if (agents.length > 0) {
-      const running = agents.filter(a => a.status === "running" || a.status === "queued").length;
-      const done = agents.filter(a => a.status === "completed" || a.status === "steered").length;
-      options.push(`Running agents (${agents.length}) — ${running} running, ${done} done`);
-    }
-
-    // Agent types list
-    if (allNames.length > 0) {
-      options.push(`Agent types (${allNames.length})`);
-    }
-
-    // Scheduled jobs entry (always present when scheduler is active)
-    if (scheduler.isActive()) {
-      const jobCount = scheduler.list().length;
-      options.push(`Scheduled jobs (${jobCount})`);
-    }
-
-    // Workflow runs, on the same terms as scheduled jobs: shown only when the
-    // feature is on, so the menu never advertises something switched off.
-    if (isWorkflowsEnabled()) {
-      options.push(`Workflows (${workflowTasks.size})`);
-    }
-
-    // Actions
-    options.push("Create new agent");
-    options.push("Settings");
-
-    const noAgentsMsg = allNames.length === 0 && agents.length === 0
-      ? "No agents found. Create specialized subagents that can be delegated to.\n\n" +
-        "Each subagent has its own context window, custom system prompt, and specific tools.\n\n" +
-        "Try creating: Code Reviewer, Security Auditor, Test Writer, or Documentation Writer.\n\n"
-      : "";
-
-    if (noAgentsMsg) {
-      ctx.ui.notify(noAgentsMsg, "info");
-    }
-
-    const choice = await ctx.ui.select("Agents", options);
-    assertActive();
-    if (!choice) return;
-
-    if (choice.startsWith("Running agents (")) {
-      await showRunningAgents(ctx);
-      assertActive();
-      await showAgentsMenu(ctx);
-      assertActive();
-    } else if (choice.startsWith("Agent types (")) {
-      await showAllAgentsList(ctx);
-      assertActive();
-      await showAgentsMenu(ctx);
-      assertActive();
-    } else if (choice.startsWith("Scheduled jobs (")) {
-      await showSchedulesMenu(ctx, scheduler);
-      assertActive();
-      await showAgentsMenu(ctx);
-      assertActive();
-    } else if (choice.startsWith("Workflows (")) {
-      await showWorkflowsMenu(ctx, workflowMenuDeps);
-      assertActive();
-      await showAgentsMenu(ctx);
-      assertActive();
-    } else if (choice === "Create new agent") {
-      await showCreateWizard(ctx);
-      assertActive();
-    } else if (choice === "Settings") {
-      await showSettings(ctx);
-      assertActive();
-      await showAgentsMenu(ctx);
-      assertActive();
-    }
   }
 
   async function showAllAgentsList(ctx: ExtensionCommandContext) {
@@ -3029,59 +2927,6 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       await showAllAgentsList(ctx);
       assertActive();
     }
-  }
-
-  async function showRunningAgents(ctx: ExtensionCommandContext) {
-    const agents = manager.listAgents().filter(isTopLevelAgent);
-    if (agents.length === 0) {
-      ctx.ui.notify("No agents.", "info");
-      return;
-    }
-
-    // Numbered + item-paired. Two same-type agents spawned together with the
-    // same description render identically here, and resolving the choice by
-    // string match would open whichever came first.
-    const record = await selectItem(ctx.ui, "Running agents", agents, a => {
-      const dn = getDisplayName(a.type);
-      const dur = formatDuration(a.startedAt, a.completedAt);
-      return `${dn} (${a.description}) · ${a.toolUses} tools · ${a.status} · ${dur}`;
-    });
-    assertActive();
-    if (!record) return;
-
-    await viewAgentConversation(ctx, record);
-    assertActive();
-    // Back-navigation: re-show the list
-    await showRunningAgents(ctx);
-    assertActive();
-  }
-
-  async function viewAgentConversation(ctx: ExtensionCommandContext, record: AgentRecord) {
-    assertActive();
-    if (!record.session) {
-      ctx.ui.notify(`Agent is ${record.status === "queued" ? "queued" : "expired"} — no session available.`, "info");
-      return;
-    }
-
-    const { ConversationViewer, VIEWPORT_HEIGHT_PCT } = await import("./ui/conversation-viewer.ts");
-    assertActive();
-    const session = record.session;
-    const activity = agentActivity.get(record.id);
-
-    await ctx.ui.custom<undefined>(
-      (tui, theme, keybindings, done) => {
-        return new ConversationViewer(tui, session, record, activity, theme, done, () => {
-          if (manager.abort(record.id)) {
-            ctx.ui.notify(`Stopped "${record.description}".`, "info");
-          }
-        }, keybindings, (message: string) => manager.steer(record.id, message), showCost, getViewerMarkdown, (mode) => chooseViewerMarkdown(mode, ctx));
-      },
-      {
-        overlay: true,
-        overlayOptions: { anchor: "center", width: "90%", maxHeight: `${VIEWPORT_HEIGHT_PCT}%` },
-      },
-    );
-    assertActive();
   }
 
   async function showAgentDetail(ctx: ExtensionCommandContext, name: string) {
@@ -3506,7 +3351,6 @@ Write the file using the write tool. Only write the file, nothing else.`;
       fallbackSubagent: getFallbackSubagent(),
       reportUsage: isReportUsageEnabled(),
       showCost: isShowCostEnabled(),
-      viewerMarkdown: getViewerMarkdown(),
     } satisfies SubagentsSettings;
   }
 
@@ -3661,17 +3505,9 @@ Write the file using the write tool. Only write the file, nothing else.`;
           id: "showCost",
           label: "Show cost",
           description:
-            "Show an estimated `~$0.0042` beside subagent token counts in the widget, fleet view, results and notifications. Priced by pi from the model's rates — omitted entirely for a model it has no rates for.",
+            "Show an estimated `~$0.0042` beside subagent token counts in the widget, Task Panel, results and notifications. Priced by pi from the model's rates — omitted entirely for a model it has no rates for.",
           currentValue: isShowCostEnabled() ? "on" : "off",
           values: ["on", "off"],
-        },
-        {
-          id: "viewerMarkdown",
-          label: "Viewer markdown",
-          description:
-            "How much of the conversation viewer renders as Markdown. assistant = assistant text only (default); all = tool results too, for tools that emit Markdown — accepting that a Markdown pass over a diff or a log eats `#` comments, swallows a `---` line and re-fences indented output; off = everything verbatim. `m` in the viewer cycles the same setting (footer: raw / md / md+).",
-          currentValue: getViewerMarkdown(),
-          values: ["off", "assistant", "all"],
         },
         {
           id: "agentMentions",
@@ -3816,9 +3652,6 @@ Write the file using the write tool. Only write the file, nothing else.`;
         const enabled = value === "on";
         setShowCost(enabled);
         notifyApplied(ctx, `Cost display ${enabled ? "enabled" : "disabled"}`);
-      } else if (id === "viewerMarkdown") {
-        setViewerMarkdown(value as ViewerMarkdownMode);
-        notifyApplied(ctx, `Viewer markdown set to ${value}`);
       } else if (id === "agentMentions") {
         const mode = value as AgentMentionMode;
         setAgentMentionMode(mode);
@@ -3959,24 +3792,39 @@ Write the file using the write tool. Only write the file, nothing else.`;
     ctx.ui.notify(message, level);
   }
 
-  pi.registerCommand("agents", {
-    description: "Manage agents",
+  /**
+   * Configuration home: agent types and settings. Runtime agents, workflows and
+   * their controls live in the Task Panel, not here.
+   */
+  async function showAgentsConfig(ctx: ExtensionCommandContext) {
+    assertActive();
+    reloadCustomAgents();
+    const types = `Agent types (${getAllTypes().length})`;
+    const choice = await ctx.ui.select("Agents config", [types, "Settings"]);
+    assertActive();
+    if (!choice) return;
+    if (choice === types) await showAllAgentsList(ctx);
+    else await showSettings(ctx);
+    assertActive();
+    await showAgentsConfig(ctx);
+  }
+
+  pi.registerCommand("agents-config", {
+    description: "Configure agent types and agent settings",
     handler: async (_args, ctx) => {
       assertActive();
-      await showAgentsMenu(ctx);
+      await showAgentsConfig(ctx);
       assertActive();
     },
   });
 
-  /**
-   * What `/agents → Workflows` and the fleet list's `workflow` rows need from
-   * here. One object, built once: both entry points open the same inspector,
-   * and handing them different views of the session would let the two drift.
-   */
-  const workflowMenuDeps: WorkflowMenuDeps = {
-    tasks: workflowTasks,
-    getRecord: id => manager.getRecord(id),
-    viewAgentConversation,
-  };
+  pi.registerCommand("agents-create", {
+    description: "Create a new agent type",
+    handler: async (_args, ctx) => {
+      assertActive();
+      await showCreateWizard(ctx);
+      assertActive();
+    },
+  });
 
 }

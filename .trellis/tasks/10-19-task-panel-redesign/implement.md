@@ -91,3 +91,25 @@ tmux 真实终端：列表页、三类详情页、agent 对话（运行中 / 已
   - 第一次运行失败：`TUI` 是抽象类且没有导出，有界等待 10 秒后超时退出。
   - 演示结束时快速连按两次 Esc 没有退出，可能被合并成了一个转义序列；trap 已清理 server，确认没有残留进程。
   - 这次演示不是真实 pi CLI，也没有调用 provider。
+
+### 阶段 4（2026-10-19）
+
+- 改动：
+  - 删除 `/agents`、`showAgentsMenu`、`showRunningAgents`、`viewAgentConversation`、`workflowMenuDeps`，以及 `ui/conversation-viewer.ts`、`viewer-keys.ts`、`workflow-dialog.ts`、`workflow-menu.ts`。
+  - 新增 `/agents-config`（Agent types、Settings 两个入口，子页面返回后回到首页）和 `/agents-create`。
+  - 删除 `viewerMarkdown` 设置和 `ViewerMarkdownMode`。
+  - 用户和模型可见文本中原来指向 `/agents → Workflows` 的地方，改为 `/tasks` 或 `agent_manage stop`，涉及 workflow resume 拒绝提示、workflow card、`subagent_workflow` usage、`workflow-api.md`。
+  - 更新 `docs/extensions/task-composition.md`（命令表、面板按键、详情布局、消息输入框和 workflow 控制）和 `PROVENANCE.md`。
+- 测试：`host-loading-smoke.mjs` 改为断言 root 注册 `agents-config` / `agents-create`、不注册 `agents`，子会话三者都不注册；`tool-waits` 的 factory 改为捕获命令，新用例覆盖首页的两个入口、类型列表与 Settings 的往返、创建向导入口、旧 `viewerMarkdown` 配置可以加载且导航时不写盘。
+- 中途失败：loading 测试 1 个失败，原因是旧断言仍要求注册 `agents`，属于预期变化，已更新断言；新用例因 fixture 的 `modelRegistry` 为空对象而报错，测试上下文补了最小 registry。
+- 独立审查（trellis-check，agent 64cc7f66-6794-404）：没有阻塞问题。做了两处修复：
+  - PROVENANCE 原来写"不改写用户文件"，实际上之后在 Settings 保存时会写入完整快照，已改为准确描述；
+  - 补强测试（旧配置、Settings 往返、不写盘）。
+  主会话核实后另外修正了文档：Enter 对排队中的 Agent 同样可用。审查指出调度相关的 UI 入口和文案只剩一半，留到阶段 5 处理。
+- 验证：六组测试共 900/900 PASS，`pnpm typecheck` PASS，`git diff --check` PASS。
+- 真实 pi CLI 的 tmux 验证：pi 1.3.0，隔离 HOME / `PI_CODING_AGENT_DIR` / cwd，加 `--offline -ne -ns -np -nc --no-mcp --no-session`，只加载本仓库的 `extensions/task-composition.ts`，没有模型。结果：
+  - 输入 `/agents` 时自动补全只给出 `agents-config` 和 `agents-create`；
+  - config 首页只有两个入口；
+  - Agent types 和 Settings 正常显示，Settings 里仍有 Scheduling，留到阶段 5；
+  - `/agents-create` 打开位置选择；
+  - Ctrl+D 退出，`PI_EXITED=0`，没有残留进程，隔离目录已删除。

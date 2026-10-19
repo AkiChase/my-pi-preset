@@ -1,12 +1,12 @@
 // Persistence for pi-subagents operational settings.
 // - Global:  ~/.pi/agent/agent-tasks.json (via getAgentDir()) — manual defaults, never written here
-// - Project: <cwd>/.pi/agent-tasks.json — written by /agents → Settings; overrides global on load
+// - Project: <cwd>/.pi/agent-tasks.json — written by /agents-config → Settings; overrides global on load
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { NO_FALLBACK } from "./agent-types.ts";
-import type { AgentMentionMode, JoinMode, ViewerMarkdownMode } from "./types.ts";
+import type { AgentMentionMode, JoinMode } from "./types.ts";
 
 export interface SubagentsSettings {
   maxConcurrent?: number;
@@ -35,7 +35,7 @@ export interface SubagentsSettings {
   /**
    * 0 = unlimited — the extension's single source of truth for that convention:
    * `normalizeMaxTurns()` in agent-runner.ts treats 0 → `undefined`, and the
-   * `/agents` → Settings input prompt explicitly says "0 = unlimited".
+   * `/agents-config` → Settings input prompt explicitly says "0 = unlimited".
    */
   defaultMaxTurns?: number;
   graceTurns?: number;
@@ -184,7 +184,7 @@ export interface SubagentsSettings {
    * `resolveWorkflowCollisions` in index.ts.
    *
    * Read once at extension init, before registration, so flipping it in
-   * `/agents → Settings` takes effect on the next pi session — the same
+   * `/agents-config → Settings` takes effect on the next pi session — the same
    * contract `schedulingEnabled` has, and for the same reason: a tool spec is
    * fixed once pi has it.
    */
@@ -237,7 +237,7 @@ export interface SubagentsSettings {
   reportUsage?: boolean;
   /**
    * Whether the subagent surfaces show an estimated dollar cost next to their
-   * token counts (conversation viewer, foreground results,
+   * token counts (Task Panel, foreground results,
    * completion notifications). Defaults to `false`. Applied live.
    *
    * Rendered as `~$0.0042` — the tilde marks it as pi's reported estimate
@@ -248,20 +248,6 @@ export interface SubagentsSettings {
    * what the parent session counts.
    */
   showCost?: boolean;
-
-  /**
-   * How much of the conversation viewer's transcript renders as Markdown.
-   * Defaults to `assistant`. Applied live — the viewer's `m` key cycles this
-   * same setting, so a choice made in the overlay persists like one made in
-   * `/agents → Settings`.
-   *
-   * Scoped rather than all-or-nothing because the two kinds of content have
-   * different contracts: assistant text is authored as Markdown, while a tool
-   * result is whatever bytes the tool produced. Rendering the latter as
-   * Markdown is lossy in ways that look like the tool misbehaved — see
-   * `ViewerMarkdownMode` for the specific rewrites — so `all` is opt-in.
-   */
-  viewerMarkdown?: ViewerMarkdownMode;
 }
 
 /** Setter hooks used by applySettings to wire persisted values into in-memory state. */
@@ -285,14 +271,12 @@ export interface SettingsAppliers {
   setFallbackSubagent: (v: string | undefined) => void;
   setReportUsage: (b: boolean) => void;
   setShowCost: (b: boolean) => void;
-  setViewerMarkdown: (mode: ViewerMarkdownMode) => void;
 }
 
 /** Emit callback — a subset of `pi.events.emit` to keep helpers testable. */
 export type SettingsEmit = (event: string, payload: unknown) => void;
 
 const VALID_JOIN_MODES: ReadonlySet<string> = new Set<JoinMode>(["async", "group", "smart"]);
-const VALID_VIEWER_MARKDOWN_MODES: ReadonlySet<string> = new Set<ViewerMarkdownMode>(["off", "assistant", "all"]);
 const VALID_AGENT_MENTION_MODES: ReadonlySet<string> = new Set<AgentMentionMode>(["model", "direct", "off"]);
 
 // Sanity ceilings — prevent hand-edited configs from asking for values that
@@ -385,9 +369,6 @@ function sanitize(raw: unknown): SubagentsSettings {
   if (typeof r.showCost === "boolean") {
     out.showCost = r.showCost;
   }
-  if (typeof r.viewerMarkdown === "string" && VALID_VIEWER_MARKDOWN_MODES.has(r.viewerMarkdown)) {
-    out.viewerMarkdown = r.viewerMarkdown as ViewerMarkdownMode;
-  }
   if (typeof r.workflowsEnabled === "boolean") {
     out.workflowsEnabled = r.workflowsEnabled;
   }
@@ -471,7 +452,6 @@ export function applySettings(s: SubagentsSettings, appliers: SettingsAppliers):
   if (typeof s.worktreeIsolation === "boolean") appliers.setWorktreeIsolation(s.worktreeIsolation);
   if (typeof s.reportUsage === "boolean") appliers.setReportUsage(s.reportUsage);
   if (typeof s.showCost === "boolean") appliers.setShowCost(s.showCost);
-  if (s.viewerMarkdown) appliers.setViewerMarkdown(s.viewerMarkdown);
   if (typeof s.workflowsEnabled === "boolean") appliers.setWorkflowsEnabled(s.workflowsEnabled);
 }
 

@@ -3,7 +3,7 @@ import { executionId } from "../../runtime-tasks/execution-id.ts";
 import { registerManagementTool } from "../../runtime-tasks/tools.ts";
 import { createRuntimeTaskFacade, type RuntimeTaskCapability } from "../../runtime-tasks/facade.ts";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { it, type TestContext } from "node:test";
@@ -38,6 +38,7 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
   const previous = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = config;
   const tools = new Map<string, Parameters<ExtensionAPI["registerTool"]>[0]>();
+  const commands = new Map<string, Parameters<ExtensionAPI["registerCommand"]>[1]>();
   const handlers = new Map<string, ((...args: unknown[]) => unknown)[]>();
   const entries: string[] = [];
   const rpcReplies: { name: string; value: unknown }[] = [];
@@ -79,7 +80,8 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
   // Factory requires SDK registration surfaces only. The boundary cast avoids
   // inventing a second SDK tool type; all execute calls use its real definition.
   const pi = { registerTool(tool: Parameters<ExtensionAPI["registerTool"]>[0]) { tools.set(tool.name, tool); },
-    registerMessageRenderer() {}, registerEntryRenderer() {}, registerFlag() {}, registerCommand() {},
+    registerMessageRenderer() {}, registerEntryRenderer() {}, registerFlag() {},
+    registerCommand(name: string, command: Parameters<ExtensionAPI["registerCommand"]>[1]) { commands.set(name, command); },
     on(name: string, handler: (...args: unknown[]) => unknown) { const list = handlers.get(name) ?? []; list.push(handler); handlers.set(name, list); },
     events, appendEntry(type: string) { entries.push(type); }, sendMessage(message: typeof notices[number]) { host.send?.(message); notices.push(message); },
     exec: host.exec, getFlag: () => host.flag, getAllTools: () => [], getActiveTools: () => [],
@@ -107,7 +109,7 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
     hasRunning(): boolean; getRecord(id: string): AgentRecord | undefined;
   };
   const execute = (name: string, params: Record<string, unknown>, signal?: AbortSignal, call: { id: string | undefined } = { id: "offline-call" }) => tools.get(name)!.execute(call.id!, completeToolCall(tools.get(name)!.parameters, params), signal, () => { throw new Error("inline renderer failed"); }, ctx);
-  return { coordinator, lifecycle, source, calls, events, rpcReplies, entries,
+  return { coordinator, lifecycle, source, calls, events, rpcReplies, entries, commands,
     rpc: (value: unknown) => events.emit("subagents:rpc:spawn", value),
     shutdownHandlers: () => handlers.get("session_shutdown")!.length, tools, resumes, notices, execute, ctx, registry, root,
     input: (text: string) => handlers.get("input")![0]!({ text, source: "interactive" }, ctx),
@@ -1139,5 +1141,43 @@ for (const background of [false, true]) void it(`registered ${background ? "back
     f.resumes[0]!.finish(); await resume; await tick();
     assert.equal(JSON.stringify(launchConfig), stored);
     assert.deepEqual(record.executionConfig?.differences, background ? undefined : [{ field: "mode", requested: "background", actual: "foreground", reason: "agent-configuration" }], "only this resume mode request is applicable");
+  } finally { await f.close(); }
+});
+
+void it("agents-config opens types/settings and returns home; agents-create starts the wizard; legacy /agents is gone", async () => {
+  // A removed setting key in an existing config is ignored, not reported or rewritten.
+  const f = await factory({ viewerMarkdown: "all" });
+  const globalConfig = join(f.root, "agent", "agent-tasks.json"), globalBytes = readFileSync(globalConfig, "utf8");
+  try {
+    const loaded = f.rpcReplies.find(reply => reply.name === "subagents:settings_loaded")?.value as { settings: Record<string, unknown> } | undefined;
+    assert.ok(loaded); assert.equal(Object.hasOwn(loaded.settings, "viewerMarkdown"), false);
+    assert.deepEqual(["agents", "agents-config", "agents-create"].map(name => f.commands.has(name)), [false, true, true]);
+    const selects: { title: string; options: string[] }[] = [];
+    let customs = 0, pick: (step: number, options: string[]) => string | undefined = () => undefined;
+    const ui = { notify() {}, custom: async () => { customs++; return undefined; },
+      select: async (title: string, options: string[]) => { selects.push({ title, options }); return pick(selects.length, options); } };
+    const ctx = { ...f.ctx, ui, hasUI: true, modelRegistry: { getAll: () => [], getAvailable: () => [], find: () => undefined } } as unknown as import("@earendil-works/pi-coding-agent").ExtensionCommandContext;
+
+    await f.commands.get("agents-config")!.handler("", ctx);
+    assert.equal(selects[0]!.title, "Agents config");
+    assert.match(selects[0]!.options[0]!, /^Agent types \(\d+\)$/); assert.equal(selects[0]!.options[1], "Settings");
+    assert.equal(selects[0]!.options.length, 2, "no runtime, workflow, schedule or create entries");
+
+    // Agent types → type list overlay → back to the config home → cancel.
+    selects.length = 0; pick = (step, options) => step === 1 ? options[0] : undefined;
+    await f.commands.get("agents-config")!.handler("", ctx);
+    assert.equal(customs, 1); assert.deepEqual(selects.map(entry => entry.title), ["Agents config", "Agents config"]);
+
+    // Settings → settings overlay → back to the config home → cancel.
+    selects.length = 0; pick = (step, options) => step === 1 ? options[1] : undefined;
+    await f.commands.get("agents-config")!.handler("", ctx);
+    assert.equal(customs, 2); assert.deepEqual(selects.map(entry => entry.title), ["Agents config", "Agents config"]);
+
+    selects.length = 0; pick = () => undefined;
+    await f.commands.get("agents-create")!.handler("", ctx);
+    assert.equal(selects[0]!.title, "Choose location"); assert.match(selects[0]!.options[0]!, /Project/);
+
+    assert.equal(readFileSync(globalConfig, "utf8"), globalBytes, "global config is never rewritten");
+    assert.equal(existsSync(join(f.ctx.cwd, ".pi", "agent-tasks.json")), false, "navigation without a change persists nothing");
   } finally { await f.close(); }
 });

@@ -8,7 +8,7 @@ Provide all top-level fields: script, scriptPath, name, args, resumeFromRunId. N
 
 Pass the first script inline, not through Write first. Each invocation automatically saves the script in the session directory and returns its path. To iterate, edit that file and call with `{script: null, scriptPath: "<path>", name: null, args: null, resumeFromRunId: null}` instead of resending source. Reusable scripts belong in `.pi/workflows/<name>.js`, `.agents/workflows/`, or `<agent dir>/workflows/`; call via name with other sources/resumeFromRunId null and explicit args. File edits still require task authorization.
 
-The tool runs in the background and immediately returns execution_id, not completion. Use agent_manage and /agents → Workflows for progress; completion is notified automatically. Do not sleep/poll solely to detect completion. Deterministic script control flow encodes fan-out, verification and synthesis.
+The tool runs in the background and immediately returns execution_id, not completion. Use agent_manage and /tasks for progress; completion is notified automatically. Do not sleep/poll solely to detect completion. Deterministic script control flow encodes fan-out, verification and synthesis.
 
 ## Source and meta
 
@@ -85,6 +85,6 @@ Concurrent agent() cap per workflow is `max(1, min(16, available CPUs - 2))`; ex
 
 ## Replay
 
-Results include execution_id. After pause, kill or script editing, relaunch a finished same-session run with scriptPath/resumeFromRunId, script/name null and explicit args. The longest unchanged agent() prefix returns recorded results instantly; the first edited/new call and everything after runs live. Same script + same args → 100% cache hit. This is a prefix, not a lookup: later matches are not reused after an earlier change. Journaled failure ends the prefix; failure at agent 5 retries from agent 5. The run must be finished in the same session; stop via /agents → Workflows first. Replay gets a new execution_id.
+Results include execution_id. After pause, kill or script editing, relaunch a finished same-session run with scriptPath/resumeFromRunId, script/name null and explicit args. The longest unchanged agent() prefix returns recorded results instantly; the first edited/new call and everything after runs live. Same script + same args → 100% cache hit. This is a prefix, not a lookup: later matches are not reused after an earlier change. Journaled failure ends the prefix; failure at agent 5 retries from agent 5. The run must be finished in the same session; stop it first (agent_manage stop or x in /tasks). Replay gets a new execution_id.
 
 Before diagnosing an empty/unexpected completed result, read `<run id>.workflow.jsonl` beside the script: it records each agent's actual return. Do not assume cached results are non-empty. Time/random globals are unavailable; supply timestamps via args or stamp after return. These are the existing replay semantics, not a replacement for result verification.

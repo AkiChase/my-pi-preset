@@ -159,3 +159,11 @@ actualSDKhost/editor/Pretty/TUI分发回归与GC4/4资源回收通过（parentta
 ## 2026-10-13：beautify 替换 Pretty
 
 移除 Pretty runtime 与输入框专属代理，保留本后端、root/child ALS guard 与统一生命周期。Down 与 beautify 共享局部 editor-handoff 小工具，两个 session_start 顺序均在实际活实例上安装，Down 禁用仍有外观。原 Pretty editor/host fixture 迁移为真实 SDK + beautify + 离线历史 fixture；hard loader 将 shutdown 断言更新为 composition、appearance、highlighter 三项，原始工具／manager 归属不变。
+
+## 2026-10-19：Task Panel 承接运行态交互，拆分 `/agents`
+
+- 删除 `/agents` 命令及其运行态子菜单（Running agents、Workflows），以及只服务它们的 `src/ui/conversation-viewer.ts`、`src/ui/viewer-keys.ts`、`src/ui/workflow-dialog.ts`、`src/ui/workflow-menu.ts`。运行态的对话查看、steer、workflow 的 pause/resume、子 Agent 的 skip/retry 都改由 Task Panel 通过 `src/source.ts` 的有限 capability 提供；steer 只对非 workflow 子 Agent 开放，与旧 viewer 不同。
+- 新增 `/agents-config`（Agent types、Settings 两个入口，复用原 `showAllAgentsList`、`showAgentDetail`、`showSettings`）和 `/agents-create`（原创建向导）。
+- 删除 `viewerMarkdown` 设置及 `ViewerMarkdownMode`。旧配置中的该键被忽略，不报错，加载时也不改写用户文件；之后在 `/agents-config` 的 Settings 中修改任意设置时，项目文件按现有方式写入完整快照，不再包含该键。面板对话固定按 Markdown 渲染 assistant 正文，tool result 保持纯文本。
+- 对话结构化转换在 `src/conversation-entries.ts`：优先读取 live session，session 释放后读取 transcript 尾部。
+- 用户和模型可见的文本中，原指向 `/agents → Workflows` 的地方改为 `/tasks` 或 `agent_manage stop`。继承的上游注释里提到旧 UI 的地方没有逐条改写。

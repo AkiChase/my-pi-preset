@@ -13,7 +13,8 @@ Task composition 把命令进程、Monitor、子 Agent 和 workflow 放进同一
 | `/tasks` 或 `Shift+Down` | 打开 Task Panel |
 | 空输入框中的 `Down` | 有可查看任务、输入框持有焦点且没有补全或浮层时打开面板 |
 | `/task-detach` 或 `Ctrl+Shift+B` | 解除所有当前任务等待，执行继续 |
-| `/agents` | 管理 Agent 类型、定时任务、workflow 和设置 |
+| `/agents-config` | 管理 Agent 类型（编辑、启用／禁用、导出内置类型、恢复默认、删除）和 Agent 设置 |
+| `/agents-create` | 新建 Agent 类型（由模型生成或手动填写） |
 | `/process-tasks-version` | 查看当前加载的进程扩展版本和路径 |
 | `/process-tasks-config` | 查看进程配置的覆盖项及加载警告 |
 
@@ -28,10 +29,12 @@ Task Panel 覆盖整个终端，列表上方是 Agents（含 workflow），下�
 | 面板内按键 | 行为 |
 | --- | --- |
 | `↑↓`、`j`、`k` | 列表中选任务；详情中滚动 |
-| `Enter` | 从列表进入所选任务详情 |
+| `Enter` | 从列表进入所选任务详情；在运行中或排队中的 Agent 详情里打开消息输入框 |
 | `←`、`→` | 列表中收起／展开组，或返回父行 |
 | `Home`、`End` | 当前页面到开头／末尾 |
 | `x` | 请求停止当前可停止的任务 |
+| `p` | 暂停／继续所选 workflow |
+| `s`、`r` | 跳过／重试所选 workflow 子 Agent |
 | `c` | 复制所选任务的日志、会话或 worktree 路径 |
 | `Esc` | 详情返回列表；列表关闭，既不停止任务，也不解除等待 |
 | 全局解除等待快捷键 | 解除所有当前等待，执行继续，与选中任务无关 |
@@ -40,7 +43,11 @@ Task Panel 覆盖整个终端，列表上方是 Agents（含 workflow），下�
 
 停止 workflow 会停止整个 run；停止子 Agent 会停止它及它所属的嵌套任务，不停止独立的兄弟任务。`c` 复制的是路径，不是正文，也不会把内容提交给模型。面板没有重跑、删除记录或清理文件的按键。
 
-详情是有长度限制的预览，最多 16K 字符，文件通常读取尾部；面板会标明范围和省略量。滚动只覆盖这段预览，更多内容请复制路径查看，或让模型用结果工具读取。终态任务通常在整体完成四秒后隐藏，正在查看的最终预览保留到换选项或关闭面板。小终端会压缩固定信息和正文，可放大终端以查看更多内容。
+详情顶部是状态行和按类型排列的字段：Agent 显示模型、耗时、轮次、工具次数、tokens、费用和当前活动；命令显示 PID、退出码和完整命令；workflow 显示进度和阶段。Agent 的输出区按对话排版，区分 User／Assistant，Assistant 正文按 Markdown 渲染，并显示工具调用和结果摘要；会话已释放时从对话记录文件末尾读取。底栏只列出当前选中任务可用的操作；停止等操作的结果通过状态变化体现，不额外插入提示行。
+
+消息输入框打开后，所有按键都输入到框内：Enter 发送给该 Agent，Esc 取消。消息会在 Agent 当前工具执行完后送达；workflow 子 Agent 不接受直接消息。暂停 workflow 后，已在运行的 Agent 会继续完成，只是不再启动新的；跳过让该 Agent 的调用返回空结果，重试只对运行中的 Agent 有效。
+
+命令输出是有长度限制的预览，最多 16K 字符，文件通常读取尾部；面板会标明范围和省略量。滚动只覆盖这段预览，更多内容请复制路径查看，或让模型用结果工具读取。终态任务通常在整体完成四秒后隐藏，正在查看的最终预览保留到换选项或关闭面板。小终端会压缩固定信息和正文，可放大终端以查看更多内容。
 
 面板只在交互终端中可用；非交互模式没有面板预览。
 
@@ -86,13 +93,13 @@ Monitor 的 wait 等整个观察结束，不是下一条事件。解除或取消
 
 Agent 文件配置优先于模型的调用请求；未指定设置时沿用配置/默认值，请求被覆盖时结果会说明实际值。可以让模型给运行中的 Agent 发指示，或在它完成后继续同一会话。queued 表示等待会话初始化，sent 表示已提交，均不保证已读取或处理。
 
-workflow 用脚本编排多步工作，可以调用 Agent，也可以不启动 Agent。你可以提供脚本、文件路径或已保存的 workflow 名称。重放可以沿用原脚本或使用替代脚本；每次启动或重放都产生独立的执行标识。暂停、继续、跳过和重试在 `/agents` UI 中操作。
+workflow 用脚本编排多步工作，可以调用 Agent，也可以不启动 Agent。你可以提供脚本、文件路径或已保存的 workflow 名称。重放可以沿用原脚本或使用替代脚本；每次启动或重放都产生独立的执行标识。暂停、继续、跳过和重试在 Task Panel 中操作。
 
 ### 委派执行管理
 
-子 Agent 和 workflow 的运行状态、结果与停止操作会显示在 Task Panel，也可从 `/agents` 中查看。停止 workflow 会停止它所属的 Agent，不停止独立任务；关闭面板或解除等待不会停止正在运行的任务。
+子 Agent 和 workflow 的运行状态、结果与停止操作会显示在 Task Panel。停止 workflow 会停止它所属的 Agent，不停止独立任务；关闭面板或解除等待不会停止正在运行的任务。
 
-输入 `@handle 消息` 可联系对应 Agent。默认的模型模式会生成更完整的委派请求，直接模式则立即启动；可在 `/agents` 的 Settings 中调整。定时定义本身不是运行任务，实际触发的 Agent 才会出现在任务列表。
+输入 `@handle 消息` 可联系对应 Agent。默认的模型模式会生成更完整的委派请求，直接模式则立即启动；可在 `/agents-config` 的 Settings 中调整。定时定义本身不是运行任务，实际触发的 Agent 才会出现在任务列表。
 
 ## 后台任务提醒
 
@@ -151,6 +158,6 @@ workflow 用脚本编排多步工作，可以调用 Agent，也可以不启动 A
 
 ### Agent
 
-全局 `agent-tasks.json` 提供默认值，项目 `.pi/agent-tasks.json` 覆盖；`/agents` 的 Settings 写项目文件。自定义类型放全局 `agents/*.md` 或项目 `.pi/agents/*.md`，同名项目类型优先。
+全局 `agent-tasks.json` 提供默认值，项目 `.pi/agent-tasks.json` 覆盖；`/agents-config` 的 Settings 写项目文件。自定义类型放全局 `agents/*.md` 或项目 `.pi/agents/*.md`，同名项目类型优先。
 
 常用设置有 `backgroundByDefault`（默认 `true`）、`maxConcurrent`（后台默认 `10`）、`maxConcurrentForeground`（默认 `0`，不限制）、`defaultMaxTurns`（默认不限制）、`maxSubagentDepth`（默认 `2`）。`worktreeIsolation: false` 关闭临时 worktree 创建；这与面板查看 worktree 路径是两回事。

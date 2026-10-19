@@ -93,21 +93,6 @@ export interface AgentConfig {
 export type JoinMode = 'async' | 'group' | 'smart';
 
 /**
- * How much of the conversation viewer's transcript is rendered as Markdown.
- * - `off`: every line wraps as literal text, as it did before the mode existed.
- * - `assistant`: assistant text renders as Markdown; tool results stay verbatim
- *   and dim. The default, because assistant text *is* Markdown by contract
- *   while a tool result is arbitrary bytes — a Markdown pass over a log or a
- *   diff eats `#` from shell comments, swallows a `---` line into a setext
- *   heading, re-fences indented output and redraws `| a | b |` as a table.
- *   (Ordered-list renumbering is the one such rewrite actively suppressed —
- *   see `MARKDOWN_OPTIONS` — because it silently changes data, not layout.)
- * - `all`: tool results render as Markdown too, for tools that genuinely emit
- *   it (#210's `ctx_execute`), accepting the rewrites above on ones that don't.
- */
-export type ViewerMarkdownMode = 'off' | 'assistant' | 'all';
-
-/**
  * How `@handle message` starts an agent that is not already running.
  * - `model`: inject Claude Code's `agent_mention` reminder and let the main
  *   model spawn it with the `subagent_run` tool, which is what Claude Code does.
