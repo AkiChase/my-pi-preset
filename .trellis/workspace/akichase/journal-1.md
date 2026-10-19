@@ -1384,3 +1384,25 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Next Steps
 
 - 后续选择 running-task-summary 或 subagent-parent-messaging；不自动实施、同步、reload 或 push。
+
+
+## Session 42: 后台任务防遗忘提醒（方案 B）
+<!-- trellis-session: v=2 fp=5da8beec8f46186a -->
+
+**Date**: 2026-10-19
+**Task**: 后台任务防遗忘提醒（方案 B）
+**Branch**: `main`
+
+### Summary
+
+实现隐藏 <background-task-reminder>：每 N 次主模型请求（task-ui.json backgroundReminderInterval，默认 8，0 关闭周期）及压缩后，经 turn_end 草稿/before_agent_start 正常追加，固定 system 规则说明非实时列表。核实 Pi 1.3.0 无压缩后请求前公开追加边界，用户接受 run 中途自动压缩晚一请求的限制。真实 AgentSession 离线测试、隔离 tmux 真实 CLI 5/5、pnpm check 1491/1491；独立审查无阻塞缺陷。更新 development/testing spec。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `00757e0` | chore(task): archive 10-14-running-task-summary |
+
+### Status
+
+[OK] **Completed**
