@@ -75,6 +75,8 @@ Preserve the live editor receiver, history, undo, paste, cursor and focus. Do no
 
 Use injected themes and SDK terminal-column helpers, not string length/hard-coded colors. Honor `render(width)` and host padding. Strip external controls before styling without indiscriminately stripping host-generated resets. Rendering has no file I/O or expensive repeated layout; cache by content/width, invalidate for theme/content, clamp selection/scroll on resize. Previews read bounded data; retain immutable metadata/bounded snapshots, not controllers/full logs, and expose paths/ranges for full data.
 
+Task Panel operations beyond stop (steer, workflow pause/resume, child skip/retry) are optional `TaskView.capabilities` flags plus optional `TaskSource.steer/control`. The source computes flags from the same current-window predicate it rechecks inside the action; the coordinator routes only to an identity that `list()` still advertises; panels gate keys and footer hints on the flags and target the identity captured at key press or composer open. Results show through view state, never inserted feedback rows that shift fixed layout. Structured detail (`TaskDetail.conversation`) is bounded, unstyled external text built by the source; the panel sanitizes before styling.
+
 ## Synchronization and Configuration Safety
 
 `pi-preset.json` owns desired state; `install.sh` bootstraps and delegates to dependency-free `scripts/sync.mjs`, including downloaded installer use. User commands/action tables belong in README, not another sync manual.

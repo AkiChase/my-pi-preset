@@ -31,7 +31,9 @@ Fixed-width startup is not dynamic resize. Keyboard success does not prove physi
 
 Use `tmux send-keys` for actual keys such as `C-o`. Preserve before/after evidence; successful key delivery does not prove the action occurred.
 
-Wait with bounded condition loops or monitor for expected screens/events/raw frames. Never guess completion with fixed sleeps. Set an overall deadline and explicit failure exit.
+Wait with bounded condition loops or monitor for expected screens/events/raw frames. Never guess completion with fixed sleeps. Set an overall deadline and explicit failure exit. Redirect the driven program's stderr to the owned run directory and inspect it on timeout: a driver that dies at import leaves an empty pane that an unbounded loop would wait on forever.
+
+Two evidence layers fit common UI work. Command/dialog flows that need no model (for example `/agents-config`) run in the real CLI with isolated HOME/`PI_CODING_AGENT_DIR`/cwd, `--offline -ne -ns -np -nc --no-mcp --no-session` and explicit `-e <entry>.ts`. Panels that need live agents/workflows can mount the actual component on a concrete pi-tui screen (`TuiAltScreen` + `ProcessTerminal`; `TUI` itself is abstract) with a typed fixture source, driven by real keys. Label the second layer as component-in-terminal evidence, not real CLI or provider evidence. Keep such drivers in the owned temporary directory; when module resolution requires a repository-root file, delete it before staging.
 
 - `capture-pane -p` saves text; `capture-pane -p -e` retains SGR. Neither is an image screenshot.
 - For rendering diagnosis, confirm installed CLI support for `PI_TUI_WRITE_LOG` and collect owned raw ANSI writes. Keep bounded fragments/action markers and inspect for credentials.

@@ -135,3 +135,13 @@ tmux 真实终端：列表页、三类详情页、agent 对话（运行中 / 已
   - 不加 force-exit 的完整集成测试 `node --test "extensions/**/__tests__/*.test.ts" "scripts/*.test.mjs"` → 1188/1188，自然退出；
   - typecheck、`git diff --check` 均 PASS。
 - 真实 pi CLI 的 tmux 验证：同阶段 4 的隔离方式，额外在全局 `agent-tasks.json` 中写入 `{"schedulingEnabled": true, "viewerMarkdown": "all"}`。结果：Settings 列表里已没有 Scheduling；stderr 为空；配置文件没有被改写；cwd 下没有产生 `.pi`；`PI_EXITED=0`；没有残留进程，隔离目录已删除。
+
+### 收尾（2026-10-19）
+
+- AC1–AC8 已逐项核对，证据见各阶段记录；PRD 已勾选，并注明未运行的项目（真实 pi CLI + 在线模型下的面板端到端）。
+- 提交：阶段 1 `752313b`，阶段 2 `247e1bd`，阶段 3 `d182ef3`，阶段 4 `0855428`，阶段 5 `0811ec8`。中间穿插的 `859d132`、`24c5045` 是并行会话的提交，与本任务无关。
+- spec 沉淀：
+  - `development/index.md`：Task Panel 的 capability 契约（source 用同一个窗口判定生成能力位并在执行时复查，coordinator 只路由到仍在声明该能力的身份，结果通过视图状态体现、不插入反馈行，结构化 detail 有界且不带样式）。
+  - `testing/tmux.md`：两层真实终端证据——没有模型的命令流用隔离的真实 CLI；需要 agent 的面板把组件挂到 `TuiAltScreen` 上，并标注证据层级；driver 的 stderr 必须落盘，避免死循环等待。
+  - `testing/index.md`：删去已不存在的 scheduler ownership 覆盖项。
+- 临时目录：tmux 截图所在目录在用户查看后删除；各次运行的隔离 HOME 已在当次清理。

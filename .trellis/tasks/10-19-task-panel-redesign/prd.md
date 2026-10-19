@@ -62,14 +62,15 @@
 
 ## 验收标准
 
-- [ ] AC1：面板中按 `x` / detach-all 前后，header 行数与滚动区起始行不变（测试断言）。
-- [ ] AC2：详情页无原始 `key: value` 拼接和原始 JSON；agent / shell / workflow 各有分区布局，状态与 exit code 有语义色（测试 + tmux 截屏）。
-- [ ] AC3：agent 详情显示角色化对话，assistant Markdown 渲染；session 被清理后从 JSONL 正确解析，首行截断与坏行被忽略；不显示原始 JSON。
-- [ ] AC4：运行中 agent 详情 Enter → 输入 → 提交后调用 steer；非运行 agent 不提供；Esc 取消不发送。
-- [ ] AC5：workflow `p` / `s` / `r` 只在可用时生效并出现在提示中，调用对应 control。
-- [ ] AC6：`/agents` 不再注册；`/agents-config`、`/agents-create` 可用并保留原有配置 / 创建行为。
-- [ ] AC7：`subagent_run` schema 与 usage 不再包含 `schedule`；传入 `schedule` 被作为未知字段拒绝；仓库中无 scheduler / croner 运行代码；带 `schedulingEnabled` 的旧配置正常加载。
-- [ ] AC8：`pnpm run typecheck`、`pnpm run test`、`pnpm run check`、`git diff --check` 通过；tmux 真实终端检查列表、详情、对话渲染与 steer 输入框。
+- [x] AC1：面板中按 `x` / detach-all 前后，header 行数与滚动区起始行不变（测试断言）。
+- [x] AC2：详情页无原始 `key: value` 拼接和原始 JSON；agent / shell / workflow 各有分区布局，状态与 exit code 有语义色（测试 + tmux 截屏）。
+- [x] AC3：agent 详情显示角色化对话，assistant Markdown 渲染；session 被清理后从 JSONL 正确解析，首行截断与坏行被忽略；不显示原始 JSON。
+- [x] AC4：运行中 agent 详情 Enter → 输入 → 提交后调用 steer；非运行 agent 不提供；Esc 取消不发送。
+- [x] AC5：workflow `p` / `s` / `r` 只在可用时生效并出现在提示中，调用对应 control。
+- [x] AC6：`/agents` 不再注册；`/agents-config`、`/agents-create` 可用并保留原有配置 / 创建行为。
+- [x] AC7：`subagent_run` schema 与 usage 不再包含 `schedule`；传入 `schedule` 被作为未知字段拒绝；仓库中无 scheduler / croner 运行代码；带 `schedulingEnabled` 的旧配置正常加载。
+- [x] AC8：`pnpm run typecheck`、`pnpm run test`、`pnpm run check`、`git diff --check` 通过；tmux 真实终端检查列表、详情、对话渲染与 steer 输入框。
+  - 说明：面板的列表、详情、对话、steer、workflow 控制是在 tmux 中把真实组件挂到 pi-tui 全屏界面（fixture 数据源）上验证的；`/agents-config`、`/agents-create`、Settings 以及旧配置加载在真实 pi CLI 中验证。在真实 pi CLI 里配合真实 agent 和 provider 打开面板的场景未运行，因为需要在线模型，没有获得授权。
 
 ## 授权
 
