@@ -54,3 +54,8 @@
 - 核对结果：`AGENTS.md` 区块外内容与备份逐字节一致；区块、workflow、两个技能都与包内源一致；备份等于 HEAD 的 `AGENTS.md`，目录权限 0700，已被 gitignore；再次生成计划为 `unchanged`；`verifyRuntime` 通过；诊断中 `inventory:root-block`、`inventory:skill`、`inventory:runtime` 均为 pass；部署后的 `no_task` breadcrumb 已是新文本。
 - 未验证：真实 TUI 中 `/trellis-init` 的菜单提示、Update resources 确认框和通知文案；新会话中实际注入的 breadcrumb。需要 push 并更新安装后补测。
 - 备份保留在 `.trellis/.runtime/resource-backups/5547c7f1-3838-4a9c-be8f-867f99eb8781/`（不入库）。
+
+### 发布后核对
+- 用户已 push、更新安装并 reload。安装目录在 `caba48a`，包含 `24c5045`；`root-blocks.ts`、`agents-block.md`、`workflow.md` 与仓库一致。
+- 用已安装的代码对本项目生成计划：`unchanged`、0 冲突；`inventory:root-block` 为 pass。
+- 仍未验证：带过期区块时 TUI 确认框和通知的文案（本项目已是最新，菜单只会显示 Up to date）；无活动任务的新会话里注入的 `no_task` breadcrumb（本会话绑定了任务，看不到）。
