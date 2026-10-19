@@ -30,6 +30,26 @@ test('workflow separates implementation from review and retains authorization bo
  }
 });
 
+test('request triage lets small tasks skip Trellis and keeps the AGENTS block a directory pointer', () => {
+ const triage = workflow.slice(workflow.indexOf('### Request Triage'), workflow.indexOf('## Phase 1: Plan'));
+ assert.ok(triage.length > 20);
+ assert.match(triage, /ask only whether this turn should create a Trellis task/);
+ assert.match(triage, /skip Trellis for this session/);
+ assert.match(triage, /Leave changes uncommitted unless the user explicitly asks for a commit/);
+ assert.match(triage, /stop and ask again whether to create a Trellis task/);
+ const noTask = workflow.match(/\[workflow-state:no_task\]\n([\s\S]*?)\n\[\/workflow-state:no_task\]/)[1];
+ assert.match(noTask, /ask only whether this turn should create a Trellis task/);
+ assert.match(noTask, /skip Trellis for this session/);
+ assert.doesNotMatch(workflow, /task\/planning approval/);
+ const start = readFileSync(at('skills/trellis-start/SKILL.md'), 'utf8');
+ assert.match(start, /Request Triage[\s\S]*direct edit/);
+ assert.doesNotMatch(start, /New work still requires task\/planning approval/);
+ const block = readFileSync(at('resources/templates/agents-block.md'), 'utf8');
+ assert.match(block, /^<!-- TRELLIS:START -->\n[\s\S]*\n<!-- TRELLIS:END -->\n$/);
+ assert.match(block, /`\.trellis\/workflow\.md`/);
+ assert.doesNotMatch(block, /trellis-init|require user approval/);
+});
+
 test('retention separates temporary execution output from selected permanent evidence', () => {
  const check = readFileSync(at('skills/trellis-check/SKILL.md'), 'utf8');
  const finish = readFileSync(at('skills/trellis-finish-work/SKILL.md'), 'utf8');

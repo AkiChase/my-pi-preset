@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "files": {
     "agents-block.md": {
-      "sha256": "359b6bcf516214ee689c3aca8714c9b5a28d5b10e5926675894d8d1c06c8a258",
+      "sha256": "8197f245798f20bab59646b0aef55b94ff10607d6cb03b8932bbe2a72bc561c9",
       "license": "AGPL-3.0-only",
       "origin": "Pi-only adaptation of project Trellis workflow conventions and upstream init behavior; no exact upstream template revision asserted"
     },
@@ -57,7 +57,7 @@
       "origin": "Pi-only adaptation of project Trellis workflow conventions and upstream init behavior; no exact upstream template revision asserted"
     },
     "workflow.md": {
-      "sha256": "947dd0e1f882dbf7cec899af29e82ec041a1d41a3faf3796efa531b639738951",
+      "sha256": "8803fe50ce77dfb463143c9ae41377fdb10a2c18b273c20b310b623ba43078ef",
       "license": "AGPL-3.0-only",
       "origin": "Pi-only adaptation of project Trellis workflow conventions and upstream init behavior; no exact upstream template revision asserted"
     },

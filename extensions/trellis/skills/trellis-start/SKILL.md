@@ -59,7 +59,7 @@ Index files list the specific guideline docs to read when you actually start cod
 
 Read the current task's PRD and available design/implementation record, then choose the actual unfinished step. Document presence alone is not proof that a stage passed checks. This skill restores context; it does not approve implementation.
 
-- **No active task** → Read-only conversation needs no task. If the user explicitly selects an existing task, bind it with `python3 .trellis/scripts/task.py active <task>` and reload context. Do not guess another session's task. New work still requires task/planning approval.
+- **No active task** → Read-only conversation needs no task. If the user explicitly selects an existing task, bind it with `python3 .trellis/scripts/task.py active <task>` and reload context. Do not guess another session's task. Route new work by the workflow's Request Triage: a small task the user declines to track goes to direct edit (read relevant specs, self-check, leave changes uncommitted unless asked); complex work asks for task-creation consent and enters **1.1**.
 - **Invalid binding** → Report task_error; inspect or deactivate the invalid binding before selecting a task. Never treat corruption as no_task.
 - **Planning, no PRD** → **1.1**, load `trellis-brainstorm`.
 - **Planning, PRD only** → Lightweight work can go to **1.4**; complex work needs design/implement first.

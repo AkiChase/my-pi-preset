@@ -4,7 +4,7 @@
 
 Read before write. Project guidelines and task artifacts are authoritative.
 Read-only exploration, research and explanation need no task and grant no implementation approval.
-Create a task only when preparing changes and after user approval. Never infer approval from status.
+Create a task only after user consent; classify new work by Request Triage first. Never infer approval from status.
 Do not cross an unapproved authorization boundary. Implementation, checking and verification may proceed
 continuously within an explicitly approved plan; material scope changes require renewed approval.
 Implementation approval includes scoped local commits by the main session unless the user explicitly opts out.
@@ -82,6 +82,22 @@ approval. `deactivate` clears only your session binding, not task status.
 3. Finish: 3.1 review, 3.2 verify, 3.3 assess spec updates, 3.4 final Git review/conditional remaining commit, 3.5 approved archive/journal.
 Pull details on demand: `python3 .trellis/scripts/get_context.py --mode phase --step X.Y`.
 
+### Request Triage
+
+With no active task, classify each new request before changing anything.
+
+- Read-only exploration, research or explanation: answer directly; no task is needed.
+- Simple conversation or small task: ask only whether this turn should create a Trellis task. If the user says no,
+  skip Trellis for this session and edit directly.
+- Complex task: ask whether you may create a Trellis task and enter planning. If the user says no, do not do broad
+  inline implementation; explain, clarify scope or suggest a smaller split.
+- Consent to create a task is not implementation approval. Planning still happens first.
+
+Direct edits without a task: the user's explicit request approves only that change. Still read relevant specs,
+self-review and run relevant checks. Leave changes uncommitted unless the user explicitly asks for a commit.
+If scope grows, design trade-offs appear, or the change touches permissions, destructive data operations, public
+compatibility or cross-module contracts, stop and ask again whether to create a Trellis task.
+
 ## Phase 1: Plan
 
 #### 1.0 Orient [required]
@@ -90,7 +106,7 @@ If scripts are absent, explicitly use `/trellis-init`. Unsupported runtime is re
 
 #### 1.1 Requirements [required]
 Use `/skill:trellis-brainstorm`. Read-only questions do not need task creation.
-Before preparing changes, get task creation/planning approval. Save goals, scope and acceptance in PRD.
+For work routed to a task by Request Triage, get task-creation consent first. Save goals, scope and acceptance in PRD.
 
 #### 1.2 Design [once]
 For complex work, document ownership, interfaces, validation, failure/rollback and exclusions.
@@ -215,7 +231,9 @@ commits/remaining changes afterwards; report configured skips and failures accur
 ## Breadcrumbs
 
 [workflow-state:no_task]
-No active task. Read-only exploration needs no task. Before modifying code, ask for task/planning approval.
+No active task. Read-only exploration needs no task. Classify new work by Request Triage before changing anything.
+Simple conversation / small task: ask only whether this turn should create a Trellis task. If the user says no, skip Trellis for this session: edit directly within the request, self-check, and leave changes uncommitted unless asked.
+Complex task: ask whether you may create a Trellis task and enter planning. If the user says no, explain, clarify scope or suggest a smaller split.
 [/workflow-state:no_task]
 
 [workflow-state:task_error]
