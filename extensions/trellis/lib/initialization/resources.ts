@@ -4,13 +4,16 @@ import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { checkedPath, defaultTemplates, digest, packageResources, packageRoot, packageSkills, runtimeBaseline, validateSkillRecords, verifyRuntime, type InstalledManifest } from "./engine.ts";
 import { reviewSkills } from "./skills.ts";
+import { PRESERVED_ROOT_BLOCK_STATES, reviewRootBlocks } from "./root-blocks.ts";
 
 const MANIFEST = ".trellis/.pi-trellis.json";
 const OPERATION = ".trellis/.runtime/init-operation.json";
 const LOCK = ".trellis/.runtime/init.lock";
+const RESOURCE_BACKUPS = ".trellis/.runtime/resource-backups";
 type Stamp = { sha256: string; mode: number };
 export interface ResourceReport { root: string; installed: string; available: string; rows: { path: string; state: string }[]; conflicts: string[] }
-interface Change { path: string; data: Buffer; mode: number; before: Stamp | null }
+/** `backup`: the whole original file is copied under `.trellis/.runtime/resource-backups/` before replacement. */
+interface Change { path: string; data: Buffer; mode: number; before: Stamp | null; backup?: boolean }
 /** `unchanged`: publishing would not alter files or manifest (e.g. no schema 3 skills upgrade pending). */
 export interface ResourcePlan { report: ResourceReport; mode: "update" | "repair"; changes: Change[]; manifest: InstalledManifest; original: string; unchanged: boolean }
 export function read(root: string, path: string): Buffer | undefined {
@@ -19,6 +22,8 @@ export function read(root: string, path: string): Buffer | undefined {
  catch (e) { if ((e as NodeJS.ErrnoException).code === "ENOENT") return undefined; throw e; }
 }
 export function stamp(root: string, path: string): Stamp | null { const b = read(root,path); return b ? { sha256:digest(b),mode:lstatSync(checkedPath(root,path)).mode & 0o777 } : null; }
+/** Bytes plus a fingerprint of exactly those bytes, so derived output and its publication guard agree. */
+export function readStamped(root: string, path: string): (Stamp & { data: Buffer }) | undefined { const data = read(root,path); return data ? { data, sha256:digest(data), mode:lstatSync(checkedPath(root,path)).mode & 0o777 } : undefined; }
 export function equal(a: Stamp | null,b: Stamp | null): boolean { return a?.sha256 === b?.sha256 && a?.mode === b?.mode; }
 function oldManifest(root: string): { manifest: InstalledManifest; raw: Buffer } {
  const raw=read(root,MANIFEST); if (!raw) throw new Error("No managed project manifest. General migration is not available. Initialize a new project first.");
@@ -78,6 +83,14 @@ export function resourcePlan(rootInput: string, mode: "update" | "repair"): Reso
   changes.push({path:c.path,data,mode:c.record.mode,before:c.before});
  }
  next.schemaVersion=3;next.skills=review.next;
+ // Root blocks are package-owned and not recorded in the manifest: compare with the current template.
+ for(const block of reviewRootBlocks(path=>readStamped(root,path))){
+  if(PRESERVED_ROOT_BLOCK_STATES.includes(block.state)){report.rows.push({path:block.path,state:block.state});report.conflicts.push(block.path);continue;}
+  if(block.state==="Current block"||!block.next){report.rows.push({path:block.path,state:block.state});continue;}
+  if(mode==="repair"){report.rows.push({path:block.path,state:"Block update available"});continue;}
+  changes.push({path:block.path,data:block.next,mode:block.before?.mode??0o644,before:block.before,backup:!!block.before});
+  report.rows.push({path:block.path,state:block.state==="Block update"?"Block update — backup and replace":block.before?"Missing block — backup and restore":block.state});
+ }
  if(Object.entries(expected).every(([p,r])=>equal(next.files[p],r))) next.runtimeReleaseId=report.available;
  return {report,mode,changes,manifest:next,original:digest(raw),unchanged:!changes.length&&JSON.stringify(next)===JSON.stringify(old)};
 }
@@ -101,7 +114,8 @@ export function atomicFile(root: string, path: string, data: Buffer, mode: numbe
   try { unlinkSync(tmp); } catch (e) { if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e; }
  }
 }
-export function applyResourcePlan(value:ResourcePlan):void {
+/** Returns the backup directory when managed root blocks replaced existing files; no automatic rollback. */
+export function applyResourcePlan(value:ResourcePlan):string|undefined {
  if(value.mode!=="update" && value.mode!=="repair")throw new Error("Invalid resource operation");
  const fresh=resourcePlan(value.report.root,value.mode);
  const signature=(p:ResourcePlan)=>digest(JSON.stringify({original:p.original,mode:p.mode,changes:p.changes.map(c=>({...c,data:c.data.toString("base64")})),manifest:p.manifest}));
@@ -109,15 +123,27 @@ export function applyResourcePlan(value:ResourcePlan):void {
  if(fresh.report.conflicts.length) throw new Error(`Modified managed files preserved; resolve conflicts before updating: ${fresh.report.conflicts.join(", ")}`);
  const root=fresh.report.root,lock=checkedPath(root,LOCK);mkdirSync(dirname(lock),{recursive:true});const fd=openSync(lock,"wx",0o600);closeSync(fd);
  const atomic=(path:string,data:Buffer,mode:number,before:Stamp|null)=>atomicFile(root,path,data,mode,before);
+ let backup:string|undefined;
  try {
   if(signature(resourcePlan(root,value.mode))!==signature(fresh))throw new Error("Resources changed before publication; review again");
   const manifestBefore=stamp(root,MANIFEST);
   if(digest(read(root,MANIFEST)!)!==fresh.original)throw new Error("Manifest changed since preview");
+  // Complete every backup before replacing any file; a backed-up original must still match its preview stamp.
+  const originals=fresh.changes.filter(c=>c.backup&&c.before);
+  if(originals.length){
+   backup=`${RESOURCE_BACKUPS}/${randomUUID()}`;
+   const backupPath=checkedPath(root,backup);mkdirSync(dirname(backupPath),{recursive:true});checkedPath(root,backup);mkdirSync(backupPath,{mode:0o700});
+   for(const c of originals){const data=read(root,c.path);if(!data||!equal(stamp(root,c.path),c.before)||digest(data)!==c.before!.sha256)throw new Error(`Concurrent change preserved: ${c.path}`);atomic(`${backup}/${c.path}`,data,c.before!.mode,null);}
+  }
   for(const c of fresh.changes)atomic(c.path,c.data,c.mode,c.before);
   // A completed init audit record describes the previous release; it grants no update authority.
   // Retain it as history, outside the initializer's live recovery record.
   const op=read(root,OPERATION);if(op){const archive=".trellis/.runtime/init-completed-"+digest(op)+".json";if(!read(root,archive))atomic(archive,op,0o600,null);if(!read(root,OPERATION)?.equals(op))throw new Error("Initialization record changed");unlinkSync(checkedPath(root,OPERATION));}
   atomic(MANIFEST,Buffer.from(JSON.stringify(fresh.manifest,null,2)+"\n"),0o644,manifestBefore);
+  return backup;
+ } catch(error) {
+  if(backup)throw new Error(`${String(error)}\nResource backup: ${backup}. Partial files are preserved; no automatic rollback.`);
+  throw error;
  } finally {unlinkSync(lock);}
 }
 

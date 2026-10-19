@@ -3,10 +3,11 @@ import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { adoptPlan, applyAdoptPlan, adoptionDialog } from "./adoption.ts";
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { applyResourcePlan, read, resourcePlan, templatePlan, applyTemplatePlan, type TemplateScope } from "./resources.ts";
+import { applyResourcePlan, read, readStamped, resourcePlan, templatePlan, applyTemplatePlan, type TemplateScope } from "./resources.ts";
 import { initializationRoot } from "../project-state.ts";
 import { inspect, plan, apply, checkedPath, packageResources, packageSkills, defaultTemplates, runtimeBaseline, verifyRuntime, validateUsername, SKILL_ROOT, type Inspection, type InitPlan } from "./engine.ts";
 import { runDiagnostics } from "./diagnostic-runtime.ts";
+import { PRESERVED_ROOT_BLOCK_STATES, reviewRootBlocks } from "./root-blocks.ts";
 import { collectDiagnostics, formatDiagnostics, buildDiagnosticReport, type DiagnosticScope } from "./diagnostics.ts";
 import { CHECK_REPORT_TYPE, registerDiagnosticReport } from "./diagnostic-report.ts";
 
@@ -139,6 +140,10 @@ function menuSnapshot(cwd: string): MenuSnapshot {
 			state.state = state.developer ? "ready" : "supported";
 			// Schema 2 predates deployed skills: runtime stays usable, Update adds them explicitly.
 			const issues = state.manifest!.schemaVersion === 3 ? [] : [`Project skills not deployed; choose ${UPDATE}.`];
+			const blocks = reviewRootBlocks(path => readStamped(root, path)).filter(block => block.state !== "Current block");
+			const preserved = blocks.filter(block => PRESERVED_ROOT_BLOCK_STATES.includes(block.state)), stale = blocks.filter(block => !preserved.includes(block));
+			if (stale.length) issues.push(`Trellis block out of date: ${stale.map(block => block.path).join(", ")}; choose ${UPDATE}.`);
+			if (preserved.length) issues.push(`Trellis block malformed or unreadable: ${preserved.map(block => block.path).join(", ")}; fix it by hand, then choose ${UPDATE}.`);
 			return { state, view: view(STATUS[state.state], issues, { installed: state.releaseId }), operations: state.developer ? [UPDATE, TEMPLATE] : [IDENTITY, ...(issues.length ? [UPDATE] : []), TEMPLATE] };
 		}
 		// Missing/older owned resources may still be safely restored; modified resources never authorize writes.
@@ -244,18 +249,19 @@ export function registerInitCommand(pi: ExtensionAPI, refresh: (ctx: ExtensionCo
 					if (update.report.conflicts.length) throw new Error(`Modified or unmanaged files are preserved: ${update.report.conflicts.join(", ")}`);
 					if (update.unchanged) { notify(result(UPDATE, "Up to date", [["Changed", "0 files"]])); return; }
 					const added = new Set(update.report.rows.filter(row => row.state === "New — will install").map(row => row.path));
-					const label = (before: unknown, path: string) => before ? "Update" : added.has(path) ? "Install" : "Restore";
+					const label = (change: (typeof update.changes)[number]) => change.backup ? "Update block" : change.before ? "Update" : added.has(change.path) ? "Install" : "Restore";
+					const backups = update.changes.some(c => c.backup);
 					const dialog = confirmation(UPDATE, [
 						["Project", dialogPath(state.root)],
-						["Changes", counts(update.changes.map(c => ({ state: label(c.before, c.path) })))],
-						["Keeps", "identity, tasks, journals and modified documents"],
-						["Backup", "none (no automatic rollback)"],
-					], update.changes.map(c => `${label(c.before, c.path)}: ${dialogPath(c.path)}`));
+						["Changes", counts(update.changes.map(c => ({ state: label(c) })))],
+						["Keeps", "identity, tasks, journals, modified documents and content outside Trellis blocks"],
+						["Backup", backups ? ".trellis/.runtime/resource-backups/ (files with Trellis blocks only)" : "none (no automatic rollback)"],
+					], update.changes.map(c => `${label(c)}: ${dialogPath(c.path)}`));
 					if (!await confirm(ctx, UPDATE, dialog)) return;
-					applyResourcePlan(update);
+					const backup = applyResourcePlan(update);
 					const release = shortRelease(update.manifest.runtimeReleaseId);
 					const skills = update.changes.some(c => c.path.startsWith(`${SKILL_ROOT}/`));
-					notify(result(UPDATE, "Done", [["Changed", `${update.changes.length} files`], ...(release ? [["Runtime", release] as [string, string]] : []), ...(skills ? [["Skills", RELOAD_HINT] as [string, string]] : [])]));
+					notify(result(UPDATE, "Done", [["Changed", `${update.changes.length} files`], ...(release ? [["Runtime", release] as [string, string]] : []), ...(skills ? [["Skills", RELOAD_HINT] as [string, string]] : []), ...(backup ? [["Backup", backup] as [string, string]] : [])]));
 					await refresh(ctx, state.root); return;
 				}
 				const expected = choice === INITIALIZE ? "fresh" : choice === RESUME ? "incomplete" : "supported";

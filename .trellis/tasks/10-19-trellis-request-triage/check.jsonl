@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/development/index.md", "reason": "Trellis resource ownership, project copies and root managed block rules"}
+{"file": ".trellis/spec/testing/index.md", "reason": "Test isolation and regression design"}

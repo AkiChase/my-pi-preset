@@ -43,6 +43,8 @@
 
 你改过的 workflow、spec 等文档会保留。被修改过的脚本、角色或技能不会被直接覆盖，会提示冲突，需要你决定如何处理。不是 Trellis 部署的同名技能目录会整个保留。
 
+`AGENTS.md` 和 `.gitignore` 里的 Trellis 区块（两个标记之间的内容）由 Trellis 管理。区块和当前版本不一致时，`Update resources` 会先把整个文件备份到 `.trellis/.runtime/resource-backups/`，再替换区块；区块以外的内容保持不变。如果标记重复或不完整，更新会停止，需要先手工修好标记。
+
 菜单里还有两个会覆盖文件的操作，使用前请确认：
 
 - `Apply template`：用默认版本替换 workflow 或 spec，替换前会备份到 `.trellis/.runtime/template-backups/`。

@@ -6,6 +6,7 @@ import { discoverProject } from "../project-state.ts";
 import { containsPath } from "../config.ts";
 import { binarySkillFile, checkedPath, digest, packageRoot, validateUsername, packageProvenance, type PackageProvenance, type InstalledManifest } from "./engine.ts";
 import { reviewSkills } from "./skills.ts";
+import { PRESERVED_ROOT_BLOCK_STATES, ROOT_BLOCKS, reviewRootBlocks } from "./root-blocks.ts";
 
 /** Deployment-check scope: the project directory only. No session/task identity. */
 export interface DiagnosticScope {
@@ -320,6 +321,15 @@ export function collectDiagnostics(scope: DiagnosticScope, options: { signal?: A
 				if (!problems.length) { add("inventory:skill", "resources", "pass", "Project skills match the package (static)"); return; }
 				add("inventory:skill", "resources", "issue", `${problems.length} project skill item(s) need attention${conflicts ? `; ${conflicts} preserved conflict(s)` : ""}${problems.length > 12 ? `; ${problems.length - 12} path details omitted` : ""}`, problems.slice(0, 12).map(row => `${row.state}: ${row.path}`), "Skills load through Pi project discovery; runtime execution is unaffected.", conflicts ? "Resolve modified/unmanaged skill files (rename, move or restore), then choose /trellis-init → Update resources." : "Choose /trellis-init → Update resources, then /reload or start a new session.", "warning");
 			}, "Project skill state is unverified; runtime execution is unaffected.", "Inspect .pi/skills; Check never changes skill files.");
+			// Trellis blocks in AGENTS.md/.gitignore: same comparison as Update resources (current package template).
+			attempt("inventory:root-block", "resources", ROOT_BLOCKS.map(block => block.path).join("; "), () => {
+				const review = reviewRootBlocks(path => reader.file(root!, path, DIAGNOSTIC_LIMITS.file), reader);
+				// Read failures become preserved rows; a cancellation swallowed there is surfaced here.
+				reader.checkpoint();
+				const stale = review.filter(row => row.state !== "Current block"), malformed = stale.filter(row => PRESERVED_ROOT_BLOCK_STATES.includes(row.state));
+				if (!stale.length) { add("inventory:root-block", "resources", "pass", "Trellis blocks in root files match the package"); return; }
+				add("inventory:root-block", "resources", "issue", `${stale.length} Trellis root block(s) need attention${malformed.length ? `; ${malformed.length} malformed` : ""}`, stale.map(row => `${row.state}: ${row.path}${row.reason ? ` (${row.reason})` : ""}`), "Agents read the AGENTS.md block every session; an outdated block can carry outdated rules.", malformed.length ? "Fix the repeated or incomplete Trellis markers (or the unreadable file) by hand, then choose /trellis-init → Update resources." : "Choose /trellis-init → Update resources (the previous file is backed up).", malformed.length ? "error" : "warning");
+			}, "Trellis root block state is unverified.", "Inspect AGENTS.md and .gitignore; Check never changes them.");
 			result.facts.runtimeStaticValid = runtimeValid && templateRoutesValid && result.facts.manifest?.runtimeReleaseId === pkg.release && !result.facts.operationInvalid && result.facts.operation !== "incomplete" && !result.facts.locked;
 		}
 		// Required editable entries have no package-integrity dependency.
