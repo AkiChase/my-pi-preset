@@ -1,10 +1,10 @@
 import { copyToClipboard, type ExtensionContext, type KeybindingsManager } from "@earendil-works/pi-coding-agent";
-import { ScrollView, VStack, isKeyRelease, matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi, type Component, type TUI, type TuiMouseEvent, type TuiMouseEventResult } from "@earendil-works/pi-tui";
+import { Input, ScrollView, VStack, isKeyRelease, matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi, type Component, type Focusable, type TUI, type TuiMouseEvent, type TuiMouseEventResult } from "@earendil-works/pi-tui";
 import { layoutError, type NativeFrame, type NativeLayout } from "../shared/scroll-panel/native-layout.ts";
 import { consumeWheel } from "../shared/scroll-panel/wheel.ts";
 import type { TaskCoordinator } from "./coordinator.ts";
 import type { TaskUIConfig } from "./config.ts";
-import type { TaskDetail } from "./types.ts";
+import type { TaskControl, TaskDetail } from "./types.ts";
 import { TaskPanelModel, type TaskRow } from "./model.ts";
 import { cleanTaskText, taskLine, taskOneLine, type TaskTheme } from "./presentation.ts";
 import { detailRange, renderDetailHeader, sectionTitle } from "./detail-view.ts";
@@ -20,7 +20,7 @@ interface TaskPanelArgs {
 }
 
 /** One interaction; rendering reads only metadata and the unique bounded selected preview. */
-export class TaskPanel implements Component {
+export class TaskPanel implements Component, Focusable {
     readonly model = new TaskPanelModel();
     private listScroll: ScrollView;
     private detailScroll: ScrollView;
@@ -39,6 +39,11 @@ export class TaskPanel implements Component {
     private cachedList?: { width: number; lines: string[] };
     private cachedDetail?: { width: number; lines: string[] };
     private readonly conversation = new ConversationRenderer();
+    /** Steering composer for the selected running agent; owns all input while open. */
+    private composer?: { input: Input };
+    private focusedState = false;
+    get focused(): boolean { return this.focusedState; }
+    set focused(value: boolean) { this.focusedState = value; if (this.composer) this.composer.input.focused = value; }
     private readonly copy: (text: string) => Promise<void>;
     private readonly args: TaskPanelArgs;
     constructor(args: TaskPanelArgs) {
@@ -98,7 +103,7 @@ export class TaskPanel implements Component {
         if (visible && previous !== this.selectedLine()) this.ensureSelected = true;
         const selected = this.model.selected;
         if (selected?.key !== this.detailKey) {
-            this.detailKey = selected?.key; this.detail = undefined;
+            this.detailKey = selected?.key; this.detail = undefined; this.composer = undefined;
             this.detailScroll = this.scrollView(width => this.detailBody(width));
         }
         if (selected) {
@@ -126,6 +131,12 @@ export class TaskPanel implements Component {
         try { this.applyInput(data); } catch (cause) { this.refuse(cause); }
     }
     private applyInput(data: string): void {
+        if (this.composer) {
+            this.composer.input.handleInput(data);
+            // A steer can publish synchronously and close the panel.
+            if (!this.disposed) { this.invalidate(); this.args.tui.requestRender(); }
+            return;
+        }
         if (matchesKey(data, "escape") || this.args.keys.matches(data, "tui.select.cancel")) {
             if (this.page === "detail") { this.page = "list"; this.frame = undefined; this.args.tui.requestRender(); }
             else this.close();
@@ -138,6 +149,17 @@ export class TaskPanel implements Component {
         } else if (matchesKey(data, "x") && this.model.selected?.capabilities.stop) {
             this.args.coordinator.stop(this.model.selected);
             if (this.disposed) return;
+        } else if ((matchesKey(data, "p") || matchesKey(data, "s") || matchesKey(data, "r")) && this.model.selected) {
+            const selected = this.model.selected;
+            const action: TaskControl | undefined = matchesKey(data, "p") ? selected.capabilities.pause ? "pause" : selected.capabilities.resume ? "resume" : undefined
+                : matchesKey(data, "s") ? selected.capabilities.skip ? "skip" : undefined : selected.capabilities.retry ? "retry" : undefined;
+            if (!action) return;
+            if (!this.args.coordinator.control(selected, action) && !this.disposed) this.args.ctx.ui.notify(`Could not ${action}: the task changed state.`, "warning");
+            if (this.disposed) return;
+            this.refresh();
+        } else if (matchesKey(data, "enter") && this.page === "detail") {
+            if (this.model.selected?.capabilities.steer) this.openComposer(this.model.selected);
+            else return;
         } else if (matchesKey(data, "c")) {
             const path = this.detail?.path ?? this.model.selected?.artifacts[0]?.path;
             if (path) void this.copy(path).then(() => {
@@ -174,6 +196,21 @@ export class TaskPanel implements Component {
             } else return;
         }
         if (!this.disposed) { this.invalidate(); this.args.tui.requestRender(); }
+    }
+    private openComposer(target: NonNullable<TaskPanelModel["selected"]>): void {
+        const input = new Input({ prompt: "› ", placeholder: "Message the agent · Enter send · Esc cancel",
+            placeholderStyle: text => this.theme.fg("dim", text) });
+        input.focused = this.focusedState;
+        const close = () => { if (this.composer?.input === input) this.composer = undefined; };
+        input.onEscape = close;
+        input.onSubmit = value => {
+            close();
+            const message = value.trim();
+            if (!message || this.disposed) return;
+            // Identity is the one the composer was opened for, never a later selection.
+            if (!this.args.coordinator.steer(target, message) && !this.disposed) this.args.ctx.ui.notify("Message not delivered: the agent is no longer running.", "warning");
+        };
+        this.composer = { input };
     }
     private listBody(width: number): string[] {
         if (this.cachedList?.width === width) return this.cachedList.lines;
@@ -215,10 +252,23 @@ export class TaskPanel implements Component {
     private footerLines(width: number, rows: number, position: string): string[] {
         const detach = this.args.config.shortcutBackground.join("/") || "/task-detach";
         const waits = this.args.coordinator.waitCount;
-        const actions = width >= 70 ? `waiting ${waits} · x Stop selected · c Copy path · ${detach} Detach all waits` : `waiting ${waits} · x Stop · c Copy · ${detach} All waits`;
+        const wide = width >= 70, caps = this.model.selected?.capabilities;
+        const selected = [
+            this.page === "detail" && caps?.steer ? "Enter Message" : undefined,
+            caps?.pause ? "p Pause" : caps?.resume ? "p Resume" : undefined,
+            caps?.skip ? "s Skip" : undefined, caps?.retry ? "r Retry" : undefined,
+        ].filter(Boolean).join(" · ");
+        const actions = `waiting ${waits} · ${wide ? "x Stop selected · c Copy path" : "x Stop · c Copy"}${selected ? ` · ${selected}` : ""} · ${detach} ${wide ? "Detach all waits" : "All waits"}`;
         // Wrap action groups independently: ordinary narrow screens must not silently
         // lose either selected operations or the distinct global wait-release entry.
         const lines = [this.hints(width), actions].flatMap(line => wrapTextWithAnsi(line, width));
+        if (this.composer) {
+            // The composer takes the navigation hint rows; footer height stays the same
+            // (blank rows stand in when narrow hints wrapped onto several lines).
+            const hintRows = wrapTextWithAnsi(this.hints(width), width).length;
+            return [this.composer.input.render(width)[0] ?? "", ...Array.from({ length: hintRows - 1 }, () => ""),
+                ...lines.slice(hintRows).map(line => this.theme.fg("dim", truncateToWidth(line, width, "…")))].slice(0, Math.max(1, rows - 2));
+        }
         if (width >= 100) lines[0] += ` · ${position}`;
         const budget = Math.max(1, rows - 2);
         return lines.slice(0, budget).map(line => this.theme.fg("dim", truncateToWidth(line, width, "…")));
@@ -278,6 +328,6 @@ export class TaskPanel implements Component {
     dispose(): void {
         if (this.disposed) return;
         this.disposed = true; clearInterval(this.timer); this.timer = undefined; this.unsubscribe();
-        this.model.dispose(); this.conversation.dispose(); this.detail = undefined; this.rows = []; this.invalidate();
+        this.composer = undefined; this.model.dispose(); this.conversation.dispose(); this.detail = undefined; this.rows = []; this.invalidate();
     }
 }

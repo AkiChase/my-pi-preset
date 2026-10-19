@@ -3,7 +3,7 @@ const layout = await loadNativeLayout();
 import assert from "node:assert/strict";
 import { it } from "node:test";
 import { createEventBus, SessionManager, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
+import { CURSOR_MARKER, stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 import { TaskCoordinator } from "../coordinator.ts";
 import { TaskLifecycle } from "../lifecycle.ts";
 import { DEFAULTS } from "../config.ts";
@@ -406,4 +406,78 @@ void it("structured conversation replaces the raw output body, with running acti
         for (const pattern of [/── Conversation · 2 messages \(latest\)/, /older messages omitted/, /User/, /do it/, /Assistant/, /done/, /⏺ read {2}a\.ts/, /▍ reading a\.ts/]) assert.match(frame, pattern);
         assert.doesNotMatch(frame, /"type":"user"|── Output|\*\*done\*\*/);
     } finally { h.panel.dispose(); f.coordinator.dispose(); }
+});
+
+void it("detail Enter opens a steering composer that owns input, keeps footer height and targets the opened identity", () => {
+    const running = view("live", { capabilities: { stop: true, details: true, steer: true } }), done = view("done", { status: "completed", endedAt: Date.now() });
+    const f = sourceFixture([running, done]);
+    const sent: [string, string][] = [];
+    f.source.steer = (identity, message) => { sent.push([identity.taskId, message]); return true; };
+    const notices: string[] = [];
+    const terminal = { rows: 16, columns: 80 };
+    const panel = new TaskPanel({ coordinator: f.coordinator, config: DEFAULTS, layout, ctx: { ui: { notify(message: string) { notices.push(message); } } } as unknown as ExtensionContext,
+        theme: { fg: (_color, text) => text }, keys: { matches: () => false }, tui: { terminal, requestRender() {} } as never, done() {} });
+    try {
+        panel.handleInput("\r");
+        const before = panel.render(80).map(stripTerminalSequences);
+        assert.match(before.join("\n"), /Enter Message/);
+        panel.handleInput("\r");
+        const open = panel.render(80).map(stripTerminalSequences);
+        assert.equal(open.length, before.length); assert.match(open.join("\n"), /› Message the agent/);
+        assert.deepEqual(open.slice(0, 3), before.slice(0, 3), "body origin unchanged");
+        for (const ch of "x focus") panel.handleInput(ch);
+        assert.equal(f.stops.length, 0, "x is typed into the composer, not a stop");
+        panel.handleInput("\r");
+        assert.deepEqual(sent, [["live", "x focus"]]);
+        assert.doesNotMatch(panel.render(80).join("\n"), /›/);
+        panel.handleInput("\r"); panel.handleInput("a"); panel.handleInput("\u001b");
+        assert.equal(sent.length, 1, "Esc cancels without sending"); assert.equal(panel.getState().page, "detail", "Esc closes only the composer");
+        panel.handleInput("\u001b"); panel.handleInput("j"); panel.handleInput("\r");
+        assert.doesNotMatch(panel.render(80).join("\n"), /Enter Message/);
+        panel.handleInput("\r"); assert.doesNotMatch(panel.render(80).join("\n"), /›/, "non-steerable rows never open a composer");
+        f.source.steer = () => false;
+        panel.handleInput("\u001b"); panel.handleInput("k"); panel.handleInput("\r"); panel.handleInput("\r"); panel.handleInput("y"); panel.handleInput("\r");
+        assert.match(notices.join("\n"), /not delivered/);
+    } finally { panel.dispose(); f.coordinator.dispose(); }
+});
+
+void it("p/s/r route only advertised workflow controls and the footer lists exactly those", () => {
+    const wf = view("wf", { kind: "workflow", capabilities: { stop: true, details: true, pause: true } });
+    const child = view("child", { parentKey: wf.key, executionMode: "owned", capabilities: { stop: true, details: true, skip: true } });
+    const f = sourceFixture([wf, child]);
+    const controls: string[] = [];
+    f.source.control = (identity, action) => { controls.push(`${identity.taskId}:${action}`); return true; };
+    const h = component(f);
+    try {
+        let frame = stripTerminalSequences(h.panel.render(160).join("\n"));
+        assert.match(frame, /p Pause/); assert.doesNotMatch(frame, /s Skip|r Retry|p Resume/);
+        h.panel.handleInput("s"); h.panel.handleInput("r"); h.panel.handleInput("p");
+        h.panel.handleInput("j");
+        frame = stripTerminalSequences(h.panel.render(160).join("\n"));
+        assert.match(frame, /s Skip/); assert.doesNotMatch(frame, /p Pause|r Retry/);
+        h.panel.handleInput("r"); h.panel.handleInput("p"); h.panel.handleInput("s");
+        assert.deepEqual(controls, ["wf:pause", "child:skip"]);
+    } finally { h.panel.dispose(); f.coordinator.dispose(); }
+});
+
+void it("steering composer forwards focus for the IME cursor and keeps footer height when hints wrap", () => {
+    const f = sourceFixture([view("live", { capabilities: { stop: true, details: true, steer: true } })]);
+    const terminal = { rows: 16, columns: 18 };
+    const panel = new TaskPanel({ coordinator: f.coordinator, config: DEFAULTS, layout, ctx: { ui: { notify() {} } } as unknown as ExtensionContext,
+        theme: { fg: (_color, text) => text }, keys: { matches: () => false }, tui: { terminal, requestRender() {} } as never, done() {} });
+    try {
+        panel.focused = true;
+        panel.handleInput("\r");
+        const before = panel.render(18).map(stripTerminalSequences);
+        panel.handleInput("\r"); panel.handleInput("h");
+        const raw = panel.render(18);
+        assert.ok(raw.some(line => line.includes(CURSOR_MARKER)), "focused composer emits the hardware cursor marker");
+        const open = raw.map(stripTerminalSequences);
+        assert.equal(open.length, before.length);
+        assert.equal(open.findIndex(line => line.startsWith("›")), before.findIndex(line => /Esc Back/.test(line)), "composer replaces the first hint row in place");
+        assert.equal(open.filter(line => /waiting 0/.test(line)).length, 1);
+        assert.equal(open.findIndex(line => /waiting 0/.test(line)), before.findIndex(line => /waiting 0/.test(line)), "action rows keep their position");
+        panel.focused = false;
+        assert.ok(!panel.render(18).some(line => line.includes(CURSOR_MARKER)), "blur propagates to the composer");
+    } finally { panel.dispose(); f.coordinator.dispose(); }
 });

@@ -8,7 +8,8 @@ import { extractText } from "./context.ts";
 import { fromMessages, MAX_TEXT, readTranscriptTail } from "./conversation-entries.ts";
 import type { AgentRecord } from "./types.ts";
 import { getLifetimeTotal } from "./usage.ts";
-import { collapse } from "./workflow/progress.ts";
+import { collapse, displayState, type WorkflowAgentEntry } from "./workflow/progress.ts";
+import { pauseWorkflowTask, resumeWorkflowTask } from "./workflow/task.ts";
 import type { WorkflowTask } from "./workflow/task.ts";
 
 const MAX_DETAIL = 16_000;
@@ -55,6 +56,27 @@ function withOutcome(entries: readonly ConversationEntry[], record: AgentRecord)
     extra.push(Object.freeze({ kind: "assistant" as const, text: result.slice(0, MAX_TEXT), tools: Object.freeze([]) }));
   if (record.status === "error" && record.error) extra.push(Object.freeze({ kind: "notice" as const, text: `Error: ${record.error.slice(0, 2_000)}` }));
   return extra.length ? Object.freeze([...entries, ...extra]) : entries;
+}
+
+/** A workflow still accepting control: active status and a live control handle. */
+function controllable(task: WorkflowTask | undefined): task is WorkflowTask & { control: NonNullable<WorkflowTask["control"]> } {
+  return !!task && (task.status === "running" || task.status === "paused") && task.control !== undefined;
+}
+/** Workflow children answer to their script, not the user; only independent live agents take steering. */
+function steerable(record: AgentRecord): boolean {
+  return !record.workflowId && (record.status === "running" || record.status === "queued");
+}
+/** The workflow progress row that owns a child record, by manager record id. */
+function childEntry(task: WorkflowTask, recordId: string): WorkflowAgentEntry | undefined {
+  return collapse(task.workflowProgress).agents.find(entry => entry.recordId === recordId);
+}
+/** Skip covers the whole unanswered window; retry needs a running child to restart. */
+function childActions(task: WorkflowTask | undefined, record: AgentRecord): { skip: boolean; retry: boolean } {
+  if (!controllable(task) || !record.workflowId) return { skip: false, retry: false };
+  const entry = childEntry(task, record.id);
+  if (!entry) return { skip: false, retry: false };
+  const state = displayState(entry, true);
+  return { skip: state === "queued" || state === "running", retry: state === "running" };
 }
 
 export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCoordinator, workflows: ReadonlyMap<string, WorkflowTask>, options: { observe?: boolean; filter?: (record: AgentRecord) => boolean } = {}): TaskSource {
@@ -104,7 +126,9 @@ export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCo
             model: record.executionConfig ? record.executionConfig.model : record.invocation?.modelId ?? record.invocation?.modelName,
             thinking: record.executionConfig ? record.executionConfig.thinking : record.invocation?.thinking,
             durationMs: (record.completedAt ?? Date.now()) - record.startedAt }),
-          artifacts: Object.freeze(artifacts), capabilities: Object.freeze({ stop: status === "starting" || status === "running" || status === "queued", details: true }),
+          artifacts: Object.freeze(artifacts), capabilities: Object.freeze({ stop: status === "starting" || status === "running" || status === "queued", details: true,
+            steer: steerable(record),
+            ...childActions(record.workflowId ? workflows.get(record.workflowId) : undefined, record) }),
         });
       });
       for (const task of workflows.values()) {
@@ -117,7 +141,8 @@ export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCo
           startedAt: task.startTime, endedAt: task.endTime,
           stats: Object.freeze({ tokens: task.totalTokens, toolUses: task.totalToolCalls, doneCount: task.doneCount, totalCount: task.agentCount, phases }),
           artifacts: Object.freeze(task.journalPath ? [Object.freeze({ kind: "log" as const, path: task.journalPath })] : []),
-          capabilities: Object.freeze({ stop: task.status === "running" || task.status === "paused", details: true }),
+          capabilities: Object.freeze({ stop: task.status === "running" || task.status === "paused", details: true,
+            pause: controllable(task) && task.status === "running", resume: controllable(task) && task.status === "paused" }),
         }));
       }
       return Object.freeze(views);
@@ -169,6 +194,29 @@ export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCo
       }
       const record = manager.getRecord(identity.taskId);
       return record !== undefined && (!options.filter || options.filter(record)) && manager.stopRun(identity);
+    },
+    steer(identity, message) {
+      if (disposed || identity.sourceId !== "agent" || !message.trim()) return false;
+      const record = manager.getRecord(identity.taskId);
+      if (!record || record.runId !== identity.runId || !steerable(record) || (options.filter && !options.filter(record))) return false;
+      return manager.steer(record.id, message);
+    },
+    control(identity, action) {
+      if (disposed || identity.sourceId !== "agent") return false;
+      const task = workflows.get(identity.taskId);
+      if (task && identity.runId === task.id) {
+        if (action === "pause") return pauseWorkflowTask(task);
+        if (action === "resume") return resumeWorkflowTask(task);
+        return false;
+      }
+      if (action !== "skip" && action !== "retry") return false;
+      const record = manager.getRecord(identity.taskId);
+      if (!record || record.runId !== identity.runId || (options.filter && !options.filter(record))) return false;
+      const parent = record.workflowId ? workflows.get(record.workflowId) : undefined;
+      // Recheck the current window: the row may have settled since the panel rendered.
+      if (!childActions(parent, record)[action] || !controllable(parent)) return false;
+      const entry = childEntry(parent, record.id)!;
+      return parent.control[action](entry.index);
     },
     subscribe(listener) { if (!disposed) listeners.add(listener); return () => { listeners.delete(listener); }; },
     dispose() {

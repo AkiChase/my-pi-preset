@@ -36,8 +36,12 @@ export interface TaskView extends TaskIdentity {
         phases?: readonly Readonly<{ index: number; title: string; detail?: string }>[];
     }>;
     readonly artifacts: readonly Readonly<{ kind: "log" | "conversation" | "worktree"; path: string }>[];
-    readonly capabilities: Readonly<{ stop: boolean; details: boolean }>;
+    /** Optional finite operations; absent means unsupported. */
+    readonly capabilities: Readonly<{ stop: boolean; details: boolean; steer?: boolean } & { readonly [K in TaskControl]?: boolean }>;
 }
+
+/** Workflow-level (pause/resume) and workflow-child (skip/retry) controls. */
+export type TaskControl = "pause" | "resume" | "skip" | "retry";
 
 export interface TaskDetailRequest {
     readonly offset?: number;
@@ -74,6 +78,9 @@ export interface TaskSource {
     list(): readonly TaskView[];
     detail(identity: TaskIdentity, request?: TaskDetailRequest): TaskDetail | undefined;
     stop(identity: TaskIdentity): boolean;
+    /** Deliver a user message to a running task; false when no longer accepted. */
+    steer?(identity: TaskIdentity, message: string): boolean;
+    control?(identity: TaskIdentity, action: TaskControl): boolean;
     subscribe(listener: () => void): () => void;
     dispose(): void;
 }

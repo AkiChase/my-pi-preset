@@ -576,3 +576,47 @@ void it("nested background startup failure retains launch identity and resolved 
     await f.manager.drainExecution(); assert.equal(f.manager.executionCount, 0);
   } finally { await f.close(); rmSync(root, { recursive: true, force: true }); }
 });
+
+void it("source steer and workflow controls advertise only current windows and recheck identity before effects", async () => {
+  const f = fixture();
+  try {
+    const id = f.spawn(true); await tick();
+    const steered: string[] = [];
+    const record = f.manager.getRecord(id)!;
+    if (record.session) record.session.steer = (async (message: string) => { steered.push(message); }) as unknown as typeof record.session.steer;
+    const identity = f.manager.getRun(id)!.identity;
+    const row = () => f.source.list().find(view => view.taskId === id)!;
+    assert.equal(row().capabilities.steer, true);
+    assert.equal(f.coordinator.steer(identity, "   "), false);
+    assert.equal(f.coordinator.steer({ ...identity, runId: "stale" }, "hi"), false);
+    assert.equal(f.coordinator.steer(identity, "focus on auth"), true);
+    await tick(); assert.deepEqual(steered, ["focus on auth"]);
+
+    const calls: string[] = [];
+    const task = createWorkflowTask({ id: "wf_ctl", script: "", meta: { name: "w", description: "d" } });
+    task.control = { pause: () => calls.push("pause"), resume: () => calls.push("resume"), isPaused: () => false,
+      skip: index => { calls.push(`skip ${index}`); return true; }, retry: index => { calls.push(`retry ${index}`); return true; } } as NonNullable<typeof task.control>;
+    f.workflows.set(task.id, task);
+    const child = f.spawn(true, { workflowId: task.id }); await tick();
+    task.workflowProgress.push({ type: "workflow_agent", index: 3, label: "c", state: "start", recordId: child, startedAt: Date.now() } as never);
+    const wfRow = () => f.source.list().find(view => view.kind === "workflow")!;
+    const childRow = () => f.source.list().find(view => view.taskId === child)!;
+    assert.deepEqual([wfRow().capabilities.pause, wfRow().capabilities.resume], [true, false]);
+    assert.deepEqual([childRow().capabilities.skip, childRow().capabilities.retry], [true, true]);
+    assert.equal(childRow().capabilities.steer, false, "workflow-owned children are steered by their script, not the panel");
+    assert.equal(f.source.steer!(childRow(), "hi"), false);
+    assert.equal(f.coordinator.control(childRow(), "pause"), false, "child rows do not pause the workflow");
+    assert.equal(f.coordinator.control(wfRow(), "pause"), true); assert.equal(task.status, "paused");
+    assert.deepEqual([wfRow().capabilities.pause, wfRow().capabilities.resume], [false, true]);
+    assert.equal(f.coordinator.control(wfRow(), "resume"), true); assert.equal(task.status, "running");
+    assert.equal(f.coordinator.control(childRow(), "retry"), true);
+    assert.equal(f.coordinator.control(childRow(), "skip"), true);
+    assert.deepEqual(calls, ["pause", "resume", "retry 3", "skip 3"]);
+    // Settled row: no window, no effect even through the source directly.
+    task.workflowProgress.push({ type: "workflow_agent", index: 3, label: "c", state: "done", recordId: child } as never);
+    assert.deepEqual([childRow().capabilities.skip, childRow().capabilities.retry], [false, false]);
+    assert.equal(f.source.control!(childRow(), "skip"), false); assert.equal(calls.length, 4);
+    task.control = undefined;
+    assert.equal(wfRow().capabilities.pause, false); assert.equal(f.source.control!(wfRow(), "pause"), false);
+  } finally { await f.close(); }
+});

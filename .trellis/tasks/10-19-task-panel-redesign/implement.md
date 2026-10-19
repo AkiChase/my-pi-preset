@@ -72,3 +72,22 @@ tmux 真实终端：列表页、三类详情页、agent 对话（运行中 / 已
 - 失败与重跑：第一次跑完整套件时 `backend-waits` 有 2 个失败（"fresh panel after actual sweep…"）。原因是 session 消息里没有最终答案时，对话视图把原来 preview 会附带的 `record.result` 弄丢了，属于产品回归。补上 `withOutcome` 后重跑 878/878 PASS。
 - 过程失误：为对比基线执行过一次 `git stash`，把并行会话未提交的改动也一起暂存了，随后 `stash pop` 已恢复（`git stash list` 为空）。之后不再用 stash 做基线对比。
 - 视觉检查：用 dark 主题直接渲染对话详情帧（不经过 pi CLI），Markdown、角色、工具行、失败结果、activity 都显示正常。
+
+### 阶段 3（2026-10-19）
+
+- 改动：
+  - `TaskView.capabilities` 增加 `steer` / `pause` / `resume` / `skip` / `retry`，`TaskSource` 增加可选的 `steer` / `control`。
+  - coordinator 新增 `capable()`：先按 key 重新读取 `list()`，确认身份和能力仍然有效，再转发。
+  - agent source：可 steer 的只限非 workflow 子 agent 且状态为 running/queued；workflow 的 pause/resume 走 `pause/resumeWorkflowTask`；子 agent 的 skip/retry 按 progress index 调用 `task.control`，并在执行前重新检查当前状态窗口。
+  - panel：详情页按 Enter 打开 `Input` composer（接管全部按键、Esc 只关闭 composer、IME 光标通过 Focusable 转发、footer 高度不变）；`p` / `s` / `r` 只在有对应能力时生效；footer 只列出当前可用的动作。
+- 独立审查（trellis-check，agent 41da36dd-b30c-495）：发现并修复 2 个 Medium 和 1 个 Low 问题：
+  - workflow 子 agent 也能 steer，超出了 design §4 的范围；
+  - 窄屏下 composer 让 footer 变矮，正文跟着位移；
+  - 面板关闭后仍调用 render。
+  另补了 IME 光标、窄屏 footer、子 agent 不可 steer 三项测试。主会话逐项核实了这些修改，并顺手删掉未使用的 `composer.key`。
+  未修复：composer 打开时 footer 仍显示 x/c 等提示（placeholder 已写明 Enter 发送、Esc 取消）；目标 agent 结束后 composer 不会自动关闭，提交会被拒绝并提示。
+- 验证：五个目录共 882/882 PASS，`pnpm typecheck` PASS，`git diff --check` PASS。中途一次失败是 fixture 问题：已完成的行缺少 `endedAt`，被列表隐藏。
+- tmux 终端演示：独立 `tmux -L tpdemo*` server，100×38，dark 主题；用真实 pi-tui `TuiAltScreen` + `ProcessTerminal` 挂载 TaskPanel，数据来自 fixture source；按真实按键操作，每个等待都设 10 秒上限。截了 7 张屏：列表、agent 对话详情、composer 输入、发送后、workflow 暂停、子 agent 的 s/r 提示、shell 详情。全部 PASS。
+  - 第一次运行失败：`TUI` 是抽象类且没有导出，有界等待 10 秒后超时退出。
+  - 演示结束时快速连按两次 Esc 没有退出，可能被合并成了一个转义序列；trap 已清理 server，确认没有残留进程。
+  - 这次演示不是真实 pi CLI，也没有调用 provider。

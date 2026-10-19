@@ -1,4 +1,4 @@
-import type { DetachReason, TaskDetail, TaskDetailRequest, TaskIdentity, TaskSource, TaskSourceView, TaskView, WaitLease, WaitOutcome, WaitRegistration } from "./types.ts";
+import type { DetachReason, TaskControl, TaskDetail, TaskDetailRequest, TaskIdentity, TaskSource, TaskSourceView, TaskView, WaitLease, WaitOutcome, WaitRegistration } from "./types.ts";
 import { taskKey } from "./types.ts";
 
 /** One composition-owned coordinator; execution and terminal result ownership stay in backends. */
@@ -146,6 +146,22 @@ export class TaskCoordinator {
         const source = this.sources.get(identity.sourceId)?.source;
         if (!source || !source.list().some(view => view.key === taskKey(identity) && view.capabilities.stop)) return false;
         return source.stop(identity);
+    }
+
+    /** Routed only to a current identity that still advertises the capability. */
+    private capable(identity: TaskIdentity, capability: "steer" | TaskControl): TaskSource | undefined {
+        if (this.closed || !this.accepting) return undefined;
+        const source = this.sources.get(identity.sourceId)?.source;
+        return source?.list().some(view => view.key === taskKey(identity) && view.capabilities[capability] === true) ? source : undefined;
+    }
+
+    steer(identity: TaskIdentity, message: string): boolean {
+        if (!message.trim()) return false;
+        return this.capable(identity, "steer")?.steer?.(identity, message) ?? false;
+    }
+
+    control(identity: TaskIdentity, action: TaskControl): boolean {
+        return this.capable(identity, action)?.control?.(identity, action) ?? false;
     }
 
 
