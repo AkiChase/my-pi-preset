@@ -99,7 +99,7 @@ workflow 用脚本编排多步工作，可以调用 Agent，也可以不启动 A
 
 子 Agent 和 workflow 的运行状态、结果与停止操作会显示在 Task Panel。停止 workflow 会停止它所属的 Agent，不停止独立任务；关闭面板或解除等待不会停止正在运行的任务。
 
-输入 `@handle 消息` 可联系对应 Agent。默认的模型模式会生成更完整的委派请求，直接模式则立即启动；可在 `/agents-config` 的 Settings 中调整。定时定义本身不是运行任务，实际触发的 Agent 才会出现在任务列表。
+输入 `@handle 消息` 可联系对应 Agent。默认的模型模式会生成更完整的委派请求，直接模式则立即启动；可在 `/agents-config` 的 Settings 中调整。
 
 ## 后台任务提醒
 

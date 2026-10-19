@@ -24,7 +24,7 @@ async function harness() {
     new vm.Script(WORKER_SOURCE, { filename: "workflow-worker.js" });
     const root = mkdtempSync(join(tmpdir(), "workflow-failure-host-"));
     const config = join(root, "agent"); mkdirSync(config);
-    writeFileSync(join(config, "agent-tasks.json"), JSON.stringify({ schedulingEnabled: false, rememberAgents: false, workflowsEnabled: true }));
+    writeFileSync(join(config, "agent-tasks.json"), JSON.stringify({ rememberAgents: false, workflowsEnabled: true }));
     const previous = process.env.PI_CODING_AGENT_DIR;
     process.env.PI_CODING_AGENT_DIR = config;
     const tools = new Map<string, Parameters<ExtensionAPI["registerTool"]>[0]>();

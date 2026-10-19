@@ -2,16 +2,16 @@ import { parseControlArguments } from "../../shared/tool-arguments.ts";
 import { assertNonEmptyString } from "./spawn-input.ts";
 import { THINKING_LEVELS } from "./invocation-config.ts";
 
-export interface AgentToolCapabilities { nested: boolean; isolation: boolean; scheduling: boolean }
+export interface AgentToolCapabilities { nested: boolean; isolation: boolean }
 
 export interface AgentToolParams {
   prompt: string; description?: string; subagent_type?: string; name?: string; model?: string;
   thinking?: typeof THINKING_LEVELS[number]; run_in_background?: boolean; resume?: string;
-  isolated?: boolean; inherit_context?: boolean; isolation?: "off" | "worktree"; schedule?: string;
+  isolated?: boolean; inherit_context?: boolean; isolation?: "off" | "worktree";
 }
 export function agentToolFields(capabilities: AgentToolCapabilities): string[] {
   return ["prompt", "description", "subagent_type", ...(capabilities.nested ? [] : ["name"]), "model", "thinking", "run_in_background", "resume", "isolated", "inherit_context",
-    ...(capabilities.isolation ? ["isolation"] : []), ...(capabilities.scheduling ? ["schedule"] : [])];
+    ...(capabilities.isolation ? ["isolation"] : [])];
 }
 
 /** Tool-only admission; internal manager/RPC option contracts remain separate. */
@@ -28,21 +28,20 @@ export function parseAgentToolArguments(value: unknown, capabilities: AgentToolC
   const allowed = resume
     ? ["prompt", "resume", ...(capabilities.nested ? [] : ["run_in_background"])]
     : ["prompt", "description", "subagent_type", ...(capabilities.nested ? [] : ["name"]), "model", "thinking", "run_in_background", "isolated", "inherit_context",
-      ...(capabilities.isolation ? ["isolation"] : []), ...(capabilities.scheduling ? ["schedule"] : [])];
+      ...(capabilities.isolation ? ["isolation"] : [])];
   assertFields(params, allowed);
   assertNonEmptyString(params.prompt, "`prompt`");
   if (!resume) {
     assertNonEmptyString(params.description, "`description`");
     assertNonEmptyString(params.subagent_type, "`subagent_type`");
   }
-  for (const field of ["model", "name", "schedule"]) if (Object.hasOwn(params, field)) assertNonEmptyString(params[field], `\`${field}\``);
+  for (const field of ["model", "name"]) if (Object.hasOwn(params, field)) assertNonEmptyString(params[field], `\`${field}\``);
   if (params.name !== undefined && !/^[A-Za-z0-9_-]+$/.test(String(params.name))) throw new Error("name accepts only letters, digits, '_' and '-'.");
   for (const field of ["run_in_background", "isolated", "inherit_context"]) {
     if (Object.hasOwn(params, field) && typeof params[field] !== "boolean") throw new Error(`${field} must be boolean.`);
   }
   if (Object.hasOwn(params, "thinking") && !THINKING_LEVELS.some(level => level === params.thinking)) throw new Error(`thinking must be one of ${THINKING_LEVELS.join(", ")}.`);
   if (Object.hasOwn(params, "isolation") && params.isolation !== "off" && params.isolation !== "worktree") throw new Error("isolation must be off or worktree.");
-  if (Object.hasOwn(params, "schedule") && params.inherit_context === true) throw new Error("Cannot combine schedule with inherit_context.");
   return params as unknown as AgentToolParams;
 }
 export function assertAgentToolArguments(value: unknown, capabilities: AgentToolCapabilities): void {

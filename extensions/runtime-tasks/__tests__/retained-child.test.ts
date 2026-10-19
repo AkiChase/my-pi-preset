@@ -33,7 +33,7 @@ function fixture(configPatch: Partial<AgentConfig> = {}) {
   const root = mkdtempSync(join(tmpdir(), "runtime-child-loader-")), agent = join(root, "agent"), cwd = join(root, "cwd"), other = join(root, "other");
   mkdirSync(agent); mkdirSync(cwd); mkdirSync(other); mkdirSync(join(agent, "agents"));
   writeFileSync(join(agent, "settings.json"), JSON.stringify({ extensions: [composition], compaction: { enabled: false } }));
-  writeFileSync(join(agent, "agent-tasks.json"), JSON.stringify({ schedulingEnabled: false, rememberAgents: false, outputTranscript: false }));
+  writeFileSync(join(agent, "agent-tasks.json"), JSON.stringify({ rememberAgents: false, outputTranscript: false }));
   writeFileSync(join(agent, "agents", "leaf.md"), "---\nname: leaf\ndescription: offline leaf\nextensions: false\ntools: none\npersist_session: false\n---\nReturn the answer.\n");
   const previous = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = agent;

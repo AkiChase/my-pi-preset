@@ -60,7 +60,7 @@ export function getStatusNote(status: string): string {
  * raises its salience. Two instructions were tried here and cut: "re-spawn with
  * a higher max_turns" (pushes a fresh multi-minute run to save one wasted tool
  * call) and, on `stopped`, "ask before restarting it" (restates the lead, and
- * presumes someone is present to ask — false under `pi -p`, in scheduled jobs,
+ * presumes someone is present to ask — false under `pi -p`
  * and in any background-driven run). Nothing here can measure whether wording
  * improves parent behavior, so removing a false cue (which cannot induce new
  * behavior) and adding an instruction (which can) are not equally safe bets.

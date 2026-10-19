@@ -56,7 +56,7 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
         mkdirSync(join(config, "agents"));
         writeFileSync(join(config, "agents", "custom.md"), typeof settings.customAgent === "string" ? settings.customAgent : "---\nname: custom\ndescription: Offline agent\n---\nDo work.\n");
     }
-    writeFileSync(join(config, "agent-tasks.json"), JSON.stringify({ schedulingEnabled: false, worktreeIsolation: true, outputTranscript: false, rememberAgents: false, defaultJoinMode: "async", ...settings }));
+    writeFileSync(join(config, "agent-tasks.json"), JSON.stringify({ worktreeIsolation: true, outputTranscript: false, rememberAgents: false, defaultJoinMode: "async", ...settings }));
     const previous = process.env.PI_CODING_AGENT_DIR;
     process.env.PI_CODING_AGENT_DIR = config;
 
@@ -162,7 +162,7 @@ function hostError(parameters: unknown, args: unknown, name = "subagent_run"): E
 
 void it("actual registered Agent tools contribute one official SDK rule group and ignore old modes/templates", async () => {
     for (const backgroundByDefault of [false, true]) {
-        const f = await factory({ backgroundByDefault, toolDescriptionMode: "custom", testTemplate: true, schedulingEnabled: false, worktreeIsolation: false });
+        const f = await factory({ backgroundByDefault, toolDescriptionMode: "custom", testTemplate: true, worktreeIsolation: false });
         try {
             const definitions = [...f.tools.values()];
             const snippets = Object.fromEntries(definitions.map(tool => [tool.name, tool.promptSnippet ?? ""]));
@@ -199,17 +199,22 @@ void it("actual registered Agent tools contribute one official SDK rule group an
 
 void it("short root/nested rules preserve feature gates, modes, owned lifecycle and admitted examples", async () => {
     for (const enabled of [false, true]) {
-        const f = await factory({ schedulingEnabled: enabled, worktreeIsolation: enabled, workflowsEnabled: enabled });
+        const f = await factory({ worktreeIsolation: enabled, workflowsEnabled: enabled });
         try {
             assert.equal(f.tools.has("subagent_workflow"), enabled);
             for (const [nested, tool] of [[false, f.tools.get("subagent_run")!], [true, f.nested()[0]!]] as const) {
                 const rules = tool.promptGuidelines!.join("\n");
                 const props = Reflect.get(tool.parameters, "properties");
                 assert.equal(Object.hasOwn(props, "isolation"), enabled);
-                assert.equal(Object.hasOwn(props, "schedule"), enabled && !nested);
+                assert.equal(Object.hasOwn(props, "schedule"), false);
                 assert.equal(Object.hasOwn(props, "name"), !nested);
                 assert.equal(rules.includes("isolation selects Git"), enabled);
-                assert.equal(rules.includes("Use schedule only"), enabled && !nested);
+                assert.doesNotMatch(rules, /schedule/i);
+                const legacy = { subagent_type: "general-purpose", description: "later", prompt: "work", schedule: "5m" };
+                assert.match(hostError(tool.parameters, legacy, tool.name)?.message ?? "", /schedule/);
+                const refused = await tool.execute("legacy", completeToolCall(tool.parameters, legacy) as never, undefined, undefined, f.ctx);
+                assert.equal(refused.isError, true); assert.match(text(refused), /schedule/);
+                assert.equal(f.calls.length, 0);
                 assert.match(rules, /takes precedence over applicable call parameters/);
                 assert.match(rules, /agent_id.*execution_id/);
                 if (nested) {
@@ -222,7 +227,7 @@ void it("short root/nested rules preserve feature gates, modes, owned lifecycle 
                     const args = JSON.parse(example[1]!);
                     args.subagent_type = args.resume ? null : "general-purpose";
                     validateToolArguments(tool, { type: "toolCall", id: "example", name: tool.name, arguments: args });
-                    assert.doesNotThrow(() => parseAgentToolArguments(args, { nested, isolation: enabled, scheduling: enabled && !nested }));
+                    assert.doesNotThrow(() => parseAgentToolArguments(args, { nested, isolation: enabled }));
                 }
                 const prompt = buildSystemPrompt({ cwd: f.cwd, selectedTools: [tool.name], toolSnippets: { [tool.name]: tool.promptSnippet! }, toolGuidelines: { [tool.name]: tool.promptGuidelines! } });
                 assert.equal(prompt.split("Subagent_run usage:").length - 1, 1);
@@ -321,7 +326,7 @@ void it("actual host preserves required nullable null for tool admission and pre
         const validated = validateToolArguments(tool, { type: "toolCall", id: "host", name: tool.name, arguments: completeToolCall(tool.parameters, args) as never });
         assert.equal(validated.resume, null);
         assert.equal(validated.model, null);
-        const admitted = parseAgentToolArguments(validated, { nested: false, isolation: true, scheduling: false });
+        const admitted = parseAgentToolArguments(validated, { nested: false, isolation: true });
         assert.equal(Object.hasOwn(admitted, "resume"), false);
         assert.equal(Object.hasOwn(admitted, "model"), false);
         assert.equal(validated.run_in_background, false);

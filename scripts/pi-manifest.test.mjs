@@ -60,7 +60,7 @@ describe("package.json pi.extensions", () => {
     assert.ok(packageJson.dependencies.shiki);
     assert.ok(packageJson.dependencies["@shikijs/cli"]);
     assert.equal(declaredExtensions().filter(path => path === "extensions/beautify.ts").length, 1);
-    assert.ok(packageJson.dependencies.croner);
+    assert.equal(Object.hasOwn(packageJson.dependencies, "croner"), false, "subagent scheduling was removed");
     assert.ok(packageJson.dependencies.nanoid);
     assert.ok(packageJson.peerDependencies["@earendil-works/pi-coding-agent"]);
     assert.equal(Object.hasOwn(packageJson.dependencies, "@earendil-works/pi-coding-agent"), false);

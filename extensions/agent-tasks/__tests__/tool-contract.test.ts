@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { agentToolFields, parseAgentToolArguments, assertMessageToolArguments, parseWorkflowToolArguments } from "../src/tool-contract.ts";
-const main = { nested: false, isolation: true, scheduling: true };
-const nested = { ...main, nested: true, scheduling: false };
+const main = { nested: false, isolation: true };
+const nested = { ...main, nested: true };
 const run = (values: Record<string, unknown>, capabilities = main) => ({ ...Object.fromEntries(agentToolFields(capabilities).map(field => [field, null])), ...values });
 const workflow = (values: Record<string, unknown>) => ({ script: null, scriptPath: null, name: null, args: null, resumeFromRunId: null, ...values });
 
@@ -22,7 +22,7 @@ test("required control nulls select spawn/resume without mutating the wire objec
 test("null cannot hide unknown or unavailable fields and non-null mode conflicts remain errors", () => {
   const base = { prompt: "inspect", description: "work", subagent_type: "Explore" };
   for (const extra of [{ typo: null }, { model: " " }, { thinking: "hight" }, { isolated: "false" }, { name: "a b" }]) assert.throws(() => parseAgentToolArguments(run({ ...base, ...extra }), main));
-  assert.throws(() => parseAgentToolArguments(run({ ...base, schedule: null }, nested), nested), /schedule/);
+  for (const capabilities of [main, nested]) assert.throws(() => parseAgentToolArguments(run({ ...base, schedule: null }, capabilities), capabilities), /schedule/);
   assert.throws(() => parseAgentToolArguments(run({ ...base, name: null }, nested), nested), /name/);
   const disabled = { ...main, isolation: false };
   assert.throws(() => parseAgentToolArguments(run({ ...base, isolation: null }, disabled), disabled), /isolation/);

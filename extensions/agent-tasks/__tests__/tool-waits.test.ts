@@ -30,7 +30,7 @@ const pause = (ms: number) => new Promise<void>(done => setTimeout(done, ms));
 async function factory(settings: Record<string, unknown> = {}, extra: AgentManagerDependencies = {}, mentionDependencies?: import("../src/mention-clone.ts").MentionCloneDependencies, host: { send?: (message: { customType: string; content: unknown; details?: NotificationDetails }) => void; exec?: ExtensionAPI["exec"]; flag?: string; localLifecycle?: boolean; onEvent?: (name: string) => void; customAgent?: boolean; ui?: ExtensionToolContext["ui"]; beforeStart?: (coordinator: TaskCoordinator, lifecycle: TaskLifecycle) => void; onSource?: (source: import("../../task-ui/types.ts").TaskSource, lifecycle: TaskLifecycle) => void } = {}) {
   const root = mkdtempSync(join(tmpdir(), "agent-tool-waits-")), cwd = join(root, "cwd"), config = join(root, "agent");
   mkdirSync(cwd); mkdirSync(config);
-  writeFileSync(join(config, "agent-tasks.json"), JSON.stringify({ schedulingEnabled: false, outputTranscript: true, rememberAgents: false, defaultJoinMode: "async", ...settings }));
+  writeFileSync(join(config, "agent-tasks.json"), JSON.stringify({ outputTranscript: true, rememberAgents: false, defaultJoinMode: "async", ...settings }));
   if (host.customAgent) {
     mkdirSync(join(config, "agents"));
     writeFileSync(join(config, "agents", "custom.md"), "---\nname: custom\ndescription: Offline foreground-pinned agent\nrun_in_background: false\n---\nDo the requested work.\n");
@@ -168,23 +168,19 @@ for (const background of [false, true]) void it(`legacy model turn limit cannot 
   } finally { await f.close(); await Promise.allSettled(pending); setDefaultMaxTurns(undefined); }
 });
 
-void it("model scheduled delegation never persists legacy or default turn budgets and fires with current user configuration", async () => {
-  const f = await factory({ schedulingEnabled: true, defaultMaxTurns: 7 });
+void it("scheduling is gone: legacy schedulingEnabled is ignored and a schedule field is refused before any spawn", async () => {
+  const f = await factory({ schedulingEnabled: true });
   try {
-    const refused = await f.start(true, { schedule: "1s", max_turns: 1 });
-    assert.equal(refused.isError, true); assert.equal(f.calls.length, 0);
-    const result = await f.start(true, { schedule: "1s" });
-    assert.match(text(result), /Scheduled/);
-    const path = join(f.ctx.cwd, ".pi", "subagent-schedules", "offline-test.json");
-    const stored = JSON.parse(readFileSync(path, "utf8")) as { jobs: { max_turns?: number }[] };
-    assert.equal(Object.hasOwn(stored.jobs[0]!, "max_turns"), false);
-    setDefaultMaxTurns(9);
-    for (let i = 0; i < 150 && !f.calls.length; i++) await pause(10);
-    assert.equal(f.calls[0]!.options.maxTurns ?? f.registry.getRecord(f.calls[0]!.options.agentId!)?.maxTurns, 9);
-    assert.equal(f.registry.getRecord(f.calls[0]!.options.agentId!)?.invocation?.maxTurns, 9);
-    f.calls[0]!.finish(); await tick(); await pause(260);
-    assert.equal(f.notices[0]?.details?.maxTurns, 9);
-  } finally { await f.close(); setDefaultMaxTurns(undefined); }
+    const tool = f.tools.get("subagent_run")!;
+    assert.equal(Object.hasOwn(Reflect.get(tool.parameters, "properties"), "schedule"), false);
+    assert.doesNotMatch(tool.promptGuidelines!.join("\n"), /schedule/i);
+    const loaded = f.rpcReplies.find(reply => reply.name === "subagents:settings_loaded")?.value as { settings: Record<string, unknown> } | undefined;
+    assert.ok(loaded); assert.equal(Object.hasOwn(loaded.settings, "schedulingEnabled"), false);
+    const refused = await tool.execute("legacy", { subagent_type: "general-purpose", description: "later", prompt: "test", schedule: "5m" } as never, undefined, undefined, f.ctx);
+    assert.equal(refused.isError, true); assert.match(text(refused), /schedule/);
+    await tick(); assert.equal(f.calls.length, 0);
+    assert.equal(existsSync(join(f.ctx.cwd, ".pi", "subagent-schedules")), false);
+  } finally { await f.close(); }
 });
 
 void it("actual root delegation preserves frontmatter limits including unlimited, ignores legacy values and resumes stored type", async () => {

@@ -7,11 +7,8 @@ import { join } from "node:path";
 import { Type } from "typebox";
 import type { AgentSession, ExtensionAPI, ExtensionContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { AgentManager } from "../src/agent-manager.ts";
-import type { ScheduleTimers } from "../src/schedule.ts";
 import type { MentionCloneDependencies } from "../src/mention-clone.ts";
 const { runMentionClone } = await import("../src/mention-clone.ts");
-const { SubagentScheduler } = await import("../src/schedule.ts");
-const { ScheduleStore } = await import("../src/schedule-store.ts");
 const tick = async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(done => { resolve = done; }); return { promise, resolve }; }
 function cloneFixture() {
@@ -53,49 +50,6 @@ void it("actual clone attempts one forced-background Agent call and never retrie
   assert.equal((await f.tool().execute("two", {}, undefined, undefined, f.ctx as never)).isError, true);
   f.prompt.resolve(); const result = await work;
   assert.equal(result.spawned, false); assert.equal(result.attempted, true); assert.equal(f.counts.spawn, 1);
-});
-
-void it("actual scheduler old timer/finalize cannot dispatch or mutate a rebound same-id store", async () => {
-  const root = mkdtempSync(join(tmpdir(), "scheduler-owner-"));
-  const callbacks: (() => void)[] = [], notices: unknown[] = [];
-  const timers: ScheduleTimers = { interval(callback) { callbacks.push(callback); return {} as NodeJS.Timeout; }, once(callback) { callbacks.push(callback); return {} as NodeJS.Timeout; }, cron(_expression, callback) { callbacks.push(callback); return { stop() {}, nextRun: () => null }; }, clear() {} };
-  const scheduler = new SubagentScheduler(timers);
-  const first = new ScheduleStore(join(root, "first.json")), second = new ScheduleStore(join(root, "second.json"));
-  const startup = deferred<void>(), terminal = deferred<void>(); let spawned = 0;
-  const manager = { spawn() { spawned++; return "old-agent"; }, awaitStartup: () => startup.promise, getRecord: () => ({ promise: terminal.promise, status: "completed" }) } as unknown as AgentManager;
-  const pi = { events: { emit(_name: string, event: unknown) { notices.push(event); } } } as unknown as ExtensionAPI;
-  const ctx = { cwd: root, modelRegistry: {} } as unknown as ExtensionContext;
-  const job = scheduler.buildJob({ name: "shared", description: "test", schedule: "1h", subagent_type: "general-purpose", prompt: "offline" });
-  first.add(job); second.add({ ...job, prompt: "new", runCount: 17 });
-  try {
-    scheduler.start(pi, ctx, manager, first); callbacks[0]!(); assert.equal(spawned, 1);
-    scheduler.start(pi, ctx, manager, second);
-    const before = readFileSync(join(root, "second.json"), "utf8"), noticeCount = notices.length;
-    callbacks[0]!(); startup.resolve(); terminal.resolve(); await scheduler.drain();
-    assert.equal(spawned, 1); assert.equal(notices.length, noticeCount); assert.equal(readFileSync(join(root, "second.json"), "utf8"), before);
-    assert.equal(second.get(job.id)?.runCount, 17); assert.ok(scheduler.getNextRun(job.id));
-    scheduler.stop("shutdown"); callbacks[1]!(); assert.equal(spawned, 1); assert.equal(second.get(job.id)?.enabled, true);
-  } finally { startup.resolve(); terminal.resolve(); scheduler.stop("shutdown"); await scheduler.drain(); rmSync(root, { recursive: true, force: true }); }
-});
-
-void it("actual scheduler once and cron callbacks retain binding and shutdown cancels its executing child signal", async () => {
-  const root = mkdtempSync(join(tmpdir(), "schedule-kind-owner-")), callbacks: (() => void)[] = [];
-  const timers: ScheduleTimers = { interval(callback) { callbacks.push(callback); return {} as NodeJS.Timeout; }, once(callback) { callbacks.push(callback); return {} as NodeJS.Timeout; }, cron(_expression, callback) { callbacks.push(callback); return { stop() {}, nextRun: () => null }; }, clear() {} };
-  const scheduler = new SubagentScheduler(timers), first = new ScheduleStore(join(root, "first.json")), second = new ScheduleStore(join(root, "second.json"));
-  let spawned = 0, childSignal: AbortSignal | undefined;
-  const manager = { spawn(_pi: unknown, _ctx: unknown, _type: unknown, _prompt: unknown, options: { signal: AbortSignal }) { spawned++; childSignal = options.signal; return "agent"; }, async awaitStartup() {}, getRecord: () => ({ promise: Promise.resolve(), status: "completed" }) } as unknown as AgentManager;
-  const pi = { events: { emit() {} } } as unknown as ExtensionAPI, ctx = { cwd: root, modelRegistry: {} } as unknown as ExtensionContext;
-  const once = scheduler.buildJob({ name: "once", description: "test", schedule: "+1h", subagent_type: "general-purpose", prompt: "once" });
-  const cron = scheduler.buildJob({ name: "cron", description: "test", schedule: "0 * * * * *", subagent_type: "general-purpose", prompt: "cron" });
-  first.add(once); first.add(cron); second.add(once); second.add(cron);
-  try {
-    scheduler.start(pi, ctx, manager, first); scheduler.start(pi, ctx, manager, second);
-    const before = readFileSync(join(root, "first.json"), "utf8"); callbacks[0]!(); callbacks[1]!();
-    assert.equal(spawned, 0); assert.equal(readFileSync(join(root, "first.json"), "utf8"), before); assert.equal(second.get(once.id)?.enabled, true);
-    callbacks[3]!(); assert.equal(spawned, 1); assert.equal(childSignal?.aborted, false);
-    scheduler.stop("shutdown"); assert.equal(childSignal?.aborted, true); await scheduler.drain();
-    assert.equal(second.get(cron.id)?.enabled, true);
-  } finally { scheduler.stop("shutdown"); await scheduler.drain(); rmSync(root, { recursive: true, force: true }); }
 });
 
 void it("actual workflow host gate observes cancellation and drain waits for the real pi.exec promise", async () => {

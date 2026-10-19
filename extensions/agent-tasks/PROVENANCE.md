@@ -27,7 +27,7 @@
 1. 原源码 40 个文件中的 171 处本地模块 specifier 从 `.js` 改为 `.ts`，对应本仓库 no-build 的真实源文件。只处理模块引用；workflow 的内联 CommonJS worker、VM 的 `workflow.js` 文件名及用户脚本引用不机械改写。
 2. `src/settings.ts` 的全局／项目设置文件改为 `agent-tasks.json`，不读取 `subagents.json`，不自动改写用户文件。其他运行、管理与旧 UI 设置暂保留。
 3. `src/index.ts` 与顶层 composition 继续显式导出 `runInChildSessionContext` 供真实 host-loader 回归桥接，但 guard 不再要求调用方与加载方共享同一 jiti graph。Pi 1.1.0 的 `loadExtensionsCached` 在资源 cwd 改变时清空 factory cache，随后以 `moduleCache: false` 创建新 graph；worktree 中的 `loader.reload()` 因而无法读取原 graph 的模块局部 AsyncLocalStorage。`src/child-context.ts` 现在通过 `Symbol.for("my-pi-preset:agent-tasks:child-session-context:v1")` 取得有类型、经 `instanceof AsyncLocalStorage` 检查的进程共享异步标记。它只携带 child scope，不承载 task-ui coordinator、manager 或执行状态；不使用全局布尔值／环境开关，子关闭也不得 disable/delete 该 ALS。根上下文与嵌套异步作用域保持隔离。
-4. 运行依赖 `croner`、`nanoid` 声明在根 package；SDK 与 TypeBox 为 host peers，TypeBox 同时是本地开发依赖。`.npmrc` 禁用自动安装 peers，不把第二份 SDK 塞入 lockfile。
+4. 运行依赖 `nanoid` 声明在根 package（`croner` 已随定时功能于 2026-10-19 移除）；SDK 与 TypeBox 为 host peers，TypeBox 同时是本地开发依赖。`.npmrc` 禁用自动安装 peers，不把第二份 SDK 塞入 lockfile。
 5. `__tests__/source-loader.mjs` 只为原生 Node 测试在内存中变换 vendor `src/` 的不可擦除 TS（参数属性）。生产仍由 Pi jiti 加载，不生成 dist、不修改 SDK；测试须先注册 hook，再动态导入被测源模块。
 
 基础阶段仍保留上游 AgentWidget、FleetView 与非 UI 能力；阶段 2B 的共享等待及读模型偏离见下。完整会话 epoch、旧 UI 移除和统一面板仍属后续阶段。
@@ -167,3 +167,11 @@ actualSDKhost/editor/Pretty/TUI分发回归与GC4/4资源回收通过（parentta
 - 删除 `viewerMarkdown` 设置及 `ViewerMarkdownMode`。旧配置中的该键被忽略，不报错，加载时也不改写用户文件；之后在 `/agents-config` 的 Settings 中修改任意设置时，项目文件按现有方式写入完整快照，不再包含该键。面板对话固定按 Markdown 渲染 assistant 正文，tool result 保持纯文本。
 - 对话结构化转换在 `src/conversation-entries.ts`：优先读取 live session，session 释放后读取 transcript 尾部。
 - 用户和模型可见的文本中，原指向 `/agents → Workflows` 的地方改为 `/tasks` 或 `agent_manage stop`。继承的上游注释里提到旧 UI 的地方没有逐条改写。
+
+## 2026-10-19：移除子 Agent 定时功能
+
+- 删除 `src/schedule.ts`、`src/schedule-store.ts`、`src/ui/schedule-menu.ts`（以及仅被它使用的 `src/ui/select-item.ts`）、`types.ts` 的 `ScheduledSubagent`／`ScheduleStoreData`，以及 index 中 scheduler 的创建、`session_start` 绑定、shutdown stop/drain、`subagent_run` 的 schedule 分支、Settings 的 Scheduling 项和 `subagents:scheduler_ready` 事件。定时只在 pi 进程存活时运行，错过的触发不补跑，用户判断用处有限。
+- `subagent_run` 的 schema 与 usage 不再有 `schedule`；`AgentToolCapabilities` 与 `runToolGuidance` 去掉 `scheduling`。传入 `schedule` 按未知字段拒绝，不提供迁移说明。删除 subagents skill 的 `references/delegation.md` 中的 schedule 规则。
+- `schedulingEnabled` 设置不再解析、应用或写入；旧配置中的该键被忽略。已有的 `.pi/subagent-schedules/*.json` 不读取，也不删除。
+- 根 `package.json` 移除 `croner`，用 `pnpm install --lockfile-only --offline` 同步 lockfile（只删除 croner 条目，没有下载或安装）。
+- `bypassQueue` 仍由创建向导的 AI 生成路径使用，予以保留。上文各历史段落中关于 scheduler 的记录保持原样，以本段为准。

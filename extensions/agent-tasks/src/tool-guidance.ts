@@ -1,17 +1,16 @@
 export interface RunGuidanceOptions {
   nested: boolean;
   isolation: boolean;
-  scheduling: boolean;
   agentTypes: string;
 }
 
 /** Official registration guidance; no alternate prompt assembler or template I/O. */
 export function runToolGuidance(options: RunGuidanceOptions): string[] {
-  const controlFields = ["description", "subagent_type", ...(options.nested ? [] : ["name"]), "model", "thinking", "run_in_background", "resume", "isolated", "inherit_context", ...(options.isolation ? ["isolation"] : []), ...(options.scheduling ? ["schedule"] : [])];
+  const controlFields = ["description", "subagent_type", ...(options.nested ? [] : ["name"]), "model", "thinking", "run_in_background", "resume", "isolated", "inherit_context", ...(options.isolation ? ["isolation"] : [])];
   const emptyControls = Object.fromEntries(controlFields.map(field => [field, null]));
   const newExample = JSON.stringify({ prompt: "Inspect login validation; do not edit files; report concrete defects.", ...emptyControls, subagent_type: "<available_type>", description: "Inspect login validation", run_in_background: false });
   const resumeExample = JSON.stringify({ prompt: "Check the remaining boundary cases.", ...emptyControls, resume: "<agent_id>" });
-  const spawnExtras = `${options.isolation ? ", isolation" : ""}${options.scheduling ? ", schedule" : ""}`;
+  const spawnExtras = options.isolation ? ", isolation" : "";
   const modeRule = options.nested
     ? "New nested agents: null uses agent configuration, otherwise foreground. Background needs owned agent_manage; collect before finishing, when owned children are stopped."
     : "run_in_background:null uses the configured execution mode. Use foreground for dependent next steps; otherwise do independent work during background execution.";
@@ -29,7 +28,7 @@ ${options.agentTypes.split("\n").map(line => `    ${line}`).join("\n")}
   - Agent-file configuration takes precedence over applicable call parameters; inspect effective/overridden requests in results. ${modeRule}
   - Background launch is accepted/queued, not completed. Copy agent_id for messaging/resume, execution_id for agent_manage; never substitute IDs. Foreground returns inline; releasing wait does not stop execution.
   - ${options.nested ? "Collect owned background results before finishing; do not rely on top-level completion notifications." : "Background completion is notified automatically."} Do not poll/sleep solely to detect completion or invent results.
-${options.isolation ? '  - isolation selects Git working-directory isolation: off uses the current checkout, worktree uses a temporary copy that cannot see uncommitted changes. Follow project worktree authorization. isolated is different: it disables extension/MCP tools.\n' : ""}${options.scheduling ? '  - Use schedule only for explicitly requested delayed/recurring execution. It creates a scheduled definition, not a current execution; it cannot combine with resume, inherit_context or run_in_background:false.\n' : ""}  - Examples:
+${options.isolation ? '  - isolation selects Git working-directory isolation: off uses the current checkout, worktree uses a temporary copy that cannot see uncommitted changes. Follow project worktree authorization. isolated is different: it disables extension/MCP tools.\n' : ""}  - Examples:
     New: ${newExample}
     Resume: ${resumeExample}`];
 }

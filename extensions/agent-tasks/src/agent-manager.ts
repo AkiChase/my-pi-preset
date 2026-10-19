@@ -238,8 +238,7 @@ interface SpawnOptions {
    * is still COUNTED once the run starts, so a bypassing spawn transiently
    * exceeds the limit rather than being invisible to it.
    *
-   * Used by the scheduler, so a fired job can't be deferred past its trigger
-   * window, and by the `/agents` agent-file generator, which has no way to
+   * Used by the `/agents-create` agent-file generator, which has no way to
    * cancel a wait (see its call site).
    */
   bypassQueue?: boolean;

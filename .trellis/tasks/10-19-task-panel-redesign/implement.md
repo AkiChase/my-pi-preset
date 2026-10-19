@@ -113,3 +113,25 @@ tmux 真实终端：列表页、三类详情页、agent 对话（运行中 / 已
   - Agent types 和 Settings 正常显示，Settings 里仍有 Scheduling，留到阶段 5；
   - `/agents-create` 打开位置选择；
   - Ctrl+D 退出，`PI_EXITED=0`，没有残留进程，隔离目录已删除。
+
+### 阶段 5（2026-10-19）
+
+- 改动：
+  - 删除 `schedule.ts`、`schedule-store.ts`、`ui/schedule-menu.ts`，以及仅被后者使用的 `ui/select-item.ts`。
+  - 从 index 中删除 scheduler 的创建、绑定、shutdown stop/drain，`subagent_run` 的 schedule 分支和 schema 参数，Settings 的 Scheduling 项，以及 `scheduler_ready` 事件。
+  - `tool-contract`、`tool-guidance`、`nested-tools` 去掉 `scheduling` 能力和 `schedule` 字段。
+  - `settings` 和 `types` 删除 `schedulingEnabled`、`ScheduledSubagent`、`ScheduleStoreData`。
+  - `bypassQueue` 仍被创建向导使用，予以保留。
+  - 移除 `croner`：执行 `pnpm install --lockfile-only --offline`，exit 0，lockfile 只删除了 croner 的三处条目，`node_modules` 未改动。
+  - 更新 docs、PROVENANCE 和 `delegation.md`，并把提到 scheduler 的注释改为准确描述。
+- 测试：
+  - 删除仅测试 scheduler 的 3 个用例（auxiliary-lifecycle ×2、tool-waits ×1）。backend-waits 只去掉 scheduler 部分，保留 RPC 轮次上限的覆盖。
+  - 新增 AC7 用例：旧配置 `schedulingEnabled: true` 被忽略，schema 和 guidance 中没有 schedule，传入 `schedule` 会在 spawn 之前被拒绝，也不会创建 `.pi/subagent-schedules`。
+  - 去掉各 fixture 中遗留的 `schedulingEnabled`。
+- 独立审查（trellis-check，agent 54f1383d-469b-4dc）：没有阻塞问题。修复了 3 个 Low 问题：补充嵌套工具经注册 schema 和 execute 拒绝 schedule 的测试，修正 2 条过时注释。审查认为超出其范围的 3 条注释和 1 个 fixture，由主会话随后修复。
+- 中途失败：第一次脚本修改 `tool-guidance.ts` 时断言失败，原因是还有一行 schedule 规则没有覆盖到，补上后重跑通过。整个过程没有产品测试失败。
+- 验证：
+  - `PI_SDK_DIR=<sdk> PI_CODING_AGENT_DIR=<tmp> pnpm check` → exit 0，1526/1526（forced-exit 全量）；
+  - 不加 force-exit 的完整集成测试 `node --test "extensions/**/__tests__/*.test.ts" "scripts/*.test.mjs"` → 1188/1188，自然退出；
+  - typecheck、`git diff --check` 均 PASS。
+- 真实 pi CLI 的 tmux 验证：同阶段 4 的隔离方式，额外在全局 `agent-tasks.json` 中写入 `{"schedulingEnabled": true, "viewerMarkdown": "all"}`。结果：Settings 列表里已没有 Scheduling；stderr 为空；配置文件没有被改写；cwd 下没有产生 `.pi`；`PI_EXITED=0`；没有残留进程，隔离目录已删除。

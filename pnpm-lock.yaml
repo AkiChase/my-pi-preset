@@ -11,9 +11,6 @@ importers:
       '@shikijs/cli':
         specifier: ^4.0.2
         version: 4.5.0
-      croner:
-        specifier: ^10.0.1
-        version: 10.0.1
       nanoid:
         specifier: ^5.1.16
         version: 5.1.16
@@ -103,10 +100,6 @@ packages:
 
   comma-separated-tokens@2.0.3:
     resolution: {integrity: sha512-Fu4hJdvzeylCfQPp9SGWidpzrMs7tTrlu6Vb8XGaRGck8QSNZJJp538Wrb60Lax4fPwR64ViY468OIUTbRlGZg==}
-
-  croner@10.0.1:
-    resolution: {integrity: sha512-ixNtAJndqh173VQ4KodSdJEI6nuioBWI0V1ITNKhZZsO0pEMoDxz539T4FTTbSZ/xIOSuDnzxLVRqBVSvPNE2g==}
-    engines: {node: '>=18.0'}
 
   dequal@2.0.3:
     resolution: {integrity: sha512-0je+qPKHEMohvfRTCEo3CrPG6cAzAYgmzKyxRiYSSDkS6eGJdyVJm7WaYA5ECaAD9wLB2T4EEeymA5aFVcYXCA==}
@@ -289,8 +282,6 @@ snapshots:
   character-entities-legacy@3.0.0: {}
 
   comma-separated-tokens@2.0.3: {}
-
-  croner@10.0.1: {}
 
   dequal@2.0.3: {}
 

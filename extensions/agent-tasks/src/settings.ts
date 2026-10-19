@@ -58,15 +58,6 @@ export interface SubagentsSettings {
    */
   backgroundByDefault?: boolean;
   /**
-   * Master switch for the schedule subagent feature. Defaults to `true`.
-   * When `false`: the `subagent_run` tool's `schedule` param + its guideline are
-   * stripped from the tool spec at registration (zero LLM-context cost), the
-   * scheduler doesn't bind to the session, and the `/agents → Scheduled jobs`
-   * menu entry is hidden. Schema-level removal applies at extension load
-   * (next pi session); runtime menu/runtime-fire short-circuit is immediate.
-   */
-  schedulingEnabled?: boolean;
-  /**
    * When true, the effective model of each subagent spawn is validated
    * against `enabledModels` from pi's settings — both global
    * (`<agentDir>/settings.json`) and project-local (`<cwd>/.pi/settings.json`),
@@ -164,16 +155,16 @@ export interface SubagentsSettings {
    * Deliberately a downgrade rather than an error. The fail-loud rule covers
    * worktrees that *cannot* be created; this is the user declining one, and
    * throwing would reject exactly the calls that the `isolation: "off"` value
-   * exists to tolerate. Enforced below the tool boundary, so it also covers the
-   * scheduler and the unvalidated cross-extension RPC path.
+   * exists to tolerate. Enforced below the tool boundary, so it also covers
+   * agent files and the unvalidated cross-extension RPC path.
    */
   worktreeIsolation?: boolean;
   /**
    * Master switch for scripted workflows. Defaults to `true`.
    *
    * Off is not a soft hide: the `subagent_workflow` tool is never registered, so
-   * the model is not told it exists and cannot call it, the `/agents`
-   * Workflows entry is hidden, and `--subagents-workflow-file` is refused.
+   * the model is not told it exists and cannot call it, and
+   * `--subagents-workflow-file` is refused.
    *
    * Absent is not the same as `true`. Unset means *auto*: on, but yielding to
    * another extension that already offers a workflow tool, because two
@@ -184,9 +175,8 @@ export interface SubagentsSettings {
    * `resolveWorkflowCollisions` in index.ts.
    *
    * Read once at extension init, before registration, so flipping it in
-   * `/agents-config → Settings` takes effect on the next pi session — the same
-   * contract `schedulingEnabled` has, and for the same reason: a tool spec is
-   * fixed once pi has it.
+   * `/agents-config → Settings` takes effect on the next pi session, because a
+   * tool spec is fixed once pi has it.
    */
   workflowsEnabled?: boolean;
   /**
@@ -258,7 +248,6 @@ export interface SettingsAppliers {
   setGraceTurns: (n: number) => void;
   setDefaultJoinMode: (mode: JoinMode) => void;
   setBackgroundByDefault: (b: boolean) => void;
-  setSchedulingEnabled: (b: boolean) => void;
   setScopeModels: (enabled: boolean) => void;
   setStrictAgentFiles: (b: boolean) => void;
   setDisableDefaultAgents: (b: boolean) => void;
@@ -334,9 +323,6 @@ function sanitize(raw: unknown): SubagentsSettings {
   }
   if (typeof r.backgroundByDefault === "boolean") {
     out.backgroundByDefault = r.backgroundByDefault;
-  }
-  if (typeof r.schedulingEnabled === "boolean") {
-    out.schedulingEnabled = r.schedulingEnabled;
   }
   if (typeof r.scopeModels === "boolean") {
     out.scopeModels = r.scopeModels;
@@ -442,7 +428,6 @@ export function applySettings(s: SubagentsSettings, appliers: SettingsAppliers):
   if (typeof s.fallbackSubagent === "string") appliers.setFallbackSubagent(s.fallbackSubagent);
   if (s.defaultJoinMode) appliers.setDefaultJoinMode(s.defaultJoinMode);
   if (typeof s.backgroundByDefault === "boolean") appliers.setBackgroundByDefault(s.backgroundByDefault);
-  if (typeof s.schedulingEnabled === "boolean") appliers.setSchedulingEnabled(s.schedulingEnabled);
   if (typeof s.scopeModels === "boolean") appliers.setScopeModels(s.scopeModels);
   if (typeof s.strictAgentFiles === "boolean") appliers.setStrictAgentFiles(s.strictAgentFiles);
   if (typeof s.disableDefaultAgents === "boolean") appliers.setDisableDefaultAgents(s.disableDefaultAgents);

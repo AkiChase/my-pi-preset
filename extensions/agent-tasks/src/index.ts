@@ -53,8 +53,6 @@ import { describeModel, type ModelRegistry, resolveModel } from "./model-resolve
 import { checkModelScope, isScopeModelsEnabled, setScopeModelsEnabled } from "./model-scope.ts";
 import { getMaxSubagentDepth, setMaxSubagentDepth } from "./nested-tools.ts";
 import { createOutputFilePath, ensureOutputFile, getOutputTranscriptDefault, sessionTaskDir, setOutputTranscriptDefault, streamToOutputFile, writeInitialEntry } from "./output-file.ts";
-import { SubagentScheduler } from "./schedule.ts";
-import { resolveStorePath, ScheduleStore } from "./schedule-store.ts";
 import { applyAndEmitLoaded, loadSettings, type SubagentsSettings, saveAndEmitChanged } from "./settings.ts";
 import { getForegroundOutcomeNote, getStatusNote, partialOutputSuffix } from "./status-note.ts";
 import { type AgentConfig, type AgentInvocation, type AgentMentionMode, type AgentRecord, type JoinMode, type NotificationDetails, type SubagentType } from "./types.ts";
@@ -75,7 +73,6 @@ import {
   SPINNER,
   type Theme,
 } from "./activity.ts";
-import { showSchedulesMenu } from "./ui/schedule-menu.ts";
 import { renderWorkflowCard, renderWorkflowEntryCard } from "./ui/workflow-card.ts";
 import { getLifetimeCost, getLifetimeTotal, getSessionContextPercent, type LifetimeUsage, PendingUsagePool, toReportedUsage } from "./usage.ts";
 import { decideWorkflowCollision, FOREIGN_WORKFLOW_TOOL_NAMES } from "./workflow/collisions.ts";
@@ -842,29 +839,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
   /** Whether the `@handle` autocomplete wrapper has been stacked on pi's provider. */
   let mentionProviderRegistered = false;
 
-  // ---- Subagent scheduler ----
-  // Session-scoped: store is constructed inside session_start once sessionId
-  // is available. Mirrors pi-chonky-tasks's session-scoped task store —
-  // schedules reset on /new, restore on /resume.
-  const scheduler = new SubagentScheduler();
-
-  function startScheduler(ctx: ExtensionContext) {
-    if (!active()) return;
-    try {
-      const sessionId = ctx.sessionManager?.getSessionId?.();
-      if (!sessionId) return;  // sessionId not yet available — try again on next event
-      const path = resolveStorePath(ctx.cwd, sessionId);
-      const store = new ScheduleStore(path);
-      scheduler.start(pi, ctx, manager, store);
-      pi.events.emit("subagents:scheduler_ready", { sessionId, jobCount: store.list().length });
-    } catch (err) {
-      // Scheduling is non-essential — log and move on so the rest of the
-      // extension keeps working if e.g. .pi/ is unwritable.
-      console.warn("[pi-subagents] Failed to start scheduler:", err);
-    }
-  }
-
-  // Capture ctx from session_start for RPC spawn handler + start the scheduler.
+  // Capture ctx from session_start for the RPC spawn handler.
   // This also wires the RPC handlers and broadcasts readiness — on the first
   // bound session_start, so a filtered-out activation never advertises (#142).
   pi.on("session_start", async (_event, ctx) => {
@@ -875,8 +850,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       unregisterSource = unsubscribe;
       if (!active()) { unsubscribe(); unregisterSource = undefined; return; }
     }
-    // Guard mirrors the `!scheduler.isActive()` pattern below: session_start
-    // fires once per activation, but a double-bind must not leak listeners.
+    // session_start fires once per activation, but a double-bind must not leak listeners.
     if (!rpcHandle) {
       rpcHandle = registerRpcHandlers({
         events: pi.events,
@@ -911,7 +885,6 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       pi.events.emit("subagents:ready", {});
     }
     if (!active()) return;
-    if (isSchedulingEnabled() && !scheduler.isActive()) startScheduler(ctx);
     // Stack `@handle` suggestions on pi's built-in autocomplete. Registered at
     // most once per activation: pi appends wrappers to a list it never prunes,
     // so a second call would layer a duplicate provider on the first. TUI only
@@ -1170,8 +1143,8 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       // Nothing else to pass: runAgent resolves model, thinking and max turns
       // from the agent's own config when the spawn omits them, and the
       // manager's onStart/onComplete callbacks own the widget, the fleet list
-      // and the completion notification — the same contract the scheduler and
-      // cross-extension RPC spawns run under.
+      // and the completion notification — the same contract cross-extension
+      // RPC spawns run under.
       const id = spawnTopLevel(pi, ctx, type, mention.message, {
         description: describeMention(mention.message),
         isBackground: true,
@@ -1208,13 +1181,12 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       rpcHandle = undefined;
     },
     stop() {
-      safely(() => scheduler.stop("shutdown"));
       for (const controller of clones) safely(() => controller.abort());
       for (const task of workflowTasks.values()) safely(() => task.abortController.abort());
       manager.stopForShutdown();
     },
     async drain() {
-      await Promise.all([manager.drainExecution(), scheduler.drain(), drainAuxiliary()]);
+      await Promise.all([manager.drainExecution(), drainAuxiliary()]);
     },
     dispose() {
       manager.sealHostEffects();
@@ -1257,16 +1229,6 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
   let backgroundByDefault = true;
   function getBackgroundByDefault(): boolean { return backgroundByDefault; }
   function setBackgroundByDefault(b: boolean) { backgroundByDefault = b; }
-
-  // Master switch for the schedule subagent feature. Defaults to enabled.
-  // Read once at extension init (before tool registration) so the subagent_run tool's
-  // param schema reflects the persisted setting. Runtime toggles via /agents
-  // → Settings short-circuit the menu entry + the execute-time addJob path
-  // immediately, but the schema-level removal only takes effect on next
-  // extension load (next pi session). Documented in CHANGELOG/README.
-  let schedulingEnabled = true;
-  function isSchedulingEnabled(): boolean { return schedulingEnabled; }
-  function setSchedulingEnabled(b: boolean) { schedulingEnabled = b; }
 
   // Master switch for scripted workflows. Defaults to ON. Off means the
   // `subagent_workflow` tool is never registered: the model is not told the
@@ -1475,7 +1437,6 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       setGraceTurns,
       setDefaultJoinMode,
       setBackgroundByDefault,
-      setSchedulingEnabled,
       setScopeModels: setScopeModelsEnabled,
       setStrictAgentFiles: (b) => { strictAgentFiles = b; },
       setDisableDefaultAgents: setDisableDefaultAgents,
@@ -1494,24 +1455,6 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
 
   // ---- subagent_run tool ----
 
-  // Schedule param + its guideline are gated on `schedulingEnabled` (read once
-  // at registration; flipping the setting later requires next pi session for
-  // the schema to update). Defining the shape once and spreading it via Partial
-  // preserves Type.Object's inference when present and produces a
-  // `schedule`-free schema when absent — zero LLM-context cost in disabled mode.
-  const scheduleParamShape = {
-    schedule: nullableControl(
-      Type.String({
-        description:
-          'Opt-in only — fire later instead of now. Set null to run immediately (the default, almost always correct). ' +
-          'Formats: 6-field cron ("0 0 9 * * 1" = 9am Mon), interval ("5m"/"1h"), one-shot ("+10m" or ISO). ' +
-          'Forces run_in_background; incompatible with inherit_context and resume. Returns job ID.',
-      }),
-    ),
-  };
-  const scheduleParam: Partial<typeof scheduleParamShape> =
-    isSchedulingEnabled() ? scheduleParamShape : {};
-
   // Held rather than registered inline: the mention clone reuses this exact
   // definition, so the agent it starts is an ordinary top-level spawn instead
   // of a second implementation that has to be kept in step with this one.
@@ -1520,7 +1463,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     label: "subagent_run",
     description: "Start or resume an autonomous agent for delegated work.",
     promptSnippet: "Launch autonomous sub-agents for complex multi-step tasks",
-    promptGuidelines: runToolGuidance({ nested: false, isolation: isWorktreeIsolationEnabled(), scheduling: isSchedulingEnabled(), agentTypes: buildTypeListText() }),
+    promptGuidelines: runToolGuidance({ nested: false, isolation: isWorktreeIsolationEnabled(), agentTypes: buildTypeListText() }),
     parameters: Type.Object({
       prompt: Type.String({
         description: "The task for the agent to perform.",
@@ -1565,7 +1508,6 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
         }),
       ),
       ...isolationParam(isWorktreeIsolationEnabled()),
-      ...scheduleParam,
     }, { additionalProperties: false }),
 
     // ---- Custom rendering: Claude Code style ----
@@ -1714,7 +1656,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       assertActive();
 
       let params;
-      try { params = parseAgentToolArguments(input, { nested: false, isolation: isWorktreeIsolationEnabled(), scheduling: isSchedulingEnabled() }); }
+      try { params = parseAgentToolArguments(input, { nested: false, isolation: isWorktreeIsolationEnabled() }); }
       catch (err) { return errorResult(err instanceof Error ? err.message : String(err)); }
       reloadCustomAgents();
       const resumeTarget = params.resume === undefined ? undefined : manager.getRecord(params.resume);
@@ -1871,48 +1813,6 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
           tags: recTags.length > 0 ? recTags : undefined,
         };
       };
-
-      // ---- Schedule: register a job, don't spawn now ----
-      if (params.schedule) {
-        if (!isSchedulingEnabled()) {
-          return errorResult("Scheduling is disabled in this project. Enable via /agents → Settings → Scheduling.");
-        }
-        if (params.resume) {
-          return errorResult("Cannot combine `schedule` with `resume` — schedules create fresh agents.");
-        }
-        if (params.inherit_context) {
-          return errorResult("Cannot combine `schedule` with `inherit_context` — there is no parent conversation at fire time.");
-        }
-        if (params.run_in_background === false) {
-          return errorResult("Cannot combine `schedule` with `run_in_background: false` — scheduled jobs always run in background.");
-        }
-        if (!scheduler.isActive()) {
-          return errorResult("Scheduler is not active in this session yet. Try again after the session has fully started.");
-        }
-        try {
-          const job = scheduler.addJob({
-            name: params.description as string,
-            description: params.description as string,
-            schedule: params.schedule as string,
-            // The caller's own name, not the substitute — the scheduler re-resolves
-            // at fire time, and the original is what a user edits.
-            subagent_type: requestedType,
-            prompt: params.prompt as string,
-            model: params.model as string | undefined,
-            thinking: thinking,
-            isolated: isolated,
-            isolation: isolation,
-          });
-          const next = scheduler.getNextRun(job.id);
-          return textResult(
-            `${fallbackNote}Scheduled "${job.name}" (id: ${job.id}, type: ${job.scheduleType}). ` +
-            `Next run: ${next ?? "(unknown)"}. ` +
-            `Manage via /agents → Scheduled jobs.`,
-          );
-        } catch (err) {
-          return errorResult(`Failed to schedule this agent: ${err instanceof Error ? err.message : String(err)}`);
-        }
-      }
 
       // Resume existing agent
       if (params.resume) {
@@ -3327,7 +3227,6 @@ Write the file using the write tool. Only write the file, nothing else.`;
       graceTurns: getGraceTurns(),
       defaultJoinMode: getDefaultJoinMode(),
       backgroundByDefault: getBackgroundByDefault(),
-      schedulingEnabled: isSchedulingEnabled(),
       scopeModels: isScopeModelsEnabled(),
       strictAgentFiles,
       disableDefaultAgents: isDefaultsDisabled(),
@@ -3432,13 +3331,6 @@ Write the file using the write tool. Only write the file, nothing else.`;
           label: "Background by default",
           description: "A subagent_run call that doesn't say runs detached (off = blocks the turn and returns inline)",
           currentValue: getBackgroundByDefault() ? "on" : "off",
-          values: ["on", "off"],
-        },
-        {
-          id: "schedulingEnabled",
-          label: "Scheduling",
-          description: "Schedule subagent feature (off removes `schedule` param from subagent_run tool spec on next pi session)",
-          currentValue: isSchedulingEnabled() ? "on" : "off",
           values: ["on", "off"],
         },
         {
@@ -3580,18 +3472,6 @@ Write the file using the write tool. Only write the file, nothing else.`;
             ? "subagent_run calls run in the background unless they pass run_in_background: false"
             : "subagent_run calls block and return inline unless they pass run_in_background: true",
         );
-      } else if (id === "schedulingEnabled") {
-        const enabled = value === "on";
-        if (enabled === isSchedulingEnabled()) {
-          ctx.ui.notify(`Scheduling already ${enabled ? "enabled" : "disabled"}.`, "info");
-        } else {
-          setSchedulingEnabled(enabled);
-          if (!enabled) scheduler.stop();  // immediate kill — outstanding fires stop ticking
-          notifyApplied(
-            ctx,
-            `Scheduling ${enabled ? "enabled" : "disabled"}. Tool spec change takes effect on next pi session.`,
-          );
-        }
       } else if (id === "workflowsEnabled") {
         const enabled = value === "on";
         if (enabled === isWorkflowsEnabled()) {
