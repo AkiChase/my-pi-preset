@@ -76,7 +76,10 @@
 
 - 文档：`docs/extensions/task-composition.md` 新增“中途消息与提问”，说明顶层卡片、详情页、wait/release、嵌套边界和 workflow 排除；不新增模型工具参数教学。
 - 回归：阶段 3 后 `pnpm check` exit 0（1540/1540），`git diff --check` 无输出。
-- tmux 已确认环境可用（3.6a），但本轮明确未授权真实 provider 调用，无法在真实 Agent 会话中生成并目视验证中途消息卡片；保留为最终验收限制，不把普通离线测试误记为终端验证。
+- tmux 已确认环境可用（3.6a）。真实 provider 验收于 `parent-messaging-current-source` tmux pane 完成：以 `--no-extensions --extension /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/task-composition.ts` 显式加载当前 checkout，使用 `mp-ptu-test/gpt-5.6-terra:azureptu`、thinking `medium`。这避免了首次误加载 installed preset checkout（`caba48a…`、缺少 `reply` schema）的问题。
+  - 顶层 `reply:"notify"` 生成并显示 `req_4a12fefc9a` 与 canonical execution ID；child 的 notice 即时显示卡片，关联 reply 显示 `↩ acceptance-running-child · reply req_4a12fefc9a`，且 `<reply request-id="req_4a12fefc9a">…</reply>` 正确送达。
+  - child 保持运行约 130.4s，父会话在运行时打开 `/tasks`，确认 detail Messages/对话含 `reply_to_parent` notice、question 与 request envelope；随后 deferred reply 正确出现。
+  - 从 tmux pipe-pane 建立 monitor，15s silence reminder + capture-pane 周期检查；monitor task `mwfzfssab` 在 child 完成后已停止。无源码修改发生于真实验收。
 
 
 ## 验证命令
