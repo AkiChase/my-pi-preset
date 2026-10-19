@@ -1,0 +1,4 @@
+{"file":".trellis/spec/development/index.md","reason":"Task Viewer is a Trellis TUI extension; implementation must follow UI/rendering, bounded-state, source ownership, and user-documentation constraints."}
+{"file":".trellis/spec/testing/index.md","reason":"Implementation needs the required Trellis MJS test boundaries, focused reader regression coverage, full checks, and evidence rules."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reader and Component changes must extend their existing owners without introducing speculative shared state."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Archive reader data crosses into TUI navigation; preserve validation, authoritative state, failure behavior, and test coverage."}

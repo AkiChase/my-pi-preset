@@ -1,0 +1,4 @@
+{"file":".trellis/spec/development/index.md","reason":"Review needs the Trellis extension UI/rendering and documentation ownership contracts."}
+{"file":".trellis/spec/testing/index.md","reason":"Review must verify required regression coverage, test boundaries, and final evidence expectations."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Review reader/component ownership and confirm no unnecessary abstraction changed behavior."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Review archive-to-TUI boundary validation, error behavior, and preserved state semantics."}
