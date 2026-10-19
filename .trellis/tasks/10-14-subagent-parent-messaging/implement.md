@@ -40,6 +40,16 @@
 - 测试：多请求不串、四种父状态送达、同 tick 回复与终态、多 waiter、无 timer 泄漏、shutdown 隔离、Beautify 与 task-ui 回归。
 - 独立审查 → 主会话核实 → scoped commit。
 
+### 阶段 2 记录（2026-10-19）
+
+- 实现：新增 `parent-delivery.ts`，在收到子消息时即时 `appendEntry` 对话卡片；非等待态经 `sendMessage({ display: false }, { triggerTurn: true, deliverAs: "steer" })` 一次性进入父上下文。`subagent_message` 支持 `reply: null | "wait" | "notify"`，问题以有序 steering 正文 + `<parent-request … />` marker 投递；前台 launch、`agent_manage wait` 与 reply wait 均把等待中的消息附加回工具结果。`source.ts` 与 task UI 暴露最新消息和带预算的详情 `Messages` 区块。
+- 独立审查（trellis-check，execution `exec_WyJhNzVhNzcyNS00N2U5LTQ0YiIsIjEiXQ`；原 Trellis host 被打断后以同角色新执行恢复）：
+  - High（已修）：reply wait 在 Esc / detach 后仍保留 mailbox waiter，随后回复会被吞掉。lease cleanup 立即取消 waiter；只有 completed wait 才取得 held messages。
+  - Medium（已修）：持久化卡片 payload 允许终端控制序列；渲染前清理。详情问题原先静默截断 2,000 字符且不遵守 detail budget；现保留预算内最新完整 entries 并显式显示 omitted 数。
+  - 审查者新增 detach race、控制序列、超长问题与 task panel 消息行 / selection 映射的回归覆盖。
+- 复验：`node --test extensions/agent-tasks/__tests__/parent-messaging.test.ts extensions/agent-tasks/__tests__/parent-delivery.test.ts` 25/25；`pnpm run typecheck` exit 0；task-ui + tool-contract 78/78；主会话最终 `pnpm check` 1538/1538，均使用临时 `PI_CODING_AGENT_DIR`；`git diff --check` 无输出。
+- 未运行真实 provider 或 tmux 终端验证（留阶段 4）；嵌套交付为阶段 3 范围。
+
 ## 阶段 3：嵌套支持
 
 - 嵌套 `subagent_message` 增加 `reply`，与主入口准入一致。

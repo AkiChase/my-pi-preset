@@ -32,6 +32,7 @@ import { isAbsolute, join } from "node:path";
 import { defineTool, type ExtensionAPI, type ExtensionCommandContext, type ExtensionContext, getAgentDir, getSettingsListTheme } from "@earendil-works/pi-coding-agent";
 import { Container, Key, matchesKey, type SettingItem, SettingsList, Spacer, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
+import { StringEnum } from "@earendil-works/pi-ai";
 import { renderAgentName } from "./agent-color.ts";
 import { buildNewAgentFile, disableInContent, enableInContent, isEmptyStub, locateAgentFile, personalAgentsDir, projectAgentsDir, serializeAgentFile } from "./agent-file-toggle.ts";
 import type { AgentManagerDependencies } from "./agent-manager.ts";
@@ -87,9 +88,11 @@ import { completeWorkflowTask, createWorkflowTask, failWorkflowTask, formatWorkf
 import { workflowToolGuidance } from "./workflow/tool-description.ts";
 import { isWorktreeIsolationEnabled, setWorktreeIsolationEnabled } from "./worktree.ts";
 import { runToolGuidance, messageToolGuidance } from "./tool-guidance.ts";
-import { parseAgentToolArguments, assertMessageToolArguments, parseWorkflowToolArguments } from "./tool-contract.ts";
+import { parseAgentToolArguments, parseMessageToolArguments, parseWorkflowToolArguments, MESSAGE_REPLY_MODES, type MessageToolParams } from "./tool-contract.ts";
 import { assertNonEmptyString, assertSpawnInput, normalizeAgentDescription, parseSpawnOptions } from "./spawn-input.ts";
 import { escapeXml } from "./xml.ts";
+import { createParentDelivery, formatHeldMessages, renderSubagentMessageCard, SUBAGENT_MESSAGE_TYPE, type SubagentMessageEntryData } from "./parent-delivery.ts";
+import type { ChildMessage } from "./parent-messaging.ts";
 
 // ---- Shared helpers ----
 
@@ -457,6 +460,9 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
   // activation rather than lazily.
   pi.registerEntryRenderer<WorkflowEntryData>(WORKFLOW_ENTRY_TYPE, (entry, _options, theme) =>
     renderWorkflowEntryCard(entry.data, theme));
+  // Child messages: shown immediately as entries, delivered to the model separately.
+  pi.registerEntryRenderer<SubagentMessageEntryData>(SUBAGENT_MESSAGE_TYPE, (entry, { expanded }, theme) =>
+    renderSubagentMessageCard(entry.data, expanded, theme));
 
   // Registered at activation; READ from session_start. The host applies CLI
   // values after every extension factory has run, so `getFlag` here would only
@@ -540,6 +546,8 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
   // ---- Individual nudge helper (async join mode) ----
   function emitIndividualNudge(record: AgentRecord, runId = record.runId) {
     if (!active() || !canDeliverAgentResult(manager, coordinator, record, runId)) return;
+    // Messages sent before the run ended reach the model before its completion.
+    delivery.flush(record.id);
 
     const notification = formatTaskNotification(record, 500, showCost);
     const footer = record.outputFile ? `\nFull transcript available at: ${record.outputFile}` : '';
@@ -588,6 +596,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
         const unconsumed = runs.filter(({ record, runId }) => canDeliverAgentResult(manager, coordinator, record, runId)).map(({ record }) => record);
         if (unconsumed.length === 0) return;
 
+        for (const member of unconsumed) delivery.flush(member.id);
         const notifications = unconsumed.map(r => formatTaskNotification(r, 300, showCost)).join('\n\n');
         const label = partial
           ? `${unconsumed.length} agent(s) finished (partial — others still running)`
@@ -717,6 +726,18 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     // pool grows in a session that will never drain it.
     if (active() && reportUsage) pendingUsage.add(usage);
   }, options.managerDependencies);
+
+  const delivery = createParentDelivery({ manager, coordinator, pi, active, owns: isTopLevelAgent,
+    onFailure: () => { if (!active()) return; const message = "Subagent message delivery failed; the message is recorded in the task panel.";
+      if (currentCtx?.hasUI) safely(() => { if (active()) currentCtx?.ui.notify(message, "warning"); }); else safely(() => console.warn(`[pi-subagents] ${message}`)); },
+  });
+  /** Held messages taken by a waiting tool call, appended to its result by the wrapper. */
+  const heldForCall = new Map<string, readonly ChildMessage[]>();
+  const takeHeldForCall = (toolCallId: string | undefined, identity: { taskId: string; runId: string }) => {
+    if (!toolCallId) return;
+    const messages = delivery.take(identity);
+    if (messages.length) heldForCall.set(toolCallId, [...(heldForCall.get(toolCallId) ?? []), ...messages]);
+  };
 
   // Expose manager via Symbol.for() global registry for cross-package access.
   // Standard Node.js pattern for cross-package singletons (used by OpenTelemetry, etc.).
@@ -1176,6 +1197,8 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       clearTimeout(batchFinalizeTimer); batchFinalizeTimer = undefined;
       currentBatchAgents = [];
       safely(() => groupJoin.dispose());
+      safely(() => delivery.dispose());
+      heldForCall.clear();
       manager.freezeAdmission();
       if (rpcHandle) for (const unsubscribe of Object.values(rpcHandle)) safely(unsubscribe);
       rpcHandle = undefined;
@@ -1896,6 +1919,8 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
         const run = manager.getRun(id)!;
         const lease = registerAgentWait(manager, coordinator, run, "launch", signal, () => reconsiderAgentNotice(existing));
         const outcome = await lease.result;
+        // Messages held during this wait belong to its result (see withHeldMessages).
+        takeHeldForCall(toolCallId, run.identity);
         assertActive();
         if (outcome.kind === "detached") {
           return textResult(`Agent resumed in background.\nAgent ID: ${id}\nExecution ID: ${executionId(run.identity, "subagent")}\nThe same session continues; you will be notified when it completes.`,
@@ -2120,6 +2145,8 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
         catch (error) { manager.stopRun(run.identity); lease.interrupt(); throw error; }
         agentActivity.set(fgId, fgState);
         const outcome = await lease.result;
+        // Messages held during this wait belong to its result (see withHeldMessages).
+        takeHeldForCall(toolCallId, run.identity);
         assertActive();
         if (outcome.kind === "detached") {
           return textResult(`${fallbackNote}Agent continuing in background.\nAgent ID: ${fgId}\nExecution ID: ${executionId(run.identity, "subagent")}\n` +
@@ -2187,8 +2214,15 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       },
     };
   }
-  options.onManagementResult?.((id, result) => {
+  options.onManagementResult?.((id, input) => {
     assertActive();
+    // agent_manage wait holds messages of the waited execution; return them with it.
+    const meta = input.details.runtimeTask;
+    let result = input;
+    if (meta.action === "wait" && meta.task_type === "subagent" && meta.task_id && meta.run_id) {
+      const held = delivery.take({ taskId: meta.task_id, runId: meta.run_id });
+      if (held.length) result = { ...input, content: [...input.content, { type: "text" as const, text: formatHeldMessages(held).trimStart() }] };
+    }
     const usage = reportUsage && id ? pendingUsage.drain() : undefined;
     return usage ? { ...result, usage } : result;
   });
@@ -2198,7 +2232,21 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
 
   // The mention path is handed THIS object, not the bare `agentTool` — see the
   // mention-clone header on why the clone must call the registered tool.
-  const registeredAgentTool = withUsageReporting(agentTool);
+  /** Append messages a foreground wait held to that call's result text. */
+  function withHeldMessages<T extends { execute: (...args: any[]) => any }>(tool: T): T {
+    return {
+      ...tool,
+      execute: async (toolCallId: string | undefined, ...rest: any[]) => {
+        try {
+          const result = await tool.execute(toolCallId, ...rest);
+          const held = toolCallId ? heldForCall.get(toolCallId) : undefined;
+          if (!held?.length || !result || !Array.isArray(result.content)) return result;
+          return { ...result, content: [...result.content, { type: "text" as const, text: formatHeldMessages(held).trimStart() }] };
+        } finally { if (toolCallId) heldForCall.delete(toolCallId); }
+      },
+    };
+  }
+  const registeredAgentTool = withUsageReporting(withHeldMessages(agentTool));
   pi.registerTool(registeredAgentTool);
   // Private identity capability: only this dispatcher can force background.
   // Ordinary model parameters and frontmatter precedence remain unchanged.
@@ -2676,23 +2724,58 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
 
   // ---- subagent_message tool ----
 
-  registerToolReportingUsage(defineTool({
+  /** Per-agent delivery order: a question and its request marker are never interleaved. */
+  const steerChains = new Map<string, Promise<unknown>>();
+  function sendInOrder(record: AgentRecord, texts: readonly string[]): Promise<"queued" | "sent"> {
+    if (!record.session) {
+      // Session not ready: both messages queue together and flush in order.
+      (record.pendingSteers ??= []).push(...texts);
+      return Promise.resolve("queued");
+    }
+    const session = record.session;
+    const previous = steerChains.get(record.id) ?? Promise.resolve();
+    const next = previous.catch(() => {}).then(async () => { for (const text of texts) await steerAgent(session, text); return "sent" as const; });
+    const settled = next.catch(() => {});
+    steerChains.set(record.id, settled);
+    void settled.then(() => { if (steerChains.get(record.id) === settled) steerChains.delete(record.id); });
+    return next;
+  }
+  function stateLine(record: AgentRecord): string {
+    const tokens = formatLifetimeTokens(record);
+    const contextPercent = getSessionContextPercent(record.session);
+    const stateParts: string[] = [];
+    if (tokens) stateParts.push(tokens);
+    if (showCost) {
+      const costText = formatCost(getLifetimeCost(record.lifetimeUsage));
+      if (costText) stateParts.push(costText);
+    }
+    stateParts.push(`${record.toolUses} tool ${record.toolUses === 1 ? "use" : "uses"}`);
+    if (contextPercent !== null) stateParts.push(`context ${Math.round(contextPercent)}% full`);
+    if (record.compactionCount) stateParts.push(`${record.compactionCount} compaction${record.compactionCount === 1 ? "" : "s"}`);
+    return `Current state: ${stateParts.join(" · ")}`;
+  }
+
+  registerToolReportingUsage(withHeldMessages(defineTool({
     name: SUBAGENT_TOOL_NAMES.STEER,
     label: "subagent_message",
-    description: "Send additional guidance to a currently running agent; delivery does not confirm processing.",
-    promptGuidelines: messageToolGuidance(),
-    promptSnippet: "Send additional guidance to a running agent",
+    description: "Send guidance or a question to a currently running agent; delivery does not confirm processing.",
+    promptGuidelines: messageToolGuidance({ reply: true }),
+    promptSnippet: "Send guidance or a question to a running agent",
     parameters: Type.Object({
       agent_id: Type.String({
         description: "Real agent_id from launch/list; must identify a currently running agent owned by this session. Names and execution_id are not accepted.",
       }),
       message: Type.String({
         minLength: 1,
-        description: "The non-blank steering message to send. This will appear as a user message in the agent's conversation.",
+        description: "The non-blank message to send. This will appear as a user message in the agent's conversation.",
       }),
+      reply: nullableControl(StringEnum(MESSAGE_REPLY_MODES, {
+        description: "null sends plain guidance; \"wait\" asks and waits in this call for the reply; \"notify\" asks and returns at once, the reply is delivered later.",
+      })),
     }, { additionalProperties: false }),
-    execute: async (_toolCallId, params, _signal, _onUpdate, _ctx) => {
-      try { assertMessageToolArguments(params); }
+    execute: async (toolCallId, input, signal, _onUpdate, _ctx) => {
+      let params: MessageToolParams;
+      try { params = parseMessageToolArguments(input); }
       catch (err) { return errorResult(err instanceof Error ? err.message : String(err)); }
       const record = manager.getRecord(params.agent_id);
       if (!record || !isTopLevelAgent(record)) {
@@ -2701,38 +2784,72 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       if (record.status !== "running") {
         return errorResult(`Agent "${params.agent_id}" is not running (status: ${record.status}). Cannot steer a non-running agent.`);
       }
-      if (!record.session) {
-        // Session not ready yet — queue the steer for delivery once initialized
-        if (!record.pendingSteers) record.pendingSteers = [];
-        record.pendingSteers.push(params.message);
-        pi.events.emit("subagents:steered", { id: record.id, message: params.message });
-        return textResult(`Steering message queued for agent ${record.id}. It will be delivered once the session initializes.`);
+
+      if (params.reply === undefined) {
+        try {
+          const phase = await sendInOrder(record, [params.message]);
+          assertActive();
+          pi.events.emit("subagents:steered", { id: record.id, message: params.message });
+          if (phase === "queued") return textResult(`Steering message queued for agent ${record.id}. It will be delivered once the session initializes.`);
+          return textResult(
+            `Steering message sent to agent ${record.id}. Submitted to its session; this does not confirm it has been read or processed.\n${stateLine(record)}`,
+          );
+        } catch (err) {
+          return errorResult(`Failed to steer agent: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
 
-      try {
-        await steerAgent(record.session, params.message);
-        assertActive();
-        pi.events.emit("subagents:steered", { id: record.id, message: params.message });
-        const tokens = formatLifetimeTokens(record);
-        const contextPercent = getSessionContextPercent(record.session);
-        const stateParts: string[] = [];
-        if (tokens) stateParts.push(tokens);
-        if (showCost) {
-          const costText = formatCost(getLifetimeCost(record.lifetimeUsage));
-          if (costText) stateParts.push(costText);
-        }
-        stateParts.push(`${record.toolUses} tool ${record.toolUses === 1 ? "use" : "uses"}`);
-        if (contextPercent !== null) stateParts.push(`context ${Math.round(contextPercent)}% full`);
-        if (record.compactionCount) stateParts.push(`${record.compactionCount} compaction${record.compactionCount === 1 ? "" : "s"}`);
-        return textResult(
-          `Steering message sent to agent ${record.id}. Submitted to its session; this does not confirm it has been read or processed.\n` +
-          `Current state: ${stateParts.join(" · ")}`,
-        );
-      } catch (err) {
-        return errorResult(`Failed to steer agent: ${err instanceof Error ? err.message : String(err)}`);
+      // A question: register first so an immediate reply can never be orphaned.
+      const created = manager.createParentRequest(record.id, params.message);
+      if (!created.ok) return errorResult(created.error);
+      const { request, identity } = created.value;
+      const exec = executionId(identity, "subagent");
+      const marker = `<parent-request request_id="${request.requestId}" reply_tool="reply_to_parent" />`;
+      // Waiters exist before the question leaves, so an immediate reply is
+      // returned here rather than also delivered as a separate message.
+      const replyWait = params.reply === "wait" ? record.mailbox!.waitForReply(request.requestId) : undefined;
+      // A retrieval wait: Esc and /task-detach end it without stopping the agent,
+      // and messages of this execution are held for this call's result meanwhile.
+      const lease = replyWait ? coordinator.registerWait<import("./parent-messaging.ts").ReplyWaitOutcome>({
+        identity, label: `Reply ${request.requestId}`, kind: "retrieval", signal,
+        // Release the mailbox waiter synchronously when Esc/detach ends this
+        // tool wait. A reply after release belongs to ordinary delivery, not a
+        // now-abandoned tool result.
+        cleanup: () => {
+          replyWait.cancel();
+          queueMicrotask(() => { const live = manager.getRecord(record.id); if (live) reconsiderAgentNotice(live); });
+        },
+      }) : undefined;
+      if (replyWait && lease) void replyWait.promise.then(outcome => { lease.complete(outcome); });
+      const head = (phase: string) => `Question ${phase} to agent ${record.id}.\nRequest ID: ${request.requestId}\nExecution ID: ${exec}`;
+      let phase: "queued" | "sent";
+      try { phase = await sendInOrder(record, [params.message, marker]); }
+      catch (err) {
+        // Failing the request settles the waiter, which completes the lease.
+        manager.failParentRequest(record.id, request.requestId);
+        replyWait?.cancel();
+        return errorResult(`Failed to send the question; request ${request.requestId} was closed. ${err instanceof Error ? err.message : String(err)}`);
       }
+      assertActive();
+      pi.events.emit("subagents:steered", { id: record.id, message: params.message });
+      if (!replyWait || !lease) {
+        return textResult(`${head(phase)}\nThe reply will be delivered to you when the agent answers; this does not confirm it has read the question.`);
+      }
+      const outcome = await lease.result;
+      replyWait.cancel();
+      // A released/cancelled wait must return held messages to ordinary delivery.
+      // Only a completed wait owns messages in its tool result.
+      if (outcome.kind === "completed") takeHeldForCall(toolCallId, identity);
+      assertActive();
+      if (outcome.kind !== "completed") {
+        return textResult(`${head(phase)}\nWait ${outcome.kind === "detached" ? "released" : "cancelled"}; the question stays open and a later reply will be delivered to you.`);
+      }
+      const value = outcome.value;
+      if (value.kind === "replied") return textResult(`${head(phase)}\nReply:\n${value.message.text}`);
+      if (value.kind === "failed") return errorResult(`${head(phase)}\nThe question could not be delivered.`);
+      return textResult(`${head(phase)}\nThe ${value.reason === "shutdown" ? "session closed" : value.reason === "stopped" ? "execution was stopped" : "execution ended"} without a reply. Check its result with agent_manage.`);
     },
-  }));
+  })));
 
   // ---- /agents-config and /agents-create ----
 

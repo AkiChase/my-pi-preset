@@ -1,5 +1,5 @@
 import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
-import type { TaskDetail, TaskView } from "./types.ts";
+import type { TaskDetail, TaskMessageEntry, TaskView } from "./types.ts";
 import { cleanTaskText, taskDot, taskDuration, taskOneLine, taskStatusColor, taskTokens, type TaskTheme } from "./presentation.ts";
 
 type Color = Parameters<TaskTheme["fg"]>[0];
@@ -143,6 +143,26 @@ export function renderDetailHeader(view: TaskView, theme: TaskTheme, width: numb
     if (view.artifacts.length) {
         lines.push("", ...sectionTitle("Artifacts", theme, width));
         for (const artifact of view.artifacts) lines.push(...field(artifact.kind, cleanTaskText(artifact.path), theme, width));
+    }
+    return lines.map(line => truncateToWidth(line, width, "…"));
+}
+
+function clock(at: number): string {
+    const date = new Date(at);
+    return Number.isFinite(date.getTime()) ? `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}:${String(date.getSeconds()).padStart(2, "0")}` : "";
+}
+
+/** Parent questions (with state) and child replies/notices, oldest first. */
+export function renderMessages(entries: readonly TaskMessageEntry[], theme: TaskTheme, width: number): string[] {
+    width = Math.max(1, Math.floor(width));
+    const lines: string[] = [];
+    for (const entry of entries) {
+        const time = theme.fg("dim", clock(entry.at));
+        const label = entry.kind === "question"
+            ? `${theme.fg("accent", "↑ question")} ${theme.fg("dim", entry.requestId)} ${theme.fg(entry.state === "replied" ? "success" : entry.state === "pending" ? "warning" : "error", `[${entry.state}]`)}`
+            : entry.kind === "reply" ? `${theme.fg("success", "↓ reply")} ${theme.fg("dim", entry.requestId)}` : theme.fg("muted", "↓ notice");
+        lines.push(truncateToWidth(`${time} ${label}`, width, "…"));
+        for (const part of cleanTaskText(entry.text).split(/\r\n|\n|\r/)) lines.push(...wrapTextWithAnsi("  " + part, width));
     }
     return lines.map(line => truncateToWidth(line, width, "…"));
 }

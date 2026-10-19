@@ -2,7 +2,7 @@ import { copyAgentExecutionConfig } from "../../runtime-tasks/execution-config.t
 import { closeSync, fstatSync, openSync, readSync } from "node:fs";
 import { FINISHED_LINGER_MS } from "../../task-ui/model.ts";
 import type { TaskCoordinator } from "../../task-ui/coordinator.ts";
-import { taskKey, type ConversationEntry, type TaskDetail, type TaskDetailRequest, type TaskIdentity, type TaskSource, type TaskStatus, type TaskView } from "../../task-ui/types.ts";
+import { taskKey, type ConversationEntry, type TaskDetail, type TaskMessageEntry, type TaskDetailRequest, type TaskIdentity, type TaskSource, type TaskStatus, type TaskView } from "../../task-ui/types.ts";
 import type { AgentManager } from "./agent-manager.ts";
 import { extractText } from "./context.ts";
 import { fromMessages, MAX_TEXT, readTranscriptTail } from "./conversation-entries.ts";
@@ -79,6 +79,39 @@ function childActions(task: WorkflowTask | undefined, record: AgentRecord): { sk
   return { skip: state === "queued" || state === "running", retry: state === "running" };
 }
 
+const MESSAGE_PREVIEW = 160;
+/** Message headers/styles consume a small fixed amount in the detail budget. */
+const MESSAGE_DETAIL_OVERHEAD = 128;
+/** Messages of one execution, oldest first, bounded by the requested detail budget. */
+function executionMessages(record: AgentRecord, runId: string, budget: number): { entries: readonly TaskMessageEntry[]; omitted: number } {
+  const mailbox = record.mailbox;
+  if (!mailbox) return { entries: [], omitted: 0 };
+  const entries: TaskMessageEntry[] = [
+    ...mailbox.listRequests(runId).map(request => Object.freeze({ kind: "question" as const, requestId: request.requestId, state: request.state, text: request.question, at: request.createdAt })),
+    ...mailbox.listMessages(runId).map(message => Object.freeze(message.requestId
+      ? { kind: "reply" as const, requestId: message.requestId, text: message.text, at: message.at }
+      : { kind: "notice" as const, text: message.text, at: message.at })),
+  ];
+  // Stable: a question precedes a reply sharing its timestamp.
+  const ordered = entries.map((entry, index) => ({ entry, index })).sort((a, b) => a.entry.at - b.entry.at || a.index - b.index).map(({ entry }) => entry);
+  let start = ordered.length;
+  let used = 0;
+  for (let index = ordered.length - 1; index >= 0; index--) {
+    const size = Buffer.byteLength(ordered[index]!.text, "utf8") + MESSAGE_DETAIL_OVERHEAD;
+    if (used + size > budget) break;
+    used += size;
+    start = index;
+  }
+  return { entries: Object.freeze(ordered.slice(start)), omitted: start };
+}
+function latestMessage(record: AgentRecord): string | undefined {
+  if (record.status !== "running" || !record.mailbox || !record.runId) return undefined;
+  const last = record.mailbox.listMessages(record.runId).at(-1);
+  if (!last) return undefined;
+  const text = last.text.replace(/\s+/g, " ").trim();
+  return (last.requestId ? "reply: " : "notice: ") + (text.length > MESSAGE_PREVIEW ? text.slice(0, MESSAGE_PREVIEW - 1) + "…" : text);
+}
+
 export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCoordinator, workflows: ReadonlyMap<string, WorkflowTask>, options: { observe?: boolean; filter?: (record: AgentRecord) => boolean } = {}): TaskSource {
   let revision = 0, disposed = false;
   const listeners = new Set<() => void>();
@@ -123,6 +156,7 @@ export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCo
           stats: Object.freeze({ tokens: getLifetimeTotal(record.lifetimeUsage), inputTokens: record.lifetimeUsage.input,
             outputTokens: record.lifetimeUsage.output, cost: record.lifetimeUsage.cost, toolUses: record.toolUses,
             turnCount: record.turnCount, maxTurns: record.maxTurns, activity: record.activity,
+            latestMessage: latestMessage(record),
             model: record.executionConfig ? record.executionConfig.model : record.invocation?.modelId ?? record.invocation?.modelName,
             thinking: record.executionConfig ? record.executionConfig.thinking : record.invocation?.thinking,
             durationMs: (record.completedAt ?? Date.now()) - record.startedAt }),
@@ -169,6 +203,8 @@ export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCo
       // Structured conversation: the live session while it exists, else the transcript tail.
       const slice = record.session ? fromMessages(record.session.messages) : record.outputFile ? readTranscriptTail(record.outputFile) : undefined;
       const conversation = slice ? { conversation: withOutcome(slice.entries, record), conversationTruncated: slice.truncated } : {};
+      const messages = executionMessages(record, identity.runId, range(request).limit);
+      if (messages.entries.length || messages.omitted) Object.assign(conversation, { messages: messages.entries, ...(messages.omitted ? { messagesOmitted: messages.omitted } : {}) });
       if (record.outputFile) {
         const detail = fileDetail(record.outputFile, request);
         if (detail) return Object.freeze({ ...detail, ...conversation });

@@ -40,7 +40,8 @@ subagent_message({ agent_id: string, message: string, reply: "wait" | "notify" |
   1. 沿用现有目标 / owner / 运行状态校验。
   2. 检查请求上限（未完成 ≤ 8，每执行 ≤ 30）。
   3. 生成 `request_id`（宿主分配，`req_` + 短随机），登记请求并绑定 `agent_id` + 当前 `execution_id`。
-  4. 投递：原 message 作为普通 steering；随后在同一队列发送自定义消息 `<parent-request request_id="req_…" reply_tool="reply_to_parent" />`（子会话 `sendCustomMessage`，`deliverAs: "steer"`）。会话未就绪时两条一起进入 pending 队列（`pendingSteers` 扩展为可区分普通 steer 与自定义消息，或新增并行队列，按序 flush）。
+  4. 投递：原 message 作为普通 steering；随后再发一条 steering，正文为 `<parent-request request_id="req_…" reply_tool="reply_to_parent" />`。两条按 agent 串行发送（同一 agent 的并发消息不会插入其间）；会话未就绪时两条同时进入 `pendingSteers`。
+     - 实施差异（2026-10-19）：原计划第二条用子会话 `sendCustomMessage(deliverAs:"steer")`。核实 SDK 发现：会话尚未 streaming 时（pendingSteers 在首个 prompt 前 flush），自定义消息会立即写入历史，排在初始提示和问题之前；steer 则统一进入 agent steering 队列。为保证顺序，两条都用 steering（user 角色）。
   5. 投递失败：请求标 `failed`，返回错误。
 - `"notify"`：立即返回 `request_id`、`execution_id`、投递阶段。
 - `"wait"`：注册 waiter，复用 `waits.ts` 的 Esc / detach 机制，无超时：
@@ -113,7 +114,7 @@ Messages (execution <execution_id>)
 
 - appendEntry 卡片在父代理工具执行中插入时的视觉位置：tmux 真实终端验证。
 - `display: false` + `triggerTurn` 空闲唤醒：SDK 级测试确认。
-- 子会话 `sendCustomMessage` 的 steer 与普通 steer 同队列有序：SDK 级测试确认；若不成立，退回为单条 steer 并以 XML 尾注携带请求（需告知用户）。
+- 子会话两条 steering 的顺序：由按 agent 串行发送保证（见 §2.2 实施差异）。
 - 模型是否稳定使用 `reply_to_parent` 与 `request_id`：只能真实 provider 验证，fixture 不宣称。
 
 ## 8. 回退

@@ -7,7 +7,7 @@ import type { TaskUIConfig } from "./config.ts";
 import type { TaskControl, TaskDetail } from "./types.ts";
 import { TaskPanelModel, type TaskRow } from "./model.ts";
 import { cleanTaskText, taskLine, taskOneLine, type TaskTheme } from "./presentation.ts";
-import { detailRange, renderDetailHeader, sectionTitle } from "./detail-view.ts";
+import { detailRange, renderDetailHeader, renderMessages, sectionTitle } from "./detail-view.ts";
 import { ConversationRenderer } from "./conversation.ts";
 export { cleanTaskText } from "./presentation.ts";
 const oneLine = taskOneLine;
@@ -20,6 +20,16 @@ interface TaskPanelArgs {
 }
 
 /** One interaction; rendering reads only metadata and the unique bounded selected preview. */
+/** Running agents show their latest parent message under the row. */
+function hasMessageLine(row: TaskRow): boolean {
+    return row.view.kind === "agent" && (row.view.status === "running" || row.view.status === "starting") && !!row.view.stats.latestMessage;
+}
+function messageLine(row: TaskRow, width: number, theme: TaskTheme): string[] {
+    if (!hasMessageLine(row)) return [];
+    const indent = " ".repeat(Math.min(Math.max(0, width - 8), 4 + visibleWidth(cleanTaskText(row.prefix ?? "").replace(/[\r\n]/g, ""))));
+    return [truncateToWidth(indent + theme.fg("dim", "↳ " + taskOneLine(row.view.stats.latestMessage!)), width, "…")];
+}
+
 export class TaskPanel implements Component, Focusable {
     readonly model = new TaskPanelModel();
     private listScroll: ScrollView;
@@ -71,10 +81,13 @@ export class TaskPanel implements Component, Focusable {
     private selectedLine(): number {
         const agents = this.rows.filter(row => row.view.kind === "agent" || row.view.kind === "workflow");
         const processes = this.rows.filter(row => row.view.kind === "shell" || row.view.kind === "monitor");
+        // Rows may carry a message line below them; count rendered lines, not rows.
+        const height = (row: TaskRow) => 1 + (hasMessageLine(row) ? 1 : 0);
+        const offset = (rows: TaskRow[], index: number) => rows.slice(0, index).reduce((sum, row) => sum + height(row), 0);
         const ai = agents.findIndex(row => row.view.key === this.model.selected?.key);
-        if (ai >= 0) return ai + 1;
+        if (ai >= 0) return 1 + offset(agents, ai);
         const pi = processes.findIndex(row => row.view.key === this.model.selected?.key);
-        return pi >= 0 ? Math.max(1, agents.length) + 2 + pi : 0;
+        return pi >= 0 ? Math.max(1, offset(agents, agents.length)) + 2 + offset(processes, pi) : 0;
     }
     private refresh(): void {
         if (this.disposed) return;
@@ -214,10 +227,10 @@ export class TaskPanel implements Component, Focusable {
     }
     private listBody(width: number): string[] {
         if (this.cachedList?.width === width) return this.cachedList.lines;
-        const group = (label: string, rows: TaskRow[]) => [this.theme.fg("accent", label), ...(rows.length ? rows.map(row => taskLine(row.view, width, this.theme, {
+        const group = (label: string, rows: TaskRow[]) => [this.theme.fg("accent", label), ...(rows.length ? rows.flatMap(row => [taskLine(row.view, width, this.theme, {
             prefix: row.prefix, children: this.model.isCollapsed(row.view.key) ? row.descendantCount : undefined,
             selected: row.view.key === this.model.selected?.key, now: this.args.now?.(),
-        })) : [this.theme.fg("dim", "No tasks")])];
+        }), ...messageLine(row, width, this.theme)]) : [this.theme.fg("dim", "No tasks")])];
         const lines = [...group("Agents", this.rows.filter(row => row.view.kind === "agent" || row.view.kind === "workflow")), ...group("Processes", this.rows.filter(row => row.view.kind === "shell" || row.view.kind === "monitor"))].map(line => truncateToWidth(line, width, "…"));
         this.cachedList = { width, lines }; return lines;
     }
@@ -240,7 +253,13 @@ export class TaskPanel implements Component, Focusable {
                 ? cleanTaskText(this.detail.text).split(/\r\n|\n|\r/).flatMap(part => wrapTextWithAnsi(part, Math.max(1, width)))
                 : [this.theme.fg("dim", "Output not established yet.")];
         }
-        const lines = [...header, "", ...section, ...body];
+        const messageEntries = this.detail?.messages ?? [];
+        const messagesOmitted = this.detail?.messagesOmitted ?? 0;
+        const messages = messageEntries.length || messagesOmitted
+            ? ["", ...sectionTitle("Messages", this.theme, width, `${messageEntries.length}${messagesOmitted ? ` shown · ${messagesOmitted} older omitted` : ""}`),
+                ...(messageEntries.length ? renderMessages(messageEntries, this.theme, width) : [this.theme.fg("dim", "Message content omitted by detail budget.")])]
+            : [];
+        const lines = [...header, ...messages, "", ...section, ...body];
         this.cachedDetail = { width, lines }; return lines;
     }
     private hints(width: number): string {

@@ -72,6 +72,21 @@ export function assertMessageToolArguments(value: unknown): asserts value is Rec
   assertNonEmptyString(params.message, "`message`");
 }
 
+export const MESSAGE_REPLY_MODES = ["wait", "notify"] as const;
+export type MessageReplyMode = typeof MESSAGE_REPLY_MODES[number];
+export interface MessageToolParams { agent_id: string; message: string; reply?: MessageReplyMode }
+
+/** subagent_message with the nullable `reply` control; null keeps plain steering. */
+export function parseMessageToolArguments(value: unknown): MessageToolParams {
+  const params = parseControlArguments(value, ["agent_id", "message", "reply"], ["reply"]);
+  assertNonEmptyString(params.agent_id, "`agent_id`");
+  assertNonEmptyString(params.message, "`message`");
+  if (Object.hasOwn(params, "reply") && !MESSAGE_REPLY_MODES.some(mode => mode === params.reply)) {
+    throw new Error("reply must be \"wait\", \"notify\" or null.");
+  }
+  return params as unknown as MessageToolParams;
+}
+
 function assertObject(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Tool arguments must be an object.");
   return value as Record<string, unknown>;

@@ -31,6 +31,8 @@ export interface TaskView extends TaskIdentity {
         pid?: number; exitCode?: number; durationMs?: number;
         tokens?: number; inputTokens?: number; outputTokens?: number; cost?: number;
         toolUses?: number; turnCount?: number; maxTurns?: number; activity?: string;
+        /** One-line preview of the latest message the running task sent to its parent. */
+        latestMessage?: string;
         model?: string; thinking?: string;
         doneCount?: number; totalCount?: number;
         phases?: readonly Readonly<{ index: number; title: string; detail?: string }>[];
@@ -57,8 +59,18 @@ export type ConversationEntry =
     | Readonly<{ kind: "bash"; command: string; output: string; elided: number; exitCode?: number }>
     | Readonly<{ kind: "notice"; text: string }>;
 
+/** Parent/child message exchange of one execution; text is external and unstyled. */
+export type TaskMessageEntry =
+    | Readonly<{ kind: "question"; requestId: string; state: "pending" | "replied" | "failed" | "closed"; text: string; at: number }>
+    | Readonly<{ kind: "reply"; requestId: string; text: string; at: number }>
+    | Readonly<{ kind: "notice"; text: string; at: number }>;
+
 export interface TaskDetail {
     readonly text: string;
+    /** Parent/child messages of this execution, oldest first. */
+    readonly messages?: readonly TaskMessageEntry[];
+    /** Number of older messages omitted to respect the detail request's byte budget. */
+    readonly messagesOmitted?: number;
     /** Structured, bounded, unstyled conversation; renderers prefer it over `text`. */
     readonly conversation?: readonly ConversationEntry[];
     /** True when older conversation entries were dropped by the source bound. */

@@ -1,10 +1,15 @@
-{"file": ".trellis/spec/development/index.md", "reason": "Extension execution, lifecycle, tool guidance and split runtime management constraints"}
-{"file": ".trellis/spec/testing/index.md", "reason": "Required regression evidence for execution/notification and tool validation changes"}
-{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Child tool, backend mailbox and parent delivery cross module boundaries"}
-{"file": "extensions/agent-tasks/src/parent-messaging.ts", "reason": "New mailbox, parent channel contract and reply_to_parent tool"}
-{"file": "extensions/agent-tasks/src/agent-manager.ts", "reason": "Mailbox ownership, current-execution channel, request registration and lifecycle closing"}
-{"file": "extensions/agent-tasks/src/agent-runner.ts", "reason": "Host tool injection and tool-scope gates"}
-{"file": "extensions/agent-tasks/src/structured-output.ts", "reason": "Existing host-owned injected tool precedent"}
-{"file": "extensions/agent-tasks/src/types.ts", "reason": "AgentRecord mailbox field"}
-{"file": "extensions/agent-tasks/__tests__/parent-messaging.test.ts", "reason": "Stage regression tests"}
-{"file": "extensions/agent-tasks/__tests__/runner-cancellation.test.ts", "reason": "Actual runner fixture pattern"}
+{"file": ".trellis/spec/development/index.md", "reason": "Extension execution, lifecycle, tool guidance, model-visible context and UI rendering constraints"}
+{"file": ".trellis/spec/testing/index.md", "reason": "Required regression evidence for execution/notification, tool validation and task UI changes"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Child channel, backend mailbox, parent delivery and task UI cross module boundaries"}
+{"file": "extensions/agent-tasks/src/parent-messaging.ts", "reason": "Mailbox and channel contract from stage 1"}
+{"file": "extensions/agent-tasks/src/parent-delivery.ts", "reason": "New delivery: cards, hidden context messages, wait holding"}
+{"file": "extensions/agent-tasks/src/index.ts", "reason": "subagent_message reply mode, foreground/agent_manage wait attachment, notification flush ordering"}
+{"file": "extensions/agent-tasks/src/tool-contract.ts", "reason": "parseMessageToolArguments nullable reply"}
+{"file": "extensions/agent-tasks/src/tool-guidance.ts", "reason": "subagent_message usage group"}
+{"file": "extensions/agent-tasks/src/waits.ts", "reason": "Existing wait lease and notification suppression semantics"}
+{"file": "extensions/agent-tasks/src/source.ts", "reason": "Detail messages and latestMessage stat"}
+{"file": "extensions/task-ui/types.ts", "reason": "TaskMessageEntry and latestMessage contract"}
+{"file": "extensions/task-ui/detail-view.ts", "reason": "Messages section renderer"}
+{"file": "extensions/task-ui/panel.ts", "reason": "Messages section placement, list message line and selection line mapping"}
+{"file": "extensions/agent-tasks/__tests__/parent-delivery.test.ts", "reason": "Stage 2 regression tests"}
+{"file": "extensions/agent-tasks/__tests__/parent-messaging.test.ts", "reason": "Stage 1 regression tests"}
