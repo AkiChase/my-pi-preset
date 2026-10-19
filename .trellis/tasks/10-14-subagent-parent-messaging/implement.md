@@ -30,6 +30,8 @@
 
 ## 阶段 2：顶层父侧提问、送达与展示
 
+> 2026-10-19 暂停：`10-19-task-panel-redesign`（in_progress，未提交）将修改 `agent-tasks/src/index.ts`、`source.ts`、task-ui 详情页与 `docs/extensions/task-composition.md`，与本阶段重叠。用户选择等待该任务完成并提交后，再基于其新详情页布局实施阶段 2–4。恢复前重新复核 design §1 的代码位置与详情页接口。
+
 - 主 `subagent_message` 增加 `reply`（schema、类型、准入、usage）；`reply: null` 回归锁定。
 - 两条消息投递（含 pending 队列有序 flush）、请求上限、投递失败。
 - `reply: "wait"`：接入 `waits.ts`，replied / cancelled / released / execution_ended。
