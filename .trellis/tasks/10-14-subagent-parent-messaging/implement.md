@@ -72,6 +72,13 @@
 - spec：仅记录有证据的通用约束（即时可见用 appendEntry、上下文用 display:false sendMessage 等）。
 - 全量验证、tmux 真实终端检查卡片位置与详情页、AC 逐项核对 → scoped commit。
 
+### 阶段 4 进行记录（2026-10-19）
+
+- 文档：`docs/extensions/task-composition.md` 新增“中途消息与提问”，说明顶层卡片、详情页、wait/release、嵌套边界和 workflow 排除；不新增模型工具参数教学。
+- 回归：阶段 3 后 `pnpm check` exit 0（1540/1540），`git diff --check` 无输出。
+- tmux 已确认环境可用（3.6a），但本轮明确未授权真实 provider 调用，无法在真实 Agent 会话中生成并目视验证中途消息卡片；保留为最终验收限制，不把普通离线测试误记为终端验证。
+
+
 ## 验证命令
 
 ```bash
