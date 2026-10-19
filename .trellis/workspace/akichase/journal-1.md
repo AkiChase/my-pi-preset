@@ -1406,3 +1406,30 @@ Session Name 收敛为每会话最多两次自动命名并复用 Recap 的共享
 ### Status
 
 [OK] **Completed**
+
+
+## Session 43: Task panel redesign
+<!-- trellis-session: v=2 fp=904964461ac791c7 -->
+
+**Date**: 2026-10-19
+**Task**: Task panel redesign
+**Branch**: `main`
+
+### Summary
+
+Task Panel 重构完成并归档：删除 feedback 行；分区详情视图；结构化 agent 对话渲染（有界 conversation entries + Markdown）；steer 输入框与 workflow p/s/r 控制（capability 门控）；/agents 拆为 /agents-config 与 /agents-create，删除旧对话查看器；彻底删除子 Agent 定时功能与 croner。阶段 3–5 经 trellis-check 独立审查；pnpm check 1526/1526，自然退出全量 1188/1188；tmux 真实 CLI 与组件级终端验证。未运行：真实 CLI + 在线模型下的面板端到端。spec 沉淀 Task Panel capability 契约与两层终端证据。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `752313b` | feat(task-ui): sectioned task detail and stable panel header |
+| `247e1bd` | feat(task-ui): render agent conversations in task detail |
+| `d182ef3` | feat(task-ui): steer agents and control workflows from the task panel |
+| `0855428` | feat(agent-tasks): replace /agents with /agents-config and /agents-create |
+| `0811ec8` | feat(agent-tasks): remove subagent scheduling |
+| `23a5457` | docs(spec): capture task panel capability contract and terminal harness |
+
+### Status
+
+[OK] **Completed**
