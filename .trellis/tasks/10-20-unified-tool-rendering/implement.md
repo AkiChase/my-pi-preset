@@ -90,6 +90,8 @@
 
 **S3b 嵌套 `subagent_run` / `subagent_message`（已完成，待 scoped commit）**：两个 nested 工具直接采用公共 cooperative self-shell，摘要分别保留 child 类型/描述及 child id/实际 guidance 或 question；正文以 `text(result)` 合并全部 text blocks，因此 expanded 不丢 held reply/message。未触碰 nested manager、registry、mailbox、delivery、wait、timer 或 lifecycle。独立检查发现 message 标题错误显示 `wait`/`notify` 控制模式而未显示用户消息；已改为实际 message 并加入 actual-host 标题断言。最终回归在临时 `PI_CODING_AGENT_DIR` 下运行 `node --test extensions/beautify/__tests__/nested-agent-card.test.ts extensions/agent-tasks/__tests__/backend-waits.test.ts extensions/agent-tasks/__tests__/parent-delivery.test.ts`（43/43 PASS，natural exit），`pnpm typecheck` 与 `git diff --check` 均通过。已检查的范围以外的 workflow/process/notification 适配仍 NOT_RUN。
 
+**S3c `monitor` tool（已完成，待 scoped commit）**：仅将 monitor tool 的 legacy call heading 替换为公共 cooperative self-shell；标题使用 description，正文合并所有 text blocks，执行结果原有 source/deadline/log/config 内容保持在正文。没有修改 monitor source setup、registry、session lifecycle、batching、notification delivery、schema 或实际结果构造；monitor 自身不创建 timer，计时仍由 Beautify activation 注入。独立 check 与临时环境下的 `node --test extensions/beautify/__tests__/monitor-card.test.ts extensions/process-tasks/__tests__/monitor.test.ts extensions/process-tasks/__tests__/monitor-setup-result.test.ts extensions/process-tasks/__tests__/monitor-session.test.ts extensions/process-tasks/__tests__/monitor-schema.test.ts`（87/87 PASS，natural exit）、`pnpm typecheck`、`git diff --check` 均通过。通知 renderer/monitor batch UI 属于 S4，NOT_RUN。
+
 ### S4：通知、reply/notice、monitor batch 与 Trellis Check
 
 **目的**：迁移后台通知、父会话消息和诊断报告；保留实际 delivery 粒度与消息语义。

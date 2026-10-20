@@ -22,3 +22,9 @@
 {"file": "extensions/beautify/__tests__/nested-agent-card.test.ts", "reason": "Actual-host nested card and cooperative timing regression"}
 {"file": "extensions/agent-tasks/__tests__/backend-waits.test.ts", "reason": "Nested execution and wait semantics regression"}
 {"file": "extensions/agent-tasks/__tests__/parent-delivery.test.ts", "reason": "Nested reply/held message delivery preservation"}
+{"file": "extensions/process-tasks/tools/monitor.ts", "reason": "S3c cooperative monitor tool card adapter"}
+{"file": "extensions/beautify/__tests__/monitor-card.test.ts", "reason": "Actual-host monitor card and timing regression"}
+{"file": "extensions/process-tasks/__tests__/monitor.test.ts", "reason": "Monitor tool command/WS execution regression"}
+{"file": "extensions/process-tasks/__tests__/monitor-setup-result.test.ts", "reason": "Monitor setup result and lifecycle preservation"}
+{"file": "extensions/process-tasks/__tests__/monitor-session.test.ts", "reason": "Monitor source/session ownership regression"}
+{"file": "extensions/process-tasks/__tests__/monitor-schema.test.ts", "reason": "Monitor argument and metadata validation regression"}

@@ -1,5 +1,6 @@
 import { copyMonitorExecutionConfig, monitorExecutionSummary } from "../../runtime-tasks/execution-config.ts";
-import { createToolCallHeading } from "../../beautify/tool-call-heading.ts";
+import { createToolCardRenderers } from "../../beautify/tool-card.ts";
+import { text } from "../../beautify/types.ts";
 import { launchMetadata, launchText } from "../../runtime-tasks/launch.ts";
 // Monitor tool: event-arrival notifications, bounded batching, optional silence wakes.
 
@@ -71,10 +72,15 @@ export function parseMonitorArguments(input: unknown): MonitorParams {
 }
 
 export function registerMonitorTool(pi: ExtensionAPI, reg: BackgroundRegistry): void {
+    const monitorCardRenderers = createToolCardRenderers("monitor", undefined, (args, result) => ({
+        identity: "monitor",
+        summary: typeof args.description === "string" ? args.description : "",
+        bodyText: result ? text(result) : undefined,
+    }));
     pi.registerTool({
         name: "monitor",
         label: "monitor",
-        renderCall: (args, theme, context) => createToolCallHeading({ name: "monitor", detail: args.description, theme, context }),
+        ...monitorCardRenderers,
         description: "Start a command or WebSocket observation task with batched event notifications.",
         promptSnippet: "Observe event streams; manage the returned task through process_manage",
         promptGuidelines: [
