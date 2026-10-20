@@ -32,7 +32,7 @@
  */
 
 import { stripTerminalSequences, truncateToWidth, visibleWidth, type Component } from "@earendil-works/pi-tui";
-import { clean, toolHeading, wrap } from "../../../beautify/layout.ts";
+import { clean, clip, toolHeading, wrap } from "../../../beautify/layout.ts";
 import type { Theme as HostTheme } from "@earendil-works/pi-coding-agent";
 import type { WorkflowEntryData } from "../workflow/entry.ts";
 import type { WorkflowMeta } from "../workflow/meta.ts";
@@ -155,6 +155,8 @@ export interface WorkflowCardTask {
   startTime: number;
   endTime?: number;
   totalPausedMs?: number;
+  /** Terminal workflow failure reason, when the target task failed. */
+  error?: string;
 }
 
 export interface WorkflowCardInput {
@@ -436,6 +438,45 @@ export function styleWorkflowCardLines(lines: readonly WorkflowCardLine[], theme
       })
       .join(""),
   );
+}
+
+/** Header-free workflow body for the public tool-card shell. */
+export function renderWorkflowBody(input: WorkflowCardInput, theme: Theme, expanded = true): Component {
+  return {
+    invalidate() {},
+    render(width) {
+      if (width < 1) return [];
+      const groups = buildPhaseGroups(input.progress, input.meta?.phases);
+      const head = header(input.task, input.meta, groups, input.agentCount ?? 0, input.now ?? Date.now());
+      const description = clean(head.subtext).trim() || clean(head.name);
+      const target = input.task.status === "failed" && input.task.error
+        ? `Target error: ${clean(input.task.error)}`
+        : [`Target state: ${input.task.status}`, head.stats].filter(Boolean).join(" · ");
+      const targetTone = input.task.status === "failed" ? "error" : "muted";
+      const layout = layoutWorkflowCard({ ...input, width, showToolTitle: false });
+      const offset = head.subtext ? 2 : 1;
+      const detailRows = styleWorkflowCardLines(
+        layout.slice(offset).map(line => clampLine(line.map(segment => ({ ...segment, text: clean(segment.text).replace(/\n/g, "\\n") })), width)),
+        theme,
+      );
+      if (expanded) {
+        return [
+          ...wrap(target, width).map(row => theme.fg(targetTone, row)),
+          ...wrap(`Description: ${description}`, width).map(row => theme.fg("muted", row)),
+          ...detailRows,
+        ];
+      }
+      const rows = [
+        theme.fg(targetTone, clip(target, width, "")),
+        theme.fg("muted", clip(`Description: ${description}`, width, "")),
+      ].filter(Boolean);
+      if (detailRows.length) {
+        const hint = clip("… expand", width, "");
+        if (hint) rows.push(theme.fg("muted", hint));
+      }
+      return rows.slice(0, 3);
+    },
+  };
 }
 
 /** The card as a component, for a tool result or a session entry renderer. */

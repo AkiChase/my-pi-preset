@@ -5,7 +5,7 @@ import { copyAgentExecutionConfig, agentExecutionSummary } from "../../runtime-t
 import { registerBuiltinSkills } from "./builtin-skills.ts";
 import { nullableControl } from "../../shared/tool-arguments.ts";
 import { createToolCardRenderers } from "../../beautify/tool-card.ts";
-import { createToolCallHeading } from "../../beautify/tool-call-heading.ts";
+import { text } from "../../beautify/types.ts";
 import { launchMetadata, launchText, isLaunchMetadata } from "../../runtime-tasks/launch.ts";
 import { createAgentManagement } from "./management.ts";
 import { createWorkflowManagement } from "./workflow/management.ts";
@@ -74,7 +74,7 @@ import {
   SPINNER,
   type Theme,
 } from "./activity.ts";
-import { renderWorkflowCard, renderWorkflowEntryCard } from "./ui/workflow-card.ts";
+import { renderWorkflowBody, renderWorkflowCard, renderWorkflowEntryCard } from "./ui/workflow-card.ts";
 import { getLifetimeCost, getLifetimeTotal, getSessionContextPercent, type LifetimeUsage, PendingUsagePool, toReportedUsage } from "./usage.ts";
 import { decideWorkflowCollision, FOREIGN_WORKFLOW_TOOL_NAMES } from "./workflow/collisions.ts";
 import { WORKFLOW_ENTRY_TYPE, type WorkflowEntryData, workflowEntryData } from "./workflow/entry.ts";
@@ -2165,6 +2165,42 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
   // Defined unconditionally, registered only when the feature is on — the same
   // shape the subagent_run tool uses. Keeping the definition out of the `if` means the
   // switch changes exactly one thing: whether pi is ever told about the tool.
+  const workflowCardRenderers = createToolCardRenderers(
+    SUBAGENT_TOOL_NAMES.WORKFLOW,
+    undefined,
+    (args, result, renderContext, theme) => {
+      const workflowArg = (value: unknown) => typeof value === "string" ? value : undefined;
+      const callName = workflowCallName({ script: workflowArg(args.script), scriptPath: workflowArg(args.scriptPath), name: workflowArg(args.name) });
+      const taskId = (result?.details as { taskId?: string } | undefined)?.taskId;
+      const task = taskId !== undefined ? workflowTasks.get(taskId) : undefined;
+      if (renderContext.isError || !task) {
+        return { identity: SUBAGENT_TOOL_NAMES.WORKFLOW, summary: callName, bodyText: result ? text(result) : undefined };
+      }
+      return {
+        identity: SUBAGENT_TOOL_NAMES.WORKFLOW,
+        summary: task.workflowName ?? callName,
+        body: renderWorkflowBody(
+          {
+            progress: task.workflowProgress,
+            task: {
+              status: task.status,
+              workflowName: task.workflowName,
+              startTime: task.startTime,
+              endTime: task.endTime,
+              totalPausedMs: task.totalPausedMs,
+              error: task.error,
+            },
+            meta: task.meta,
+            agentCount: task.agentCount,
+            totalTokens: task.totalTokens,
+          },
+          theme,
+          renderContext.expanded,
+        ),
+      };
+    },
+  );
+
   const workflowTool = defineTool({
     name: SUBAGENT_TOOL_NAMES.WORKFLOW,
     label: "subagent_workflow",
@@ -2203,35 +2239,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
 
     }, { additionalProperties: false }),
 
-    renderCall(args, theme, context) {
-      return createToolCallHeading({ name: "subagent_workflow", detail: workflowCallName({ script: args.script ?? undefined, scriptPath: args.scriptPath ?? undefined, name: args.name ?? undefined }), theme, context });
-    },
-
-    renderResult(result, options, theme, renderContext) {
-      const text = result.content[0]?.type === "text" ? result.content[0].text : "";
-      const taskId = (result.details as { taskId?: string } | undefined)?.taskId;
-      const task = taskId !== undefined ? workflowTasks.get(taskId) : undefined;
-      // No task means the run predates this session (a reloaded transcript) or
-      // the call never started one — show what `execute` said instead.
-      if (renderContext.isError || !task) return new Text(text, 0, 0);
-      return renderWorkflowCard(
-        {
-          progress: task.workflowProgress,
-          task: {
-            status: task.status,
-            workflowName: task.workflowName,
-            startTime: task.startTime,
-            endTime: task.endTime,
-            totalPausedMs: task.totalPausedMs,
-          },
-          meta: task.meta,
-          agentCount: task.agentCount,
-          totalTokens: task.totalTokens,
-        },
-        theme,
-        options.expanded,
-      );
-    },
+    ...workflowCardRenderers,
 
     execute: async (toolCallId, input, _signal, _onUpdate, ctx) => {
       assertActive();

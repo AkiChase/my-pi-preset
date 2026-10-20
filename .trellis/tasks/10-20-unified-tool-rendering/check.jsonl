@@ -28,3 +28,10 @@
 {"file": "extensions/process-tasks/__tests__/monitor-setup-result.test.ts", "reason": "Monitor setup result and lifecycle preservation"}
 {"file": "extensions/process-tasks/__tests__/monitor-session.test.ts", "reason": "Monitor source/session ownership regression"}
 {"file": "extensions/process-tasks/__tests__/monitor-schema.test.ts", "reason": "Monitor argument and metadata validation regression"}
+{"file": "extensions/agent-tasks/src/ui/workflow-card.ts", "reason": "S3d header-free workflow live body and entry preservation"}
+{"file": "extensions/agent-tasks/src/index.ts", "reason": "S3d cooperative workflow tool card adapter"}
+{"file": "extensions/beautify/__tests__/registered-workflow.test.ts", "reason": "Actual-host registered workflow card regression"}
+{"file": "extensions/agent-tasks/__tests__/workflow-card-render.test.ts", "reason": "Workflow header-free body width and error-preview regression"}
+{"file": "extensions/agent-tasks/__tests__/workflow-failures.test.ts", "reason": "Workflow failed-child and tolerant-branch semantics regression"}
+{"file": "extensions/agent-tasks/__tests__/workflow-failure-host.test.ts", "reason": "Workflow host failure/notification semantics regression"}
+{"file": "extensions/agent-tasks/__tests__/workflow.test.ts", "reason": "Workflow runtime and natural-exit regression"}
