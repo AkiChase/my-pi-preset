@@ -1458,3 +1458,45 @@ Task Panel 重构完成并归档：删除 feedback 行；分区详情视图；�
 ### Status
 
 [OK] **Completed**
+
+
+## Session 45: 完成子代理与父代理中途消息
+<!-- trellis-session: v=2 fp=3ae115dc243db8c1 -->
+
+**Date**: 2026-10-20
+**Task**: 完成子代理与父代理中途消息
+**Branch**: `main`
+
+### Summary
+
+完成非 workflow 子代理的 request_id 中途问答、顶层/嵌套送达、Task Panel 消息展示和真实 tmux 验收；任务已归档。
+
+### Main Changes
+
+- 增加 reply_to_parent mailbox/channel，以及 reply:null|notify|wait 父侧接口。
+- 增加对话卡片、隐藏上下文送达、等待结果附加、Task Panel 最新消息与详情页 Messages。
+- 增加嵌套父子消息送达与 resume execution-race 围栏。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `27ab63b` | feat(agent-tasks): add child-side parent channel and mailbox |
+| `84b768d` | feat(agent-tasks): add parent reply delivery |
+| `85c3fdd` | feat(agent-tasks): support nested parent messages |
+| `937f238` | docs(agent-tasks): document parent message delivery |
+| `b60fed8` | docs(trellis): record parent messaging acceptance |
+| `77f730d` | chore(task): archive parent messaging |
+
+### Testing
+
+- [OK] pnpm check: 1540/1540 pass；typecheck 与 git diff --check 通过。
+- [OK] tmux 真实 provider 验收：notice、notify 关联回复、运行中详情与 deferred reply 均已观察。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 后续 agent_manage 输出/查询优化须另建任务；本任务不扩展该接口。
