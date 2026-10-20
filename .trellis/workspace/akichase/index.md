@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 45
+- **Total Sessions**: 46
 - **Last Active**: 2026-10-20
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1502 | Active |
+| `journal-1.md` | ~1537 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 46 | 2026-10-20 | 完成 Task Viewer 文档优先与归档浏览 | `093ab67`, `c82b3ec` | `main` |
 | 45 | 2026-10-20 | 完成子代理与父代理中途消息 | `27ab63b`, `84b768d`, `85c3fdd`, `937f238`, `b60fed8`, `77f730d` | `main` |
 | 44 | 2026-10-19 | 恢复 Trellis 小任务分流与 AGENTS 区块更新 | `8555152`, `859d132`, `24c5045`, `c2445a2` | `main` |
 | 43 | 2026-10-19 | Task panel redesign | `752313b`, `247e1bd`, `d182ef3`, `0855428`, `0811ec8`, `23a5457` | `main` |

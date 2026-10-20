@@ -1500,3 +1500,38 @@ Task Panel 重构完成并归档：删除 feedback 行；分区详情视图；�
 ### Next Steps
 
 - 后续 agent_manage 输出/查询优化须另建任务；本任务不扩展该接口。
+
+
+## Session 46: 完成 Task Viewer 文档优先与归档浏览
+<!-- trellis-session: v=2 fp=48175c154f3670d3 -->
+
+**Date**: 2026-10-20
+**Task**: 完成 Task Viewer 文档优先与归档浏览
+**Branch**: `main`
+
+### Summary
+
+在托管 worktree 实现并独立审查 Task Viewer 的文档优先详情页、Metadata 与按月归档浏览；已合并到 main 并归档任务。
+
+### Main Changes
+
+- 详情页改为 PRD、Design、Implement、Metadata，文档页显示紧凑任务摘要。
+- Active 列表提供 Browse archive，支持按归档月份和月内任务只读浏览，并维持安全路径校验。
+- 独立审查修复跨归档月份的任务目录符号链接边界。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `093ab67` | feat(trellis): browse archived tasks |
+| `c82b3ec` | Merge branch 'trellis/10-19-task-viewer-navigation' |
+
+### Testing
+
+- [OK] PASS: node --test extensions/trellis/__tests__/task-browser-reader.test.mjs（37/37）
+- [OK] PASS: node --test extensions/trellis/__tests__/*.test.mjs（341/341）及 git diff --check
+- [OK] BLOCKED: pnpm typecheck / pnpm check 因环境缺少 tsc，未安装依赖。
+
+### Status
+
+[OK] **Completed**
