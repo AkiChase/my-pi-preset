@@ -25,11 +25,10 @@ import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 // Layout (width permitting):
 //   ~/tools/pi-trellis  main ●2 +1 ↑2   session name
 //   ▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 39% 157k/400k (auto)        mp-messages·claude-opus-5·medium
-//   ↑112 ↓30k R5.3M W260k H83% $0.42   ⛁ 96% 1.2M/1.3M   ⚙ 2 jobs
+//   ↑112 ↓30k R5.3M W260k $0.42   │   ⛁ 96% 1.2M/1.3M · req 83%   │   ⚙ 2 jobs
 //
-// `H` is the hit rate of the latest request; ⛁ is pi-cache-optimizer's session
-// running total, which is why it carries the token pair the percentage comes
-// from.
+// `req` is the hit rate of the latest request. ⛁ is pi-cache-optimizer's
+// session running total, which is why it carries the cumulative token pair.
 //
 // Before the first response nothing has a value yet, so the spend line draws a
 // dim skeleton (`↑– ↓– $–  │  ⛁ –`) instead of collapsing to whichever single
@@ -422,7 +421,7 @@ export default function (pi: ExtensionAPI) {
 		 * Draw every `setStatus()` entry. Known keys are compressed; unknown keys
 		 * pass through so an extension installed later is still visible here.
 		 */
-		const renderChips = (): string[] => {
+		const renderChips = (requestHitRate: string | undefined): string[] => {
 			// Cache first (it belongs with the token counts to its left), then the
 			// rest alphabetically so chip order stays stable between renders.
 			const statuses = [...footerData.getExtensionStatuses()].sort(([a], [b]) => {
@@ -431,6 +430,7 @@ export default function (pi: ExtensionAPI) {
 				return a.localeCompare(b);
 			});
 
+			let cacheChip: string | undefined;
 			const chips: string[] = [];
 			for (const [key, text] of statuses) {
 				if (!text?.trim()) continue;
@@ -438,7 +438,7 @@ export default function (pi: ExtensionAPI) {
 					const { chip, percent } = parseCacheStatus(text);
 					// `dim` for "no measurement yet" / "off": those states are not a
 					// bad hit rate and must not borrow the error color.
-					chips.push(paint(percent === null ? "dim" : hitRateColor(percent), chip));
+					cacheChip = paint(percent === null ? "dim" : hitRateColor(percent), chip);
 					continue;
 				}
 				if (key === "task-ui") {
@@ -450,6 +450,12 @@ export default function (pi: ExtensionAPI) {
 				// extension considers important stays readable.
 				chips.push(paint("muted", sanitize(text)));
 			}
+
+			// The latest-request rate belongs with the optional optimizer aggregate,
+			// not cumulative R/W token totals. It still renders alone when the
+			// optimizer extension is unavailable.
+			const cacheMetrics = [cacheChip, requestHitRate].filter((chip): chip is string => chip !== undefined);
+			if (cacheMetrics.length) chips.unshift(cacheMetrics.join(paint("dim", " · ")));
 			return chips;
 		};
 
@@ -491,12 +497,6 @@ export default function (pi: ExtensionAPI) {
 				if (totals.output) tokenParts.push(field("↓", formatTokens(totals.output), "text"));
 				if (totals.cacheRead) tokenParts.push(field("R", formatTokens(totals.cacheRead), "success"));
 				if (totals.cacheWrite) tokenParts.push(field("W", formatTokens(totals.cacheWrite), "warning"));
-				if ((totals.cacheRead || totals.cacheWrite) && latestCacheHitRate !== undefined) {
-					// `H` is the hit rate of the *latest* request, while the ⛁ chip is the
-					// session running total -- the chip's token pair is what marks it as
-					// cumulative. Single-letter label so it stays in the ↑ ↓ R W $ family.
-					tokenParts.push(field("H", `${latestCacheHitRate.toFixed(0)}%`, hitRateColor(latestCacheHitRate)));
-				}
 				if (totals.cost) {
 					const amount = totals.cost >= 1 ? totals.cost.toFixed(2) : totals.cost.toFixed(3);
 					tokenParts.push(field("$", amount, "accent"));
@@ -509,7 +509,11 @@ export default function (pi: ExtensionAPI) {
 				// placeholders, so the first response fills values in instead of
 				// pushing a third line into existence.
 				groups.push(tokenParts.length ? tokenParts.join(" ") : paint("dim", `↑${NO_VALUE} ↓${NO_VALUE} $${NO_VALUE}`));
-				groups.push(...renderChips());
+
+				const requestHitRate = latestCacheHitRate === undefined
+					? undefined
+					: field("req ", `${latestCacheHitRate.toFixed(0)}%`, hitRateColor(latestCacheHitRate));
+				groups.push(...renderChips(requestHitRate));
 
 				const lines = [line1, line2];
 				if (groups.length) lines.push(truncateToWidth(groups.join(`  ${divider()}  `), width, paint("dim", "…")));
