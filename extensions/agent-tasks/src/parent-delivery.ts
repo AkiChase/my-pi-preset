@@ -18,7 +18,6 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text, stripTerminalSequences } from "@earendil-works/pi-tui";
 import type { TaskCoordinator } from "../../task-ui/coordinator.ts";
 import type { TaskIdentity } from "../../task-ui/types.ts";
-import { executionId } from "../../runtime-tasks/execution-id.ts";
 import type { AgentManager } from "./agent-manager.ts";
 import type { ChildMessage } from "./parent-messaging.ts";
 import type { AgentRecord } from "./types.ts";
@@ -32,7 +31,6 @@ export const MESSAGE_HOLD_MS = 200;
 export interface SubagentMessageEntryData {
   readonly agentId: string;
   readonly label: string;
-  readonly executionId: string;
   readonly requestId: string | null;
   readonly text: string;
   readonly at: number;
@@ -40,21 +38,15 @@ export interface SubagentMessageEntryData {
 
 export interface SubagentMessageDetails {
   readonly agentId: string;
-  readonly executionId: string;
   readonly messages: readonly { readonly requestId: string | null; readonly seq: number }[];
 }
 
-export function agentLabel(record: Pick<AgentRecord, "alias" | "handle" | "type">): string {
-  return record.alias ?? record.handle ?? record.type;
-}
-
 /** Model-facing text for messages of one execution. */
-export function formatSubagentMessages(agentId: string, runId: string, messages: readonly ChildMessage[]): string {
-  const exec = executionId({ taskId: agentId, runId }, "subagent");
+export function formatSubagentMessages(agentId: string, messages: readonly ChildMessage[]): string {
   const body = messages.map(message => message.requestId
     ? `<reply request-id="${escapeXml(message.requestId)}">${escapeXml(message.text)}</reply>`
     : `<notice>${escapeXml(message.text)}</notice>`).join("\n");
-  return `<subagent-message agent-id="${escapeXml(agentId)}" execution-id="${escapeXml(exec)}">\n${body}\n</subagent-message>`;
+  return `<subagent-message agent-id="${escapeXml(agentId)}">\n${body}\n</subagent-message>`;
 }
 
 /** Appended to a wait result that held messages of the waited execution. */
@@ -114,9 +106,9 @@ export function createParentDelivery(options: {
     try {
       pi.sendMessage<SubagentMessageDetails>({
         customType: SUBAGENT_MESSAGE_TYPE,
-        content: formatSubagentMessages(agentId, entry.runId, messages),
+        content: formatSubagentMessages(agentId, messages),
         display: false,
-        details: { agentId, executionId: executionId({ taskId: agentId, runId: entry.runId }, "subagent"), messages: messages.map(message => ({ requestId: message.requestId, seq: message.seq })) },
+        details: { agentId, messages: messages.map(message => ({ requestId: message.requestId, seq: message.seq })) },
       }, { triggerTurn: true, deliverAs: "steer" });
     } catch { options.onFailure(); }
   }
@@ -148,8 +140,7 @@ export function createParentDelivery(options: {
     if (accepted.deliveredToWaiter) return;
     const { message } = accepted;
     const data: SubagentMessageEntryData = {
-      agentId: record.id, label: agentLabel(record),
-      executionId: executionId({ taskId: record.id, runId: message.runId }, "subagent"),
+      agentId: record.id, label: record.id,
       requestId: message.requestId, text: message.text, at: message.at,
     };
     try { pi.appendEntry(SUBAGENT_MESSAGE_TYPE, data); } catch { options.onFailure(); }

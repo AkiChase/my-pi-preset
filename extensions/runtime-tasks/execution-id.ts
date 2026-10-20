@@ -1,6 +1,6 @@
 import type { TaskIdentity } from "../task-ui/types.ts";
 
-/** A public execution handle is an identity encoding, never an authority token. */
+/** Per-run fence identifier; only workflows expose it as a public execution ID. */
 export function executionId(identity: Pick<TaskIdentity, "taskId" | "runId">, kind: "subagent" | "workflow"): string {
   return kind === "workflow" ? identity.taskId
     : `exec_${Buffer.from(JSON.stringify([identity.taskId, identity.runId])).toString("base64url")}`;

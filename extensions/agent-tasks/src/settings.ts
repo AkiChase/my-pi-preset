@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { NO_FALLBACK } from "./agent-types.ts";
-import type { AgentMentionMode, JoinMode } from "./types.ts";
+import type { JoinMode } from "./types.ts";
 
 export interface SubagentsSettings {
   maxConcurrent?: number;
@@ -26,7 +26,7 @@ export interface SubagentsSettings {
    * Bounds only spawns a caller is blocking on inline. Nested children are
    * exempt — their parent is blocked awaiting them, so queueing a child behind
    * its own parent would deadlock — and so are detached spawns from
-   * cross-extension RPC or `@handle` mentions, which block nobody and are
+   * cross-extension RPC calls, which block nobody and are
    * documented to start immediately. Foreground `resume` is also outside the
    * pool: it reuses an existing session and never reaches the spawn path, so
    * several blocking resumes in one message can still exceed the limit.
@@ -98,24 +98,6 @@ export interface SubagentsSettings {
    * Defaults to false.
    */
   disableDefaultAgents?: boolean;
-  /**
-   * Whether `@handle message` typed at the prompt is routed to that subagent
-   * instead of the main model, and whether `@` offers running agents alongside
-   * pi's file completion. Defaults to `model`. Applied live.
-   *
-   *   - `model`: mentioning an agent that is not running asks the main model to
-   *     spawn it with the `subagent_run` tool, Claude Code's behaviour. Costs a turn,
-   *     and the model writes the agent's prompt rather than your text being it.
-   *   - `direct`: that agent is started here instead, with the typed message as
-   *     its prompt and no main-model turn spent.
-   *   - `off`: the input hook falls straight through and the stacked
-   *     autocomplete provider delegates everything back to pi's built-in one.
-   *
-   * Messaging a running agent and resuming a finished one are direct in both
-   * `model` and `direct`. The legacy booleans are still accepted: `true` reads
-   * as `model`, `false` as `off`.
-   */
-  agentMentions?: AgentMentionMode;
   /**
    * Project/global default for writing each subagent's `.output` transcript
    * (a JSON-lines copy of the run, stored under the OS temp dir).
@@ -241,7 +223,6 @@ export interface SettingsAppliers {
   setScopeModels: (enabled: boolean) => void;
   setStrictAgentFiles: (b: boolean) => void;
   setDisableDefaultAgents: (b: boolean) => void;
-  setAgentMentions: (mode: AgentMentionMode) => void;
   setOutputTranscript: (b: boolean) => void;
   setWorktreeIsolation: (b: boolean) => void;
   setWorkflowsEnabled: (b: boolean) => void;
@@ -255,7 +236,6 @@ export interface SettingsAppliers {
 export type SettingsEmit = (event: string, payload: unknown) => void;
 
 const VALID_JOIN_MODES: ReadonlySet<string> = new Set<JoinMode>(["async", "group", "smart"]);
-const VALID_AGENT_MENTION_MODES: ReadonlySet<string> = new Set<AgentMentionMode>(["model", "direct", "off"]);
 
 // Sanity ceilings — prevent hand-edited configs from asking for values that
 // make no operational sense (e.g. 1e6 concurrent subagents). Permissive enough
@@ -324,11 +304,7 @@ function sanitize(raw: unknown): SubagentsSettings {
   }
   // Was a boolean before the `model` mode existed. A hand-written or
   // previously-written `true` means "on", which is now the default `model`.
-  if (typeof r.agentMentions === "boolean") {
-    out.agentMentions = r.agentMentions ? "model" : "off";
-  } else if (typeof r.agentMentions === "string" && VALID_AGENT_MENTION_MODES.has(r.agentMentions)) {
-    out.agentMentions = r.agentMentions as AgentMentionMode;
-  }
+
   if (typeof r.outputTranscript === "boolean") {
     out.outputTranscript = r.outputTranscript;
   }
@@ -417,7 +393,6 @@ export function applySettings(s: SubagentsSettings, appliers: SettingsAppliers):
   if (typeof s.scopeModels === "boolean") appliers.setScopeModels(s.scopeModels);
   if (typeof s.strictAgentFiles === "boolean") appliers.setStrictAgentFiles(s.strictAgentFiles);
   if (typeof s.disableDefaultAgents === "boolean") appliers.setDisableDefaultAgents(s.disableDefaultAgents);
-  if (s.agentMentions) appliers.setAgentMentions(s.agentMentions);
   if (typeof s.outputTranscript === "boolean") appliers.setOutputTranscript(s.outputTranscript);
   if (typeof s.worktreeIsolation === "boolean") appliers.setWorktreeIsolation(s.worktreeIsolation);
   if (typeof s.reportUsage === "boolean") appliers.setReportUsage(s.reportUsage);

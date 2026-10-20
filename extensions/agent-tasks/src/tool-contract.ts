@@ -5,12 +5,12 @@ import { THINKING_LEVELS } from "./invocation-config.ts";
 export interface AgentToolCapabilities { nested: boolean; isolation: boolean }
 
 export interface AgentToolParams {
-  prompt: string; description?: string; subagent_type?: string; name?: string; model?: string;
+  prompt: string; description?: string; subagent_type?: string; model?: string;
   thinking?: typeof THINKING_LEVELS[number]; run_in_background?: boolean; resume?: string;
   isolated?: boolean; inherit_context?: boolean; isolation?: "off" | "worktree";
 }
 export function agentToolFields(capabilities: AgentToolCapabilities): string[] {
-  return ["prompt", "description", "subagent_type", ...(capabilities.nested ? [] : ["name"]), "model", "thinking", "run_in_background", "resume", "isolated", "inherit_context",
+  return ["prompt", "description", "subagent_type", "model", "thinking", "run_in_background", "resume", "isolated", "inherit_context",
     ...(capabilities.isolation ? ["isolation"] : [])];
 }
 
@@ -27,7 +27,7 @@ export function parseAgentToolArguments(value: unknown, capabilities: AgentToolC
   }
   const allowed = resume
     ? ["prompt", "resume", ...(capabilities.nested ? [] : ["run_in_background"])]
-    : ["prompt", "description", "subagent_type", ...(capabilities.nested ? [] : ["name"]), "model", "thinking", "run_in_background", "isolated", "inherit_context",
+    : ["prompt", "description", "subagent_type", "model", "thinking", "run_in_background", "isolated", "inherit_context",
       ...(capabilities.isolation ? ["isolation"] : [])];
   assertFields(params, allowed);
   assertNonEmptyString(params.prompt, "`prompt`");
@@ -35,8 +35,7 @@ export function parseAgentToolArguments(value: unknown, capabilities: AgentToolC
     assertNonEmptyString(params.description, "`description`");
     assertNonEmptyString(params.subagent_type, "`subagent_type`");
   }
-  for (const field of ["model", "name"]) if (Object.hasOwn(params, field)) assertNonEmptyString(params[field], `\`${field}\``);
-  if (params.name !== undefined && !/^[A-Za-z0-9_-]+$/.test(String(params.name))) throw new Error("name accepts only letters, digits, '_' and '-'.");
+  if (Object.hasOwn(params, "model")) assertNonEmptyString(params.model, "`model`");
   for (const field of ["run_in_background", "isolated", "inherit_context"]) {
     if (Object.hasOwn(params, field) && typeof params[field] !== "boolean") throw new Error(`${field} must be boolean.`);
   }

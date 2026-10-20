@@ -145,13 +145,13 @@ export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCo
         const parent = record.parentAgentId ? manager.getRecord(record.parentAgentId) : undefined;
         const parentKey = record.parentAgentId ? taskKey({ sourceId: "agent", taskId: record.parentAgentId, runId: record.parentRunId ?? parent?.runId ?? "0" }) : record.workflowId ? taskKey(workflowTaskIdentity(record.workflowId)) : undefined;
         const status: TaskStatus = record.status === "queued" ? "queued" : record.status === "running" ? record.starting ? "starting" : "running" :
-          record.status === "error" ? "failed" : record.status === "interrupted" ? "stopped" : record.status === "stopped" || record.status === "aborted" ? "stopped" : "completed";
+          record.status === "error" ? "failed" : record.status === "interrupted" ? "interrupted" : record.status === "stopped" || record.status === "aborted" ? "stopped" : "completed";
         const artifacts: TaskView["artifacts"][number][] = [];
         if (record.outputFile) artifacts.push(Object.freeze({ kind: "conversation", path: record.outputFile }));
         if (record.sessionFile) artifacts.push(Object.freeze({ kind: "conversation", path: record.sessionFile }));
         if (record.worktree) artifacts.push(Object.freeze({ kind: "worktree", path: record.worktree.path }));
         return Object.freeze({ ...identity, key: taskKey(identity), parentKey, kind: "agent" as const,
-          title: record.alias ?? record.handle ?? record.type, description: record.description, status,
+          title: record.id, description: `${record.type} · ${record.description}${record.status === "interrupted" ? " · interrupted by Pi exit; resume to continue" : ""}`, status,
           executionMode: parentKey ? "owned" as const : record.isBackground === false ? "foreground" as const : "background" as const,
           waitCount: coordinator.countWaits(identity), startedAt: record.startedAt, endedAt: record.completedAt,
           executionConfig: copyAgentExecutionConfig(record.executionConfig),

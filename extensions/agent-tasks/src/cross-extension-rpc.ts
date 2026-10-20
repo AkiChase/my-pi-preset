@@ -13,7 +13,6 @@
  * completion-notification race, and what protocol version 2 does not promise.
  */
 
-import { executionId } from "../../runtime-tasks/execution-id.ts";
 import { assertSpawnInput, normalizeAgentDescription, parseSpawnOptions } from "./spawn-input.ts";
 import { isTopLevelAgent } from "./agent-manager.ts";
 import { type ModelRegistry, resolveModel } from "./model-resolver.ts";
@@ -32,7 +31,7 @@ export type RpcReply<T = void> =
   | { success: false; error: string };
 
 /** RPC protocol version — bumped when the envelope or method contracts change. */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 /** Minimal AgentManager interface needed by the spawn/stop/consume RPCs. */
 export interface SpawnCapable {
@@ -184,9 +183,9 @@ export function registerRpcHandlers(deps: RpcDeps): RpcHandle {
       // than an id for an agent that never ran.
       await manager.awaitStartup(id);
       if (!active()) throw new Error("Agent task activation is closing");
-      const run = manager.getRecord(id);
-      if (!run?.runId) throw new Error("Spawned agent execution identity is unavailable");
-      return { id, execution_id: executionId({ taskId: id, runId: run.runId }, "subagent") };
+      const record = manager.getRecord(id);
+      if (!record?.runId) throw new Error("Spawned agent execution identity is unavailable");
+      return { agent_id: id };
     }, active,
   );
 
@@ -213,7 +212,7 @@ export function registerRpcHandlers(deps: RpcDeps): RpcHandle {
   // TaskOutput is the one in practice — says so here, so the completion
   // notification for that same result is not delivered on top of it and does
   // not cost the parent a turn. Deliberately outside the ping version
-  // handshake: an extension built against protocol v2 simply never calls it.
+  // handshake: an extension built against protocol v3 simply never calls it.
   const unsubConsume = handleRpc<{ requestId: string; agentId: string }>(
     events, "subagents:rpc:consume", ({ agentId }) => {
       if (!manager.consumeResult(agentId)) throw new Error("Agent not found or still running");

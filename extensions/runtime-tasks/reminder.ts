@@ -1,4 +1,3 @@
-import { executionId } from "./execution-id.ts";
 import type { RuntimeTaskCapability } from "./facade.ts";
 import type { TaskView } from "../task-ui/types.ts";
 
@@ -41,7 +40,7 @@ export function reminderDuration(ms: number): string {
 }
 
 function identity(view: TaskView): string[] | undefined {
-    const ids = view.kind === "agent" ? [executionId(view, "subagent"), `agent=${view.taskId}`] : [view.taskId];
+    const ids = view.kind === "agent" ? [`agent_id=${view.taskId}`] : [view.taskId];
     return ids.every(id => id.length > 0 && id.length <= ID_MAX && !/[\s|<>]/.test(id)) ? ids : undefined;
 }
 

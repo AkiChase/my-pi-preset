@@ -67,7 +67,7 @@
 
 ### 阶段 2 执行记录
 
-- 状态：已实现、独立检查并通过；等待本阶段 scoped commit。
+- 状态：已实现、独立检查并提交（`e32d56f feat(subagents): recover persisted agent sessions`）。
 - 关键实现：根会话仅投影顶层 registry 条目；恢复后的 Agent 仅投影直属 child；磁盘 resume 保留原 `agent_id` 并创建新的内部运行；中断 child 通知按父 session 生命周期去重；无 live run 的 completed/interrupted 查询、等待和停止均返回明确状态。
 - 独立检查修复：root registry 无法读取时，原本会把后续 resume 错报为“Agent not found”；现在保留并返回具体 registry 错误。
 - 验证：`PI_SDK_DIR=<installed SDK> PI_CODING_AGENT_DIR=<owned temp> pnpm typecheck` 通过；`PI_SDK_DIR=<installed SDK> PI_CODING_AGENT_DIR=<owned temp> node --test extensions/agent-tasks/__tests__/*.test.ts` 通过（298 passed, 0 failed）；`git diff --check` 通过。
@@ -94,6 +94,15 @@
 ### 提交检查点
 
 公开工具契约、UI 迁移和回归测试在同一提交中完成。
+
+### 阶段 3 执行记录
+
+- 状态：已实现、独立检查并验证；本提交为本阶段 scoped checkpoint。
+- 关键实现：删除实例 handle/alias/tombstone 与 mention-clone 路径；`agent_manage` 对 subagent 使用完整 `agent_id`，对 workflow 保留 `execution_id`；旧 subagent execution handle 在 backend 前拒绝；公开 launch metadata、RPC spawn reply、后台提醒、parent-delivery 持久 entry、Task Panel 与 Trellis dispatch 均不再泄露内部 execution；`@agent:create:<type>` 与直属 scope 的 `@agent:resume:<type>_<index>` 取代普通实例 mention；Task Panel 展示完整 ID 和 interrupted 状态。
+- 诊断并修复：旧 subagent execution ID 被错误分派导致 `execution-id.test.ts` pending Promise；`tool-waits` fixture 签名迁移遗漏导致 workflow/lifecycle host seam 被忽略；Task UI 与 beautify fixture 缺失持久 root/child session；独立检查另发现并删除未注册的 mention-clone 死代码和遗漏的 parent-delivery 旧 ID 断言，同时保留 auxiliary lifecycle 中非 clone 的 workflow/RPC 回归。最终独立检查发现 legacy `exec_…` 曾可通过解析进入 stale lookup、public metadata 曾接受该内部 fencing，已收紧为 workflow-only `wf_…` execution ID，并增加拒绝/泄露回归。
+- 验证：`PI_SDK_DIR=<installed SDK> PI_CODING_AGENT_DIR=<owned temp> pnpm typecheck` 通过；`node --test --test-timeout=30000 extensions/agent-tasks/__tests__/*.test.ts extensions/runtime-tasks/__tests__/*.test.ts extensions/task-ui/__tests__/*.test.ts extensions/beautify/__tests__/registered-agent.test.ts extensions/trellis/__tests__/dispatch.test.mjs` 通过（464 passed, 0 failed，约21秒）；`git diff --check` 通过。独立 `trellis-check` 在修复前后分别通过 354/354 与 16/16 相关测试并完成复审。`pnpm check` 未运行；项目未定义独立 lint script。
+- 文档：更新 `docs/extensions/task-composition.md` 与 Trellis worktree protocol，说明 `@agent:create` / `@agent:resume`、持久 `agent_id` 恢复，以及 workflow-only execution ID。
+- 原始输出：`/tmp/pi-subagent-restart-recovery.5Pj0Lq`、`/tmp/pi-subagent-stage3.DY1Bzi`、`/tmp/trellis-check-stage3.4zDPX9`、`/tmp/trellis-check-stage3-rerun.6ueXhz`、`/tmp/trellis-check-stage3-type-final.Zg7aj7`、`/tmp/trellis-check-stage3.NG3lya`。
 
 ## 最终验证
 

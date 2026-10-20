@@ -18,7 +18,7 @@ import { TaskLifecycle } from "../../task-ui/lifecycle.ts";
 import { managementContract } from "../tools/management.ts";
 import { executionId } from "../../runtime-tasks/execution-id.ts";
 const rawAgentContract = managementContract("agent");
-const complete = (args: Record<string, unknown>) => ({ execution_id: null, kind: null, verbose: null, ...args });
+const complete = (args: Record<string, unknown>) => ({ agent_id: null, execution_id: null, kind: null, verbose: null, ...args });
 const agentContract: typeof rawAgentContract = (args, result, ctx) => rawAgentContract(complete(args), result, ctx);
 import { createRuntimeTaskFacade, type RuntimeTaskCapability } from "../../runtime-tasks/facade.ts";
 import type { RenderContext } from "../types.ts";
@@ -26,15 +26,15 @@ const { default: agentTasks } = await import("../../agent-tasks/src/index.ts");
 const tick = async () => { for (let i = 0; i < 30; i++) await new Promise<void>(done => setImmediate(done)); };
 
 test("actual registered Agent launch/manage renders config, lifecycle outcomes and safe history without display consumption", async () => {
-  const root = mkdtempSync(join(tmpdir(), "beautify-agent-contract-")), config = join(root, "agent"), cwd = join(root, "cwd");
-  mkdirSync(config); mkdirSync(cwd);
+  const root = mkdtempSync(join(tmpdir(), "beautify-agent-contract-")), config = join(root, "agent"), cwd = join(root, "cwd"), rootSessionFile = join(root, "root.jsonl"), childSessionFile = join(root, "child.jsonl");
+  mkdirSync(config); mkdirSync(cwd); writeFileSync(rootSessionFile, ""); writeFileSync(childSessionFile, "");
   writeFileSync(join(config, "agent-tasks.json"), JSON.stringify({ outputTranscript: false, defaultJoinMode: "async" }));
   const previous = process.env.PI_CODING_AGENT_DIR; process.env.PI_CODING_AGENT_DIR = config;
   const tools = new Map<string, Parameters<ExtensionAPI["registerTool"]>[0]>();
   const handlers = new Map<string, ((...args: unknown[]) => unknown)[]>();
   const coordinator = new TaskCoordinator(), lifecycle = new TaskLifecycle(coordinator);
   let finish!: (result: RunResult) => void;
-  const session = { model: { provider: "offline", id: "模型🧠/".repeat(20) }, thinkingLevel: "off", getThinkingLevel: () => "off", messages: [{ role: "user", content: "verbose conversation" }], sessionManager: { getSessionFile: () => undefined }, subscribe: () => () => {}, dispose() {}, getContextUsage: () => undefined } as unknown as AgentSession;
+  const session = { model: { provider: "offline", id: "模型🧠/".repeat(20) }, thinkingLevel: "off", getThinkingLevel: () => "off", messages: [{ role: "user", content: "verbose conversation" }], sessionManager: { getSessionFile: () => childSessionFile }, subscribe: () => () => {}, dispose() {}, getContextUsage: () => undefined } as unknown as AgentSession;
   const dependencies: AgentManagerDependencies = {
     runAgent: async (_ctx, _type, _prompt, options) => {
       await new Promise<void>(resolve => setImmediate(resolve));
@@ -48,7 +48,7 @@ test("actual registered Agent launch/manage renders config, lifecycle outcomes a
     on(name: string, handler: (...args: unknown[]) => unknown) { const list = handlers.get(name) ?? []; list.push(handler); handlers.set(name, list); },
     events: { emit() {}, on: () => () => {} }, appendEntry() {}, sendMessage() {}, getFlag: () => undefined, getAllTools: () => [], getActiveTools: () => [],
   } as unknown as ExtensionAPI;
-  const ctx = { cwd, hasUI: false, mode: "print", ui: { setStatus() {}, setWidget() {}, notify() {} }, sessionManager: { getSessionId: () => "offline-beautify", getBranch: () => [] }, modelRegistry: {} } as unknown as ExtensionToolContext;
+  const ctx = { cwd, hasUI: false, mode: "print", ui: { setStatus() {}, setWidget() {}, notify() {} }, sessionManager: { getSessionId: () => "offline-beautify", getSessionFile: () => rootSessionFile, getBranch: () => [] }, modelRegistry: {} } as unknown as ExtensionToolContext;
   const viewContext = (args: Record<string, unknown>): RenderContext => ({ args, toolCallId: "display", invalidate() {}, lastComponent: undefined, state: {}, cwd, executionStarted: true, argsComplete: true, isPartial: false, expanded: false, showImages: true, isError: false, durationMs: 0, outputPad: 1 });
   const execute = (args: Record<string, unknown>, signal?: AbortSignal) => tools.get("agent_manage")!.execute("get-result", complete(args), signal, undefined, ctx);
   const loaded = await loadExtensions([fileURLToPath(new URL("../../beautify.ts", import.meta.url))], cwd);
@@ -83,7 +83,7 @@ test("actual registered Agent launch/manage renders config, lifecycle outcomes a
     agentTasks(pi, { coordinator, lifecycle, managerDependencies: dependencies, onManagement: c => capabilities.push(c) });
     registerManagementTool(pi, "agent", capabilities);
     await handlers.get("session_start")![0]!(undefined, ctx);
-    const notFound = await execute({ action: "output", execution_id: executionId({ taskId: "absent", runId: "1" }, "subagent") }); assert.equal(agentContract({ action: "output", execution_id: executionId({ taskId: "absent", runId: "1" }, "subagent") }, notFound, viewContext({ action: "output", execution_id: executionId({ taskId: "absent", runId: "1" }, "subagent") }))?.stats, "stale");
+    const notFound = await execute({ action: "output", agent_id: "absent" }); assert.equal(agentContract({ action: "output", agent_id: "absent" }, notFound, viewContext({ action: "output", agent_id: "absent" }))?.stats, "stale");
     const launchArgs = completeToolCall(tools.get("subagent_run")!.parameters, { subagent_type: "general-purpose", description: "Actual description", prompt: "offline", run_in_background: true });
     const launched = await tools.get("subagent_run")!.execute("launch", launchArgs, undefined, undefined, ctx);
     const launchComponent = display("subagent_run", launchArgs, launched as Awaited<ReturnType<typeof execute>>);
@@ -92,19 +92,19 @@ test("actual registered Agent launch/manage renders config, lifecycle outcomes a
     assert.match(plain(launchComponent.render(160).join("\n")), /inherit_context: false/);
     await tick();
     const id = coordinator.list().find(view => view.kind === "agent")!.taskId;
-    const args = { action: "output", execution_id: executionId({ taskId: id, runId: "1" }, "subagent"), verbose: true };
+    const args = complete({ action: "output", agent_id: id, verbose: true });
     const running = await execute(args), copy = structuredClone(running);
     assert.equal(agentContract(args, running, viewContext(args))?.stats, "running");
     assert.equal(agentContract(args, running, viewContext(args))?.title, "output · Actual description");
     assert.match(running.content[0]!.type === "text" ? running.content[0]!.text : "", /verbose conversation/);
     display("agent_manage", complete(args), running);
     assert.deepEqual(running, copy);
-    const partialArgs = complete({ action: "wait", execution_id: args.execution_id });
+    const partialArgs = complete({ action: "wait", agent_id: args.agent_id });
     const partialResult = { ...running, content: [{ type: "text" as const, text: "old partial" }], details: { runtimeManagement: { ...((running.details as import("../../runtime-tasks/tools.ts").ManagementDetails).runtimeManagement), action: "wait", wait_outcome: "waiting" } } };
     const partialComponent = display("agent_manage", partialArgs, partialResult, true);
     partialComponent.setExpanded(true);
     assert.match(plain(partialComponent.render(160).join("\n")), /old partial/);
-    const waitingArgs = { action: "wait", execution_id: executionId({ taskId: id, runId: "1" }, "subagent") };
+    const waitingArgs = complete({ action: "wait", agent_id: id });
     const release = execute(waitingArgs); await tick(); coordinator.detachAll();
     const released = await release;
     display("agent_manage", complete(waitingArgs), released);
@@ -160,8 +160,8 @@ test("actual registered Agent launch/manage renders config, lifecycle outcomes a
     const foregroundComponent = display("subagent_run", foregroundArgs, foregroundFinal as Awaited<ReturnType<typeof execute>>);
     foregroundComponent.setExpanded(true);
     assert.match(plain(foregroundComponent.render(160).join("\n")), /Actual foreground final/);
-    const foregroundIdentity = (foregroundFinal.details as { runtimeLaunch: { execution_id: string } }).runtimeLaunch.execution_id;
-    display("agent_manage", complete({ action: "status", execution_id: foregroundIdentity }), await execute({ action: "status", execution_id: foregroundIdentity }));
+    const foregroundIdentity = (foregroundFinal.details as { runtimeLaunch: { agent_id: string } }).runtimeLaunch.agent_id;
+    display("agent_manage", complete({ action: "status", agent_id: foregroundIdentity }), await execute({ action: "status", agent_id: foregroundIdentity }));
     const failedRun = tools.get("subagent_run")!.execute("failure", foregroundArgs, undefined, undefined, ctx);
     await tick();
     finish({ session, responseText: "partial before failure", aborted: false, steered: false, failure: "offline provider failure" });
@@ -194,15 +194,15 @@ test("actual registered Agent launch/manage renders config, lifecycle outcomes a
     assert.doesNotMatch(plain(transition.render(160).join("\n")), /thinking…|State: running/);
     const stopLaunch = await tools.get("subagent_run")!.execute("stop-launch", launchArgs, undefined, undefined, ctx);
     await tick();
-    const stopIdentity = (stopLaunch.details as { runtimeLaunch: { execution_id: string } }).runtimeLaunch.execution_id;
-    const stopArgs = complete({ action: "stop", execution_id: stopIdentity });
+    const stopIdentity = (stopLaunch.details as { runtimeLaunch: { agent_id: string } }).runtimeLaunch.agent_id;
+    const stopArgs = complete({ action: "stop", agent_id: stopIdentity });
     const stopped = await execute(stopArgs);
     const stoppedComponent = display("agent_manage", stopArgs, stopped);
     stoppedComponent.setExpanded(true);
     assert.match(plain(stoppedComponent.render(160).join("\n")), /stop · observed stopped/);
     assert.match(plain(stoppedComponent.render(160).join("\n")), /Stop requested/);
     await tick();
-    const finalWaitArgs = complete({ action: "wait", execution_id: stopIdentity });
+    const finalWaitArgs = complete({ action: "wait", agent_id: stopIdentity });
     const finalWait = await execute(finalWaitArgs);
     const finalWaitComponent = display("agent_manage", finalWaitArgs, finalWait);
     finalWaitComponent.setExpanded(true);

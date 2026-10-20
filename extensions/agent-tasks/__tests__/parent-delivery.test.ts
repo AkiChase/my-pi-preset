@@ -138,6 +138,8 @@ void it("reply null keeps plain steering; notify sends the question then its mar
     assert.deepEqual(message.options, { triggerTurn: true, deliverAs: "steer" });
     assert.match(message.content, new RegExp(`<reply request-id="${requestId}">src/schema.ts</reply>`));
     assert.match(message.content, /<subagent-message agent-id=/);
+    assert.doesNotMatch(message.content, /execution-id=/);
+    assert.equal("executionId" in (f.cards()[0]!.data as object), false);
   } finally { await f.close(); }
 });
 
@@ -268,7 +270,7 @@ void it("detail omits whole older message entries rather than silently truncatin
 
 void it("message card renders kind, label and a collapsed body", () => {
   const theme = { fg: (_color: never, value: string) => value, bold: (value: string) => value };
-  const data = { agentId: "a", label: "explore", executionId: "exec_x", requestId: null, text: "1\n2\n3\n4\n5", at: 0 };
+  const data = { agentId: "a", label: "explore", requestId: null, text: "1\n2\n3\n4\n5", at: 0 };
   const collapsed = renderSubagentMessageCard(data, false, theme)!.render(80).map(line => line.trimEnd());
   assert.equal(collapsed[0], "↩ explore · notice");
   assert.ok(collapsed.includes("  … 2 more lines"));
@@ -281,7 +283,7 @@ void it("message card renders kind, label and a collapsed body", () => {
 void it("message card strips external terminal controls before styling", () => {
   const theme = { fg: (_color: never, value: string) => value, bold: (value: string) => value };
   const rendered = renderSubagentMessageCard({
-    agentId: "a", label: "\u001b[31mevil", executionId: "exec_x", requestId: "req_\u001b[2J1",
+    agentId: "a", label: "\u001b[31mevil", requestId: "req_\u001b[2J1",
     text: "safe\u001b[2J\u0000 text", at: 0,
   }, true, theme)!.render(80).join("\n");
   assert.equal(rendered.includes("\u001b"), false);
@@ -293,9 +295,7 @@ void it("agent_manage wait appends messages of the waited execution to its resul
   const f = await factory();
   try {
     const { id, channel, run } = await f.background();
-    const execution = f.coordinator.list().find(view => view.taskId === id)!;
-    const { executionId } = await import("../../runtime-tasks/execution-id.ts");
-    const waiting = f.manage({ action: "wait", execution_id: executionId({ taskId: id, runId: execution.runId }, "subagent") });
+    const waiting = f.manage({ action: "wait", agent_id: id });
     await tick();
     channel.send("halfway there", null);
     run.finish("finished");

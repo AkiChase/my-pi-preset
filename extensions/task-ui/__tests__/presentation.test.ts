@@ -11,12 +11,12 @@ function view(id: string, patch: Partial<TaskView> = {}): TaskView {
     return { ...identity, key: taskKey(identity), kind: "agent", title: id, status: "running", executionMode: "background", waitCount: 0,
         stats: {}, artifacts: [], capabilities: { stop: true, details: true }, ...patch };
 }
-void it("kind-aware titles preserve process prose and fallback without changing original text", () => {
+void it("agent titles preserve the stable public identity while other kinds use prose", () => {
     const command = "TRELLIS_CONTEXT_ID=original echo '完整命令'";
     const agent = view("a", { title: "reviewer", description: "审查\n实现\u001b]0;bad\u0007\u001b[31m" });
-    assert.equal(taskTitle(agent), "审查 实现");
+    assert.equal(taskTitle(agent), "reviewer");
     assert.equal(agent.description?.includes("\n"), true);
-    assert.equal(taskTitle(view("wf", { kind: "workflow", title: "Pipeline", description: "Review changes" })), "Review changes");
+    assert.equal(taskTitle(view("wf", { kind: "workflow", title: "Pipeline", description: "Review changes" })), "Pipeline");
     assert.equal(taskTitle(view("b", { kind: "shell", title: "Run checks", description: command })), "Run checks");
     assert.equal(taskTitle(view("m", { kind: "monitor", title: "Watch events", description: "tail -f events" })), "Watch events");
     assert.equal(taskTitle(view("b", { kind: "shell", title: " \n\t", description: command })), command);

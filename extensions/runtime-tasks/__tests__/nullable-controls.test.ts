@@ -3,12 +3,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { validateToolArguments } from "@earendil-works/pi-ai";
 import { managementTool, parseAgentManagementParams, parseProcessManagementParams, validateManagementParams } from "../tools.ts";
-import { executionId } from "../execution-id.ts";
 
 test("Agent management requires all fields and treats only declared null controls as unspecified", async () => {
   let calls = 0;
   const { tool } = managementTool("agent", [{ list: () => [], execute: async () => { calls++; throw Error("unexpected effect"); } }]);
-  const input = Object.freeze({ action: "list", execution_id: null, kind: null, verbose: null });
+  const input = Object.freeze({ action: "list", agent_id: null, execution_id: null, kind: null, verbose: null });
   const host = (value: unknown) => validateToolArguments(tool, { type: "toolCall", id: "wire", name: tool.name, arguments: value as never });
   assert.deepEqual(host(input), input);
   assert.deepEqual(parseAgentManagementParams(input), { action: "list" });
@@ -22,8 +21,8 @@ test("Agent management requires all fields and treats only declared null control
     assert.throws(() => parseAgentManagementParams(bad));
     assert.equal((await tool.execute("bad", bad as never, undefined, undefined, {} as never)).isError, true);
   }
-  const id = executionId({ taskId: "agent", runId: "1" }, "subagent");
-  assert.deepEqual(parseAgentManagementParams({ action: "output", execution_id: id, kind: null, verbose: false }), { action: "output", execution_id: id, verbose: false });
+  const id = "agent_general_purpose_0_12345678";
+  assert.deepEqual(parseAgentManagementParams({ action: "output", agent_id: id, execution_id: null, kind: null, verbose: false }), { action: "output", agent_id: id, verbose: false });
   assert.equal(validateManagementParams("process", processInput({ action: "list" })), undefined);
   assert.ok(validateManagementParams("process", { action: "list", task_type: null }));
   assert.equal(input.verbose, null); assert.equal(calls, 0);

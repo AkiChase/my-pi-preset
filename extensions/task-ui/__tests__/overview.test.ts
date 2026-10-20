@@ -62,12 +62,12 @@ it("root metadata only, five rows plus hidden count, no child sums/input/detail,
     }
     const lines = overviewLines(selected, 100, 24, theme, 103_000);
     assert.equal(lines.length, 6); assert.equal(lines[5], "+2 hidden");
-    assert.match(lines[0], /^◌ Description 0 +\[running\] 3s · ↓ 12$/);
+    assert.match(lines[0], /^◌ alias-0 +\[running\] 3s · ↓ 12$/);
     const malicious = view("safe", { description: "中文🙂\u001b]0;BAD\u0007\n描述\u001b[31m", status: "paused" });
     for (const width of [0, 1, 2, 5, 20, 40, 80]) for (const line of overviewLines([malicious], width, 24, theme, 103_000)) {
         assert.ok(visibleWidth(line) <= width); assert.doesNotMatch(stripTerminalSequences(line), /BAD|[\u0000-\u001f]/);
     }
-    assert.match(overviewLines([malicious], 80, 24, theme, 103_000)[0], /^Ⅱ 中文🙂 描述/);
+    assert.match(overviewLines([malicious], 80, 24, theme, 103_000)[0], /^Ⅱ alias-safe/);
 });
 it("retention is unpinned whole-root four seconds, orphan/cycle safe and new run does not resurrect old metadata", () => {
     const model = new TaskOverviewModel(), root = view("parent"), child = view("child", { parentKey: root.key, status: "completed", endedAt: 0 });
@@ -143,7 +143,7 @@ it("failed central publication preserves finite metadata expiry without a visual
         t.mock.timers.tick(10_000); assert.equal(snapshots.length, reads + 1);
         t.mock.method(f.ctx.ui, "setStatus", () => { throw new Error("optional footer sink failed"); });
         f.reenter(); f.publish([view("fresh")]);
-        assert.match(f.render().join("\n"), /Description fresh/);
+        assert.match(f.render().join("\n"), /alias-fresh/);
         assert.doesNotMatch(f.render().join("\n"), /failed-sink/);
         assert.equal(f.reads(), 0);
     } finally { f.dispose(); }

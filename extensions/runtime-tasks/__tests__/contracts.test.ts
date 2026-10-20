@@ -45,7 +45,7 @@ test("split management schemas define each field once and defer combinations to 
     const schema = JSON.parse(JSON.stringify(tool.parameters));
     assert.equal(schema.type, "object"); assert.equal(schema.anyOf, undefined); assert.equal(schema.additionalProperties, false);
     assert.deepEqual(schema.required, Object.keys(schema.properties));
-    const bad = group === "process" ? processInput({ action: "status", task_id: "x", limit: 1 }) : { action: "status", execution_id: "x", kind: null, verbose: false };
+    const bad = group === "process" ? processInput({ action: "status", task_id: "x", limit: 1 }) : { action: "status", agent_id: "x", execution_id: null, kind: null, verbose: false };
     const result = await tool.execute("bad", bad as never, undefined, undefined, ctx);
     assert.equal(result.isError, true);
     assert.match(result.content[0]!.type === "text" ? result.content[0]!.text : "", /fields that do not apply to this action/);
@@ -129,15 +129,16 @@ test("execution config is optional, closed, group-specific and deeply immutable 
   assert.ok(isRuntimeTaskMetadata(result.details.runtimeTask));
   assert.notEqual(result.details.runtimeTask.executionConfig, snapshot);
   for (const task_type of ["bash", "monitor", "workflow"]) assert.equal(isRuntimeTaskMetadata({ ...result.details.runtimeTask, task_type }), false);
-  const publicMeta = { version: 2, group: "agent", action: "status", execution_id: executionId({ taskId: "x", runId: "1" }, "subagent"), kind: "subagent", executionConfig: snapshot };
+  const publicMeta = { version: 2, group: "agent", action: "status", agent_id: "x", kind: "subagent", executionConfig: snapshot };
   assert.ok(isManagementDetails({ runtimeManagement: publicMeta }));
-  for (const patch of [{ kind: "workflow" }, { execution_id: "wf_foreign123" }, { group: "process" }, { executionConfig: { ...snapshot, auth: "secret" } }])
+  assert.equal(isManagementDetails({ runtimeManagement: { ...publicMeta, execution_id: executionId({ taskId: "x", runId: "1" }, "subagent") } }), false, "subagent execution fencing must never enter public metadata");
+  for (const patch of [{ kind: "workflow" }, { agent_id: undefined }, { group: "process" }, { executionConfig: { ...snapshot, auth: "secret" } }])
     assert.equal(isManagementDetails({ runtimeManagement: { ...publicMeta, ...patch } }), false);
   let backend = 0;
   const capability: RuntimeTaskCapability = { list: () => [{ view: { ...view("x"), executionConfig: snapshot }, manageable: true, rawStatus: "completed" }],
     execute: async () => { backend++; return result; } };
   const { tool } = managementTool("agent", [capability]);
-  const status = await tool.execute("status", { action: "status", execution_id: publicMeta.execution_id, kind: null, verbose: null }, undefined, undefined, ctx);
+  const status = await tool.execute("status", { action: "status", agent_id: publicMeta.agent_id, execution_id: null, kind: null, verbose: null }, undefined, undefined, ctx);
   assert.ok(isManagementDetails(status.details));
   assert.deepEqual((status.details as import("../tools.ts").ManagementDetails).runtimeManagement.executionConfig, snapshot);
   assert.match(status.content[0]!.type === "text" ? status.content[0]!.text : "", /pending session confirmation.*thinking=off.*mode=foreground/);

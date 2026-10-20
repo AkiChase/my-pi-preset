@@ -5,7 +5,6 @@ import { copyAgentExecutionConfig, agentExecutionSummary } from "../../runtime-t
 import { registerBuiltinSkills } from "./builtin-skills.ts";
 import { nullableControl } from "../../shared/tool-arguments.ts";
 import { createToolCallHeading } from "../../beautify/tool-call-heading.ts";
-import { executionId } from "../../runtime-tasks/execution-id.ts";
 import { launchMetadata, launchText, isLaunchMetadata } from "../../runtime-tasks/launch.ts";
 import { createAgentManagement } from "./management.ts";
 import { createWorkflowManagement } from "./workflow/management.ts";
@@ -48,8 +47,7 @@ import { type RpcHandle, registerRpcHandlers } from "./cross-extension-rpc.ts";
 import { loadCustomAgents } from "./custom-agents.ts";
 import { GroupJoinManager } from "./group-join.ts";
 import { isolationParam, resolveAgentInvocationConfig, resolveJoinMode, THINKING_LEVELS, thinkingParam } from "./invocation-config.ts";
-import { describeMention, handleBase, isReservedHandle, parseMention, resolveHandleToType, stripAgentPrefix } from "./mention.ts";
-import { runMentionClone } from "./mention-clone.ts";
+import { parseAgentInput, resumeKey } from "./mention.ts";
 import { describeModel, type ModelRegistry, resolveModel } from "./model-resolver.ts";
 import { checkModelScope, isScopeModelsEnabled, setScopeModelsEnabled } from "./model-scope.ts";
 import { registryLocatorForRootSession } from "./subagent-registry.ts";
@@ -57,8 +55,8 @@ import { getMaxSubagentDepth, setMaxSubagentDepth } from "./nested-tools.ts";
 import { createOutputFilePath, ensureOutputFile, getOutputTranscriptDefault, sessionTaskDir, setOutputTranscriptDefault, streamToOutputFile, writeInitialEntry } from "./output-file.ts";
 import { applyAndEmitLoaded, loadSettings, type SubagentsSettings, saveAndEmitChanged } from "./settings.ts";
 import { getForegroundOutcomeNote, getStatusNote, partialOutputSuffix } from "./status-note.ts";
-import { type AgentConfig, type AgentInvocation, type AgentMentionMode, type AgentRecord, type JoinMode, type NotificationDetails, type SubagentType } from "./types.ts";
-import { createMentionProvider, mentionRoster, type TypeInfo } from "./ui/agent-mention.ts";
+import { type AgentConfig, type AgentInvocation, type AgentRecord, type JoinMode, type NotificationDetails, type SubagentType } from "./types.ts";
+import { createMentionProvider, type TypeInfo } from "./ui/agent-mention.ts";
 import {
   type AgentActivity,
   type AgentDetails,
@@ -216,7 +214,6 @@ function formatTaskNotification(record: AgentRecord, resultMaxLen: number, showC
   return [
     `<task-notification>`,
     `<agent-id>${record.id}</agent-id>`,
-    `<execution-id>${executionId({ taskId: record.id, runId: record.runId ?? "1" }, "subagent")}</execution-id>`,
     record.toolCallId ? `<tool-use-id>${escapeXml(record.toolCallId)}</tool-use-id>` : null,
     record.outputFile ? `<output-file>${escapeXml(record.outputFile)}</output-file>` : null,
     `<status>${escapeXml(status)}</status>`,
@@ -336,7 +333,6 @@ export interface AgentTasksOptions {
   readonly lifecycle?: import("../../task-ui/lifecycle.ts").TaskLifecycle;
   /** Narrow runner/startup seam for offline backend integration tests. */
   readonly managerDependencies?: AgentManagerDependencies;
-  readonly mentionDependencies?: import("./mention-clone.ts").MentionCloneDependencies;
 }
 
 export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
@@ -349,7 +345,6 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
   const coordinator = options.coordinator ?? new TaskCoordinator();
   const lifecycle = options.lifecycle ?? new TaskLifecycle(coordinator);
   const active = () => lifecycle.active;
-  const cloneBackgroundParams = new WeakSet<object>();
   const assertActive = () => { if (!active()) throw new Error("Agent task activation is closing or closed"); };
   // Optional host sinks can synchronously initiate shutdown. Re-check at every
   // effect, not just at callback entry, so later effects in that callback stop.
@@ -371,7 +366,6 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       return typeof value === "function" ? value.bind(target) : value;
     },
   });
-  const clones = new Set<AbortController>();
   const auxiliary = new Set<Promise<unknown>>();
   // Register ownership BEFORE any callback can synchronously shut down.
   function own<T>(start: () => Promise<T>): Promise<T> {
@@ -767,8 +761,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     reloadCustomAgents();
     const dispatch = resolveSpawnType(type);
     if (!dispatch.ok) throw new Error(dispatch.message);
-    // Every programmatic spawn lands here — cross-extension RPC, both `@handle`
-    // mention paths, and the `Symbol.for("pi-subagents:manager")` registry — and
+    // Every programmatic spawn lands here — cross-extension RPC, explicit input paths, and the `Symbol.for("pi-subagents:manager")` registry — and
     // none came through the subagent_run tool, which is where the UI activity tracker is
     // otherwise created. Without one the widget and FleetView have no tool name
     // and no turn count, so the row reads `thinking…` for the agent's whole life
@@ -809,32 +802,11 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     // Also internal: it names a transcript directory, so a forged value would
     // be a path-traversal primitive.
     delete safeOptions.rootSessionId;
-    // Worse than rootSessionId: this one names a file to OPEN and replay as a
-    // conversation. Only the mention dispatcher may set it, and only from a
-    // path this extension itself recorded — never from anything a caller sent.
-    delete safeOptions.resumeSessionFile;
-    // Bypasses handle allocation, so a forged value would duplicate a live
-    // agent's name and make `@handle` ambiguous. Same rule: dispatcher only.
-    delete safeOptions.reclaim;
     // Every spawn through here is DETACHED — the caller gets an id back and
     // awaits nothing. A forged `blocking` would charge it to the foreground
     // pool and could defer it behind a queue whose gate nobody is holding.
     delete safeOptions.blocking;
     return spawnResolved(piRef, ctxRef, type, prompt, safeOptions);
-  };
-
-  /**
-   * Resolve a tool's `agent_id` as an id OR a handle, so the model addresses
-   * agents by the same names the user types. Ids are tried first, keeping the
-   * existing behaviour exact — a handle is only consulted when the string is
-   * not an id at all. Only live records: a tombstone has nothing to steer and
-   * no result to read. Callers still enforce the nested-ownership rejection.
-   */
-  const resolveAgentRef = (ref: string): AgentRecord | undefined => {
-    const byId = manager.getRecord(ref);
-    if (byId) return byId;
-    const resolved = manager.resolveMention(ref);
-    return resolved?.kind === "live" ? resolved.record : undefined;
   };
 
   const registryEntry = {
@@ -862,7 +834,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
   // (currentCtx would stay undefined → spawn always "No active session"). Gating
   // here makes a filtered session behave like an absent one (#142).
   let rpcHandle: RpcHandle | undefined;
-  /** Whether the `@handle` autocomplete wrapper has been stacked on pi's provider. */
+  /** Whether the explicit agent autocomplete wrapper has been stacked on Pi's provider. */
   let mentionProviderRegistered = false;
   /** Root recovery notice is emitted once for this main-session activation. */
   let rootRecoveryNoticeDelivered = false;
@@ -926,7 +898,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
           // "Agent not found" a false from here used to be read as.
           abort: (id) => manager.abort(id),
           consumeResult: (id) => {
-            const record = resolveAgentRef(id);
+            const record = manager.getRecord(id);
             // Same guard as agent_manage: a running agent has no result
             // to consume, and its notification is still the caller's only
             // signal that it finished.
@@ -945,7 +917,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       pi.events.emit("subagents:ready", {});
     }
     if (!active()) return;
-    // Stack `@handle` suggestions on pi's built-in autocomplete. Registered at
+    // Stack explicit agent suggestions on Pi's built-in autocomplete. Registered at
     // most once per activation: pi appends wrappers to a list it never prunes,
     // so a second call would layer a duplicate provider on the first. TUI only
     // — print mode has no such method, and RPC mode's is a no-op.
@@ -956,8 +928,8 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
           current,
           // Plain text, not renderAgentName: the same label FleetView and the
           // widget show, but the autocomplete description cannot carry ANSI.
-          () => active() ? mentionRoster(manager, mentionTypes(), type => getConfig(type).displayName) : [],
-          () => active() && isAgentMentionsEnabled(),
+          () => active() ? { manager, types: mentionTypes() } : undefined,
+          () => active(),
         ),
       );
     }
@@ -974,251 +946,34 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
   const mentionTypes = (): TypeInfo[] =>
     getAvailableTypes().map(name => ({ name, description: getAgentConfig(name)?.description ?? name }));
 
-  /**
-   * `@handle message` typed at the prompt addresses that agent instead of the
-   * main model — Claude Code's prompt mention, same grammar (see mention.ts).
-   *
-   * The handle names the *agent*, not one process, so one syntax covers its
-   * whole lifecycle: message it while it runs, resume it once it has finished,
-   * start it if it never ran. Everything that isn't an agent mention falls
-   * through untouched, which is what keeps `@src/foo.ts summarize this`, a bare
-   * `@handle`, and ordinary prose working. A delivered mention costs no
-   * main-model turn; the answer arrives through the ordinary completion
-   * notification either way.
-   */
+  /** Explicit @agent namespace; all ordinary @ input belongs to Pi (not us). */
   pi.on("input", (event, ctx) => own(async () => {
-    if (!active()) return { action: "continue" as const };
-    // Never hijack text the extension layer itself submitted (pi.sendMessage,
-    // scheduled prompts) — only something a person typed can be a mention.
-    if (event.source === "extension" || !isAgentMentionsEnabled()) return { action: "continue" as const };
-    // Claiming the turn is TUI only, matching the `@` completion that teaches
-    // the syntax. Pi defaults `session.prompt()` to source "interactive", so a
-    // headless `pi -p "@explore …"` reaches here too — and claiming it would
-    // answer with silence, which the background hold cannot fix: `handled`
-    // returns from prompt() before any turn starts, so the loop that patch wraps
-    // never runs (it holds subagents spawned by the subagent_run tool MID-turn, a
-    // different path). The agent would detach, `ctx.ui.notify` is a no-op
-    // outside the TUI, and print mode would exit having printed nothing.
-    //
-    // `model` mode has none of that problem: it queues a reminder and lets the
-    // turn run, so the answer is the model's own, printed as usual. It is the
-    // only branch allowed to act headlessly; everything else falls through to
-    // the main model exactly as it did before mentions existed.
-    const canDispatchDirectly = ctx.mode === "tui";
-    if (!canDispatchDirectly && getAgentMentionMode() !== "model") return { action: "continue" as const };
-
-    const mention = parseMention(event.text);
-    if (!mention) return { action: "continue" as const };
-
-    // `@main` addresses the main conversation, never a subagent — the one name
-    // `assignHandle` refuses to allocate. An explicit escape hatch for text
-    // that would otherwise read as a mention, so the prefix is dropped and the
-    // rest goes to the model with its attachments intact.
-    if (isReservedHandle(mention.handle)) {
-      return { action: "transform" as const, text: mention.message, ...(event.images && { images: event.images }) };
-    }
-
-    // As typed first, so an agent actually called `agent-foo` wins over Claude
-    // Code's `@agent-` + `foo` spelling rather than being shadowed by it.
-    const alias = stripAgentPrefix(mention.handle);
-    const resolved = manager.resolveMention(mention.handle)
-      ?? (alias ? manager.resolveMention(alias) : undefined);
-
-    // Steering and resuming are direct in every mode, so headless they are not
-    // available at all. Falling through here rather than dropping to the start
-    // path below matters: the handle names an agent that already exists, and
-    // asking the model to start another one is not what was typed.
-    if (resolved && !canDispatchDirectly) return { action: "continue" as const };
-
-    if (resolved?.kind === "live") {
-      const record = resolved.record;
-      const target = `@${record.alias ?? record.handle ?? mention.handle}`;
-
-      if (record.status === "running" || record.status === "queued") {
-        // Steering interrupts after the current tool call, exactly like the
-        // subagent_message tool. Un-consume the result so the agent's reply to
-        // this message is still relayed even if the LLM read its last answer.
-        record.resultConsumed = false;
-        manager.steer(record.id, mention.message);
-        pi.events.emit("subagents:steered", { id: record.id, message: mention.message });
-        ctx.ui.notify(`Sent to ${target}`, "info");
-        return { action: "handled" as const };
-      }
-
-      if (record.session) {
-        // Both derived from the record's OWN type: a mention names an existing
-        // agent, so its frontmatter is what governs — `output_transcript: false`
-        // must keep holding, since record.outputFile is the sole gate every
-        // downstream consumer keys off and a resume must not re-open it.
-        const config = getAgentConfig(record.type);
-        const resumedRecord = await startBackgroundResume(ctx, record, mention.message, {
-          outputTranscript: config?.outputTranscript ?? getOutputTranscriptDefault(),
-          maxTurns: normalizeMaxTurns(config?.maxTurns ?? getDefaultMaxTurns()),
-        });
-        assertActive();
-        ctx.ui.notify(
-          resumedRecord ? `Resuming ${target}` : `Could not resume ${target} — it is still running.`,
-          resumedRecord ? "info" : "warning",
-        );
-        return { action: "handled" as const };
-      }
-      // A live record with no session never got far enough to continue, so it
-      // falls through to the start-fresh path below, like Claude's
-      // `no_transcript`.
-    }
-
-    // Evicted, but its conversation is still on disk: reopen it. This is an
-    // ordinary spawn carrying a session file, so the new record picks up the
-    // widget, fleet row, transcript and completion notification unchanged —
-    // and `reclaim` hands it back the names the tombstone was holding.
-    if (resolved?.kind === "tombstone") {
-      const entry = resolved.entry;
-      const target = `@${entry.alias ?? entry.handle}`;
-
-      // Checked here rather than left to SessionManager.open: that runs inside
-      // runAgent, whose rejection lands on the record as an agent error, not in
-      // the catch below. A `/new` in another pi window or a manual delete makes
-      // the conversation unrecoverable (Claude Code's `not_reachable`), so drop
-      // the entry — a row that can only ever fail is worse than none — and say
-      // so rather than quietly sending this message to an unrelated agent.
-      if (!existsSync(entry.sessionFile)) {
-        manager.dropTombstone(entry.handle);
-        ctx.ui.notify(`Could not resume ${target} — its session is gone.`, "warning");
-        return { action: "handled" as const };
-      }
-
-      // The subagent_run tool deliberately falls back to general-purpose for a type it
-      // cannot resolve (#183), which covers a deleted file AND a merely
-      // disabled one. A resume must not inherit that: reopening this
-      // conversation under a different agent's prompt and tools is not
-      // continuing it, and the new record would re-tombstone under the
-      // substitute, so the handle would never find its way back.
+    if (!active() || event.source === "extension" || ctx.mode !== "tui") return { action: "continue" as const };
+    const input = parseAgentInput(event.text);
+    if (!input) return { action: "continue" as const };
+    if (input.operation === "create") {
       reloadCustomAgents();
-      const dispatch = resolveSpawnType(entry.type);
+      const dispatch = resolveSpawnType(input.target);
       if (!dispatch.ok || dispatch.fellBackFrom !== undefined) {
-        // The tombstone stays: re-enabling the agent makes the handle work
-        // again, which a drop would foreclose.
-        ctx.ui.notify(`Could not resume ${target} — the ${entry.type} agent is no longer available.`, "warning");
+        ctx.ui.notify(`Unknown or disabled agent type: ${input.target}`, "warning");
         return { action: "handled" as const };
       }
-
       try {
-        // spawnResolved, not spawnTopLevel: the latter strips
-        // `resumeSessionFile` and `reclaim` as untrusted. This path is the
-        // exception — both come from a tombstone this extension wrote.
-        const id = spawnResolved(pi, ctx, dispatch.type, mention.message, {
-          description: entry.description,
-          reclaim: { handle: entry.handle, alias: entry.alias },
-          resumeSessionFile: entry.sessionFile,
-          isBackground: true,
-        });
-        // The agent may still be starting — wait, so a startup failure lands in
-        // the catch below instead of being announced as a resume.
-        await manager.awaitStartup(id);
-        assertActive();
-        // The tombstone deliberately stays. `resolveMention` prefers the live
-        // record holding these same names, so it cannot shadow the resume — and
-        // if this run dies before establishing its own session, the original
-        // transcript is still the right thing for the next mention to reopen.
-        // Once the resumed record is evicted it overwrites this entry in place,
-        // keyed by the same handle, so nothing accumulates.
-        ctx.ui.notify(`Resuming ${target}`, "info");
-      } catch (err) {
-        if (!active()) return { action: "handled" as const };
-        // The type is already settled above, so what is left is a spawn-time
-        // failure: a strict worktree-isolation error, an unusable cwd.
-        ctx.ui.notify(
-          `Could not resume ${target}: ${err instanceof Error ? err.message : String(err)}`,
-          "warning",
-        );
-      }
+        const id = spawnTopLevel(pi, ctx, dispatch.type, input.message, { description: input.message.split("\n", 1)[0]!.slice(0, 40), isBackground: true });
+        await manager.awaitStartup(id); assertActive();
+        ctx.ui.notify(`Started ${id}`, "info");
+      } catch (error) { if (active()) ctx.ui.notify(`Could not start ${input.target}: ${error instanceof Error ? error.message : String(error)}`, "error"); }
       return { action: "handled" as const };
     }
-
-    // No agent under that handle — but the name may still be an agent type, in
-    // which case the mention starts one.
-    const typeHandle = mention.handle;
-    const type = resolveHandleToType(typeHandle, getAvailableTypes())
-      ?? (alias ? resolveHandleToType(alias, getAvailableTypes()) : undefined);
-    if (!type) return { action: "continue" as const };
-
-    // Claude Code never starts the agent itself: `@agent-<type>` becomes an
-    // attachment asking the main model to do it, and the model writes the
-    // agent's prompt from the conversation rather than forwarding the typed
-    // text. That buys a real `subagent_run` tool call — transcript, per-tool widget
-    // detail, tool-use-id correlation, join grouping — and a prompt with the
-    // context a cold spawn lacks.
-    //
-    // It also costs a visible turn, spent narrating a decision the user already
-    // made by typing the handle. So the turn is taken by a clone of this
-    // conversation instead (mention-clone.ts): same messages, same system
-    // prompt, off-screen, holding only the `subagent_run` tool. Nothing reaches the
-    // chat, and what it starts is an ordinary top-level agent.
-    if (getAgentMentionMode() === "model") {
-      const label = `@${handleBase(type)}`;
-      // "Prompting", not "Starting": in this mode nothing starts until the
-      // off-screen clone has taken a whole model turn writing the agent's
-      // prompt, and that wait is the one thing the chat cannot show. `direct`
-      // says "Started" because by then it has. The distinction tells the user
-      // which of the two they are waiting on.
-      ctx.ui.notify(`Prompting ${label}…`, "info");
-      // Not awaited: the clone runs a full model turn, and prompt() is blocked
-      // until this hook returns. The user gets their prompt back immediately
-      // and the agent appears in the widget when it starts.
-      const controller = new AbortController();
-      clones.add(controller);
-      void own(() => runMentionClone({ ctx, type, message: mention.message, agentTool: cloneAgentTool,
-        signal: controller.signal, isActive: active, dependencies: options.mentionDependencies })
-        .then(async (result) => {
-          if (!active() || controller.signal.aborted || result.spawned) return;
-          if (result.attempted) {
-            ctx.ui.notify(`Could not start ${label}: ${result.error ?? "Agent admission failed; not retrying this mention"}`, "error");
-            return;
-          }
-          // A clone that could not run must not swallow the mention: start the
-          // agent the direct way rather than leaving the user with a toast and
-          // nothing running.
-          try {
-            const id = spawnTopLevel(pi, ctx, type, mention.message, {
-              description: describeMention(mention.message),
-              isBackground: true,
-            });
-            // Same reason as the direct path below: the agent may still be
-            // starting, and a failure there must reach this catch.
-            await manager.awaitStartup(id);
-            assertActive();
-            ctx.ui.notify(`Started ${label} directly — ${result.error}`, "warning");
-          } catch (err) {
-            if (!active()) return;
-            ctx.ui.notify(
-              `Could not start ${label}: ${err instanceof Error ? err.message : String(err)}`,
-              "error",
-            );
-          }
-        }).catch(() => {}).finally(() => clones.delete(controller)));
-      return { action: "handled" as const };
-    }
-
+    const wanted = input.target.toLowerCase();
+    const record = manager.listAgents().find(candidate => candidate.parentAgentId === undefined && resumeKey(candidate.type, candidate.registryIndex ?? -1) === wanted);
+    if (!record) { ctx.ui.notify(`No direct subagent matches @agent:resume:${input.target}.`, "warning"); return { action: "handled" as const }; }
     try {
-      // Nothing else to pass: runAgent resolves model, thinking and max turns
-      // from the agent's own config when the spawn omits them, and the
-      // manager's onStart/onComplete callbacks own the widget, the fleet list
-      // and the completion notification — the same contract cross-extension
-      // RPC spawns run under.
-      const id = spawnTopLevel(pi, ctx, type, mention.message, {
-        description: describeMention(mention.message),
-        isBackground: true,
-      });
-      // The agent may still be starting (a worktree copy is an awaited git
-      // call) — report a failure that lands there as a failed start, not as a
-      // "Started" toast for an agent that never ran.
-      await manager.awaitStartup(id);
-      assertActive();
-      ctx.ui.notify(`Started @${handleBase(type)}`, "info");
-    } catch (err) {
-      if (!active()) return { action: "handled" as const };
-      ctx.ui.notify(`Could not start @${handleBase(type)}: ${err instanceof Error ? err.message : String(err)}`, "error");
-    }
+      const resumed = record.session ? await startBackgroundResume(ctx, record, input.message, { outputTranscript: getAgentConfig(record.type)?.outputTranscript ?? getOutputTranscriptDefault(), maxTurns: normalizeMaxTurns(getAgentConfig(record.type)?.maxTurns ?? getDefaultMaxTurns()) })
+        : manager.resumePersistent(pi, ctx, record.id, input.message);
+      if (!resumed) ctx.ui.notify(`Could not resume ${record.id}.`, "warning");
+      else ctx.ui.notify(`Resuming ${record.id}`, "info");
+    } catch (error) { if (active()) ctx.ui.notify(`Could not resume ${record.id}: ${error instanceof Error ? error.message : String(error)}`, "warning"); }
     return { action: "handled" as const };
   }));
 
@@ -1246,7 +1001,6 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       // Persist interruption state before cancellation changes live records to
       // stopped. Explicit user stops have already been written as stopped.
       manager.markInterruptedForShutdown();
-      for (const controller of clones) safely(() => controller.abort());
       for (const task of workflowTasks.values()) safely(() => task.abortController.abort());
       manager.stopForShutdown();
     },
@@ -1265,18 +1019,6 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     },
   });
   if (ownsLifecycle) pi.on("session_shutdown", async () => { await lifecycle.shutdown(); });
-
-  // Claude Code-style `@handle message` prompt mentions. Read live by both the
-  // `input` hook and the stacked autocomplete provider, so the toggle applies
-  // immediately — the provider itself can never be unregistered (pi's wrapper
-  // list is append-only), it just delegates everything when this is off.
-  let agentMentionMode: AgentMentionMode = "model";
-  function getAgentMentionMode(): AgentMentionMode { return agentMentionMode; }
-  function setAgentMentionMode(mode: AgentMentionMode): void { agentMentionMode = mode; }
-  // `model` and `direct` differ only in who starts a not-yet-running agent, so
-  // everything that just asks "are mentions live at all" — the suggestion list,
-  // the steer and resume branches — reads this instead of the mode.
-  function isAgentMentionsEnabled(): boolean { return agentMentionMode !== "off"; }
 
   // Project/global default for writing the subagent .output transcript lives in
   // output-file.ts (both spawn paths read it). A custom agent's
@@ -1377,7 +1119,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
    * batching, the widget/fleet refresh, and the `subagents:created` event.
    *
    * Shared by the subagent_run tool's `resume` + `run_in_background` branch and the
-   * `@handle message` prompt mention — they differ only in how they report the
+   * explicit input resume — they differ only in how they report the
    * outcome. Returns the record, or undefined when the manager refused because
    * the agent is still running (see AgentManager.resume).
    *
@@ -1505,7 +1247,6 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       setScopeModels: setScopeModelsEnabled,
       setStrictAgentFiles: (b) => { strictAgentFiles = b; },
       setDisableDefaultAgents: setDisableDefaultAgents,
-      setAgentMentions: setAgentMentionMode,
       setOutputTranscript: setOutputTranscriptDefault,
       setWorktreeIsolation: setWorktreeIsolationEnabled,
       setWorkflowsEnabled: setWorkflowsEnabled,
@@ -1535,12 +1276,6 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       description: nullableControl(Type.String({
         description: "Required for new agents: a short, specific task description. Set null with resume.",
       })),
-      name: nullableControl(
-        Type.String({
-          description:
-            'Name for a new agent; set null for an automatic name, usable as @name in the input box. Tool messaging/resume uses the real agent_id; execution management uses execution_id. Set null with resume.',
-        }),
-      ),
       subagent_type: nullableControl(Type.String({
         description: `Required non-null for new agents; null with resume. Available types: ${getAvailableTypes().join(", ")}.`,
       })),
@@ -1665,7 +1400,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
                 line += "\n" + theme.fg("dim", `  ${l}`);
               }
               if (resultText.split("\n").length > 50) {
-                line += "\n" + theme.fg("muted", "  ... (use agent_manage action=output with execution_id and verbose for full output)");
+                line += "\n" + theme.fg("muted", "  ... (use agent_manage action=output with agent_id and verbose for full output)");
               }
             }
           } else {
@@ -1778,7 +1513,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       assertActive();
       const thinking = resolvedConfig.thinking;
       const inheritContext = resolvedConfig.inheritContext;
-      const runInBackground = cloneBackgroundParams.has(input) || resolvedConfig.runInBackground;
+      const runInBackground = resolvedConfig.runInBackground;
       const isolated = resolvedConfig.isolated;
       const isolation = resolvedConfig.isolation;
       // Whether this spawn writes its .output transcript. Per-agent
@@ -1988,7 +1723,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
         takeHeldForCall(toolCallId, run.identity);
         assertActive();
         if (outcome.kind === "detached") {
-          return textResult(`Agent resumed in background.\nAgent ID: ${id}\nExecution ID: ${executionId(run.identity, "subagent")}\nThe same session continues; you will be notified when it completes.`,
+          return textResult(`Agent resumed in background.\nAgent ID: ${id}\nThe same session continues; you will be notified when it completes.`,
             { ...detailBaseFor(existing), status: "background" as const, agentId: id, toolUses: existing.toolUses, tokens: "", durationMs: 0 });
         }
         if (outcome.kind !== "completed") return errorResult(`Agent ${id} interrupted.`, buildDetails(detailBaseFor(existing), existing));
@@ -2027,7 +1762,6 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
         // reads to the model as a subagent that ran and reported this (#179).
         id = manager.spawn(pi, ctx, subagentType, params.prompt, {
           description: params.description,
-          name: params.name as string | undefined,
           model,
           maxTurns: effectiveMaxTurns,
           isolated,
@@ -2184,7 +1918,6 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
         assertActive();
         fgId = manager.spawn(pi, ctx, subagentType, params.prompt, {
           description: params.description,
-          name: params.name as string | undefined,
           model,
           maxTurns: effectiveMaxTurns,
           isolated,
@@ -2214,7 +1947,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
         takeHeldForCall(toolCallId, run.identity);
         assertActive();
         if (outcome.kind === "detached") {
-          return textResult(`${fallbackNote}Agent continuing in background.\nAgent ID: ${fgId}\nExecution ID: ${executionId(run.identity, "subagent")}\n` +
+          return textResult(`${fallbackNote}Agent continuing in background.\nAgent ID: ${fgId}\n` +
             (live.outputFile ? `Output file: ${live.outputFile}\n` : "") + "The same execution continues; you will be notified when it completes.",
             { ...detailBaseFor(live), toolUses: live.toolUses, tokens: "", durationMs: 0, status: "background" as const, agentId: fgId });
         }
@@ -2260,11 +1993,9 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
    * folds it into `getSessionStats()`, which is what the footer, the statusline
    * and `/cost` read — so this is the whole of "report usage to the parent".
    *
-   * Nothing is attached to a call with no tool-call id. That is the `@handle`
-   * mention path (`mention-clone.ts`), which invokes this tool from a fork of the
-   * conversation that is discarded moments later: the result never becomes a
-   * message in the real session, so usage hung on it would be spend the user paid
-   * for and nobody counted. Skipping leaves it pending for the next real result.
+   * Nothing is attached to a call with no tool-call id: no real parent-session
+   * tool result exists to persist the usage against, so leave it pending for the
+   * next model-visible result.
    */
   function withUsageReporting<T extends { execute: (...args: any[]) => any }>(tool: T): T {
     return {
@@ -2295,8 +2026,6 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     pi.registerTool(withUsageReporting(tool));
   }
 
-  // The mention path is handed THIS object, not the bare `agentTool` — see the
-  // mention-clone header on why the clone must call the registered tool.
   /** Append messages a foreground wait held to that call's result text. */
   function withHeldMessages<T extends { execute: (...args: any[]) => any }>(tool: T): T {
     return {
@@ -2313,17 +2042,6 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
   }
   const registeredAgentTool = withUsageReporting(withHeldMessages(agentTool));
   pi.registerTool(registeredAgentTool);
-  // Private identity capability: only this dispatcher can force background.
-  // Ordinary model parameters and frontmatter precedence remain unchanged.
-  const cloneAgentTool: typeof registeredAgentTool = {
-    ...registeredAgentTool,
-    execute: async (id, params, ...rest) => {
-      if (!params || typeof params !== "object") throw new Error("Invalid clone Agent parameters");
-      cloneBackgroundParams.add(params);
-      try { return await registeredAgentTool.execute(id, params, ...rest); }
-      finally { cloneBackgroundParams.delete(params); }
-    },
-  };
 
   // ---- Workflow tool ----
 
@@ -2868,7 +2586,6 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       const created = manager.createParentRequest(record.id, params.message);
       if (!created.ok) return errorResult(created.error);
       const { request, identity } = created.value;
-      const exec = executionId(identity, "subagent");
       const marker = `<parent-request request_id="${request.requestId}" reply_tool="reply_to_parent" />`;
       // Waiters exist before the question leaves, so an immediate reply is
       // returned here rather than also delivered as a separate message.
@@ -2886,7 +2603,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
         },
       }) : undefined;
       if (replyWait && lease) void replyWait.promise.then(outcome => { lease.complete(outcome); });
-      const head = (phase: string) => `Question ${phase} to agent ${record.id}.\nRequest ID: ${request.requestId}\nExecution ID: ${exec}`;
+      const head = (phase: string) => `Question ${phase} to agent ${record.id}.\nRequest ID: ${request.requestId}`;
       let phase: "queued" | "sent";
       try { phase = await sendInOrder(record, [params.message, marker]); }
       catch (err) {
@@ -3412,7 +3129,6 @@ Write the file using the write tool. Only write the file, nothing else.`;
       scopeModels: isScopeModelsEnabled(),
       strictAgentFiles,
       disableDefaultAgents: isDefaultsDisabled(),
-      agentMentions: getAgentMentionMode(),
       outputTranscript: getOutputTranscriptDefault(),
       worktreeIsolation: isWorktreeIsolationEnabled(),
       // The user's answer, not the effective one. A stand-down for another
@@ -3582,13 +3298,7 @@ Write the file using the write tool. Only write the file, nothing else.`;
           currentValue: isShowCostEnabled() ? "on" : "off",
           values: ["on", "off"],
         },
-        {
-          id: "agentMentions",
-          label: "Agent mentions",
-          description: "Route `@handle message` at the prompt to that agent. model = an off-screen clone of this conversation calls the subagent_run tool, so the agent gets a context-written prompt, a transcript and per-tool detail, and the chat stays clean; direct = started here from your text, no model call. Messaging and resuming are direct either way.",
-          currentValue: getAgentMentionMode(),
-          values: ["model", "direct", "off"],
-        },
+
       ];
     }
 
@@ -3706,17 +3416,6 @@ Write the file using the write tool. Only write the file, nothing else.`;
         const enabled = value === "on";
         setShowCost(enabled);
         notifyApplied(ctx, `Cost display ${enabled ? "enabled" : "disabled"}`);
-      } else if (id === "agentMentions") {
-        const mode = value as AgentMentionMode;
-        setAgentMentionMode(mode);
-        notifyApplied(
-          ctx,
-          mode === "off"
-            ? "Agent mentions disabled"
-            : mode === "model"
-              ? "Agent mentions on — a conversation clone starts a mentioned agent off-screen"
-              : "Agent mentions on — a mentioned agent starts here, with no model call",
-        );
       }
     }
 

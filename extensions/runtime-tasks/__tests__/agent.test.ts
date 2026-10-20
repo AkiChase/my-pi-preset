@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import "../../agent-tasks/__tests__/source-loader.mjs";
@@ -8,15 +11,20 @@ const { AgentManager } = await import("../../agent-tasks/src/agent-manager.ts");
 const { createAgentManagement } = await import("../../agent-tasks/src/management.ts");
 const { createAgentTaskSource } = await import("../../agent-tasks/src/source.ts");
 const { getAgentConversation } = await import("../../agent-tasks/src/agent-runner.ts");
-const ctx = { cwd: "/tmp" } as ExtensionContext;
+const persistentRoot = join(tmpdir(), `runtime-tasks-agent-${process.pid}.jsonl`);
+writeFileSync(persistentRoot, "{}\n");
+const ctx = { cwd: "/tmp", sessionManager: { getSessionFile: () => persistentRoot } } as unknown as ExtensionContext;
 const pi = {} as ExtensionAPI;
 const tick = async () => { for (let n = 0; n < 12; n++) await Promise.resolve(); };
 function fixture(resumeOnComplete = false) {
   let finish!: (result: RunResult) => void;
   let finishResume!: () => void;
   let runnerOptions!: RunOptions;
+  const sessionDir = mkdtempSync(join(tmpdir(), "runtime-tasks-agent-"));
+  const rootSessionFile = join(sessionDir, "root.jsonl");
+  writeFileSync(rootSessionFile, "{}\n");
   const session = { messages: [{ role: "user", content: "old conversation" }],
-    sessionManager: { getSessionFile: () => undefined }, dispose() {}, steer: async () => {}, subscribe: () => () => {}, getContextUsage: () => undefined,
+    sessionManager: { getSessionFile: () => rootSessionFile }, dispose() {}, steer: async () => {}, subscribe: () => () => {}, getContextUsage: () => undefined,
   } as unknown as AgentSession;
   const coordinator = new TaskCoordinator();
   const manager = new AgentManager(record => {
@@ -45,7 +53,7 @@ function fixture(resumeOnComplete = false) {
   return { manager, source, coordinator, capability, id, session, options: () => runnerOptions,
     finish: () => finish({ session, responseText: "old answer", aborted: false, steered: false }),
     cancelledNotices: () => cancelledNotices,
-    async close() { finishResume?.(); manager.freezeAdmission(); manager.abortAll(); finish({ session, responseText: "cleanup", aborted: true, steered: false }); await tick(); source.dispose(); coordinator.dispose(); await manager.dispose(); },
+    async close() { finishResume?.(); manager.freezeAdmission(); manager.abortAll(); finish({ session, responseText: "cleanup", aborted: true, steered: false }); await tick(); source.dispose(); coordinator.dispose(); await manager.dispose(); rmSync(sessionDir, { recursive: true, force: true }); },
   };
 }
 

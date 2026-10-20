@@ -11,7 +11,7 @@ export function taskKey(identity: TaskIdentity): string {
 
 export type TaskKind = "shell" | "monitor" | "agent" | "workflow";
 export type TaskExecutionMode = "foreground" | "background" | "owned";
-export type TaskStatus = "starting" | "queued" | "running" | "paused" | "completed" | "failed" | "stopped";
+export type TaskStatus = "starting" | "queued" | "running" | "paused" | "completed" | "failed" | "stopped" | "interrupted";
 
 export interface TaskView extends TaskIdentity {
     readonly key: string;

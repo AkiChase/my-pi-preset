@@ -209,7 +209,7 @@ void it("short root/nested rules preserve feature gates, modes, owned lifecycle 
                 const props = Reflect.get(tool.parameters, "properties");
                 assert.equal(Object.hasOwn(props, "isolation"), enabled);
                 assert.equal(Object.hasOwn(props, "schedule"), false);
-                assert.equal(Object.hasOwn(props, "name"), !nested);
+                assert.equal(Object.hasOwn(props, "name"), false);
                 assert.equal(rules.includes("isolation selects Git"), enabled);
                 assert.doesNotMatch(rules, /schedule/i);
                 const legacy = { subagent_type: "general-purpose", description: "later", prompt: "work", schedule: "5m" };
@@ -218,7 +218,8 @@ void it("short root/nested rules preserve feature gates, modes, owned lifecycle 
                 assert.equal(refused.isError, true); assert.match(text(refused), /schedule/);
                 assert.equal(f.calls.length, 0);
                 assert.match(rules, /takes precedence over applicable call parameters/);
-                assert.match(rules, /agent_id.*execution_id/);
+                assert.match(rules, /agent_id/);
+                assert.doesNotMatch(rules, /execution_id/);
                 if (nested) {
                     assert.match(rules, /Nested resume waits inline; run_in_background must be null/);
                     assert.match(rules, /owned children are stopped/);
@@ -488,7 +489,7 @@ void it("blank root steering is refused before lookup, events, queueing or sessi
         }
         record.session = undefined;
         mock.mock.restore();
-        for (const ref of [record.handle!, `exec_not_an_agent`, "unknown-name"]) {
+        for (const ref of [`exec_not_an_agent`, "unknown-name"]) {
             const result = await f.execute("subagent_message", { agent_id: ref, message: "continue" });
             assert.equal(result.isError, true); assert.equal(record.pendingSteers, undefined);
         }

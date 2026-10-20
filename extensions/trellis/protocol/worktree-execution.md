@@ -36,7 +36,7 @@ python3 .trellis/scripts/worktree.py status --task .trellis/tasks/<slug> --json
 { "agent": "trellis-implement", "task": ".trellis/tasks/<slug>", "prompt": "实施已批准范围；只修改指定产品文件" }
 ```
 
-返回稳定 agent ID 与 execution_id；`agent_manage` 使用 execution_id 查询/等待结果，`subagent_message` 使用 agent_id 指导运行中的 Agent。provider 使用已存在的目标目录和 `isolation: off`；不临时创建 worktree，绑定损坏或未准备不回退源目录。父进程一次性 `-e` 不足以保证子会话加载，源/目标或用户 settings 需持久配置 adapter。
+返回稳定完整 `agent_id`；`agent_manage` 使用 `agent_id` 查询/等待结果，`subagent_message` 也使用 `agent_id` 指导运行中的 Agent。workflow 是唯一保留独立 `execution_id` 的管理对象。provider 使用已存在的目标目录和 `isolation: off`；不临时创建 worktree，绑定损坏或未准备不回退源目录。父进程一次性 `-e` 不足以保证子会话加载，源/目标或用户 settings 需持久配置 adapter。
 
 状态按角色报告源材料路径、诊断和已完成检查是否仍新鲜。源要求指纹与执行 checkout 快照只是证据，不证明 agent 实际完整读取，也不代表验收；需求或代码变化可能使旧结果过时。主会话仍须审查报告、实际 diff 和测试。
 

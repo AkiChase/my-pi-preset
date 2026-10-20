@@ -62,8 +62,7 @@ export interface WorkflowHostOptions {
    * The run id every child is stamped with.
    *
    * What makes them the workflow's rather than the session's: stamped children
-   * are filtered out of the fleet list, the widget, the `/agents` menus and
-   * `@handle` resolution, and they take no `maxConcurrent` slot. The run
+   * are filtered out of the fleet list, the widget, the `/agents` menus, and they take no `maxConcurrent` slot. The run
    * reports for them, and it has its own concurrency cap.
    */
   workflowId?: string;

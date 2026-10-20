@@ -27,7 +27,7 @@ function deferred<T>() {
 const tick = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
 const pause = (ms: number) => new Promise<void>(done => setTimeout(done, ms));
 
-async function factory(settings: Record<string, unknown> = {}, extra: AgentManagerDependencies = {}, mentionDependencies?: import("../src/mention-clone.ts").MentionCloneDependencies, host: { send?: (message: { customType: string; content: unknown; details?: NotificationDetails }) => void; exec?: ExtensionAPI["exec"]; flag?: string; localLifecycle?: boolean; onEvent?: (name: string) => void; customAgent?: boolean; ui?: ExtensionToolContext["ui"]; beforeStart?: (coordinator: TaskCoordinator, lifecycle: TaskLifecycle) => void; onSource?: (source: import("../../task-ui/types.ts").TaskSource, lifecycle: TaskLifecycle) => void } = {}) {
+async function factory(settings: Record<string, unknown> = {}, extra: AgentManagerDependencies = {}, host: { send?: (message: { customType: string; content: unknown; details?: NotificationDetails }) => void; exec?: ExtensionAPI["exec"]; flag?: string; localLifecycle?: boolean; onEvent?: (name: string) => void; customAgent?: boolean; ui?: ExtensionToolContext["ui"]; beforeStart?: (coordinator: TaskCoordinator, lifecycle: TaskLifecycle) => void; onSource?: (source: import("../../task-ui/types.ts").TaskSource, lifecycle: TaskLifecycle) => void } = {}) {
   const root = mkdtempSync(join(tmpdir(), "agent-tool-waits-")), cwd = join(root, "cwd"), config = join(root, "agent"), rootSessionFile = join(root, "root.jsonl");
   mkdirSync(cwd); mkdirSync(config); writeFileSync(rootSessionFile, "");
   writeFileSync(join(config, "agent-tasks.json"), JSON.stringify({ outputTranscript: true, defaultJoinMode: "async", ...settings }));
@@ -94,7 +94,7 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
   coordinator.registerSource = value => { source = value; host.onSource?.(value, lifecycle); return register(value); };
   const capabilities: RuntimeTaskCapability[] = [];
   let reporter: ((id: string, result: import("../../runtime-tasks/contracts.ts").RuntimeTaskResult) => import("../../runtime-tasks/contracts.ts").RuntimeTaskResult) | undefined;
-  agentTasks(pi, { coordinator, lifecycle: host.localLifecycle ? undefined : lifecycle, managerDependencies: deps, mentionDependencies, onManagement: c => capabilities.push(c), onManagementResult: r => { reporter = r; } });
+  agentTasks(pi, { coordinator, lifecycle: host.localLifecycle ? undefined : lifecycle, managerDependencies: deps, onManagement: c => capabilities.push(c), onManagementResult: r => { reporter = r; } });
   const facade = createRuntimeTaskFacade(capabilities);
   lifecycle.onClose(facade.close);
   const management = registerManagementTool(pi, "agent", capabilities, (id, result) => reporter?.(id, result) ?? result);
@@ -263,7 +263,7 @@ void it("actual launch detach preserves same run and transcript, later Esc canno
     f.calls[0]!.options.onAssistantUsage?.({ input: 3, output: 2, cacheWrite: 0, cost: 0 });
     assert.equal(f.coordinator.list()[0]?.stats.activity, "read");
     f.calls[0]!.finish("background output"); await tick();
-    const result = await f.execute("agent_manage", { action: "wait", execution_id: executionId({ taskId: row.taskId, runId: "1" }, "subagent")});
+    const result = await f.execute("agent_manage", { action: "wait", agent_id: row.taskId});
     assert.match(text(result), /background output/);
     await pause(260); assert.equal(f.notices.length, 0);
     const resumeParent = new AbortController();
@@ -287,11 +287,11 @@ void it("actual result waits during startup count independently, wait:false peek
     const launch = await f.start(true, { isolation: "worktree" });
     assert.match(text(launch), /background/);
     const row = f.coordinator.list()[0]!;
-    const peek = await f.execute("agent_manage", { action: "output", execution_id: executionId({ taskId: row.taskId, runId: "1" }, "subagent")});
+    const peek = await f.execute("agent_manage", { action: "output", agent_id: row.taskId});
     assert.match(text(peek), /still running/);
     const parent = new AbortController();
-    const a = f.execute("agent_manage", { action: "wait", execution_id: executionId({ taskId: row.taskId, runId: "1" }, "subagent")}, parent.signal);
-    const b = f.execute("agent_manage", { action: "wait", execution_id: executionId({ taskId: row.taskId, runId: "1" }, "subagent")});
+    const a = f.execute("agent_manage", { action: "wait", agent_id: row.taskId}, parent.signal);
+    const b = f.execute("agent_manage", { action: "wait", agent_id: row.taskId});
     await tick(); assert.equal(f.coordinator.list()[0]?.waitCount, 2);
     parent.abort(); await a; assert.equal(f.coordinator.list()[0]?.waitCount, 1);
     startup.resolve({ path: tmpdir(), branch: "fake", baseSha: "fake", workPath: tmpdir() }); await tick();
@@ -311,7 +311,7 @@ void it("actual foreground Esc stops, background result Esc does not, and both n
     assert.equal(f.calls[0]?.options.signal?.aborted, true);
     const background = await f.start(true); assert.match(text(background), /background/);
     const row = f.coordinator.list().find(view => view.status === "running")!;
-    const cancel = new AbortController(), retrieval = f.execute("agent_manage", { action: "wait", execution_id: executionId({ taskId: row.taskId, runId: "1" }, "subagent")}, cancel.signal);
+    const cancel = new AbortController(), retrieval = f.execute("agent_manage", { action: "wait", agent_id: row.taskId}, cancel.signal);
     cancel.abort(); assert.match(text(await retrieval), /cancelled/);
     assert.equal(f.calls[1]?.options.signal?.aborted, false);
     f.calls[1]!.finish(); await tick();
@@ -324,10 +324,10 @@ void it("grouped notices recheck consumed/current runs and preserve one upstream
     await f.start(true); await f.start(true); await pause(130);
     const rows = f.coordinator.list();
     f.calls[0]!.finish("one"); f.calls[1]!.finish("two"); await tick();
-    await f.execute("agent_manage", { action: "wait", execution_id: executionId({ taskId: rows[0]!.taskId, runId: "1" }, "subagent")});
+    await f.execute("agent_manage", { action: "wait", agent_id: rows[0]!.taskId});
     await pause(260);
     assert.equal(f.notices.length, 1); assert.match(String(f.notices[0]?.content), /group completed/);
-    await f.execute("agent_manage", { action: "wait", execution_id: executionId({ taskId: rows[1]!.taskId, runId: "1" }, "subagent")});
+    await f.execute("agent_manage", { action: "wait", agent_id: rows[1]!.taskId});
     assert.equal(f.notices.length, 1);
   } finally { await f.close(); }
 });
@@ -337,7 +337,7 @@ void it("group completion while retrieval is active does not strand sibling noti
   try {
     await f.start(true); await f.start(true); await pause(130);
     const rows = f.coordinator.list(), parent = new AbortController();
-    const retrieval = f.execute("agent_manage", { action: "wait", execution_id: executionId({ taskId: rows[0]!.taskId, runId: "1" }, "subagent")}, parent.signal);
+    const retrieval = f.execute("agent_manage", { action: "wait", agent_id: rows[0]!.taskId}, parent.signal);
     f.calls[0]!.finish("waited"); f.calls[1]!.finish("sibling"); parent.abort();
     await retrieval; await tick(); await pause(260);
     assert.equal(f.notices.length, 1, "whole group closes promptly despite one cancelled wait");
@@ -471,7 +471,7 @@ void it("actual delayed group details retain terminal stats for first/others and
     }
     await pause(130);
     for (let i = 0; i < 3; i++) { f.calls[i]!.options.onTurnEnd?.(i + 2); f.calls[i]!.finish(`answer-${i}`); }
-    await tick(); await f.execute("agent_manage", { action: "wait", execution_id: executionId({ taskId: f.calls[1]!.options.agentId!, runId: "1" }, "subagent")});
+    await tick(); await f.execute("agent_manage", { action: "wait", agent_id: f.calls[1]!.options.agentId!});
     await pause(260); assert.equal(f.notices.length, 1);
     const details = f.notices[0]!.details!;
     const all = [details, ...(details.others ?? [])]; assert.equal(all.length, 2);
@@ -523,7 +523,7 @@ void it("closed actual factory rejects retained tool callbacks before touching r
   const f = await factory();
   try {
     await f.start(true); await f.close();
-    const closed = await f.execute("agent_manage", { action: "wait", execution_id: executionId({ taskId: "stale", runId: "1" }, "subagent") });
+    const closed = await f.execute("agent_manage", { action: "wait", agent_id: "stale" });
     assert.equal(closed.isError, true); assert.match(text(closed), /closing|closed/i);
   } finally { /* close already released this fixture */ }
 });
@@ -564,23 +564,6 @@ void it("injected participant freezes both backends before wait cancellation, dr
   } finally { await f.close(); }
 });
 
-void it("actual factory clone late create cannot fallback or admit an Agent after shutdown", async () => {
-  const created = deferred<Awaited<ReturnType<import("../src/mention-clone.ts").MentionCloneDependencies["createSession"]>>>();
-  let createCalls = 0, prompts = 0;
-  const f = await factory({ agentMentions: "model" }, {}, {
-    createLoader: () => ({ async reload() {} }),
-    async createSession() { createCalls++; return created.promise; },
-  });
-  f.ctx.ui.notify = () => {};
-  f.ctx.getSystemPrompt = () => "offline parent";
-  try {
-    await f.input("@general-purpose do work"); await tick(); assert.equal(createCalls, 1);
-    const close = f.lifecycle.shutdown();
-    created.resolve({ session: { async prompt() { prompts++; }, async abort() {}, dispose() {} } as unknown as AgentSession } as Awaited<ReturnType<import("../src/mention-clone.ts").MentionCloneDependencies["createSession"]>>);
-    await close; await tick(); assert.equal(prompts, 0); assert.equal(f.calls.length, 0); assert.equal(f.notices.length, 0);
-  } finally { await f.close(); }
-});
-
 void it("actual factory shutdown releases queued launch/retrieval and awaited resume without an old notice", async () => {
   const f = await factory({ maxConcurrent: 1, maxConcurrentForeground: 1 });
   try {
@@ -607,7 +590,7 @@ void it("actual factory shutdown releases queued launch/retrieval and awaited re
 void it("actual factory workflow termination drains its in-flight host gate and blocks late journal/notice", { timeout: 10_000 }, async () => {
   const gate = deferred<{ code: number; stdout: string; stderr: string; killed: boolean }>();
   let entered = false, gateSignal: AbortSignal | undefined;
-  const f = await factory({}, {}, undefined, { exec: async (_command, _args, options) => { entered = true; gateSignal = options?.signal; return gate.promise; } });
+  const f = await factory({}, {}, { exec: async (_command, _args, options) => { entered = true; gateSignal = options?.signal; return gate.promise; } });
   try {
     const result = await f.execute("subagent_workflow", { script: 'export const meta = { name: "gate", description: "offline" }; return await agent("test", { gate: "verify" });' });
     for (let n = 0; n < 100 && !f.calls.length; n++) await pause(10);
@@ -625,7 +608,7 @@ void it("actual factory workflow termination drains its in-flight host gate and 
 void it("actual CLI workflow repeated start executes once; shutdown forbids late entry/next-turn delivery", { timeout: 10_000 }, async () => {
   const file = join(mkdtempSync(join(tmpdir(), "workflow-flag-")), "flag.js");
   writeFileSync(file, 'export const meta = { name: "flag", description: "offline" }; log("ready"); await new Promise(() => {});');
-  const f = await factory({}, {}, undefined, { flag: file });
+  const f = await factory({}, {}, { flag: file });
   try {
     await f.repeatStart(); await f.repeatStart(); await pause(60);
     assert.equal(f.source.list().filter(row => row.kind === "workflow").length, 1);
@@ -647,7 +630,7 @@ void it("actual factory shutdown during delayed worktree startup prevents late c
 });
 
 void it("direct actual factory owns one local shutdown handler and rejects old callbacks", async () => {
-  const f = await factory({}, {}, undefined, { localLifecycle: true });
+  const f = await factory({}, {}, { localLifecycle: true });
   try {
     assert.equal(f.shutdownHandlers(), 1); await f.start(true); await f.close();
     await assert.rejects(f.start(true), /closing|closed/); assert.equal(f.coordinator.list().length, 0);
@@ -656,7 +639,7 @@ void it("direct actual factory owns one local shutdown handler and rejects old c
 
 void it("synchronous shutdown from a completion event blocks subsequent entry and held notice", async () => {
   let close: Promise<void> | undefined;
-  const f = await factory({}, {}, undefined, { onEvent(name) { if (name === "subagents:completed") close = f.lifecycle.shutdown(); } });
+  const f = await factory({}, {}, { onEvent(name) { if (name === "subagents:completed") close = f.lifecycle.shutdown(); } });
   try {
     await f.start(true); await tick(); f.calls[0]!.finish("late event"); await tick(); await close;
     await pause(260); assert.equal(f.notices.length, 0); assert.equal(f.coordinator.list().length, 0);
@@ -689,7 +672,7 @@ function terminalUI(onRegister?: () => void, onWidget?: () => void) {
 }
 void it("source publication shutdown cannot recreate terminal input or timers", async t => {
   const timers = ownedTimers(t), terminal = terminalUI();
-  const f = await factory({}, {}, undefined, { ui: terminal.ui, beforeStart(coordinator, lifecycle) { coordinator.subscribe(() => { void lifecycle.shutdown(); }); } });
+  const f = await factory({}, {}, { ui: terminal.ui, beforeStart(coordinator, lifecycle) { coordinator.subscribe(() => { void lifecycle.shutdown(); }); } });
   try {
     await f.lifecycle.shutdown(); await tick();
     assert.equal(terminal.inputs(), 0); assert.equal(timers.size, 0);
@@ -699,13 +682,13 @@ void it("source publication shutdown cannot recreate terminal input or timers", 
 });
 void it("agent factory never registers legacy terminal navigation even with TUI context", async t => {
   const timers = ownedTimers(t), terminal = terminalUI();
-  const f = await factory({}, {}, undefined, { ui: terminal.ui });
+  const f = await factory({}, {}, { ui: terminal.ui });
   try { await f.repeatStart(); await f.lifecycle.shutdown(); await tick(); assert.equal(terminal.inputs(), 0); assert.equal(terminal.unsubscribed(), 0); assert.equal(timers.size, 0); }
   finally { await f.close(); for (const timer of timers) { clearInterval(timer); clearTimeout(timer); } }
 });
 for (const background of [true, false]) void it(`actual ${background ? "background" : "foreground"} starting source listener shutdown rejects without artifact or owner leaks`, async t => {
   const timers = ownedTimers(t), terminal = terminalUI();
-  const f = await factory({ defaultJoinMode: "group" }, {}, undefined, { ui: terminal.ui, onSource(source, lifecycle) {
+  const f = await factory({ defaultJoinMode: "group" }, {}, { ui: terminal.ui, onSource(source, lifecycle) {
     source.subscribe(() => { if (source.list().some(row => row.status === "starting")) void lifecycle.shutdown(); });
   } });
   try {
@@ -714,53 +697,6 @@ for (const background of [true, false]) void it(`actual ${background ? "backgrou
     assert.equal(timers.size, 0, `unreleased owned timer(s): ${[...timers].map(timer => Reflect.get(timer, "_idleTimeout"))}`); assert.equal(terminal.inputs(), 0); assert.equal(f.coordinator.snapshot().length, 0); assert.equal(f.coordinator.waitCount, 0);
     assert.equal(f.notices.length, 0); assert.equal(f.calls.length, 0);
   } finally { await f.close(); for (const timer of timers) { clearInterval(timer); clearTimeout(timer); } }
-});
-
-function cloneTransport(run: (tool: import("@earendil-works/pi-coding-agent").ToolDefinition) => Promise<void>): import("../src/mention-clone.ts").MentionCloneDependencies {
-  return { createLoader: () => ({ async reload() {} }), async createSession(options) {
-    return { session: { async prompt() { await run(options!.customTools![0]!); }, async abort() {}, dispose() {} } as unknown as AgentSession } as Awaited<ReturnType<import("../src/mention-clone.ts").MentionCloneDependencies["createSession"]>>;
-  } };
-}
-void it("actual clone privately overrides custom frontmatter foreground pin, ordinary Agent still honors it", async () => {
-  let invoke!: (tool: import("@earendil-works/pi-coding-agent").ToolDefinition) => Promise<void>;
-  const f = await factory({ agentMentions: "model" }, {}, cloneTransport(tool => invoke(tool)), { customAgent: true });
-  const toasts: string[] = []; f.ctx.ui.notify = message => { toasts.push(message); }; f.ctx.getSystemPrompt = () => "original main system";
-  invoke = async tool => { await tool.execute("clone-id", completeToolCall(tool.parameters, { subagent_type: "custom", description: "clone custom", prompt: "clone work" }), undefined, undefined, f.ctx); };
-  try {
-    await f.input("@custom clone work"); await tick();
-    const row = f.coordinator.list()[0]!;
-    assert.equal(row.executionMode, "background"); assert.equal(f.coordinator.waitCount, 0); assert.equal(f.registry.getRecord(row.taskId)?.resultConsumed, false);
-    f.calls[0]!.finish("clone natural answer"); await tick(); await pause(260);
-    assert.equal(f.notices.length, 1); assert.match(String(f.notices[0]?.content), /clone natural answer/); assert.equal(toasts.filter(toast => toast.startsWith("Could not start")).length, 0);
-    const ordinary = f.start(true, { subagent_type: "custom" }); await tick();
-    assert.equal(f.coordinator.waitCount, 1); assert.equal(f.coordinator.list().find(view => view.status === "running")?.executionMode, "foreground");
-    f.calls[1]!.finish("ordinary inline"); assert.match(text(await ordinary), /ordinary inline/); await pause(260); assert.equal(f.notices.length, 1);
-  } finally { await f.close(); }
-});
-void it("actual clone Agent model refusal reports original text once without fallback admission", async () => {
-  let invoke!: (tool: import("@earendil-works/pi-coding-agent").ToolDefinition) => Promise<void>;
-  const f = await factory({ agentMentions: "model" }, {}, cloneTransport(tool => invoke(tool)));
-  const toasts: { text: string; type?: string }[] = []; f.ctx.ui.notify = (text, type) => { toasts.push({ text, type }); }; f.ctx.getSystemPrompt = () => "main";
-  const known = { provider: "offline", id: "known", name: "Known model" };
-  f.ctx.modelRegistry = { find: () => known, getAll: () => [known], getAvailable: () => [known] } as unknown as ExtensionToolContext["modelRegistry"];
-  invoke = async tool => { await tool.execute("clone-id", completeToolCall(tool.parameters, { subagent_type: "general-purpose", description: "refused", prompt: "work", model: "missing-model" }), undefined, undefined, f.ctx); };
-  try {
-    await f.input("@general-purpose do work"); await tick();
-    assert.equal(f.coordinator.list().length, 0); assert.equal(f.calls.length, 0);
-    assert.deepEqual(toasts.filter(toast => toast.type === "error"), [{ type: "error", text: 'Could not start @general-purpose: Model not found: "missing-model".\n\nAvailable models:\n  offline/known' }]);
-  } finally { await f.close(); }
-});
-void it("clone throwing after admission gives failure feedback but never retries the admitted run", async () => {
-  let invoke!: (tool: import("@earendil-works/pi-coding-agent").ToolDefinition) => Promise<void>;
-  const f = await factory({ agentMentions: "model" }, {}, cloneTransport(tool => invoke(tool)), { onEvent(name) { if (name === "subagents:created") throw new Error("partial admission observer failure"); } });
-  const errors: string[] = []; f.ctx.ui.notify = (text, type) => { if (type === "error") errors.push(text); }; f.ctx.getSystemPrompt = () => "main";
-  invoke = async tool => { await tool.execute("clone-id", completeToolCall(tool.parameters, { subagent_type: "general-purpose", description: "partial", prompt: "work" }), undefined, undefined, f.ctx); };
-  try {
-    await f.input("@general-purpose do work"); await tick();
-    assert.equal(f.calls.length, 1); assert.equal(f.coordinator.list().length, 1);
-    assert.deepEqual(errors, ["Could not start @general-purpose: partial admission observer failure"]);
-    f.calls[0]!.finish("partial run answer"); await tick(); await pause(260); assert.equal(f.notices.length, 1);
-  } finally { await f.close(); }
 });
 
 void it("actual RPC description defaults and strings complete with exactly one notice", async t => {
@@ -823,7 +759,7 @@ void it("actual malformed RPC rejects before record or runner admission and neve
 for (const ui of [false, true]) void it(`notification failure gives only ${ui ? "UI warning" : "safe log"}, preserves result and isolates sinks`, async t => {
   const warnings: unknown[][] = [], toasts: string[] = []; let attempts = 0;
   t.mock.method(console, "warn", (...args: unknown[]) => { warnings.push(args); throw new Error("log sink failed"); });
-  const f = await factory({}, {}, undefined, { send() { if (++attempts === 1) throw new Error("secret payload"); } });
+  const f = await factory({}, {}, { send() { if (++attempts === 1) throw new Error("secret payload"); } });
   f.ctx.hasUI = ui;
   f.ctx.ui.notify = message => { toasts.push(message); throw new Error("UI sink failed"); };
   try {
@@ -837,7 +773,7 @@ for (const ui of [false, true]) void it(`notification failure gives only ${ui ? 
     assert.doesNotMatch(JSON.stringify([warnings, toasts]), /secret payload/);
     assert.deepEqual(f.entries, ["subagents:record"], "no persistent diagnostic entry");
     await pause(250); assert.equal(attempts, 1, "no automatic retry");
-    assert.match(text(await f.execute("agent_manage", { action: "output", execution_id: executionId({ taskId: id, runId: "1" }, "subagent")})), /available result/);
+    assert.match(text(await f.execute("agent_manage", { action: "output", agent_id: id})), /available result/);
     await f.start(true); f.calls[1]!.finish("sibling"); await tick(); await pause(260);
     assert.equal(f.notices.length, 1); assert.match(String(f.notices[0]?.content), /sibling/);
   } finally { await f.close(); }
@@ -856,13 +792,13 @@ void it("notification formatter failure is visible without consuming or marking 
     t.mock.timers.tick(260); await tick();
     assert.equal(warnings.length, 1); assert.equal(record.notificationDelivered, false); assert.equal(record.resultConsumed, false);
     Object.defineProperty(record, "result", { configurable: true, writable: true, value: "answer" });
-    assert.match(text(await f.execute("agent_manage", { action: "output", execution_id: executionId({ taskId: id, runId: "1" }, "subagent")})), /answer/);
+    assert.match(text(await f.execute("agent_manage", { action: "output", agent_id: id})), /answer/);
   } finally { await f.close(); }
 });
 
 void it("individual notification synchronous resume cannot mark the new run delivered", async () => {
   let resumed: Promise<unknown> | undefined;
-  const f = await factory({}, {}, undefined, { send(message) {
+  const f = await factory({}, {}, { send(message) {
     if (!resumed) resumed = f.start(true, { resume: message.details!.id });
   } });
   try {
@@ -880,7 +816,7 @@ void it("shutdown reentered during notification send cannot mark or report an ol
   let closing: Promise<void> | undefined;
   const warnings: unknown[][] = [];
   t.mock.method(console, "warn", (...args: unknown[]) => { warnings.push(args); });
-  const f = await factory({}, {}, undefined, { send() { closing = f.lifecycle.shutdown(); throw new Error("send failed after shutdown"); } });
+  const f = await factory({}, {}, { send() { closing = f.lifecycle.shutdown(); throw new Error("send failed after shutdown"); } });
   try {
     await f.start(true); const record = f.registry.getRecord(f.calls[0]!.options.agentId!)!;
     f.calls[0]!.finish(); await tick(); await pause(260); await closing;
@@ -894,7 +830,7 @@ void it("group notification send failure leaves every result available without r
   const warnings: unknown[][] = [];
   t.mock.method(console, "warn", (...args: unknown[]) => { warnings.push(args); });
   let attempts = 0;
-  const f = await factory({ defaultJoinMode: "group" }, {}, undefined, { send() { attempts++; throw new Error("group sink fault"); } });
+  const f = await factory({ defaultJoinMode: "group" }, {}, { send() { attempts++; throw new Error("group sink fault"); } });
   try {
     await f.start(true); await f.start(true); await pause(130);
     for (const call of f.calls) call.finish("group result");
@@ -905,14 +841,14 @@ void it("group notification send failure leaves every result available without r
       assert.equal(record.notificationDelivered, false); assert.equal(record.resultConsumed, false);
     }
     await pause(250); assert.equal(attempts, 1);
-    for (const call of f.calls) assert.match(text(await f.execute("agent_manage", { action: "output", execution_id: executionId({ taskId: call.options.agentId!, runId: "1" }, "subagent")})), /group result/);
+    for (const call of f.calls) assert.match(text(await f.execute("agent_manage", { action: "output", agent_id: call.options.agentId!})), /group result/);
   } finally { await f.close(); }
 });
 
 
 void it("group send synchronous resume marks only the original submitted runs", async () => {
   let resumed: Promise<unknown> | undefined, resumedId = "";
-  const f = await factory({ defaultJoinMode: "group" }, {}, undefined, { send(message) {
+  const f = await factory({ defaultJoinMode: "group" }, {}, { send(message) {
     if (!resumed) { resumedId = message.details!.id; resumed = f.start(true, { resume: resumedId }); }
   } });
   try {
@@ -1004,18 +940,18 @@ void it("mixed completed stopped and running group reports partial only for genu
   }
 });
 
-void it("actual RPC raw ID interoperates with task_manage without old tool aliases", async () => {
+void it("actual RPC agent_id interoperates with task_manage without old tool aliases", async () => {
   const f = await factory();
   try {
-    const response = new Promise<{ success: boolean; data: { id: string } }>(resolve => f.events.on("subagents:rpc:spawn:reply:description", data => resolve(data as { success: boolean; data: { id: string } })));
+    const response = new Promise<{ success: boolean; data: { agent_id: string } }>(resolve => f.events.on("subagents:rpc:spawn:reply:description", data => resolve(data as { success: boolean; data: { agent_id: string } })));
     f.events.emit("subagents:rpc:spawn", { requestId: "description", type: "general-purpose", prompt: "programmatic", options: { description: "programmatic task", cwd: f.ctx.cwd, isolation: "none" } });
     await tick(); const reply = await response;
-    assert.equal(reply.success, true); assert.equal(reply.data.id, f.calls[0]!.options.agentId);
-    assert.equal(f.registry.getRecord(reply.data.id)?.description, "programmatic task");
+    assert.equal(reply.success, true); assert.equal(reply.data.agent_id, f.calls[0]!.options.agentId);
+    assert.equal(f.registry.getRecord(reply.data.agent_id)?.description, "programmatic task");
     f.calls[0]!.finish("RPC complete"); await tick(); await pause(260);
     assert.equal(f.notices.length, 1); assert.match(String(f.notices[0]!.content), /programmatic task.*completed/);
-    const result = await f.execute("agent_manage", { action: "output", execution_id: executionId({ taskId: reply.data.id, runId: "1" }, "subagent") });
-    assert.match(text(result), /RPC complete/); assert.equal((result.details as import("../../runtime-tasks/tools.ts").ManagementDetails).runtimeManagement.agent_id, reply.data.id);
+    const result = await f.execute("agent_manage", { action: "output", agent_id: reply.data.agent_id });
+    assert.match(text(result), /RPC complete/); assert.equal((result.details as import("../../runtime-tasks/tools.ts").ManagementDetails).runtimeManagement.agent_id, reply.data.agent_id);
     assert.equal(f.tools.has("Agent"), false); assert.equal(f.tools.has("get_subagent_result"), false);
   } finally { await f.close(); }
 });
@@ -1027,13 +963,13 @@ void it("registered task_manage carries pending subagent usage once and leaves d
       await f.start(true);
       const id = f.calls[0]!.options.agentId!;
       f.calls[0]!.options.onAssistantUsage?.({ input: 3, output: 5, cacheRead: 0, cacheWrite: 0, cost: 0.02 });
-      const running = await f.execute("agent_manage", { action: "status", execution_id: executionId({ taskId: id, runId: "1" }, "subagent")});
+      const running = await f.execute("agent_manage", { action: "status", agent_id: id});
       assert.equal(running.usage?.input, reportUsage ? 3 : undefined);
       assert.equal(running.usage?.output, reportUsage ? 5 : undefined);
-      assert.equal((await f.execute("agent_manage", { action: "status", execution_id: executionId({ taskId: id, runId: "1" }, "subagent")})).usage, undefined);
+      assert.equal((await f.execute("agent_manage", { action: "status", agent_id: id})).usage, undefined);
       assert.notEqual(f.registry.getRecord(id)?.resultConsumed, true, "usage reporting does not consume a running result");
       f.calls[0]!.finish("usage answer"); await tick();
-      assert.match(text(await f.execute("agent_manage", { action: "wait", execution_id: executionId({ taskId: id, runId: "1" }, "subagent")})), /usage answer/);
+      assert.match(text(await f.execute("agent_manage", { action: "wait", agent_id: id})), /usage answer/);
     } finally { await f.close(); }
   }
 });
@@ -1120,16 +1056,16 @@ for (const background of [false, true]) void it(`registered ${background ? "back
     assert.ok(!launchConfig.differences?.some(d => d.field === "model"), "normalizing an alias is not an override");
     assert.doesNotMatch(JSON.stringify(launchConfig), /SECRET_PROMPT|settings|auth|sourcePath/);
     assert.match(text(launched), /Execution config/);
-    const handle = executionId({ taskId: id, runId: record.runId! }, "subagent");
+    const agentId = id;
     for (const action of ["status", "output"] as const) {
-      const result = await f.execute("agent_manage", { action, execution_id: handle });
+      const result = await f.execute("agent_manage", { action, agent_id: agentId });
       assert.ok(isManagementDetails(result.details));
       assert.deepEqual((result.details as import("../../runtime-tasks/tools.ts").ManagementDetails).runtimeManagement.executionConfig, record.executionConfig);
       assert.match(text(result), /Execution config.*thinking=off/);
     }
     const updates: unknown[] = [];
     const management = f.tools.get("agent_manage")!;
-    const waiting = management.execute("wait", completeToolCall(management.parameters, { action: "wait", execution_id: handle }), undefined, update => updates.push(update), f.ctx);
+    const waiting = management.execute("wait", completeToolCall(management.parameters, { action: "wait", agent_id: agentId }), undefined, update => updates.push(update), f.ctx);
     if (background) { assert.ok(updates.length); f.calls[0]!.finish("background result"); }
     const result = await waiting;
     assert.ok(isManagementDetails(result.details));

@@ -24,14 +24,14 @@ async function until(predicate: () => boolean) {
   assert.ok(predicate(), "actual session boundary did not settle within 10 seconds");
 }
 const text = (result: { content: { type: string; text?: string }[] }) => result.content.map(block => block.text ?? "").join("\n");
-const meta = (result: unknown) => (result as { details: { runtimeManagement: { error_code?: string; execution_id?: string; count?: number; wait_outcome?: string } } }).details.runtimeManagement;
-const launch = (result: unknown) => (result as { details: { runtimeLaunch: { task_id: string; agent_id: string; execution_id: string } } }).details.runtimeLaunch;
+const meta = (result: unknown) => (result as { details: { runtimeManagement: { error_code?: string; agent_id?: string; execution_id?: string; count?: number; wait_outcome?: string } } }).details.runtimeManagement;
+const launch = (result: unknown) => (result as { details: { runtimeLaunch: { task_id: string; agent_id: string } } }).details.runtimeLaunch;
 
 // Actual SDK session factory, cached jiti resource loader, tool wrappers and
 // manager/runner. Only environment inspection and model prompt are offline seams.
 function fixture(configPatch: Partial<AgentConfig> = {}) {
-  const root = mkdtempSync(join(tmpdir(), "runtime-child-loader-")), agent = join(root, "agent"), cwd = join(root, "cwd"), other = join(root, "other");
-  mkdirSync(agent); mkdirSync(cwd); mkdirSync(other); mkdirSync(join(agent, "agents"));
+  const root = mkdtempSync(join(tmpdir(), "runtime-child-loader-")), agent = join(root, "agent"), cwd = join(root, "cwd"), other = join(root, "other"), rootSessionFile = join(root, "root.jsonl");
+  mkdirSync(agent); mkdirSync(cwd); mkdirSync(other); mkdirSync(join(agent, "agents")); writeFileSync(rootSessionFile, "");
   writeFileSync(join(agent, "settings.json"), JSON.stringify({ extensions: [composition], compaction: { enabled: false } }));
   writeFileSync(join(agent, "agent-tasks.json"), JSON.stringify({ outputTranscript: false }));
   writeFileSync(join(agent, "agents", "leaf.md"), "---\nname: leaf\ndescription: offline leaf\nextensions: false\ntools: none\n---\nReturn the answer.\n");
@@ -43,7 +43,7 @@ function fixture(configPatch: Partial<AgentConfig> = {}) {
   const calls: { session: AgentSession; options: RunOptions; prompt: string; finish(text?: string): void }[] = [];
   const sessions = new Set<AgentSession>();
   const pi = {} as ExtensionAPI;
-  const ctx = { cwd, getSystemPrompt: () => "", modelRegistry: { getAvailable: () => [] }, sessionManager: { getSessionFile: () => undefined } } as unknown as ExtensionContext;
+  const ctx = { cwd, getSystemPrompt: () => "", modelRegistry: { getAvailable: () => [] }, sessionManager: { getSessionFile: () => rootSessionFile } } as unknown as ExtensionContext;
   let owner: RunOptions;
   let completed: ((record: import("../../agent-tasks/src/types.ts").AgentRecord) => void) | undefined;
   const manager = new AgentManager(record => completed?.(record), 4, undefined, undefined, undefined, {
@@ -108,22 +108,22 @@ for (const different of [false, true]) test(`actual retained child composite res
     const siblingSession = f.calls[3]!.session;
     const b = launch(await f.call(siblingSession, "subagent_run", { subagent_type: "leaf", description: "other owned", prompt: "sibling child", run_in_background: true }));
     await until(() => f.calls.length === 5);
-    for (const forbidden of [parent, sibling, b.agent_id]) assert.equal(meta(await f.call(session, "agent_manage", { action: "output", execution_id: executionId({ taskId: forbidden, runId: "1" }, "subagent") })).error_code, "stale");
-    assert.equal(meta(await f.call(siblingSession, "agent_manage", { action: "stop", execution_id: a.execution_id })).error_code, "stale");
+    for (const forbidden of [parent, sibling, b.agent_id]) assert.equal(meta(await f.call(session, "agent_manage", { action: "output", agent_id: forbidden })).error_code, "stale");
+    assert.equal(meta(await f.call(siblingSession, "agent_manage", { action: "stop", agent_id: a.agent_id })).error_code, "stale");
     const local = launch(await f.call(session, "bash", { command: "printf CHILD_LOCAL", background_after_seconds: 0 }));
     assert.match(text(await f.call(session, "process_manage", { action: "wait", task_id: local.task_id })), /CHILD_LOCAL/);
     assert.equal(meta(await f.call(siblingSession, "process_manage", { action: "output", task_id: local.task_id })).error_code, "not_found");
     f.onComplete(record => { if (record.id === a.agent_id && record.runId === "1") f.manager.resumeRun(a.agent_id, "nested resumed"); });
-    const waiting = f.call(session, "agent_manage", { action: "wait", execution_id: a.execution_id });
+    const waiting = f.call(session, "agent_manage", { action: "wait", agent_id: a.agent_id });
     f.calls[2]!.finish("nested final answer");
     const oldAnswer = await waiting;
-    assert.match(text(oldAnswer), /nested final answer/); assert.equal(meta(oldAnswer).execution_id, a.execution_id);
+    assert.match(text(oldAnswer), /nested final answer/); assert.equal(meta(oldAnswer).agent_id, a.agent_id);
     await until(() => f.calls.length === 6);
     assert.equal(f.manager.getRun(a.agent_id)?.identity.runId, "2");
     assert.equal(f.manager.getRecord(a.agent_id)?.resultConsumed, false, "old waiter cannot consume new child run");
     f.onComplete(undefined); f.calls[5]!.finish("nested second answer"); await until(() => !f.manager.isRunActive(a.agent_id));
-    assert.match(text(await f.call(session, "agent_manage", { action: "output", execution_id: executionId({ taskId: a.agent_id, runId: "2" }, "subagent") })), /nested second answer/);
-    const stopped = await f.call(siblingSession, "agent_manage", { action: "stop", execution_id: b.execution_id });
+    assert.match(text(await f.call(session, "agent_manage", { action: "output", agent_id: a.agent_id })), /nested second answer/);
+    const stopped = await f.call(siblingSession, "agent_manage", { action: "stop", agent_id: b.agent_id });
     assert.match(text(stopped), /Stop requested/);
     assert.equal(f.manager.getRecord(parent)?.status, "running");
     assert.equal(f.manager.getRecord(sibling)?.status, "running");
@@ -131,7 +131,7 @@ for (const different of [false, true]) test(`actual retained child composite res
     // admit children through the same tool but cannot be consumed by this wait.
     const oldChild = launch(await f.call(session, "subagent_run", { subagent_type: "leaf", description: "old waiter", prompt: "old waiter", run_in_background: true }));
     await until(() => f.calls.length === 7);
-    const oldWait = f.call(session, "agent_manage", { action: "wait", execution_id: oldChild.execution_id });
+    const oldWait = f.call(session, "agent_manage", { action: "wait", agent_id: oldChild.agent_id });
     f.onComplete(record => { if (record.id === parent && record.runId === "2") f.manager.resumeRun(parent, "third"); });
     f.calls[1]!.finish("resume complete"); await until(() => f.calls.length === 8);
     f.onComplete(undefined);
@@ -139,10 +139,10 @@ for (const different of [false, true]) test(`actual retained child composite res
     await until(() => f.calls.length === 9);
     const stale = await oldWait;
     assert.equal(meta(stale).error_code, "closed", "operation captured owner run 2, not the resumed owner");
-    assert.equal(meta(stale).execution_id, oldChild.execution_id);
+    assert.equal(meta(stale).agent_id, oldChild.agent_id);
     assert.equal(f.manager.getRecord(newer.agent_id)?.resultConsumed, false);
     assert.match(text(await f.call(session, "agent_manage", { action: "list" })), new RegExp(newer.agent_id));
-    assert.match(text(await f.call(session, "agent_manage", { action: "stop", execution_id: newer.execution_id })), /Stop requested/);
+    assert.match(text(await f.call(session, "agent_manage", { action: "stop", agent_id: newer.agent_id })), /Stop requested/);
     assert.equal(f.manager.getRecord(sibling)?.status, "running", "resumed owner's stop cannot stop sibling parent");
     await shutdownChildSession(session);
     assert.equal(f.calls[0]!.options.nestedRuntime?.management!(new (await import("../../task-ui/coordinator.ts")).TaskCoordinator()).list().length, 0, "closed retained session cannot revive branch");
@@ -183,17 +183,17 @@ for (const mode of ["noExtensions", "excluded", "deny", "isolated", "nestedOff",
       return;
     }
     const child = launch(result); await until(() => f.calls.length === 2);
-    assert.equal(meta(await f.call(session, "agent_manage", { action: "output", execution_id: executionId({ taskId: "root-or-sibling", runId: "1" }, "subagent") })).error_code, "stale");
+    assert.equal(meta(await f.call(session, "agent_manage", { action: "output", agent_id: "root-or-sibling" })).error_code, "stale");
     f.calls[1]!.finish("owned only final");
-    assert.match(text(await f.call(session, "agent_manage", { action: "wait", execution_id: child.execution_id })), /owned only final/);
+    assert.match(text(await f.call(session, "agent_manage", { action: "wait", agent_id: child.agent_id })), /owned only final/);
     const localList = text(await f.call(session, "agent_manage", { action: "list" }));
     assert.doesNotMatch(localList, /task_type=bash|task_type=monitor/);
     if (mode === "noExtensions" || mode === "excluded") {
       const next = launch(await f.call(session, "subagent_run", { subagent_type: "leaf", description: "stop owned only", prompt: "stop owned only", run_in_background: true }));
-      assert.match(text(await f.call(session, "agent_manage", { action: "stop", execution_id: next.execution_id })), /Stop requested/);
+      assert.match(text(await f.call(session, "agent_manage", { action: "stop", agent_id: next.agent_id })), /Stop requested/);
       const retainedTool = session.agent.state.tools.find(tool => tool.name === "agent_manage")!;
       await shutdownChildSession(session);
-      assert.equal(meta(await retainedTool.execute("late", { action: "list", execution_id: null, kind: null, verbose: null }, undefined)).error_code, "closed", "closed owned-only facade cannot revive");
+      assert.equal(meta(await retainedTool.execute("late", { action: "list", agent_id: null, execution_id: null, kind: null, verbose: null }, undefined)).error_code, "closed", "closed owned-only facade cannot revive");
     }
   } finally { await f.close(); }
 });

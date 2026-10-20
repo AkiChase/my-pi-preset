@@ -1,5 +1,4 @@
 import { copyAgentExecutionConfig, agentExecutionSummary } from "../../runtime-tasks/execution-config.ts";
-import { executionId } from "../../runtime-tasks/execution-id.ts";
 import type { RuntimeTaskCapability } from "../../runtime-tasks/facade.ts";
 import { taskResult as runtimeResult, type RuntimeTaskMetadata } from "../../runtime-tasks/contracts.ts";
 import type { AgentManager } from "./agent-manager.ts";
@@ -52,24 +51,24 @@ export function createAgentManagement(options: {
       if (params.action === "stop") {
         if (!currentTarget()) return taskResult("Subagent run is no longer available.", { ...meta(), error_code: "stale" });
         const requested = manager.stopRun(identity);
-        return taskResult(`kind=subagent agent_id=${identity.taskId} execution_id=${executionId({ taskId: identity.taskId, runId: identity.runId }, "subagent")}\nStop ${requested ? "requested" : "not needed"}; observed status=${record.status}. Cancellation is cooperative; actual execution may still be draining.`, { ...meta({ ...record }) });
+        return taskResult(`kind=subagent agent_id=${identity.taskId}\nStop ${requested ? "requested" : "not needed"}; observed status=${record.status}. Cancellation is cooperative; actual execution may still be draining.`, { ...meta({ ...record }) });
       }
       if (params.action === "output") {
         const snapshot = record.status === "running" || record.status === "queued" ? record : await run.terminal;
         if (!options.active()) return taskResult("Subagent activation is closed.", { ...meta(snapshot), error_code: "closed" });
         const text = options.format(snapshot, params.verbose);
         if (currentTarget() && manager.consumeRun(identity) && currentTarget()) options.cancelNotice(record.id);
-        return taskResult(`kind=subagent agent_id=${record.id} execution_id=${executionId({ taskId: record.id, runId: identity.runId }, "subagent")}\n${text}`, meta(snapshot));
+        return taskResult(`kind=subagent agent_id=${record.id}\n${text}`, meta(snapshot));
       }
       if (params.action !== "wait") return taskResult("Unsupported subagent action.", { ...meta(), error_code: "unsupported" });
       const lease = registerAgentWait(manager, coordinator, run, "retrieval", signal, () => { if (currentTarget()) options.reconsider(record); }, currentTarget);
       try {
-        if (!lease.settled) try { onUpdate?.(taskResult(`execution_id=${executionId(identity, "subagent")}\nWaiting for subagent final answer.`, { ...meta(), wait_outcome: "waiting" })); } catch { /* optional presentation sink */ }
+        if (!lease.settled) try { onUpdate?.(taskResult("Waiting for subagent final answer.", { ...meta(), wait_outcome: "waiting" })); } catch { /* optional presentation sink */ }
         const outcome = await lease.result;
         if (!options.active()) return taskResult("Subagent activation is closed.", { ...meta(), error_code: "closed", wait_outcome: "cancelled" });
-        if (outcome.kind !== "completed") return taskResult(`execution_id=${executionId(identity, "subagent")}\nWait ${outcome.kind === "detached" ? "released" : "cancelled"}; target unchanged.`, { ...meta(), wait_outcome: outcome.kind === "detached" ? "released" : "cancelled" });
+        if (outcome.kind !== "completed") return taskResult(`Wait ${outcome.kind === "detached" ? "released" : "cancelled"}; target unchanged.`, { ...meta(), wait_outcome: outcome.kind === "detached" ? "released" : "cancelled" });
         if (currentTarget()) options.cancelNotice(record.id);
-        return taskResult(`kind=subagent agent_id=${record.id} execution_id=${executionId({ taskId: record.id, runId: identity.runId }, "subagent")}\n${options.format(outcome.value, params.verbose)}`, { ...meta(outcome.value), wait_outcome: "completed" });
+        return taskResult(`kind=subagent agent_id=${record.id}\n${options.format(outcome.value, params.verbose)}`, { ...meta(outcome.value), wait_outcome: "completed" });
       } finally { if (!lease.settled) lease.dispose(); }
     },
   };

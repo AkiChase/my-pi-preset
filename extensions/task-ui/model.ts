@@ -2,7 +2,7 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { TaskView } from "./types.ts";
 
 export const FINISHED_LINGER_MS = 4_000;
-export const isTerminal = (view: TaskView): boolean => ["completed", "failed", "stopped"].includes(view.status);
+export const isTerminal = (view: TaskView): boolean => ["completed", "failed", "stopped", "interrupted"].includes(view.status);
 export interface TaskRow {
     readonly view: TaskView; readonly depth: number; readonly group: boolean;
     readonly prefix?: string; readonly descendantCount?: number;

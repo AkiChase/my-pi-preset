@@ -129,9 +129,9 @@ try {
     assertChild(child, rootExt, "composite child");
     const ext = child.extensions[0], manage = ext.tools.get("agent_manage").definition;
     const ctx = { cwd, hasUI: false, ui: { setStatus() {}, setWidget() {}, notify() {}, theme: { fg: (_c, t) => t } } };
-    const call = (args) => manage.execute("probe", { execution_id: null, kind: null, verbose: null, ...args }, undefined, undefined, ctx);
+    const call = (args) => manage.execute("probe", { agent_id: null, execution_id: null, kind: null, verbose: null, ...args }, undefined, undefined, ctx);
     assert.match((await call({ action: "list" })).content[0].text, /agent_id=owned/);
-    assert.equal((await call({ action: "output", execution_id: "exec_" + Buffer.from(JSON.stringify(["root-or-sibling", "1"])).toString("base64url") })).details.runtimeManagement.error_code, "stale");
+    assert.equal((await call({ action: "output", agent_id: "root-or-sibling" })).details.runtimeManagement.error_code, "stale");
     const launch = await ext.tools.get("bash").definition.execute("local", bashInput({ command: "printf CHILD", background_after_seconds: 0 }), undefined, undefined, ctx);
     const identity = launch.details.runtimeLaunch;
     assert.match(launch.content[0].text, new RegExp(`task_id=${identity.task_id}`));
@@ -139,7 +139,7 @@ try {
     const keepalive = setTimeout(() => {}, 5000);
     try { assert.match((await ext.tools.get("process_manage").definition.execute("local", processInput({ action: "wait", task_id: identity.task_id }), undefined, undefined, ctx)).content[0].text, /CHILD/); }
     finally { clearTimeout(keepalive); }
-    assert.match((await call({ action: "output", execution_id: "exec_" + Buffer.from(JSON.stringify(["owned", "1"])).toString("base64url") })).content[0].text, /owned answer/);
+    assert.match((await call({ action: "output", agent_id: "owned" })).content[0].text, /owned answer/);
     await close(child);
     assert.equal((await call({ action: "list" })).details.runtimeManagement.error_code, "closed");
     assert.equal(globalThis[registryKey], ownedRegistry, "child facade close never disposes root");

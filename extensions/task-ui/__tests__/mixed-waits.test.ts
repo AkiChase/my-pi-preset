@@ -3,7 +3,7 @@ const layout = await loadNativeLayout();
 import { bashInput } from "../../process-tasks/__tests__/bash-input.ts";
 import { processInput } from "../../runtime-tasks/__tests__/process-input.ts";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { it } from "node:test";
@@ -28,6 +28,8 @@ const { createAgentTaskSource } = await import("../../agent-tasks/src/source.ts"
 
 void it("one shared /task-detach releases mixed shell/agent launch and retrieval waits without replacing execution", { timeout: 10_000 }, async () => {
     const dir = mkdtempSync(join(tmpdir(), "mixed-task-waits-"));
+    const rootSessionFile = join(dir, "root.jsonl");
+    writeFileSync(rootSessionFile, "");
     const coordinator = new TaskCoordinator();
     const reg = new BackgroundRegistry({ ...DEFAULTS, logDir: dir }, coordinator);
     const tools = new Map<string, Parameters<ExtensionAPI["registerTool"]>[0]>();
@@ -35,8 +37,8 @@ void it("one shared /task-detach releases mixed shell/agent launch and retrieval
     // These partial SDK surfaces are the offline boundary; no host/model session is started.
     const pi = { registerTool: (tool: Parameters<ExtensionAPI["registerTool"]>[0]) => tools.set(tool.name, tool),
         sendMessage: (message: unknown) => messages.push(message) } as unknown as ExtensionAPI;
-    const ctx = { cwd: dir, ui: { notify() {}, setWidget() {}, setStatus() {}, theme: { fg: (_color: string, text: string) => text } } } as unknown as ExtensionToolContext;
-    const session = { messages: [], sessionManager: { getSessionFile: () => undefined },
+    const ctx = { cwd: dir, sessionManager: { getSessionFile: () => rootSessionFile }, ui: { notify() {}, setWidget() {}, setStatus() {}, theme: { fg: (_color: string, text: string) => text } } } as unknown as ExtensionToolContext;
+    const session = { messages: [], sessionManager: { getSessionFile: () => rootSessionFile },
         dispose() {}, subscribe: () => () => {}, getContextUsage: () => undefined } as unknown as AgentSession;
     let finish!: (result: RunResult) => void;
     const terminal = new Promise<RunResult>(resolve => { finish = resolve; });

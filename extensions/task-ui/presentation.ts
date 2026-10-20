@@ -11,7 +11,7 @@ export const taskOneLine = (text: string): string => cleanTaskText(text).replace
 /** Process descriptions carry commands, whereas Agent descriptions carry delegated prose. */
 export function taskTitle(view: TaskView): string {
     const candidates = view.kind === "agent" || view.kind === "workflow"
-        ? [view.description, view.title] : [view.title, view.description];
+        ? [view.title, view.description] : [view.title, view.description];
     for (const value of candidates) {
         const text = taskOneLine(value ?? "");
         if (text) return text;
@@ -29,6 +29,7 @@ export function taskDot(view: TaskView, frame?: number): string {
         case "completed": return "✓";
         case "failed": return "✕";
         case "stopped": return "■";
+        case "interrupted": return "!";
     }
 }
 export function taskStatusColor(view: TaskView): Parameters<Theme["fg"]>[0] {
@@ -39,6 +40,7 @@ export function taskStatusColor(view: TaskView): Parameters<Theme["fg"]>[0] {
         case "completed": return "success";
         case "failed": return "error";
         case "stopped": return "dim";
+        case "interrupted": return "warning";
     }
 }
 export function taskDuration(view: TaskView, now = Date.now()): string | undefined {

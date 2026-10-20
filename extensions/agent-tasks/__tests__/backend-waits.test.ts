@@ -106,14 +106,16 @@ void it("nested actual delegation ignores legacy turn budgets and keeps user def
     assert.equal(f.manager.getRecord(f.calls[0]!.id)?.invocation?.maxTurns, 7);
     f.calls[0]!.finish();
     const launchResult = await launch;
-    assert.match(launchResult.content.map(block => block.type === "text" ? block.text : "").join(""), new RegExp(`agent_id=${f.calls[0]!.id} execution_id=exec_`));
+    assert.match(launchResult.content.map(block => block.type === "text" ? block.text : "").join(""), new RegExp(`agent_id=${f.calls[0]!.id}`));
+    assert.doesNotMatch(launchResult.content.map(block => block.type === "text" ? block.text : "").join(""), /execution_id=/);
     setDefaultMaxTurns(9);
     const resume = tool.execute("nested-resume", completeToolCall(tool.parameters, { prompt: "test", resume: f.calls[0]!.id }), undefined, undefined, f.ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext); await tick();
     assert.equal(f.resumes[0]!.options?.maxTurns, 9);
     assert.equal(f.manager.getRecord(f.calls[0]!.id)?.invocation?.maxTurns, 9);
     f.resumes[0]!.finish();
     const resumedResult = await resume;
-    assert.match(resumedResult.content.map(block => block.type === "text" ? block.text : "").join(""), new RegExp(`agent_id=${f.calls[0]!.id} execution_id=exec_`));
+    assert.match(resumedResult.content.map(block => block.type === "text" ? block.text : "").join(""), new RegExp(`agent_id=${f.calls[0]!.id}`));
+    assert.doesNotMatch(resumedResult.content.map(block => block.type === "text" ? block.text : "").join(""), /execution_id=/);
   } finally { await f.close(); setDefaultMaxTurns(undefined); }
 });
 
@@ -578,7 +580,8 @@ void it("nested background startup failure retains launch identity and resolved 
     const { isLaunchMetadata } = await import("../../runtime-tasks/launch.ts");
     assert.ok(isLaunchMetadata(details.runtimeLaunch));
     const content = result.content.map(block => block.type === "text" ? block.text : "").join("\n");
-    assert.match(content, /execution_id=exec_.*\nExecution config \(pending session confirmation\)/);
+    assert.match(content, /kind=subagent agent_id=.*\nExecution config \(pending session confirmation\)/);
+    assert.doesNotMatch(content, /execution_id=/);
     assert.doesNotMatch(JSON.stringify(details), /PRIVATE_PROMPT|prompt|settings|auth/);
     assert.equal(f.calls.length, 0);
     await f.manager.drainExecution(); assert.equal(f.manager.executionCount, 0);
@@ -680,7 +683,8 @@ void it("nested questions use the mailbox and deliver notices/replies only to th
     const asked = await tool.execute("nested-notify", completeToolCall(tool.parameters, { agent_id: childId, message: "where?", reply: "notify" }), undefined, undefined, f.ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext);
     const askedText = asked.content.map(block => block.type === "text" ? block.text : "").join("\n");
     const requestId = /Request ID: (req_\w+)/.exec(askedText)![1]!;
-    assert.match(askedText, /Execution ID: exec_/);
+    assert.doesNotMatch(askedText, /Execution ID:/);
+    assert.match(askedText, new RegExp(childId));
     assert.deepEqual(steers, ["where?", `<parent-request request_id="${requestId}" reply_tool="reply_to_parent" />`]);
     assert.equal(parent.status, "running"); assert.equal(parent.runId, f.manager.getRecord(parentId)!.runId); assert.ok(parent.session);
     const channel = f.calls.find(call => call.id === childId)!.options.parentChannel!;

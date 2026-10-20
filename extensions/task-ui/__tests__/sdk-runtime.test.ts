@@ -30,6 +30,8 @@ interface Tool {
 void it("actual SDK runtime new/resume/fork/import/quit creates fresh factories; canceled/invalid switch keeps old activation usable", { timeout: 20_000 }, async () => {
     const dir = mkdtempSync(join(tmpdir(), "task-sdk-runtime-"));
     const agentDir = join(dir, "agent");
+    const rootSessionFile = join(dir, "root.jsonl");
+    writeFileSync(rootSessionFile, "");
     const activations: { lifecycle: TaskLifecycle }[] = [];
     const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
     process.env.PI_CODING_AGENT_DIR = agentDir;
@@ -38,6 +40,7 @@ void it("actual SDK runtime new/resume/fork/import/quit creates fresh factories;
     const order: string[] = [];
     let cancelSwitch = false;
     function activate(sessionManager: SessionManager) {
+        if (!sessionManager.getSessionFile()) Object.defineProperty(sessionManager, "getSessionFile", { value: () => rootSessionFile });
         const coordinator = new TaskCoordinator(), lifecycle = new TaskLifecycle(coordinator);
         const tools = new Map<string, Tool>();
         const messages: unknown[] = [];
@@ -60,7 +63,9 @@ void it("actual SDK runtime new/resume/fork/import/quit creates fresh factories;
                 agentRuns++;
                 let resolve!: (value: RunResult) => void;
                 const work = new Promise<RunResult>(done => { resolve = done; });
-                const session = { messages: [], sessionManager: { getSessionFile: () => undefined }, subscribe: () => () => {}, dispose() {}, getContextUsage: () => undefined } as unknown as AgentSession;
+                const childSessionFile = join(dir, `child-${agentRuns}.jsonl`);
+                writeFileSync(childSessionFile, "");
+                const session = { messages: [], sessionManager: { getSessionFile: () => childSessionFile }, subscribe: () => () => {}, dispose() {}, getContextUsage: () => undefined } as unknown as AgentSession;
                 queueMicrotask(() => options.onSessionCreated?.(session));
                 options.signal?.addEventListener("abort", () => { agentStops++; resolve({ session, responseText: "stopped", aborted: true, steered: false }); }, { once: true });
                 return work;
@@ -167,6 +172,8 @@ void it("actual SDK AgentSession.reload invokes old shutdown before activation r
     const { AgentSession } = await import("@earendil-works/pi-coding-agent");
     const { processActivation } = await import("../../process-tasks/__tests__/process-harness.ts");
     const dir = mkdtempSync(join(tmpdir(), "task-sdk-reload-"));
+    const rootSessionFile = join(dir, "root.jsonl");
+    writeFileSync(rootSessionFile, "");
     const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
     process.env.PI_CODING_AGENT_DIR = join(dir, "agent");
     let agentStops = 0;
@@ -180,12 +187,14 @@ void it("actual SDK AgentSession.reload invokes old shutdown before activation r
         } as unknown as ExtensionAPI;
         agentTasks(pi, { coordinator: backend.coordinator, lifecycle: backend.lifecycle, managerDependencies: {
             runAgent: async (_ctx, _type, _prompt, options) => {
-                const session = { messages: [], sessionManager: { getSessionFile: () => undefined }, subscribe: () => () => {}, dispose() {} } as unknown as AgentSession;
+                const childSessionFile = join(dir, "child.jsonl");
+                writeFileSync(childSessionFile, "");
+                const session = { messages: [], sessionManager: { getSessionFile: () => childSessionFile }, subscribe: () => () => {}, dispose() {} } as unknown as AgentSession;
                 options.onSessionCreated?.(session);
                 return await new Promise<RunResult>(resolve => { options.signal?.addEventListener("abort", () => { agentStops++; resolve({ session, responseText: "stopped", aborted: true, steered: false }); }, { once: true }); });
             },
         } });
-        Object.assign(backend.context, { sessionManager: SessionManager.inMemory(dir), modelRegistry: {}, mode: "print" });
+        Object.assign(backend.context, { sessionManager: { getSessionId: () => "offline-reload", getSessionFile: () => rootSessionFile }, modelRegistry: {}, mode: "print" });
         void callbacks.get("session_start")?.({}, backend.context);
         return backend;
     }

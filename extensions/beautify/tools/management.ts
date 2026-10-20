@@ -7,17 +7,17 @@ export function managementContract(group: ManagementGroup): RetrievalContract {
     let args = input;
     try { args = (group === "agent" ? parseAgentManagementParams(input) : parseProcessManagementParams(input)) as unknown as typeof input; }
     catch { return undefined; }
-    const id = args.task_id ?? args.execution_id;
+    const id = args.task_id ?? args.agent_id ?? args.execution_id;
     const title = `${args.action}${id ? ` ${id}` : ""}`;
     if (!result) return { title, stats: args.action === "wait" ? "waiting" : "" };
     if (!isManagementDetails(result.details)) return undefined;
     const m = (result.details as ManagementDetails).runtimeManagement;
-    const execution = parseExecutionId(m.execution_id);
-    if (m.agent_id !== undefined && (m.kind !== "subagent" || execution?.taskId !== m.agent_id)) return undefined;
+    const execution = m.execution_id === undefined ? undefined : parseExecutionId(m.execution_id);
+    if (m.agent_id !== undefined && (m.kind !== "subagent" || m.execution_id !== undefined)) return undefined;
     if (m.kind !== undefined && m.execution_id !== undefined &&
         (m.kind === "workflow") !== m.execution_id.startsWith("wf_")) return undefined;
     if (!m || m.version !== 2 || m.group !== group || m.action !== args.action ||
-        (id !== undefined && (m.task_id ?? m.execution_id) !== undefined && (m.task_id ?? m.execution_id) !== id) ||
+        (id !== undefined && (m.task_id ?? m.agent_id ?? m.execution_id) !== undefined && (m.task_id ?? m.agent_id ?? m.execution_id) !== id) ||
         (ctx.isPartial && (m.action !== "wait" || m.wait_outcome !== "waiting")) || (!ctx.isPartial && m.wait_outcome === "waiting")) return undefined;
     let stats = m.error_code ?? m.raw_status ?? m.status ?? "";
     if (m.action === "list") stats = `${m.count ?? 0} tasks`;
@@ -30,7 +30,7 @@ export function managementContract(group: ManagementGroup): RetrievalContract {
       ...(m.range ? ["Log range (bytes)", ...Object.entries(m.range).map(([key, value]) => `  ${key}: ${value}`)] : []),
       ...(m.stats && Object.keys(m.stats).length ? ["Statistics", ...Object.entries(m.stats).map(([key, value]) => `  ${key}: ${value}`)] : []),
     ] : [];
-    return { expandedRows, title: m.title?.trim() ? `${args.action} · ${m.title}` : title, stats, secondary: [m.task_type ?? m.kind, m.task_id ?? m.execution_id].filter(Boolean).join(" · "),
+    return { expandedRows, title: m.title?.trim() ? `${args.action} · ${m.title}` : title, stats, secondary: [m.task_type ?? m.kind, m.task_id ?? m.agent_id ?? m.execution_id].filter(Boolean).join(" · "),
       ...(m.executionConfig ? { executionConfig: copyExecutionConfig(m.executionConfig) } : {}) };
   };
 }

@@ -2,7 +2,6 @@ import { copyAgentExecutionConfig, agentExecutionSummary } from "../../runtime-t
 import { nullableControl } from "../../shared/tool-arguments.ts";
 import { createToolCallHeading } from "../../beautify/tool-call-heading.ts";
 import { launchMetadata, launchText } from "../../runtime-tasks/launch.ts";
-import { executionId } from "../../runtime-tasks/execution-id.ts";
 import type { Model } from "@earendil-works/pi-ai";
 import {
   type AgentSession,
@@ -191,9 +190,9 @@ function createNestedDelivery(manager: NestedAgentManager, parentAgentId: string
     // alter its acceptance result.
     void parent.session!.sendCustomMessage({
       customType: SUBAGENT_MESSAGE_TYPE,
-      content: formatSubagentMessages(child.id, messages[0]!.runId, messages),
+      content: formatSubagentMessages(child.id, messages),
       display: false,
-      details: { agentId: child.id, executionId: executionId({ taskId: child.id, runId: messages[0]!.runId }, "subagent"), messages: messages.map(message => ({ requestId: message.requestId, seq: message.seq })) },
+      details: { agentId: child.id, messages: messages.map(message => ({ requestId: message.requestId, seq: message.seq })) },
     }, { triggerTurn: true, deliverAs: "steer" }).catch(() => {});
   };
   const release = (record: AgentRecord, runId: string) => {
@@ -579,7 +578,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
       const nestedDelivery = deliveryFor();
       const marker = `<parent-request request_id="${request.requestId}" reply_tool="reply_to_parent" />`;
       const waiter = params.reply === "wait" ? record.mailbox!.waitForReply(request.requestId) : undefined;
-      const headline = (state: string) => `Question ${state} for nested agent ${record.id}.\nRequest ID: ${request.requestId}\nExecution ID: ${executionId({ taskId: record.id, runId }, "subagent")}`;
+      const headline = (state: string) => `Question ${state} for nested agent ${record.id}.\nRequest ID: ${request.requestId}`;
       if (waiter) nestedDelivery.hold(record, runId);
       let state: "queued" | "sent";
       try { state = await sendInOrder(record, [params.message, marker], runId); }

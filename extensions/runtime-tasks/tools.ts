@@ -18,13 +18,16 @@ export function isManagementDetails(value: unknown): value is ManagementDetails 
   if (v.group === "process" && ["execution_id", "kind", "agent_id"].some(k => v[k] !== undefined)) return false;
   if (v.group === "agent" && ["task_id", "task_type", "range"].some(k => v[k] !== undefined)) return false;
   for (const k of ["task_id", "agent_id", "title", "raw_status", "error_code"]) if (v[k] !== undefined && typeof v[k] !== "string") return false;
+  if (v.group === "agent" && v.kind === "subagent" && v.execution_id !== undefined) return false;
+  if (v.group === "agent" && v.kind === "workflow" && v.agent_id !== undefined) return false;
+  if (v.group === "agent" && v.execution_id !== undefined && (v.kind !== "workflow" || !String(v.execution_id).startsWith("wf_"))) return false;
   if (v.execution_id !== undefined && !parseExecutionId(v.execution_id)) return false;
   if (v.task_type !== undefined && !TASK_LOG_TYPES.includes(v.task_type as "bash")) return false;
   if (v.kind !== undefined && v.kind !== "subagent" && v.kind !== "workflow") return false;
   if (v.wait_outcome !== undefined && (v.action !== "wait" || !["waiting", "completed", "released", "cancelled"].includes(String(v.wait_outcome)))) return false;
   if (v.status !== undefined && !["starting", "queued", "running", "paused", "completed", "failed", "stopped"].includes(String(v.status))) return false;
   if (v.count !== undefined && (!Number.isSafeInteger(v.count) || Number(v.count) < 0)) return false;
-  if (v.error_code === undefined && ["status", "output", "wait", "stop"].includes(v.action) && v[v.group === "process" ? "task_id" : "execution_id"] === undefined) return false;
+  if (v.error_code === undefined && ["status", "output", "wait", "stop"].includes(v.action) && v[v.group === "process" ? "task_id" : "agent_id"] === undefined && v.execution_id === undefined) return false;
   if (v.range !== undefined) {
     if (v.group !== "process" || !["output", "wait"].includes(v.action) || !TASK_LOG_TYPES.includes(v.task_type as "bash")) return false;
     const r = v.range as Record<string, unknown>;
@@ -32,7 +35,7 @@ export function isManagementDetails(value: unknown): value is ManagementDetails 
     if (Number(r.start) > Number(r.end) || Number(r.end) > Number(r.size) || r.omitted_before !== r.start || r.omitted_after !== Number(r.size) - Number(r.end)) return false;
   }
   if (v.executionConfig !== undefined && !(v.group === "process" ? typeof v.task_id === "string" && v.task_id.length > 0 && v.task_type === "monitor" && isMonitorExecutionConfig(v.executionConfig)
-    : v.kind === "subagent" && (v.execution_id === undefined || (typeof v.execution_id === "string" && v.execution_id.startsWith("exec_"))) && isAgentExecutionConfig(v.executionConfig))) return false;
+    : v.kind === "subagent" && v.execution_id === undefined && isAgentExecutionConfig(v.executionConfig))) return false;
   // The expanded process card now displays these keys: retain the same public
   // whitelist/count semantics as the backend envelope, not arbitrary numbers.
   if (v.stats !== undefined && !isRuntimeTaskMetadata({ version: 1, action: "stats", stats: v.stats })) return false;
@@ -59,13 +62,13 @@ const processGuidance = `Process_manage usage:
     Stop observation: {"action":"stop","task_id":"<monitor_task_id>","task_type":null,"offset":null,"limit":null,"pattern":null,"ignore_case":null,"context":null}`;
 const agentGuidance = `Agent_manage usage:
   - Manage executions started by subagent_run or subagent_workflow, not process logs or Agent conversation control. Use process_manage for bash/monitor; subagent_message for messages; subagent_run for Agent resume; subagent_workflow for workflow replay.
-  - Provide every exposed field: action, execution_id, kind, verbose. Set unused controls to null; action must be non-null. Unknown fields remain invalid even when null.
+  - Provide every exposed field: action, agent_id, execution_id, kind, verbose. Set unused controls to null; action must be non-null. Unknown fields remain invalid even when null.
   - Non-null arguments by action:
-    list: kind filter if needed; execution_id and verbose must be null.
-    status/stop: execution_id; kind and verbose must be null.
-    output/wait: execution_id and verbose if needed; kind must be null.
-  - kind filters list to subagent/workflow. Copy execution_id from launch/list; do not construct it or substitute agent_id. agent_id identifies a conversation for messaging/resume; execution_id identifies one execution. Do not provide non-null values outside the selected action.
-  - Agent resume produces a new execution_id. New calls with the previous execution_id fail as stale; they never operate on the resumed execution. A wait already admitted remains bound to its original execution. Workflow replay creates a separate execution with a new ID.
+    list: kind filter if needed; agent_id, execution_id and verbose must be null.
+    status/stop: agent_id for subagent or execution_id for workflow; kind and verbose must be null.
+    output/wait: agent_id for subagent or execution_id for workflow; verbose is allowed only for subagent output/wait; kind must be null.
+  - Copy the complete agent_id for subagents from launch/list. Workflow keeps its execution_id contract. Subagent execution identities are internal: do not construct or provide execution_id for a subagent.
+  - Resuming an agent keeps its agent_id while replacing its internal execution; an admitted wait stays bound to the execution present at admission. Workflow replay creates a separate execution with a new ID.
   - output returns current output/progress or a final result; wait awaits the whole execution. verbose is only for subagent output/wait and requests additional conversation, not an unlimited trace. Set verbose to null for workflow.
   - /task-detach or cancellation releases a wait without stopping execution. stop requests cancellation; it may still be draining. Stopping a workflow also stops its owned agents, not independent siblings. Visible owned children cannot necessarily be managed directly by another owner.
   - Successful terminal output/wait delivery reports that execution's result and avoids duplicate completion notifications; list/status do not consume it. Completion is notified automatically; do not poll solely to detect completion.
@@ -77,7 +80,7 @@ const agentGuidance = `Agent_manage usage:
 
 export interface ManagementParams {
   action: RuntimeTaskParams["action"]; task_id?: string; task_type?: "bash" | "monitor";
-  execution_id?: string; kind?: "subagent" | "workflow";
+  agent_id?: string; execution_id?: string; kind?: "subagent" | "workflow";
   offset?: number; limit?: number; pattern?: string; ignore_case?: boolean; context?: number; verbose?: boolean;
 }
 export type ManagementGroup = "process" | "agent";
@@ -88,13 +91,13 @@ export interface ManagementDetails { runtimeManagement: { version: 2; group: Man
   count?: number; range?: RuntimeTaskDetails["runtimeTask"]["range"]; stats?: Readonly<Record<string, number>> } }
 const fields = {
   process: { list: ["task_type"], stats: ["task_type"], status: ["task_id"], stop: ["task_id"], output: ["task_id", "offset", "limit"], wait: ["task_id", "limit"], search: ["pattern", "task_id", "task_type", "ignore_case", "context"] },
-  agent: { list: ["kind"], status: ["execution_id"], stop: ["execution_id"], output: ["execution_id", "verbose"], wait: ["execution_id", "verbose"] },
+  agent: { list: ["kind"], status: ["agent_id", "execution_id"], stop: ["agent_id", "execution_id"], output: ["agent_id", "execution_id", "verbose"], wait: ["agent_id", "execution_id", "verbose"] },
 } as const;
 export interface ProcessManagementParams {
   action: ManagementParams["action"]; task_id: string | null; task_type: "bash" | "monitor" | null;
   offset: number | null; limit: number | null; pattern: string | null; ignore_case: boolean | null; context: number | null;
 }
-export interface AgentManagementParams { action: ManagementParams["action"]; execution_id: string | null; kind: "subagent" | "workflow" | null; verbose: boolean | null }
+export interface AgentManagementParams { action: ManagementParams["action"]; agent_id?: string | null; execution_id: string | null; kind: "subagent" | "workflow" | null; verbose: boolean | null }
 export function parseProcessManagementParams(value: unknown): ManagementParams {
   const controls = ["task_id", "task_type", "offset", "limit", "pattern", "ignore_case", "context"];
   const params = parseControlArguments(value, ["action", ...controls], controls);
@@ -103,7 +106,7 @@ export function parseProcessManagementParams(value: unknown): ManagementParams {
   return params as unknown as ManagementParams;
 }
 export function parseAgentManagementParams(value: unknown): ManagementParams {
-  const params = parseControlArguments(value, ["action", "execution_id", "kind", "verbose"], ["execution_id", "kind", "verbose"]);
+  const params = parseControlArguments(value, ["action", "agent_id", "execution_id", "kind", "verbose"], ["agent_id", "execution_id", "kind", "verbose"]);
   const error = validateNormalizedManagementParams("agent", params);
   if (error) throw new Error(error);
   return params as unknown as ManagementParams;
@@ -122,10 +125,15 @@ function validateNormalizedManagementParams(group: ManagementGroup, value: unkno
   const accepted = ["action", ...table[v.action]!];
   const bad = Object.keys(v).find(k => !accepted.includes(k));
   if (bad) return `Field '${bad}' is not accepted for ${v.action}. Accepted fields: ${accepted.join(", ")}. Set fields that do not apply to this action to null.`;
-  const target = group === "process" ? "task_id" : "execution_id";
-  if (["status", "output", "wait", "stop"].includes(v.action) && (typeof v[target] !== "string" || !v[target].trim())) return `${v.action} requires ${target}.`;
+  const target = group === "process" ? "task_id" : "agent_id";
+  if (group === "agent" && ["status", "output", "wait", "stop"].includes(v.action) &&
+      ((typeof v.agent_id === "string" && v.agent_id.trim() && v.execution_id === undefined) ||
+       (typeof v.execution_id === "string" && v.execution_id.trim() && v.agent_id === undefined))) {
+    if (v.execution_id !== undefined && (!parseExecutionId(v.execution_id) || !String(v.execution_id).startsWith("wf_"))) return "Invalid execution_id; workflows require a wf_ execution_id from launch/list. Subagents require agent_id.";
+  } else if (["status", "output", "wait", "stop"].includes(v.action) && (typeof v[target] !== "string" || !v[target].trim())) return `${v.action} requires agent_id for subagents or execution_id for workflows.`;
   if (v.task_id !== undefined && (typeof v.task_id !== "string" || !v.task_id.trim())) return "task_id must be a non-empty string.";
-  if (v.execution_id !== undefined && !parseExecutionId(v.execution_id)) return "Invalid execution_id; copy it from launch/list.";
+  if (v.agent_id !== undefined && (typeof v.agent_id !== "string" || !v.agent_id.trim())) return "agent_id must be a non-empty string.";
+  if (v.execution_id !== undefined && (!parseExecutionId(v.execution_id) || !String(v.execution_id).startsWith("wf_"))) return "Invalid execution_id; workflows require a wf_ execution_id from launch/list. Subagents require agent_id.";
   if (v.task_type !== undefined && !TASK_LOG_TYPES.includes(v.task_type as "bash")) return "task_type must be bash or monitor.";
   if (v.kind !== undefined && !["subagent", "workflow"].includes(String(v.kind))) return "kind must be subagent or workflow.";
   for (const k of ["offset", "limit", "context"]) if (v[k] !== undefined && (!Number.isSafeInteger(v[k]) || Number(v[k]) < (k === "limit" ? 1 : 0))) return `${k} must be a safe ${k === "limit" ? "positive" : "non-negative"} integer.`;
@@ -136,9 +144,11 @@ function validateNormalizedManagementParams(group: ManagementGroup, value: unkno
 function project(group: ManagementGroup, result: RuntimeTaskResult) {
   const m = result.details.runtimeTask;
   const { version: _version, task_id, run_id, task_type, ...rest } = m;
-  const identity = task_id && run_id && (task_type === "subagent" || task_type === "workflow")
-    ? { execution_id: executionId({ taskId: task_id, runId: run_id }, task_type), kind: task_type, ...(task_type === "subagent" ? { agent_id: task_id } : {}) }
-    : group === "agent" ? { ...(task_type ? { kind: task_type } : {}) }
+  const identity = task_id && run_id && task_type === "workflow"
+    ? { execution_id: executionId({ taskId: task_id, runId: run_id }, task_type), kind: task_type }
+    : task_id && task_type === "subagent"
+      ? { agent_id: task_id, kind: task_type }
+      : group === "agent" ? { ...(task_type ? { kind: task_type } : {}) }
     : { ...(task_id ? { task_id } : {}), ...(task_type ? { task_type } : {}) };
   return { ...result, details: { runtimeManagement: { version: 2 as const, group, ...rest, ...identity } } };
 }
@@ -154,7 +164,8 @@ export function managementTool(group: ManagementGroup, capabilities: readonly Ru
     pattern: nullableControl(Type.String({ description: "Non-empty search regex; null for other actions." })), ignore_case: nullableControl(Type.Boolean({ description: "Search case-insensitivity; null for default false or other actions." })),
     context: nullableControl(Type.Number({ minimum: 0, multipleOf: 1, description: "Search context lines; null for default 0 or other actions." })),
   }, { additionalProperties: false }) : Type.Object({
-    action: StringEnum(["list", "status", "output", "wait", "stop"] as const), execution_id: nullableControl(Type.String({ description: "Execution handle from launch/list; non-null for targeted actions, null for list." })),
+    action: StringEnum(["list", "status", "output", "wait", "stop"] as const), agent_id: nullableControl(Type.String({ description: "Complete persistent subagent identity from launch/list; non-null for targeted subagent actions, null when unused." })),
+    execution_id: nullableControl(Type.String({ description: "Workflow execution handle from launch/list; non-null for targeted workflow actions, null when unused." })),
     kind: nullableControl(StringEnum(["subagent", "workflow"] as const, { description: "List filter; null for no filter or other actions." })), verbose: nullableControl(Type.Boolean({ description: "Additional conversation for subagent output/wait; null is equivalent to false. Must be null for workflow or other actions." })),
   }, { additionalProperties: false });
   let closed = false;
@@ -167,17 +178,26 @@ export function managementTool(group: ManagementGroup, capabilities: readonly Ru
     const fail = (text: string, code = "invalid_arguments") => ({ content: [{ type: "text" as const, text }], details: { runtimeManagement: { version: 2 as const, group, action: String(params?.action ?? "status"), error_code: code } }, isError: true });
     if (closed) return fail("Management activation is closed.", "closed");
     if (error) return fail(error);
-    const { execution_id, kind, ...base } = params;
-    const identity = execution_id ? parseExecutionId(execution_id)! : undefined;
-      if (execution_id && !identity) return fail("Invalid execution_id; copy it from launch/list.");
+    const { agent_id, execution_id, kind, ...base } = params;
+    const identity = execution_id ? parseExecutionId(execution_id) : undefined;
+    if (execution_id && (!identity || !execution_id.startsWith("wf_"))) return fail("Invalid execution_id; workflows require a wf_ execution_id from launch/list. Subagents require agent_id.");
     if (identity && identity.taskId.startsWith("wf_") !== execution_id!.startsWith("wf_")) return fail("Execution handle kind does not match its target.");
-    if (identity && !selected.some(c => c.list().some(e => e.view.taskId === identity.taskId && e.view.runId === identity.runId))) return fail("Execution is stale or not available in this scope.", "stale");
-    const internal: RuntimeTaskParams = { ...base, ...(identity ? { task_id: identity.taskId, run_id: identity.runId } : {}), ...(kind ? { task_type: kind } : {}) };
+    if (agent_id && execution_id) return fail("Provide agent_id for a subagent or execution_id for a workflow, not both.");
+    if (agent_id && kind === "workflow") return fail("agent_id addresses subagents; workflows require execution_id.");
+    const executionView = identity ? selected.flatMap(c => c.list()).map(entry => entry.view).find(view => view.taskId === identity.taskId && view.runId === identity.runId) : undefined;
+    if (identity && !executionView) return fail("Execution is stale or not available in this scope.", "stale");
+    if (executionView && executionView.kind !== "workflow") return fail("Subagents require agent_id; execution_id is reserved for workflows.");
+    const agentView = agent_id ? selected.flatMap(c => c.list()).map(e => e.view).find(view => view.kind === "agent" && view.taskId === agent_id) : undefined;
+    if (agent_id && !agentView) return fail("Subagent agent_id is not available in this scope.", "stale");
+    const internal: RuntimeTaskParams = { ...base,
+      ...(identity ? { task_id: identity.taskId, run_id: identity.runId } : agentView ? { task_id: agentView.taskId, run_id: agentView.runId } : {}),
+      ...(kind ? { task_type: kind } : {}),
+    };
     return project(group, report(id, await facade.execute(internal, signal, update ? r => update(project(group, r)) : undefined, ctx)));
   };
   const renderCall = (value: unknown, theme: import("@earendil-works/pi-coding-agent").Theme, context: { expanded: boolean }) => {
     const args = value && typeof value === "object" ? value as Partial<ManagementParams> : {};
-    return createToolCallHeading({ name, detail: `${args.action ?? ""}${args.task_id ?? args.execution_id ? ` ${args.task_id ?? args.execution_id}` : ""}`, theme, context });
+    return createToolCallHeading({ name, detail: `${args.action ?? ""}${args.task_id ?? args.agent_id ?? args.execution_id ? ` ${args.task_id ?? args.agent_id ?? args.execution_id}` : ""}`, theme, context });
   };
   return { tool: { name, label: name, renderCall, description: group === "process" ? "Manage bash and monitor tasks and their logs." : "Manage subagent and agent-workflow executions, not conversation control.", promptSnippet: group === "process" ? "Manage command and observation tasks" : "Inspect, read, await, or stop delegated executions", promptGuidelines: [group === "process" ? processGuidance : agentGuidance], parameters, execute }, close };
 }

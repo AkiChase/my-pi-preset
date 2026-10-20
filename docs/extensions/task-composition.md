@@ -95,7 +95,7 @@ Monitor 的 wait 等整个观察结束，不是下一条事件。解除或取消
 
 ## 子 Agent 与 workflow
 
-可以让模型新建子 Agent，或继续一个已完成 Agent 的会话。后台启动先返回执行标识，完成后通知；前台直接等待结果。恢复会话沿用原类型、名称与设置；子 Agent 恢复自己的孩子时固定前台。
+可以让模型新建子 Agent，或继续一个已完成或退出中断 Agent 的会话。每个 Agent 都有完整 `agent_id`；后台启动先返回该 ID，完成后通知；前台直接等待结果。Pi 重启后，父会话会收到直属中断子 Agent 的通知，可用同一 `agent_id` 恢复其 transcript。恢复会话沿用原类型与设置；子 Agent 恢复自己的孩子时固定前台。
 
 Agent 文件配置优先于模型的调用请求；未指定设置时沿用配置/默认值，请求被覆盖时结果会说明实际值。可以让模型给运行中的 Agent 发指示，或在它完成后继续同一会话。queued 表示等待会话初始化，sent 表示已提交，均不保证已读取或处理。
 
@@ -111,9 +111,16 @@ workflow 用脚本编排多步工作，可以调用 Agent，也可以不启动 A
 
 ### 委派执行管理
 
-子 Agent 和 workflow 的运行状态、结果与停止操作会显示在 Task Panel。停止 workflow 会停止它所属的 Agent，不停止独立任务；关闭面板或解除等待不会停止正在运行的任务。
+子 Agent 的管理操作使用完整 `agent_id`；workflow 仍使用自己的 execution ID。停止或等待已退出中断的 Agent 会明确返回中断状态；先恢复它才会创建新的运行。关闭面板或解除等待不会停止正在运行的任务。
 
-输入 `@handle 消息` 可联系对应 Agent。默认的模型模式会生成更完整的委派请求，直接模式则立即启动；可在 `/agents-config` 的 Settings 中调整。
+在交互输入框中可使用显式 Agent 命名空间：
+
+```text
+@agent:create:Explore 检查 registry
+@agent:resume:explore_0 继续检查
+```
+
+`create` 后是已注册的 Agent 类型；`resume` 后是直属父级范围内的 `type_index` 简写。补全会展示完整 `agent_id`，但插入简写。其他普通 `@…` 输入仍由 Pi 的文件补全和原有行为处理。
 
 ## 后台任务提醒
 

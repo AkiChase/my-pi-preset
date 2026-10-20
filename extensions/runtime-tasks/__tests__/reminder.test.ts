@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { it } from "node:test";
 import { taskKey, type TaskView } from "../../task-ui/types.ts";
 import type { RuntimeTaskCapability, RuntimeTaskEntry } from "../facade.ts";
-import { executionId } from "../execution-id.ts";
 import { REMINDER_MAX_CHARS, REMINDER_MAX_ITEMS, REMINDER_SYSTEM_RULE, buildReminder, reminderCandidates, reminderDuration, reminderText } from "../reminder.ts";
 
 const NOW = 10_000_000;
@@ -28,7 +27,7 @@ void it("formats one compact line per kind with operable identities and no comma
     const text = buildReminder(reminderCandidates([capability([monitor, unnamed, shell, workflow, agent].map(v => entry(v)))]), NOW)!;
     assert.equal(text, [
         "<background-task-reminder>",
-        `agent | ${executionId({ taskId: "agent-A", runId: "1" }, "subagent")} | agent=agent-A | review-editor | 4m`,
+        "agent | agent_id=agent-A | review-editor | 4m",
         "workflow | wf_abc123 | review-changes | 2/5 done | 3m",
         "shell | b1 | full-tests | 2m",
         "shell | b2 | shell | 5s",
