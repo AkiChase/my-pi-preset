@@ -49,14 +49,16 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
     const root = mkdtempSync(join(tmpdir(), "agent-input-errors-"));
     const cwd = join(root, "cwd");
     const config = join(root, "agent");
+    const rootSessionFile = join(root, "root.jsonl");
     mkdirSync(cwd);
     mkdirSync(config);
+    writeFileSync(rootSessionFile, "");
     if (settings.testTemplate) writeFileSync(join(config, "agent-tool-description.md"), "OLD_CUSTOM_TEMPLATE");
     if (settings.customAgent) {
         mkdirSync(join(config, "agents"));
         writeFileSync(join(config, "agents", "custom.md"), typeof settings.customAgent === "string" ? settings.customAgent : "---\nname: custom\ndescription: Offline agent\n---\nDo work.\n");
     }
-    writeFileSync(join(config, "agent-tasks.json"), JSON.stringify({ worktreeIsolation: true, outputTranscript: false, rememberAgents: false, defaultJoinMode: "async", ...settings }));
+    writeFileSync(join(config, "agent-tasks.json"), JSON.stringify({ worktreeIsolation: true, outputTranscript: false, defaultJoinMode: "async", ...settings }));
     const previous = process.env.PI_CODING_AGENT_DIR;
     process.env.PI_CODING_AGENT_DIR = config;
 
@@ -116,7 +118,7 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
         hasUI: false,
         mode: "print",
         ui: { setWidget() {}, setStatus() {}, notify() {} },
-        sessionManager: { getSessionId: () => "input-errors", getBranch: () => [] },
+        sessionManager: { getSessionId: () => "input-errors", getBranch: () => [], getSessionFile: () => rootSessionFile },
         modelRegistry: {},
     } as unknown as ExtensionToolContext;
     await handlers.get("session_start")![0]!(undefined, ctx);
@@ -556,7 +558,7 @@ for (const background of [false, true]) void it(`root ${background ? "background
             assert.equal(options.model?.id, "pinned");
             assert.equal(options.thinkingLevel, "high", "frontmatter precedence is unchanged");
             const session = { model: pinnedModel, thinkingLevel: "low", messages: [], subscribe: () => () => {},
-                dispose() {}, sessionManager: { getSessionFile: () => undefined } } as unknown as AgentSession;
+                dispose() {}, sessionManager: { getSessionFile: () => join(f.root, "pinned-child.jsonl") } } as unknown as AgentSession;
             options.onSessionCreated?.(session);
             return { session, responseText: "visible answer", aborted: false, steered: false };
         },

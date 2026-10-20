@@ -21,6 +21,7 @@ const { createWorkflowTask, completeWorkflowTask } = await import("../src/workfl
 const { runWorkflow } = await import("../src/workflow/runtime.ts");
 const { createWorkflowHost } = await import("../src/workflow/host.ts");
 const { registerAgents } = await import("../src/agent-types.ts");
+const { allocatePersistentAgent, registryLocatorForRootSession } = await import("../src/subagent-registry.ts");
 import type { AgentManagerDependencies } from "../src/agent-manager.ts";
 import type { RunResult } from "../src/agent-runner.ts";
 
@@ -32,20 +33,24 @@ function deferred<T>() {
 const tick = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
 // SDK objects have private runtime fields. The only boundary cast is the
 // intentionally partial offline session; runner methods below never use models.
-function fakeSession(): AgentSession {
-  return { messages: [], sessionManager: { getSessionFile: () => undefined },
+function fakeSession(sessionFile: string): AgentSession {
+  return { messages: [], sessionManager: { getSessionFile: () => sessionFile },
     dispose() {}, steer: async () => {}, subscribe: () => () => {}, getContextUsage: () => undefined,
   } as unknown as AgentSession;
 }
 const pi = {} as ExtensionAPI;
-const ctx = { cwd: tmpdir() } as ExtensionContext;
 function fixture(extra: AgentManagerDependencies = {}, notify?: (record: import("../src/types.ts").AgentRecord) => void) {
+  const sessionDir = mkdtempSync(join(tmpdir(), "agent-backend-session-"));
+  const rootSessionFile = join(sessionDir, "root.jsonl");
+  writeFileSync(rootSessionFile, "");
+  const ctx = { cwd: tmpdir(), sessionManager: { getSessionFile: () => rootSessionFile } } as unknown as ExtensionContext;
   const calls: { id: string; session: AgentSession; options: Parameters<NonNullable<AgentManagerDependencies["runAgent"]>>[3]; finish: (text?: string, failure?: string) => void }[] = [];
   const resumes: { session: AgentSession; options: Parameters<NonNullable<AgentManagerDependencies["resumeAgent"]>>[2]; finish: (text?: string) => void }[] = [];
   const deps: AgentManagerDependencies = {
     runAgent: async (_ctx, _type, _prompt, options) => {
       const result = deferred<RunResult>();
-      const session = fakeSession();
+      const session = fakeSession(join(sessionDir, `child-${calls.length}.jsonl`));
+      writeFileSync(session.sessionManager.getSessionFile()!, "");
       const call = { id: options.agentId!, session, options,
         finish: (text = "answer", failure?: string) => result.resolve({ responseText: text, session, aborted: false, steered: false, failure }) };
       calls.push(call);
@@ -69,31 +74,41 @@ function fixture(extra: AgentManagerDependencies = {}, notify?: (record: import(
   const workflows = new Map<string, import("../src/workflow/task.ts").WorkflowTask>();
   const source = createAgentTaskSource(manager, coordinator, workflows);
   const off = coordinator.registerSource(source);
-  return { manager, coordinator, calls, resumes, source, workflows, deps,
+  return { ctx, manager, coordinator, calls, resumes, source, workflows, deps,
+    seedParent() { return allocatePersistentAgent(registryLocatorForRootSession(rootSessionFile), "general-purpose", undefined).agentId; },
     spawn(background = false, options: Partial<Parameters<typeof manager.spawn>[4]> = {}) {
       return manager.spawn(pi, ctx, "general-purpose", "test", { description: "test", isBackground: background, blocking: !background, ...options });
     },
-    async close() { manager.freezeAdmission(); manager.abortAll(); await tick(); off(); source.dispose(); coordinator.dispose(); await manager.dispose(); },
+    async close() { manager.freezeAdmission(); manager.abortAll(); await tick(); off(); source.dispose(); coordinator.dispose(); await manager.dispose(); rmSync(sessionDir, { recursive: true, force: true }); },
   };
 }
+
+void it("refuses subagent creation without a persisted parent session", () => {
+  const manager = new AgentManager();
+  assert.throws(
+    () => manager.spawn(pi, { cwd: tmpdir() } as ExtensionContext, "general-purpose", "test", { description: "test", isBackground: true }),
+    /persisted parent session/i,
+  );
+});
 
 void it("nested actual delegation ignores legacy turn budgets and keeps user defaults across resume", async () => {
   const f = fixture();
   setDefaultMaxTurns(7);
   try {
-    const tool = createNestedSubagentTools({ manager: f.manager, pi, parentAgentId: "parent", depth: 1,
-      maxSubagentDepth: 2, allowedSubagents: "all", configCwd: ctx.cwd })[0]!;
+    const parentAgentId = f.seedParent();
+    const tool = createNestedSubagentTools({ manager: f.manager, pi, parentAgentId, depth: 1,
+      maxSubagentDepth: 2, allowedSubagents: "all", configCwd: f.ctx.cwd })[0]!;
     const params = { subagent_type: "general-purpose", description: "nested", prompt: "test" };
-    const refused = await tool.execute("legacy", completeToolCall(tool.parameters, { ...params, max_turns: 1 }), undefined, undefined, ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext);
+    const refused = await tool.execute("legacy", completeToolCall(tool.parameters, { ...params, max_turns: 1 }), undefined, undefined, f.ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext);
     assert.equal(refused.isError, true); assert.equal(f.calls.length, 0);
-    const launch = tool.execute("nested", completeToolCall(tool.parameters, params), undefined, undefined, ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext); await tick();
+    const launch = tool.execute("nested", completeToolCall(tool.parameters, params), undefined, undefined, f.ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext); await tick();
     assert.equal(f.manager.getRecord(f.calls[0]!.id)?.maxTurns, 7);
     assert.equal(f.manager.getRecord(f.calls[0]!.id)?.invocation?.maxTurns, 7);
     f.calls[0]!.finish();
     const launchResult = await launch;
     assert.match(launchResult.content.map(block => block.type === "text" ? block.text : "").join(""), new RegExp(`agent_id=${f.calls[0]!.id} execution_id=exec_`));
     setDefaultMaxTurns(9);
-    const resume = tool.execute("nested-resume", completeToolCall(tool.parameters, { prompt: "test", resume: f.calls[0]!.id }), undefined, undefined, ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext); await tick();
+    const resume = tool.execute("nested-resume", completeToolCall(tool.parameters, { prompt: "test", resume: f.calls[0]!.id }), undefined, undefined, f.ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext); await tick();
     assert.equal(f.resumes[0]!.options?.maxTurns, 9);
     assert.equal(f.manager.getRecord(f.calls[0]!.id)?.invocation?.maxTurns, 9);
     f.resumes[0]!.finish();
@@ -107,7 +122,7 @@ void it("trusted RPC retains explicit turn limits through actual manager executi
   const f = fixture();
   const rpc = new Map<string, (value: unknown) => void>();
   const handlers = registerRpcHandlers({ events: { on(name, callback) { rpc.set(name, callback); return () => rpc.delete(name); }, emit() {} },
-    pi, getCtx: () => ctx, manager: { spawn: f.manager.spawn.bind(f.manager), awaitStartup: f.manager.awaitStartup.bind(f.manager),
+    pi, getCtx: () => f.ctx, manager: { spawn: f.manager.spawn.bind(f.manager), awaitStartup: f.manager.awaitStartup.bind(f.manager),
       getRecord: f.manager.getRecord.bind(f.manager), abort: f.manager.abort.bind(f.manager), consumeResult: () => false } });
   setDefaultMaxTurns(7);
   try {
@@ -349,7 +364,7 @@ void it("workflow child stopped through actual source/host returns skipped and n
     const entered = deferred<void>();
     const off = f.manager.subscribe(() => { if (f.calls.length) entered.resolve(); });
     const running = runWorkflow({ script: 'export const meta={name:"stop test",description:"test"}; await agent("test");',
-      host: createWorkflowHost({ pi, ctx, manager: f.manager, workflowId: task.id }),
+      host: createWorkflowHost({ pi, ctx: f.ctx, manager: f.manager, workflowId: task.id }),
     });
     await entered.promise;
     const row = f.source.list().find(row => row.kind === "agent")!;
@@ -411,7 +426,7 @@ for (const elapsed of [0, FINISHED_LINGER_MS - 1, FINISHED_LINGER_MS]) {
     try {
       const task = createWorkflowTask({ id: "wf_fresh_panel", script: "" });
       f.workflows.set(task.id, task);
-      const completion = f.manager.spawnAndWait(pi, ctx, "general-purpose", "early child", {
+      const completion = f.manager.spawnAndWait(pi, f.ctx, "general-purpose", "early child", {
         description: "early child", workflowId: task.id,
       });
       const id = f.calls[0]!.id;
@@ -440,7 +455,11 @@ for (const elapsed of [0, FINISHED_LINGER_MS - 1, FINISHED_LINGER_MS]) {
 }
 
 void it("3B1 stop releases the transferred pool once without waiting for noncooperative execution", async () => {
-  const pending = deferred<RunResult>(), session = fakeSession();
+  const pending = deferred<RunResult>();
+  const sessionDir = mkdtempSync(join(tmpdir(), "agent-backend-stop-"));
+  const sessionFile = join(sessionDir, "child.jsonl");
+  writeFileSync(sessionFile, "");
+  const session = fakeSession(sessionFile);
   const f = fixture({ runAgent: async (_ctx, _type, _prompt, options) => { options.onSessionCreated?.(session); return pending.promise; } });
   try {
     const id = f.spawn(false), run = f.manager.getRun(id)!;
@@ -457,7 +476,7 @@ void it("3B1 stop releases the transferred pool once without waiting for noncoop
     assert.equal(f.manager.getRecord(first)?.status, "running");
     assert.equal(f.manager.getRecord(queued)?.status, "queued", "late settle must not release the pool twice");
     await f.manager.waitForAll();
-  } finally { pending.resolve({ session, responseText: "late", aborted: false, steered: false }); await f.close(); }
+  } finally { pending.resolve({ session, responseText: "late", aborted: false, steered: false }); await f.close(); rmSync(sessionDir, { recursive: true, force: true }); }
 });
 
 
@@ -469,7 +488,7 @@ void it("direct manager admission normalizes descriptions before records and wor
   });
   try {
     for (const description of [undefined, null, " ", " exact "]) {
-      const id = f.manager.spawn(pi, ctx, "general-purpose", "offline", { description, isolation: "worktree" });
+      const id = f.manager.spawn(pi, f.ctx, "general-purpose", "offline", { description, isolation: "worktree" });
       await f.manager.awaitStartup(id);
       const expected = description?.trim() ? description : "general-purpose";
       assert.equal(f.manager.getRecord(id)?.description, expected);
@@ -478,7 +497,7 @@ void it("direct manager admission normalizes descriptions before records and wor
     }
     const count = f.manager.listAgents().length;
     for (const description of [42, {}, []]) {
-      assert.throws(() => f.manager.spawn(pi, ctx, "general-purpose", "offline", {
+      assert.throws(() => f.manager.spawn(pi, f.ctx, "general-purpose", "offline", {
         description: description as unknown as string,
       }), /description must be/);
       assert.equal(f.manager.listAgents().length, count);
@@ -546,11 +565,12 @@ void it("nested background startup failure retains launch identity and resolved 
   const root = mkdtempSync(join(tmpdir(), "nested-config-error-"));
   const { mkdirSync } = await import("node:fs");
   try {
+    const parentAgentId = f.seedParent();
     mkdirSync(join(root, ".pi", "agents"), { recursive: true });
     writeFileSync(join(root, ".pi", "agents", "worktree-child.md"), "---\nname: worktree-child\ndescription: test\nisolation: worktree\n---\nPRIVATE_PROMPT\n");
-    const tool = createNestedSubagentTools({ manager: f.manager, pi, parentAgentId: "parent", depth: 1,
+    const tool = createNestedSubagentTools({ manager: f.manager, pi, parentAgentId, depth: 1,
       maxSubagentDepth: 2, allowedSubagents: "all", configCwd: root })[0]!;
-    const result = await tool.execute("failure", completeToolCall(tool.parameters, { subagent_type: "worktree-child", description: "test", prompt: "test", run_in_background: true }), undefined, undefined, ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext);
+    const result = await tool.execute("failure", completeToolCall(tool.parameters, { subagent_type: "worktree-child", description: "test", prompt: "test", run_in_background: true }), undefined, undefined, f.ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext);
     assert.equal(result.isError, true);
     const details = result.details as { executionConfig?: import("../../runtime-tasks/execution-config.ts").AgentExecutionConfig; runtimeLaunch?: unknown };
     assert.equal(details.executionConfig?.phase, "resolved");
@@ -613,7 +633,7 @@ void it("nested question steering cannot leak an old request marker into a resum
   const f = fixture();
   try {
     const parentId = f.spawn(true); await tick();
-    const childId = f.manager.spawn(pi, ctx, "general-purpose", "child", { description: "child", isBackground: true, parentAgentId: parentId }); await tick();
+    const childId = f.manager.spawn(pi, f.ctx, "general-purpose", "child", { description: "child", isBackground: true, parentAgentId: parentId }); await tick();
     const child = f.manager.getRecord(childId)!;
     const firstSteer = deferred<void>();
     const steers: string[] = [];
@@ -622,8 +642,8 @@ void it("nested question steering cannot leak an old request marker into a resum
       if (steers.length === 1) await firstSteer.promise;
     }) as never;
     const tool = createNestedSubagentTools({ manager: f.manager, pi, parentAgentId: parentId, depth: 1,
-      maxSubagentDepth: 2, allowedSubagents: "all", configCwd: ctx.cwd })[1]!;
-    const asking = tool.execute("nested-race", completeToolCall(tool.parameters, { agent_id: childId, message: "old question?", reply: "notify" }), undefined, undefined, ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext);
+      maxSubagentDepth: 2, allowedSubagents: "all", configCwd: f.ctx.cwd })[1]!;
+    const asking = tool.execute("nested-race", completeToolCall(tool.parameters, { agent_id: childId, message: "old question?", reply: "notify" }), undefined, undefined, f.ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext);
     await tick();
     assert.deepEqual(steers, ["old question?"]);
     f.calls.find(call => call.id === childId)!.finish();
@@ -649,15 +669,15 @@ void it("nested questions use the mailbox and deliver notices/replies only to th
     assert.ok(parent.runId);
     const delivered: { content: string; display: boolean; options: unknown }[] = [];
     parent.session!.sendCustomMessage = (async (message: { content: string; display: boolean }, options: unknown) => { delivered.push({ ...message, options }); }) as never;
-    const childId = f.manager.spawn(pi, ctx, "general-purpose", "child", { description: "child", isBackground: true, parentAgentId: parentId }); await tick();
+    const childId = f.manager.spawn(pi, f.ctx, "general-purpose", "child", { description: "child", isBackground: true, parentAgentId: parentId }); await tick();
     const child = f.manager.getRecord(childId)!;
     assert.equal(child.status, "running");
     assert.equal(child.parentRunId, parent.runId);
     const steers: string[] = [];
     child.session!.steer = (async (message: string) => { steers.push(message); }) as never;
     const tool = createNestedSubagentTools({ manager: f.manager, pi, parentAgentId: parentId, depth: 1,
-      maxSubagentDepth: 2, allowedSubagents: "all", configCwd: ctx.cwd })[1]!;
-    const asked = await tool.execute("nested-notify", completeToolCall(tool.parameters, { agent_id: childId, message: "where?", reply: "notify" }), undefined, undefined, ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext);
+      maxSubagentDepth: 2, allowedSubagents: "all", configCwd: f.ctx.cwd })[1]!;
+    const asked = await tool.execute("nested-notify", completeToolCall(tool.parameters, { agent_id: childId, message: "where?", reply: "notify" }), undefined, undefined, f.ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext);
     const askedText = asked.content.map(block => block.type === "text" ? block.text : "").join("\n");
     const requestId = /Request ID: (req_\w+)/.exec(askedText)![1]!;
     assert.match(askedText, /Execution ID: exec_/);

@@ -54,11 +54,9 @@ export interface AgentConfig {
   model?: string;
   thinking?: ThinkingLevel;
   maxTurns?: number;
-  /** Persist this subagent as a normal pi session instead of keeping it in memory only. */
-  persistSession?: boolean;
   /** Write the subagent's .output transcript. Defaults to true; false suppresses only that transcript. */
   outputTranscript?: boolean;
-  /** Optional session directory used when persistSession is true. Omitted = pi's normal session location. */
+  /** Optional session directory for this agent's always-persisted session. */
   sessionDir?: string;
   /**
    * Nested delegation, off by default: undefined = no nested tools;
@@ -155,7 +153,7 @@ export interface AgentRecord {
    */
   alias?: string;
   description: string;
-  status: "queued" | "running" | "completed" | "steered" | "aborted" | "stopped" | "error";
+  status: "queued" | "running" | "completed" | "steered" | "aborted" | "stopped" | "error" | "interrupted";
   result?: string;
   error?: string;
   toolUses: number;
@@ -190,12 +188,7 @@ export interface AgentRecord {
   toolCallId?: string;
   /** Path to the streaming output transcript file. */
   outputFile?: string;
-  /**
-   * The agent's pi session file, when it was persisted (`persist_session`, or
-   * the `rememberAgents` default). Captured so a mention can reopen the
-   * conversation after the record itself has been evicted; undefined for an
-   * in-memory session, which leaves nothing to reopen.
-   */
+  /** The agent's always-persisted Pi session file, captured for recovery. */
   sessionFile?: string;
   /** Cleanup function for the output file stream subscription. */
   outputCleanup?: () => void;
@@ -254,6 +247,8 @@ export interface AgentRecord {
   workflowId?: string;
   /** Effective inherited nesting cap for this branch. */
   maxSubagentDepth?: number;
+  /** Root registry location inherited from the main session through nested spawns. */
+  registryLocator?: import("./subagent-registry.ts").RootRegistryLocator;
   /**
    * Session id of the root (main) session this branch descends from. Nested
    * spawns inherit it so their transcripts file under the same session

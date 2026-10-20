@@ -32,7 +32,7 @@ export function createAgentManagement(options: {
         executionConfig: copyAgentExecutionConfig(snapshot?.executionConfig),
         stats: snapshot ? { toolUses: snapshot.toolUses, duration_ms: Math.max(0, (snapshot.completedAt ?? Date.now()) - snapshot.startedAt), turnCount: snapshot.turnCount ?? 0, ...(snapshot.lifetimeUsage ? { inputTokens: snapshot.lifetimeUsage.input, outputTokens: snapshot.lifetimeUsage.output, cost: snapshot.lifetimeUsage.cost } : {}) } : undefined,
         title: snapshot?.description, raw_status: snapshot?.status,
-        status: snapshot?.status === "error" ? "failed" : snapshot?.status === "aborted" || snapshot?.status === "stopped" ? "stopped" : snapshot?.status === "steered" ? "completed" : snapshot?.status,
+        status: snapshot?.status === "error" ? "failed" : snapshot?.status === "aborted" || snapshot?.status === "stopped" || snapshot?.status === "interrupted" ? "stopped" : snapshot?.status === "steered" ? "completed" : snapshot?.status,
       });
       if (identity.sourceId !== "agent" || !record || !run || run.identity.runId !== identity.runId || !options.active()) return taskResult("Subagent run is no longer available.", { ...meta(), error_code: "stale" });
       if (!options.owns(record)) return taskResult("Subagent belongs to another owner.", { ...meta(), error_code: "forbidden" });

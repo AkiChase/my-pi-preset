@@ -39,7 +39,7 @@ import type { AgentManagerDependencies } from "./agent-manager.ts";
 import { createAgentTaskSource } from "./source.ts";
 import { registerAgentWait, canDeliverAgentResult } from "./waits.ts";
 import { AgentManager, isTopLevelAgent } from "./agent-manager.ts";
-import { getAgentConversation, getDefaultMaxTurns, getGraceTurns, getRememberAgents, normalizeMaxTurns, resolveEffectiveMaxTurns, SUBAGENT_TOOL_NAMES, setDefaultMaxTurns, setGraceTurns, setRememberAgents, steerAgent } from "./agent-runner.ts";
+import { getAgentConversation, getDefaultMaxTurns, getGraceTurns, normalizeMaxTurns, resolveEffectiveMaxTurns, SUBAGENT_TOOL_NAMES, setDefaultMaxTurns, setGraceTurns, steerAgent } from "./agent-runner.ts";
 import { BUILTIN_TOOL_NAMES, getAgentConfig, getAllTypes, getAvailableTypes, getConfig, getFallbackSubagent, isDefaultsDisabled, NO_FALLBACK, registerAgents, resolveSpawnType, resolveType, setDefaultsDisabled, setFallbackSubagent } from "./agent-types.ts";
 import { inChildSessionContext, runInChildSessionContext } from "./child-context.ts";
 // Expose the same context instance as the activation guard for host-loader probes.
@@ -801,6 +801,10 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
     delete safeOptions.depth;
     delete safeOptions.maxSubagentDepth;
     delete safeOptions.configCwd;
+    // The root registry derives from the actual caller session and must only be
+    // propagated internally to nested descendants; accepting it here would let
+    // an RPC caller redirect persistence to an arbitrary file.
+    delete safeOptions.registryLocator;
     // Also internal: it names a transcript directory, so a forged value would
     // be a path-traversal primitive.
     delete safeOptions.rootSessionId;
@@ -1204,6 +1208,9 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       rpcHandle = undefined;
     },
     stop() {
+      // Persist interruption state before cancellation changes live records to
+      // stopped. Explicit user stops have already been written as stopped.
+      manager.markInterruptedForShutdown();
       for (const controller of clones) safely(() => controller.abort());
       for (const task of workflowTasks.values()) safely(() => task.abortController.abort());
       manager.stopForShutdown();
@@ -1464,7 +1471,6 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       setStrictAgentFiles: (b) => { strictAgentFiles = b; },
       setDisableDefaultAgents: setDisableDefaultAgents,
       setAgentMentions: setAgentMentionMode,
-      setRememberAgents,
       setOutputTranscript: setOutputTranscriptDefault,
       setWorktreeIsolation: setWorktreeIsolationEnabled,
       setWorkflowsEnabled: setWorkflowsEnabled,
@@ -3185,7 +3191,7 @@ skills: <true (inherit all), false (none), or comma-separated skill names to pre
 disallowed_tools: <comma-separated tool names to block, even if otherwise available. Omit for none>
 inherit_context: <true to fork parent conversation into agent so it sees chat history. Default: false>
 run_in_background: <pin this agent to background (true) or foreground (false). Omit to follow the backgroundByDefault setting, which is background>
-output_transcript: <false to write no transcript file or path for this agent. Independent of persist_session. Default: true>
+output_transcript: <false to write no transcript file for this agent. The Pi session is always persisted. Default: true>
 isolated: <true for no extension/MCP tools, only built-in tools. Default: false>
 memory: <"user" (global), "project" (per-project), or "local" (gitignored per-project) for persistent memory. Omit for none>${
       // Offering the field on a project that turned worktrees off would bake a
@@ -3208,7 +3214,7 @@ Guidelines for choosing settings:
 - Use prompt_mode: replace for fully custom agents with their own personality/instructions
 - Set inherit_context: true if the agent needs to know what was discussed in the parent conversation
 - Set isolated: true if the agent should NOT have access to MCP servers or other extensions
-- Set output_transcript: false to skip writing this agent's transcript; this alone doesn't keep the run off disk (persist_session, isolation: worktree commits, and memory still write) — set those too if that's the goal
+- Set output_transcript: false to skip writing this agent's transcript; the Pi session remains persisted for recovery, and isolation: worktree commits and memory may still write
 - Only include frontmatter fields that differ from defaults — omit fields where the default is fine
 
 Write the file using the write tool. Only write the file, nothing else.`;
@@ -3348,7 +3354,6 @@ Write the file using the write tool. Only write the file, nothing else.`;
       strictAgentFiles,
       disableDefaultAgents: isDefaultsDisabled(),
       agentMentions: getAgentMentionMode(),
-      rememberAgents: getRememberAgents(),
       outputTranscript: getOutputTranscriptDefault(),
       worktreeIsolation: isWorktreeIsolationEnabled(),
       // The user's answer, not the effective one. A stand-down for another
@@ -3525,13 +3530,6 @@ Write the file using the write tool. Only write the file, nothing else.`;
           currentValue: getAgentMentionMode(),
           values: ["model", "direct", "off"],
         },
-        {
-          id: "rememberAgents",
-          label: "Remember agents",
-          description: "Persist subagent sessions so `@handle` can resume one long after it finished (they also appear in /resume)",
-          currentValue: getRememberAgents() ? "on" : "off",
-          values: ["on", "off"],
-        },
       ];
     }
 
@@ -3660,10 +3658,6 @@ Write the file using the write tool. Only write the file, nothing else.`;
               ? "Agent mentions on — a conversation clone starts a mentioned agent off-screen"
               : "Agent mentions on — a mentioned agent starts here, with no model call",
         );
-      } else if (id === "rememberAgents") {
-        const enabled = value === "on";
-        setRememberAgents(enabled);
-        notifyApplied(ctx, `Remember agents ${enabled ? "enabled" : "disabled"}`);
       }
     }
 

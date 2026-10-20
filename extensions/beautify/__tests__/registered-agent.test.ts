@@ -28,7 +28,7 @@ const tick = async () => { for (let i = 0; i < 30; i++) await new Promise<void>(
 test("actual registered Agent launch/manage renders config, lifecycle outcomes and safe history without display consumption", async () => {
   const root = mkdtempSync(join(tmpdir(), "beautify-agent-contract-")), config = join(root, "agent"), cwd = join(root, "cwd");
   mkdirSync(config); mkdirSync(cwd);
-  writeFileSync(join(config, "agent-tasks.json"), JSON.stringify({ outputTranscript: false, rememberAgents: false, defaultJoinMode: "async" }));
+  writeFileSync(join(config, "agent-tasks.json"), JSON.stringify({ outputTranscript: false, defaultJoinMode: "async" }));
   const previous = process.env.PI_CODING_AGENT_DIR; process.env.PI_CODING_AGENT_DIR = config;
   const tools = new Map<string, Parameters<ExtensionAPI["registerTool"]>[0]>();
   const handlers = new Map<string, ((...args: unknown[]) => unknown)[]>();

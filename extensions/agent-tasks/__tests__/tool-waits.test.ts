@@ -28,9 +28,9 @@ const tick = async () => { for (let i = 0; i < 20; i++) await Promise.resolve();
 const pause = (ms: number) => new Promise<void>(done => setTimeout(done, ms));
 
 async function factory(settings: Record<string, unknown> = {}, extra: AgentManagerDependencies = {}, mentionDependencies?: import("../src/mention-clone.ts").MentionCloneDependencies, host: { send?: (message: { customType: string; content: unknown; details?: NotificationDetails }) => void; exec?: ExtensionAPI["exec"]; flag?: string; localLifecycle?: boolean; onEvent?: (name: string) => void; customAgent?: boolean; ui?: ExtensionToolContext["ui"]; beforeStart?: (coordinator: TaskCoordinator, lifecycle: TaskLifecycle) => void; onSource?: (source: import("../../task-ui/types.ts").TaskSource, lifecycle: TaskLifecycle) => void } = {}) {
-  const root = mkdtempSync(join(tmpdir(), "agent-tool-waits-")), cwd = join(root, "cwd"), config = join(root, "agent");
-  mkdirSync(cwd); mkdirSync(config);
-  writeFileSync(join(config, "agent-tasks.json"), JSON.stringify({ outputTranscript: true, rememberAgents: false, defaultJoinMode: "async", ...settings }));
+  const root = mkdtempSync(join(tmpdir(), "agent-tool-waits-")), cwd = join(root, "cwd"), config = join(root, "agent"), rootSessionFile = join(root, "root.jsonl");
+  mkdirSync(cwd); mkdirSync(config); writeFileSync(rootSessionFile, "");
+  writeFileSync(join(config, "agent-tasks.json"), JSON.stringify({ outputTranscript: true, defaultJoinMode: "async", ...settings }));
   if (host.customAgent) {
     mkdirSync(join(config, "agents"));
     writeFileSync(join(config, "agents", "custom.md"), "---\nname: custom\ndescription: Offline foreground-pinned agent\nrun_in_background: false\n---\nDo the requested work.\n");
@@ -61,7 +61,9 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
   const deps: AgentManagerDependencies = {
     runAgent: async (_ctx, _type, _prompt, options) => {
       const result = deferred<RunResult>();
-      const session = { messages: [], sessionManager: { getSessionFile: () => undefined },
+      const sessionFile = join(root, `child-${calls.length}.jsonl`);
+      writeFileSync(sessionFile, "");
+      const session = { messages: [], sessionManager: { getSessionFile: () => sessionFile },
         subscribe: () => () => {}, dispose() {}, getContextUsage: () => undefined,
       } as unknown as AgentSession;
       const call = { options, session, finish: (text = "inline answer", failure?: string) => result.resolve({ session, responseText: text, aborted: false, steered: false, failure }) };
@@ -99,7 +101,7 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
   lifecycle.onClose(management.close);
   if (!host.localLifecycle) pi.on("session_shutdown", async () => { await lifecycle.shutdown(); });
   const ctx = { cwd, hasUI: false, mode: "print", ui: { setWidget() { throw new Error("widget sink failed"); }, setStatus() { throw new Error("status sink failed"); }, notify() { throw new Error("notify sink failed"); } },
-    sessionManager: { getSessionId: () => "offline-test", getBranch: () => [] }, modelRegistry: {},
+    sessionManager: { getSessionId: () => "offline-test", getBranch: () => [], getSessionFile: () => rootSessionFile }, modelRegistry: {},
   } as unknown as ExtensionToolContext;
   if (host.ui) { ctx.ui = host.ui; ctx.hasUI = true; }
   host.beforeStart?.(coordinator, lifecycle);
@@ -543,7 +545,7 @@ void it("injected participant freezes both backends before wait cancellation, dr
   let shutdowns = 0, resources = 0;
   const f = await factory({}, { runAgent: async (_ctx, _type, _prompt, options) => {
     resources++;
-    const session = { messages: [], sessionManager: { getSessionFile: () => undefined }, subscribe: () => () => {}, dispose() {},
+    const session = { messages: [], sessionManager: { getSessionFile: () => join(tmpdir(), `agent-tool-waits-child-${Math.random()}.jsonl`) }, subscribe: () => () => {}, dispose() {},
       extensionRunner: { hasHandlers: () => true, async emit() { shutdowns++; resources--; } },
     } as unknown as AgentSession;
     options.onSessionCreated?.(session);
@@ -930,7 +932,7 @@ for (const beforeBatch of [false, true]) void it(`stopped noncooperative grouped
   const pending = deferred<RunResult>();
   let heldSession!: AgentSession, heldOptions!: Parameters<NonNullable<AgentManagerDependencies["runAgent"]>>[3], runners = 0;
   const f = await factory({ defaultJoinMode: "group" }, { runAgent: async (_ctx, _type, _prompt, options) => {
-    const session = { messages: [], sessionManager: { getSessionFile: () => undefined }, subscribe: () => () => {}, dispose() {}, getContextUsage: () => undefined } as unknown as AgentSession;
+    const session = { messages: [], sessionManager: { getSessionFile: () => join(tmpdir(), `agent-tool-waits-child-${Math.random()}.jsonl`) }, subscribe: () => () => {}, dispose() {}, getContextUsage: () => undefined } as unknown as AgentSession;
     options.onSessionCreated?.(session);
     if (++runners === 1) { heldSession = session; heldOptions = options; return pending.promise; }
     return { session, responseText: "natural sibling", aborted: false, steered: false };
@@ -956,7 +958,7 @@ for (const beforeBatch of [false, true]) void it(`stopped noncooperative grouped
 void it("genuine running group member retains partial timeout and later straggler delivery", async t => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const held = deferred<RunResult>(); let calls = 0;
-  const session = { messages: [], sessionManager: { getSessionFile: () => undefined }, subscribe: () => () => {}, dispose() {}, getContextUsage: () => undefined } as unknown as AgentSession;
+  const session = { messages: [], sessionManager: { getSessionFile: () => join(tmpdir(), `agent-tool-waits-child-${Math.random()}.jsonl`) }, subscribe: () => () => {}, dispose() {}, getContextUsage: () => undefined } as unknown as AgentSession;
   const f = await factory({ defaultJoinMode: "group" }, { runAgent: async (_ctx, _type, _prompt, options) => {
     options.onSessionCreated?.(session);
     if (++calls === 1) return held.promise;
@@ -978,7 +980,7 @@ void it("genuine running group member retains partial timeout and later straggle
 void it("mixed completed stopped and running group reports partial only for genuinely running member", async t => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const stopped = deferred<RunResult>(), running = deferred<RunResult>(); let calls = 0;
-  const session = { messages: [], sessionManager: { getSessionFile: () => undefined }, subscribe: () => () => {}, dispose() {}, getContextUsage: () => undefined } as unknown as AgentSession;
+  const session = { messages: [], sessionManager: { getSessionFile: () => join(tmpdir(), `agent-tool-waits-child-${Math.random()}.jsonl`) }, subscribe: () => () => {}, dispose() {}, getContextUsage: () => undefined } as unknown as AgentSession;
   const f = await factory({ defaultJoinMode: "group" }, { runAgent: async (_ctx, _type, _prompt, options) => {
     options.onSessionCreated?.(session);
     if (++calls === 1) return stopped.promise;

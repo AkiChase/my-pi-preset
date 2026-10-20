@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { it } from "node:test";
 import type { AgentSession, AgentSessionEvent, DefaultResourceLoader, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import "./source-loader.mjs";
 import type { AgentRunnerDependencies, RunOptions } from "../src/agent-runner.ts";
-const { runAgent, resumeAgent, setRememberAgents, shutdownChildSession, setDefaultMaxTurns, getDefaultMaxTurns } = await import("../src/agent-runner.ts");
+const { runAgent, resumeAgent, shutdownChildSession, setDefaultMaxTurns, getDefaultMaxTurns } = await import("../src/agent-runner.ts");
 const { AgentManager } = await import("../src/agent-manager.ts");
 const { TaskCoordinator } = await import("../../task-ui/coordinator.ts");
 const { registerAgentWait } = await import("../src/waits.ts");
@@ -25,13 +25,16 @@ function fixture(boundary?: Boundary) {
   const root = mkdtempSync(join(tmpdir(), "agent-real-runner-"));
   const previous = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = root;
-  setRememberAgents(false);
   const gate = deferred(), reached = deferred(), controller = new AbortController();
   const calls = { env: 0, reload: 0, create: 0, bind: 0, prompt: 0, abort: 0, shutdown: 0, dispose: 0, ready: 0 };
   const listeners = new Set<(event: AgentSessionEvent) => void>();
   async function delay(at: Boundary) { if (boundary === at) { reached.resolve(); await gate.promise; } }
+  const rootSessionFile = join(root, "root.jsonl");
+  const childSessionFile = join(root, "child.jsonl");
+  writeFileSync(rootSessionFile, "{}\n");
+  writeFileSync(childSessionFile, "{}\n");
   const session = {
-    messages: [], setSessionName() {}, sessionManager: { getSessionFile: () => undefined },
+    messages: [], setSessionName() {}, sessionManager: { getSessionFile: () => childSessionFile },
     bindExtensions: async () => { calls.bind++; await delay("bind"); },
     subscribe(listener: (event: AgentSessionEvent) => void) {
       listeners.add(listener);
@@ -47,7 +50,7 @@ function fixture(boundary?: Boundary) {
     createResourceLoader: () => ({ reload: async () => { calls.reload++; await delay("reload"); } }) as unknown as DefaultResourceLoader,
     createAgentSession: async () => { calls.create++; await delay("create"); return { session } as Awaited<ReturnType<NonNullable<AgentRunnerDependencies["createAgentSession"]>>>; },
   };
-  const ctx = { cwd: root, getSystemPrompt: () => "", modelRegistry: {}, sessionManager: { getBranch: () => [], getSessionFile: () => undefined } } as unknown as ExtensionContext;
+  const ctx = { cwd: root, getSystemPrompt: () => "", modelRegistry: {}, sessionManager: { getBranch: () => [], getSessionFile: () => rootSessionFile } } as unknown as ExtensionContext;
   const pi = {} as ExtensionAPI;
   const options: RunOptions = { pi, isolated: true, signal: controller.signal,
     onSessionCreated() { calls.ready++; if (boundary === "callback") controller.abort(); },

@@ -20,8 +20,8 @@ import { normalizeAgentDescription } from "./spawn-input.ts";
 import { createAgentManagement } from "./management.ts";
 import { createAgentTaskSource } from "./source.ts";
 import { getAgentConversation } from "./agent-runner.ts";
+import { allocatePersistentAgent, markRunningAgentsInterrupted, registryLocatorForRootSession, updatePersistentAgent, type RootRegistryLocator } from "./subagent-registry.ts";
 import type { TaskIdentity } from "../../task-ui/types.ts";
-import { randomUUID } from "node:crypto";
 import { statSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import type { Model } from "@earendil-works/pi-ai";
@@ -331,6 +331,8 @@ interface SpawnOptions {
   maxSubagentDepth?: number;
   /** Config-discovery root inherited by nested launches when it differs from the working directory. */
   configCwd?: string;
+  /** Root registry location explicitly inherited by nested descendants. */
+  registryLocator?: RootRegistryLocator;
   /** Root session id, inherited by nested launches so transcripts stay grouped. */
   rootSessionId?: string;
 }
@@ -382,6 +384,8 @@ export class AgentManager {
   private cleanupController = new AbortController();
   private retainOwner?: (record: AgentRecord) => boolean;
   private parentMessageListeners = new Set<ParentMessageListener>();
+  /** Entries marked interrupted before shutdown must not be overwritten by stop cleanup. */
+  private shutdownInterrupted = new Set<string>();
   subscribe(listener: () => void): () => void {
     if (this.admissionClosed) return () => {};
     this.listeners.add(listener);
@@ -656,7 +660,14 @@ export class AgentManager {
     options = { ...options, description };
     assertValidSpawnCwd(options.cwd);
 
-    const id = randomUUID().slice(0, 17);
+    const inheritedLocator = options.registryLocator ?? (options.parentAgentId ? this.agents.get(options.parentAgentId)?.registryLocator : undefined);
+    const rootSessionFile = inheritedLocator?.rootSessionFile ?? ctx.sessionManager?.getSessionFile?.();
+    if (!rootSessionFile) {
+      throw new Error("Subagents require a persisted parent session; start Pi without --no-session.");
+    }
+    const registryLocator = inheritedLocator ?? registryLocatorForRootSession(rootSessionFile);
+    const persistent = allocatePersistentAgent(registryLocator, type, options.parentAgentId);
+    const id = persistent.agentId;
     const abortController = new AbortController();
     const maxTurns = resolveEffectiveMaxTurns(type, options.maxTurns);
     const record: AgentRecord = {
@@ -709,6 +720,7 @@ export class AgentManager {
       parentRunId: options.parentAgentId ? this.agents.get(options.parentAgentId)?.runId : undefined,
       workflowId: options.workflowId,
       maxSubagentDepth: options.maxSubagentDepth,
+      registryLocator,
       rootSessionId: options.rootSessionId,
       // Workflow children answer to a script, not a conversation: no channel.
       mailbox: options.workflowId === undefined ? new AgentMailbox() : undefined,
@@ -805,6 +817,7 @@ export class AgentManager {
     // settle releases that current lease, not a pool captured at launch time.
     this.acquireSlot(record);
     record.status = "running";
+    updatePersistentAgent(record.registryLocator!, record.id, { status: "running" });
     record.startedAt = Date.now();
     record.startGate = undefined;
     this.notifyChanged();
@@ -976,6 +989,10 @@ export class AgentManager {
         // stubbed session must degrade to "not resumable" rather than throw
         // and take the whole spawn down with it.
         record.sessionFile = session.sessionManager?.getSessionFile?.();
+        if (!record.sessionFile) {
+          throw new Error("Subagent persistence failed: the child session has no session file.");
+        }
+        updatePersistentAgent(record.registryLocator!, record.id, { sessionFile: record.sessionFile, status: "running" });
         // Same reason, different field: the model and thinking level are only
         // knowable once pi has resolved its defaults and clamped the level to
         // what the model supports. Writing them back here makes the record
@@ -1139,6 +1156,9 @@ export class AgentManager {
     this.releaseSlot(record, run);
     // Unanswered requests end with this execution; their waiters learn it now.
     record.mailbox?.closeRun(run.identity.runId, record.status === "stopped" ? "stopped" : "execution_ended");
+    if (!this.shutdownInterrupted.has(record.id)) {
+      updatePersistentAgent(record.registryLocator!, record.id, { status: record.status });
+    }
     this.resolveTerminal(record);
     this.notifyChanged();
     try { if (this.current(record, run)) this.onComplete?.(record); } catch { /* isolate completion side effects */ }
@@ -1307,6 +1327,7 @@ export class AgentManager {
     this.ownSession(session, run);
     this.acquireSlot(record);
     record.status = "running"; record.starting = false; record.startedAt = Date.now();
+    updatePersistentAgent(record.registryLocator!, record.id, { status: "running" });
     record.startGate = undefined;
     this.notifyChanged();
     if (!this.current(record, run) || record.abortController?.signal.aborted) { this.settleRun(record, run); return; }
@@ -1618,6 +1639,19 @@ export class AgentManager {
     return [...this.agents.values()].some(
       r => r.status === "running" || r.status === "queued",
     );
+  }
+
+  /** Persist the shutdown interruption before live executions are stopped. */
+  markInterruptedForShutdown(): number {
+    const locators = new Map<string, RootRegistryLocator>();
+    for (const record of this.agents.values()) {
+      if (record.status !== "queued" && record.status !== "running") continue;
+      if (record.registryLocator) locators.set(record.registryLocator.registryFile, record.registryLocator);
+      this.shutdownInterrupted.add(record.id);
+    }
+    let count = 0;
+    for (const locator of locators.values()) count += markRunningAgentsInterrupted(locator);
+    return count;
   }
 
   /** Abort all running and queued agents immediately. */

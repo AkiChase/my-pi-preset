@@ -338,20 +338,6 @@ export function resolveEffectiveMaxTurns(type: string, explicit?: number): numbe
   return normalizeMaxTurns(explicit ?? getAgentConfig(type)?.maxTurns ?? defaultMaxTurns);
 }
 
-/**
- * Project default for `persist_session`, from the `rememberAgents` setting.
- * On by default: a persisted session is what lets `@handle` reopen an agent's
- * conversation after its record has been evicted, which is the whole point of
- * addressing an agent by a name that outlives one run. Per-agent frontmatter
- * still overrides it in both directions.
- */
-let rememberAgents = true;
-
-/** Whether subagent sessions are persisted by default. */
-export function getRememberAgents(): boolean { return rememberAgents; }
-/** Set whether subagent sessions are persisted by default. */
-export function setRememberAgents(b: boolean): void { rememberAgents = b; }
-
 /** Additional turns allowed after the soft limit steer message. */
 let graceTurns = 5;
 
@@ -424,13 +410,7 @@ export interface RunOptions {
    * under the type's *current* definition, not the one the original run used.
    */
   resumeSessionFile?: string;
-  /**
-   * True when another agent spawned this one. Only top-level agents get a
-   * handle, so only they can be reopened by name — which is the whole reason
-   * `rememberAgents` persists a session at all. A nested run's transcript would
-   * be unreachable by anything, so it stays in memory unless its own
-   * frontmatter asks otherwise.
-   */
+  /** True when another agent spawned this one; all child sessions persist. */
   nested?: boolean;
   /**
    * True when a workflow run spawned this agent. Its final text is the value
@@ -1074,25 +1054,19 @@ export async function runAgent(
   const settingsManager = SettingsManager.create(configCwd, agentDir);
   const configuredSessionDir = resolveConfiguredSessionDir(agentConfig?.sessionDir, effectiveCwd);
   const defaultSessionDir = process.env.PI_CODING_AGENT_SESSION_DIR ?? settingsManager.getSessionDir?.();
-  // Frontmatter wins when it says anything; otherwise the project default,
-  // which `rememberAgents` supplies for top-level agents only. Same precedence
-  // as `outputTranscript`.
-  const persistSession = agentConfig?.persistSession ?? (options.nested ? false : rememberAgents);
+  // Every child session is persistent. Instance recovery requires a transcript
+  // regardless of nesting depth or agent frontmatter.
   const sessionManager = options.resumeSessionFile
     // Reopening an existing conversation: the file already carries its own
     // header (cwd, parent) and history, so none of the create-time options
     // apply. `sessionDir` still matters for a later /new or /branch off it.
     ? SessionManager.open(options.resumeSessionFile, configuredSessionDir ?? defaultSessionDir)
-    : persistSession
-      ? SessionManager.create(effectiveCwd, configuredSessionDir ?? defaultSessionDir, {
+    : SessionManager.create(effectiveCwd, configuredSessionDir ?? defaultSessionDir, {
           // Optional metadata — it only nests the subagent under its spawner in
-          // `/resume`. Until `rememberAgents` this ran solely for the rare
-          // `persist_session: true` agent; now it runs for every spawn, so a
-          // context without a session manager (a bare programmatic ctx) must
-          // still persist rather than take the whole spawn down.
+          // `/resume`. A bare programmatic context must still persist rather
+          // than silently creating an unrecoverable in-memory child.
           parentSession: ctx.sessionManager?.getSessionFile?.(),
-        })
-      : SessionManager.inMemory(effectiveCwd);
+        });
 
   // Pi 0.80.8 replaced createAgentSession's modelRegistry option with
   // modelRuntime, but ExtensionContext still exposes only the registry facade.

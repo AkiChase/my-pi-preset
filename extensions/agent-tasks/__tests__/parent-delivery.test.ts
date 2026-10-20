@@ -33,9 +33,9 @@ interface Sent { customType: string; content: string; display?: boolean; options
 /** Real registration with offline runner/session seams; sinks are recorded. */
 async function factory() {
   const root = mkdtempSync(join(tmpdir(), "agent-parent-delivery-"));
-  const cwd = join(root, "cwd"), config = join(root, "agent");
-  mkdirSync(cwd); mkdirSync(config);
-  writeFileSync(join(config, "agent-tasks.json"), JSON.stringify({ outputTranscript: false, rememberAgents: false, defaultJoinMode: "async" }));
+  const cwd = join(root, "cwd"), config = join(root, "agent"), rootSessionFile = join(root, "root.jsonl");
+  mkdirSync(cwd); mkdirSync(config); writeFileSync(rootSessionFile, "");
+  writeFileSync(join(config, "agent-tasks.json"), JSON.stringify({ outputTranscript: false, defaultJoinMode: "async" }));
   const previous = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = config;
   const tools = new Map<string, Parameters<ExtensionAPI["registerTool"]>[0]>();
@@ -45,7 +45,9 @@ async function factory() {
   const deps: AgentManagerDependencies = {
     runAgent: async (_ctx, _type, _prompt, options) => {
       const result = deferred<RunResult>();
-      const session = { messages: [], sessionManager: { getSessionFile: () => undefined }, getContextUsage: () => undefined,
+      const sessionFile = join(root, `child-${runs.length}.jsonl`);
+      writeFileSync(sessionFile, "");
+      const session = { messages: [], sessionManager: { getSessionFile: () => sessionFile }, getContextUsage: () => undefined,
         steer: async (value: string) => { steers.push(value); }, subscribe: () => () => {}, dispose() {} } as unknown as AgentSession;
       runs.push({ id: options.agentId!, options, session, finish: (value = "final answer") => result.resolve({ responseText: value, session, aborted: false, steered: false }) });
       queueMicrotask(() => options.onSessionCreated?.(session));
@@ -70,7 +72,7 @@ async function factory() {
   agentTasks(pi, { coordinator, lifecycle, managerDependencies: deps, onManagement: capability => capabilities.push(capability), onManagementResult: reporter => { report = reporter; } });
   const agentManage = managementTool("agent", capabilities, (id, result) => report?.(id, result) ?? result);
   const ctx = { cwd, hasUI: false, mode: "print", ui: { setWidget() {}, setStatus() {}, notify() {} },
-    sessionManager: { getSessionId: () => "parent-delivery", getBranch: () => [] }, modelRegistry: {} } as unknown as ExtensionToolContext;
+    sessionManager: { getSessionId: () => "parent-delivery", getBranch: () => [], getSessionFile: () => rootSessionFile }, modelRegistry: {} } as unknown as ExtensionToolContext;
   await handlers.get("session_start")![0]!(undefined, ctx);
   const execute = (name: string, params: Record<string, unknown>, id = "call", signal?: AbortSignal) =>
     tools.get(name)!.execute(id, completeToolCall(tools.get(name)!.parameters, params), signal, () => {}, ctx);

@@ -117,23 +117,13 @@ export interface SubagentsSettings {
    */
   agentMentions?: AgentMentionMode;
   /**
-   * Whether subagents persist their pi session by default, so `@handle` can
-   * reopen an agent's conversation long after its in-memory record is gone.
-   * Defaults to `true`. Per-agent `persist_session:` frontmatter overrides it
-   * in both directions. Turning it off restores the previous behaviour, where
-   * a handle stops resolving roughly ten minutes after the agent finishes and
-   * mentioning it starts a fresh run instead. Persisted sessions also appear
-   * nested under the spawning session in pi's `/resume`.
-   */
-  rememberAgents?: boolean;
-  /**
    * Project/global default for writing each subagent's `.output` transcript
    * (a JSON-lines copy of the run, stored under the OS temp dir).
    * Defaults to `true`. Set `false` to make transcripts opt-in for the whole
    * project (e.g. a repo that shouldn't leave run transcripts on disk for backup
    * or DLP tooling to ingest). A custom agent's `output_transcript` frontmatter
    * overrides this per agent. This governs only the transcript — it does NOT
-   * affect the persisted pi session (`persist_session`), worktree commits
+   * affect the always-persisted Pi session, worktree commits
    * (`isolation: worktree`), or memory files.
    */
   outputTranscript?: boolean;
@@ -252,7 +242,6 @@ export interface SettingsAppliers {
   setStrictAgentFiles: (b: boolean) => void;
   setDisableDefaultAgents: (b: boolean) => void;
   setAgentMentions: (mode: AgentMentionMode) => void;
-  setRememberAgents: (b: boolean) => void;
   setOutputTranscript: (b: boolean) => void;
   setWorktreeIsolation: (b: boolean) => void;
   setWorkflowsEnabled: (b: boolean) => void;
@@ -339,9 +328,6 @@ function sanitize(raw: unknown): SubagentsSettings {
     out.agentMentions = r.agentMentions ? "model" : "off";
   } else if (typeof r.agentMentions === "string" && VALID_AGENT_MENTION_MODES.has(r.agentMentions)) {
     out.agentMentions = r.agentMentions as AgentMentionMode;
-  }
-  if (typeof r.rememberAgents === "boolean") {
-    out.rememberAgents = r.rememberAgents;
   }
   if (typeof r.outputTranscript === "boolean") {
     out.outputTranscript = r.outputTranscript;
@@ -432,7 +418,6 @@ export function applySettings(s: SubagentsSettings, appliers: SettingsAppliers):
   if (typeof s.strictAgentFiles === "boolean") appliers.setStrictAgentFiles(s.strictAgentFiles);
   if (typeof s.disableDefaultAgents === "boolean") appliers.setDisableDefaultAgents(s.disableDefaultAgents);
   if (s.agentMentions) appliers.setAgentMentions(s.agentMentions);
-  if (typeof s.rememberAgents === "boolean") appliers.setRememberAgents(s.rememberAgents);
   if (typeof s.outputTranscript === "boolean") appliers.setOutputTranscript(s.outputTranscript);
   if (typeof s.worktreeIsolation === "boolean") appliers.setWorktreeIsolation(s.worktreeIsolation);
   if (typeof s.reportUsage === "boolean") appliers.setReportUsage(s.reportUsage);

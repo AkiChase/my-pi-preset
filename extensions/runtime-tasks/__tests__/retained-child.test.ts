@@ -33,11 +33,11 @@ function fixture(configPatch: Partial<AgentConfig> = {}) {
   const root = mkdtempSync(join(tmpdir(), "runtime-child-loader-")), agent = join(root, "agent"), cwd = join(root, "cwd"), other = join(root, "other");
   mkdirSync(agent); mkdirSync(cwd); mkdirSync(other); mkdirSync(join(agent, "agents"));
   writeFileSync(join(agent, "settings.json"), JSON.stringify({ extensions: [composition], compaction: { enabled: false } }));
-  writeFileSync(join(agent, "agent-tasks.json"), JSON.stringify({ rememberAgents: false, outputTranscript: false }));
-  writeFileSync(join(agent, "agents", "leaf.md"), "---\nname: leaf\ndescription: offline leaf\nextensions: false\ntools: none\npersist_session: false\n---\nReturn the answer.\n");
+  writeFileSync(join(agent, "agent-tasks.json"), JSON.stringify({ outputTranscript: false }));
+  writeFileSync(join(agent, "agents", "leaf.md"), "---\nname: leaf\ndescription: offline leaf\nextensions: false\ntools: none\n---\nReturn the answer.\n");
   const previous = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = agent;
-  const parent: AgentConfig = { name: "parent", description: "parent", systemPrompt: "offline", builtinToolNames: ["bash"], extensions: true, skills: false, promptMode: "replace", allowedSubagents: "all", persistSession: false, ...configPatch };
+  const parent: AgentConfig = { name: "parent", description: "parent", systemPrompt: "offline", builtinToolNames: ["bash"], extensions: true, skills: false, promptMode: "replace", allowedSubagents: "all", ...configPatch };
   const leaf: AgentConfig = { ...parent, name: "leaf", allowedSubagents: undefined, extensions: false };
   registerAgents(new Map([[parent.name, parent], [leaf.name, leaf]]));
   const calls: { session: AgentSession; options: RunOptions; prompt: string; finish(text?: string): void }[] = [];

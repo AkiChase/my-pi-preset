@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { it } from "node:test";
@@ -10,7 +10,7 @@ import type { AgentManagerDependencies } from "../src/agent-manager.ts";
 import type { AgentRunnerDependencies, RunOptions, RunResult } from "../src/agent-runner.ts";
 const { AgentMailbox, PARENT_MESSAGE_LIMITS, REPLY_TO_PARENT_TOOL_NAME, createReplyToParentTool } = await import("../src/parent-messaging.ts");
 const { AgentManager } = await import("../src/agent-manager.ts");
-const { runAgent, setRememberAgents, shutdownChildSession } = await import("../src/agent-runner.ts");
+const { runAgent, shutdownChildSession } = await import("../src/agent-runner.ts");
 
 const tick = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
 function deferred<T>() {
@@ -159,7 +159,6 @@ function runnerFixture() {
   const root = mkdtempSync(join(tmpdir(), "agent-parent-channel-"));
   const previous = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = root;
-  setRememberAgents(false);
   const sessionOptions: Parameters<NonNullable<AgentRunnerDependencies["createAgentSession"]>>[0][] = [];
   let active: string[] = [];
   const session = {
@@ -224,12 +223,17 @@ void it("actual runner keeps reply_to_parent through extension-mode registry and
 });
 
 function managerFixture() {
+  const sessionDir = mkdtempSync(join(tmpdir(), "agent-parent-manager-"));
+  const rootSessionFile = join(sessionDir, "root.jsonl");
+  writeFileSync(rootSessionFile, "");
   const calls: { id: string; options: RunOptions; session: AgentSession; finish: (text?: string) => void }[] = [];
   const resumes: { finish: (text?: string) => void }[] = [];
   const deps: AgentManagerDependencies = {
     runAgent: async (_ctx, _type, _prompt, options) => {
       const result = deferred<RunResult>();
-      const session = { messages: [], sessionManager: { getSessionFile: () => undefined }, dispose() {}, steer: async () => {}, subscribe: () => () => {} } as unknown as AgentSession;
+      const sessionFile = join(sessionDir, `child-${calls.length}.jsonl`);
+      writeFileSync(sessionFile, "");
+      const session = { messages: [], sessionManager: { getSessionFile: () => sessionFile }, dispose() {}, steer: async () => {}, subscribe: () => () => {} } as unknown as AgentSession;
       calls.push({ id: options.agentId!, options, session, finish: (text = "done") => result.resolve({ responseText: text, session, aborted: false, steered: false }) });
       queueMicrotask(() => options.onSessionCreated?.(session));
       options.signal?.addEventListener("abort", () => result.resolve({ responseText: "stopped", session, aborted: false, steered: false }), { once: true });
@@ -243,10 +247,10 @@ function managerFixture() {
     },
   };
   const manager = new AgentManager(undefined, 4, undefined, undefined, undefined, deps);
-  const ctx = { cwd: tmpdir() } as ExtensionContext;
+  const ctx = { cwd: tmpdir(), sessionManager: { getSessionFile: () => rootSessionFile } } as unknown as ExtensionContext;
   return { manager, calls, resumes,
     spawn: (options: Partial<Parameters<typeof manager.spawn>[4]> = {}) => manager.spawn({} as ExtensionAPI, ctx, "general-purpose", "work", { description: "work", isBackground: true, ...options }),
-    async close() { manager.freezeAdmission(); manager.abortAll(); await tick(); await manager.dispose(); },
+    async close() { manager.freezeAdmission(); manager.abortAll(); await tick(); await manager.dispose(); rmSync(sessionDir, { recursive: true, force: true }); },
   };
 }
 

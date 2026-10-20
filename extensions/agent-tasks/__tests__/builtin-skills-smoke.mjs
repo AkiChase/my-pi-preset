@@ -25,7 +25,7 @@ export default function(pi) {
     registerAgents(new Map([['resource-child', { name: 'resource-child', description: 'offline', extensions: ctx.extensions,
       excludeExtensions: ctx.excludeExtensions, skills: ctx.skills, builtinToolNames: ['read'],
       disallowedTools: ['subagent_run', 'subagent_workflow', 'subagent_message', 'agent_manage'],
-      persistSession: false, systemPrompt: 'CHILD_ONLY', promptMode: 'replace' }]]));
+      systemPrompt: 'CHILD_ONLY', promptMode: 'replace' }]]));
     let loader;
     const result = await runAgent(ctx, 'resource-child', 'offline', { pi, isolated: ctx.isolated, nested: true }, {
       detectEnv: async () => ({ isGitRepo: false, platform: 'offline' }),

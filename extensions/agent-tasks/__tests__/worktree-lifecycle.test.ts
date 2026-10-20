@@ -15,6 +15,8 @@ function deferred() {
 }
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "worktree-lifecycle-"));
+  const rootSessionFile = join(root, "root.jsonl");
+  writeFileSync(rootSessionFile, "");
   const calls: { args: string[]; options: Parameters<ExtensionAPI["exec"]>[2] }[] = [];
   const gate = deferred(), reached = deferred();
   let partial: WorktreeInfo | undefined;
@@ -30,7 +32,8 @@ function fixture() {
   };
   // SDK private fields are not involved: only its public exec surface is used.
   const pi = { exec } as ExtensionAPI;
-  return { root, pi, calls, gate, reached, get partial() { return partial; },
+  const ctx = { cwd: root, sessionManager: { getSessionFile: () => rootSessionFile } } as unknown as ExtensionContext;
+  return { root, ctx, pi, calls, gate, reached, get partial() { return partial; },
     close() { gate.resolve(); if (partial) rmSync(partial.path, { recursive: true, force: true }); rmSync(root, { recursive: true, force: true }); },
   };
 }
@@ -51,7 +54,7 @@ void it("actual manager worktree add cancelled at close never launches a runner 
     worktreeEnabled: () => true, runAgent: async () => { runs++; throw new Error("must not run"); },
   });
   try {
-    const id = manager.spawn(f.pi, { cwd: f.root } as ExtensionContext, "general-purpose", "no", { description: "cancel", isolation: "worktree", isBackground: true });
+    const id = manager.spawn(f.pi, f.ctx, "general-purpose", "no", { description: "cancel", isolation: "worktree", isBackground: true });
     await f.reached.promise;
     manager.freezeAdmission(); manager.abortAll(); assert.equal((await manager.getRun(id)!.terminal).status, "stopped");
     let drained = false; const drain = manager.drainExecution().then(() => { drained = true; });
@@ -94,7 +97,7 @@ void it("actual cleanup cancellation between awaits starts no subsequent git and
 void it("actual runner cleanup waits for its output hook and in-flight git, stops after close boundary", async () => {
   const f = fixture(), cleanupGate = deferred(), cleanupReached = deferred();
   let finish!: () => void, output = 0, hooks = 0;
-  const session = { messages: [], sessionManager: { getSessionFile: () => undefined }, abort: async () => {}, dispose() {} } as unknown as import("@earendil-works/pi-coding-agent").AgentSession;
+  const session = { messages: [], sessionManager: { getSessionFile: () => join(f.root, "cleanup-child.jsonl") }, abort: async () => {}, dispose() {} } as unknown as import("@earendil-works/pi-coding-agent").AgentSession;
   const exec: ExtensionAPI["exec"] = async (_cmd, args, options) => {
     f.calls.push({ args, options }); cleanupReached.resolve(); await cleanupGate.promise;
     return { stdout: " M unsaved.txt", stderr: "", code: 0, killed: false };
@@ -110,7 +113,7 @@ void it("actual runner cleanup waits for its output hook and in-flight git, stop
     },
   });
   try {
-    const id = manager.spawn({ exec } as ExtensionAPI, { cwd: f.root } as ExtensionContext, "general-purpose", "work", { description: "cleanup", isolation: "worktree", isBackground: true,
+    const id = manager.spawn({ exec } as ExtensionAPI, f.ctx, "general-purpose", "work", { description: "cleanup", isolation: "worktree", isBackground: true,
       onBeforeWorktreeCleanup: async () => { hooks++; },
     });
     for (let i = 0; i < 10; i++) await Promise.resolve();
@@ -132,7 +135,7 @@ void it("actual runner cleanup waits for its output hook and in-flight git, stop
 void it("noncooperative runner close preserves actively written worktree and retained late owner", async () => {
   const f = fixture(), gate = deferred(), ready = deferred(); let cleanup = 0, disposed = 0;
   const tree = join(f.root, "active-tree"); mkdirSync(tree); writeFileSync(join(tree, "writing.txt"), "keep");
-  const session = { messages: [], sessionManager: { getSessionFile: () => undefined }, abort: async () => {}, dispose() { disposed++; } } as unknown as import("@earendil-works/pi-coding-agent").AgentSession;
+  const session = { messages: [], sessionManager: { getSessionFile: () => join(f.root, "active-child.jsonl") }, abort: async () => {}, dispose() { disposed++; } } as unknown as import("@earendil-works/pi-coding-agent").AgentSession;
   const manager = new AgentManager(undefined, 1, undefined, undefined, undefined, {
     disposeTimeoutMs: 15, worktreeEnabled: () => true,
     createWorktree: async () => ({ path: tree, workPath: tree, branch: "saved", baseSha: "base" }),
@@ -143,7 +146,7 @@ void it("noncooperative runner close preserves actively written worktree and ret
     },
   });
   try {
-    manager.spawn(f.pi, { cwd: f.root } as ExtensionContext, "general-purpose", "work", { description: "active", isolation: "worktree", isBackground: true });
+    manager.spawn(f.pi, f.ctx, "general-purpose", "work", { description: "active", isolation: "worktree", isBackground: true });
     await ready.promise; await manager.dispose();
     assert.equal(cleanup, 0); assert.equal(disposed, 0); assert.ok(manager.executionCount > 0);
     assert.equal(readFileSync(join(tree, "writing.txt"), "utf8"), "keep");

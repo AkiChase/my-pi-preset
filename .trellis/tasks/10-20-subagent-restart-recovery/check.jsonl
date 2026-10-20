@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/development/index.md", "reason": "Review lifecycle, tool-contract, UI, and state-ownership requirements."}
+{"file": ".trellis/spec/testing/index.md", "reason": "Review required regression, lifecycle, and tool-boundary verification."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Trace persistence, lifecycle, ownership, error, and UI boundaries."}

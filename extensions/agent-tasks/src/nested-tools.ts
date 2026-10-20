@@ -76,6 +76,7 @@ interface NestedSpawnOptions {
   maxSubagentDepth: number;
   configCwd?: string;
   rootSessionId?: string;
+  registryLocator?: import("./subagent-registry.ts").RootRegistryLocator;
 }
 
 export interface NestedAgentManager {
@@ -366,6 +367,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
       // The whole branch shares the root session's transcript directory; read it
       // off the owning parent rather than this child session's own id.
       const rootSessionId = context.manager.getRecord(context.parentAgentId)?.rootSessionId;
+      const registryLocator = context.manager.getRecord(context.parentAgentId)?.registryLocator;
       const childDepth = context.depth + 1;
       const modelIdentity = model ? describeModel(model) : {};
       // Fuzzy aliases of the same effective model are not an override.
@@ -425,6 +427,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
         maxSubagentDepth: context.maxSubagentDepth,
         configCwd: context.configCwd,
         rootSessionId,
+        registryLocator,
       };
 
       // Transcript wiring, same gate as the top-level path: the child's
