@@ -99,10 +99,12 @@ export interface NestedAgentManager {
     onSpawned?: (id: string) => void,
   ): Promise<{ id: string; record: AgentRecord }>;
   getRecord(id: string): AgentRecord | undefined;
+  hydratePersistentChildren?(parentAgentId: string): AgentRecord[];
   /** Optional lifecycle subscription supplied by AgentManager; test doubles may omit it. */
   subscribe?(listener: () => void): () => void;
   subscribeParentMessages?(listener: (record: AgentRecord, accepted: { message: ChildMessage; deliveredToWaiter: boolean }) => void): () => void;
   resume(id: string, prompt: string, signal?: AbortSignal): Promise<AgentRecord | undefined>;
+  resumePersistent?(pi: ExtensionAPI, ctx: ExtensionContext, id: string, prompt: string, signal?: AbortSignal): AgentRecord | undefined;
 }
 
 export interface NestedToolContext {
@@ -288,12 +290,19 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
         return errorResult(err instanceof Error ? err.message : String(err));
       }
       if (params.resume) {
+        // A restored parent projects only direct children. Hydrating here keeps
+        // grandchildren invisible until their own parent has been resumed.
+        context.manager.hydratePersistentChildren?.(context.parentAgentId);
         const existing = context.manager.getRecord(params.resume);
         if (!ownsRecord(existing, context.parentAgentId)) {
           return textResult(`Nested agent not found or not owned by this parent: "${params.resume}".`, true);
         }
         if (existing.status === "running" || existing.status === "queued") return errorResult("Nested agent is still active; wait or send a message instead.");
-        const resumed = await context.manager.resume(params.resume, params.prompt, signal);
+        const resumed = existing.session
+          ? await context.manager.resume(params.resume, params.prompt, signal)
+          : context.manager.resumePersistent
+            ? context.manager.resumePersistent(context.pi, ctx, params.resume, params.prompt, signal)
+            : undefined;
         return resumed
           ? (() => {
             const identity = launchMetadata("subagent", resumed.id, resumed.runId ?? "1", "foreground");

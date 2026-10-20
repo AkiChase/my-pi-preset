@@ -16,13 +16,14 @@ import { copyAgentExecutionConfig } from "../../runtime-tasks/execution-config.t
  * either — see `occupiesPoolSlot` / `occupiesForegroundSlot`.
  */
 
+import { getAgentConfig } from "./agent-types.ts";
 import { normalizeAgentDescription } from "./spawn-input.ts";
 import { createAgentManagement } from "./management.ts";
 import { createAgentTaskSource } from "./source.ts";
 import { getAgentConversation } from "./agent-runner.ts";
-import { allocatePersistentAgent, markRunningAgentsInterrupted, registryLocatorForRootSession, updatePersistentAgent, type RootRegistryLocator } from "./subagent-registry.ts";
+import { allocatePersistentAgent, loadSubagentRegistry, markRunningAgentsInterrupted, registryLocatorForRootSession, updatePersistentAgent, type PersistentAgentEntry, type RootRegistryLocator } from "./subagent-registry.ts";
 import type { TaskIdentity } from "../../task-ui/types.ts";
-import { statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import type { Model } from "@earendil-works/pi-ai";
 import type { AgentSession, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -333,6 +334,8 @@ interface SpawnOptions {
   configCwd?: string;
   /** Root registry location explicitly inherited by nested descendants. */
   registryLocator?: RootRegistryLocator;
+  /** Internal recovery path: reuse a validated persistent identity, never allocate another one. */
+  persistentEntry?: PersistentAgentEntry;
   /** Root session id, inherited by nested launches so transcripts stay grouped. */
   rootSessionId?: string;
 }
@@ -386,6 +389,8 @@ export class AgentManager {
   private parentMessageListeners = new Set<ParentMessageListener>();
   /** Entries marked interrupted before shutdown must not be overwritten by stop cleanup. */
   private shutdownInterrupted = new Set<string>();
+  /** Recovery notices are once per newly created parent-session execution. */
+  private recoveryNotices = new Set<string>();
   subscribe(listener: () => void): () => void {
     if (this.admissionClosed) return () => {};
     this.listeners.add(listener);
@@ -666,8 +671,12 @@ export class AgentManager {
       throw new Error("Subagents require a persisted parent session; start Pi without --no-session.");
     }
     const registryLocator = inheritedLocator ?? registryLocatorForRootSession(rootSessionFile);
-    const persistent = allocatePersistentAgent(registryLocator, type, options.parentAgentId);
+    const persistent = options.persistentEntry ?? allocatePersistentAgent(registryLocator, type, options.parentAgentId);
+    if (persistent.type !== type || persistent.parentAgentId !== (options.parentAgentId ?? null)) {
+      throw new Error(`Persistent subagent identity does not match this recovery scope: "${persistent.agentId}".`);
+    }
     const id = persistent.agentId;
+    if (this.agents.has(id)) throw new Error(`Subagent "${id}" is already loaded.`);
     const abortController = new AbortController();
     const maxTurns = resolveEffectiveMaxTurns(type, options.maxTurns);
     const record: AgentRecord = {
@@ -722,6 +731,7 @@ export class AgentManager {
       maxSubagentDepth: options.maxSubagentDepth,
       registryLocator,
       rootSessionId: options.rootSessionId,
+      recoveredFromInterruption: persistent.status === "interrupted",
       // Workflow children answer to a script, not a conversation: no channel.
       mailbox: options.workflowId === undefined ? new AgentMailbox() : undefined,
     };
@@ -993,6 +1003,7 @@ export class AgentManager {
           throw new Error("Subagent persistence failed: the child session has no session file.");
         }
         updatePersistentAgent(record.registryLocator!, record.id, { sessionFile: record.sessionFile, status: "running" });
+        this.notifyInterruptedChildren(record, session, run);
         // Same reason, different field: the model and thinking level are only
         // knowable once pi has resolved its defaults and clamped the level to
         // what the model supports. Writing them back here makes the record
@@ -1457,6 +1468,106 @@ export class AgentManager {
 
   failParentRequest(id: string, requestId: string): void {
     this.agents.get(id)?.mailbox?.failRequest(requestId);
+  }
+
+  /**
+   * Recreate only the small, non-executing projection for one ownership scope.
+   * A root session passes null; a restored agent explicitly loads only its own
+   * children. This never opens sessions or starts a descendant tree.
+   */
+  hydratePersistentAgents(locator: RootRegistryLocator, parentAgentId: string | null): AgentRecord[] {
+    const registry = loadSubagentRegistry(locator);
+    if (!registry) return [];
+    const restored: AgentRecord[] = [];
+    for (const entry of Object.values(registry.agents)) {
+      if (entry.parentAgentId !== parentAgentId || this.agents.has(entry.agentId)) continue;
+      const record: AgentRecord = {
+        id: entry.agentId,
+        type: entry.type,
+        description: `Recovered ${entry.type} subagent`,
+        status: entry.status,
+        toolUses: 0,
+        turnCount: 0,
+        maxTurns: resolveEffectiveMaxTurns(entry.type),
+        startedAt: entry.createdAt,
+        completedAt: entry.status === "queued" || entry.status === "running" ? undefined : entry.updatedAt,
+        sessionFile: entry.sessionFile,
+        lifetimeUsage: { input: 0, output: 0, cacheWrite: 0, cost: 0 },
+        compactionCount: 0,
+        parentAgentId: entry.parentAgentId ?? undefined,
+        registryLocator: locator,
+        mailbox: new AgentMailbox(),
+      };
+      this.agents.set(record.id, record);
+      restored.push(record);
+    }
+    if (restored.length) this.notifyChanged();
+    return restored;
+  }
+
+  /** Load just the direct children of an already restored parent. */
+  hydratePersistentChildren(parentAgentId: string): AgentRecord[] {
+    const parent = this.agents.get(parentAgentId);
+    return parent?.registryLocator ? this.hydratePersistentAgents(parent.registryLocator, parentAgentId) : [];
+  }
+
+  /**
+   * Resume a disk-only record by creating a fresh run through the normal runner.
+   * The old execution has no live resources; no session is opened until this
+   * call is explicitly admitted by the direct owner.
+   */
+  resumePersistent(pi: ExtensionAPI, ctx: ExtensionContext, id: string, prompt: string, signal?: AbortSignal, options: ResumeOptions = {}): AgentRecord | undefined {
+    const previous = this.agents.get(id);
+    if (this.admissionClosed || !previous || previous.session || this.isRunActive(id)) return undefined;
+    if (!previous.registryLocator || !previous.sessionFile || !existsSync(previous.sessionFile)) {
+      throw new Error(`Cannot resume subagent "${id}": its persisted session file is unavailable.`);
+    }
+    if (!getAgentConfig(previous.type)) {
+      throw new Error(`Cannot resume subagent "${id}": agent type "${previous.type}" is no longer enabled.`);
+    }
+    const registry = loadSubagentRegistry(previous.registryLocator);
+    const entry = registry?.agents[id];
+    if (!entry || entry.parentAgentId !== (previous.parentAgentId ?? null) || entry.sessionFile !== previous.sessionFile) {
+      throw new Error(`Cannot resume subagent "${id}": its persistent registry entry is invalid.`);
+    }
+    this.agents.delete(id);
+    try {
+      this.spawn(pi, ctx, previous.type, prompt, {
+        description: previous.description,
+        resumeSessionFile: previous.sessionFile,
+        isBackground: options.isBackground,
+        maxTurns: options.maxTurns,
+        parentAgentId: previous.parentAgentId,
+        maxSubagentDepth: previous.maxSubagentDepth,
+        registryLocator: previous.registryLocator,
+        rootSessionId: previous.rootSessionId,
+        persistentEntry: entry,
+        onTurnEnd: options.onTurnEnd,
+        onToolActivity: options.onToolActivity,
+        onAssistantUsage: options.onAssistantUsage,
+        onCompaction: options.onCompaction,
+      });
+      return this.agents.get(id);
+    } catch (error) {
+      this.agents.set(id, previous);
+      throw error;
+    }
+  }
+
+  /** Deliver one hidden, structured recovery notice to a restored parent. */
+  private notifyInterruptedChildren(record: AgentRecord, session: AgentSession, run: AgentRun): void {
+    if (!record.recoveredFromInterruption) return;
+    const key = `${record.id}\u0000${run.identity.runId}`;
+    if (this.recoveryNotices.has(key)) return;
+    const children = this.hydratePersistentChildren(record.id).filter(child => child.status === "interrupted");
+    if (!children.length) return;
+    this.recoveryNotices.add(key);
+    void session.sendCustomMessage({
+      customType: "subagent_recovery",
+      content: JSON.stringify({ kind: "interrupted_children", children: children.map(child => ({ agent_id: child.id, type: child.type, status: child.status })) }),
+      display: false,
+      details: { kind: "interrupted_children", parentAgentId: record.id, children: children.map(child => child.id) },
+    }, { triggerTurn: false }).catch(() => {});
   }
 
   getRecord(id: string): AgentRecord | undefined {

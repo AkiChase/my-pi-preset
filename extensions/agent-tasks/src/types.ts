@@ -247,6 +247,8 @@ export interface AgentRecord {
   workflowId?: string;
   /** Effective inherited nesting cap for this branch. */
   maxSubagentDepth?: number;
+  /** True only for the first fresh execution after Pi marked this instance interrupted. */
+  recoveredFromInterruption?: boolean;
   /** Root registry location inherited from the main session through nested spawns. */
   registryLocator?: import("./subagent-registry.ts").RootRegistryLocator;
   /**

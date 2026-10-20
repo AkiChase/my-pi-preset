@@ -110,6 +110,24 @@ void it("rejects invalid persisted status, interruption, path, and counter value
     assert.throws(() => loadSubagentRegistry(test.locator), /Invalid subagent registry index state/);
   } finally { test.dispose(); }
 });
+void it("records direct ownership scopes without flattening a descendant tree", () => {
+  const test = fixture();
+  try {
+    const root = allocatePersistentAgent(test.locator, "Explore", undefined, { uuid: () => "33333333-0000-0000-0000-000000000000" });
+    const child = allocatePersistentAgent(test.locator, "Plan", root.agentId, { uuid: () => "44444444-0000-0000-0000-000000000000" });
+    const grandchild = allocatePersistentAgent(test.locator, "Explore", child.agentId, { uuid: () => "55555555-0000-0000-0000-000000000000" });
+    updatePersistentAgent(test.locator, root.agentId, { status: "interrupted", interruptionReason: "pi_exit", sessionFile: join(test.dir, "root-child.jsonl") });
+    updatePersistentAgent(test.locator, child.agentId, { status: "interrupted", interruptionReason: "pi_exit", sessionFile: join(test.dir, "child.jsonl") });
+    updatePersistentAgent(test.locator, grandchild.agentId, { status: "completed", sessionFile: join(test.dir, "grandchild.jsonl") });
+
+    const registry = loadSubagentRegistry(test.locator)!;
+    assert.deepEqual(Object.values(registry.agents).filter(entry => entry.parentAgentId === null).map(entry => entry.agentId), [root.agentId]);
+    assert.deepEqual(Object.values(registry.agents).filter(entry => entry.parentAgentId === root.agentId).map(entry => entry.agentId), [child.agentId]);
+    assert.deepEqual(Object.values(registry.agents).filter(entry => entry.parentAgentId === child.agentId).map(entry => entry.agentId), [grandchild.agentId]);
+    assert.equal(registry.agents[root.agentId]?.interruptionReason, "pi_exit");
+  } finally { test.dispose(); }
+});
+
 void it("refuses a missing persistent root session", () => {
   const test = fixture();
   try {

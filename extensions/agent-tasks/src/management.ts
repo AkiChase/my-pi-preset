@@ -34,8 +34,20 @@ export function createAgentManagement(options: {
         title: snapshot?.description, raw_status: snapshot?.status,
         status: snapshot?.status === "error" ? "failed" : snapshot?.status === "aborted" || snapshot?.status === "stopped" || snapshot?.status === "interrupted" ? "stopped" : snapshot?.status === "steered" ? "completed" : snapshot?.status,
       });
-      if (identity.sourceId !== "agent" || !record || !run || run.identity.runId !== identity.runId || !options.active()) return taskResult("Subagent run is no longer available.", { ...meta(), error_code: "stale" });
+      if (identity.sourceId !== "agent" || !record || !options.active()) return taskResult("Subagent run is no longer available.", { ...meta(), error_code: "stale" });
       if (!options.owns(record)) return taskResult("Subagent belongs to another owner.", { ...meta(), error_code: "forbidden" });
+      // Restart projections intentionally have no live run/execution identity.
+      // Their persisted status is still safe to inspect; waiting on an
+      // interrupted record must not hang or accidentally bind a later resume.
+      if (!run) {
+        if (params.action === "output") return taskResult(`kind=subagent agent_id=${record.id}\nPersisted status=${record.status}${record.status === "interrupted" ? "; interrupted by Pi exit — resume this agent to continue its transcript." : "."}`, meta(record));
+        if (params.action === "wait") return taskResult(record.status === "interrupted"
+          ? `Subagent ${record.id} was interrupted by Pi exit; resume it to start a new execution.`
+          : `Subagent ${record.id} is already ${record.status}; there is no live execution to wait for.`, { ...meta(record), wait_outcome: "completed" });
+        if (params.action === "stop") return taskResult(`Subagent ${record.id} is already ${record.status}; no live execution needs stopping.`, meta(record));
+        return taskResult("Unsupported subagent action.", { ...meta(record), error_code: "unsupported" });
+      }
+      if (run.identity.runId !== identity.runId) return taskResult("Subagent run is no longer available.", { ...meta(), error_code: "stale" });
       const currentTarget = () => options.active() && manager.getRecord(record.id) === record && manager.getRun(record.id)?.identity.runId === identity.runId && options.owns(record);
       if (params.action === "stop") {
         if (!currentTarget()) return taskResult("Subagent run is no longer available.", { ...meta(), error_code: "stale" });

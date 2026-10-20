@@ -145,7 +145,7 @@ export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCo
         const parent = record.parentAgentId ? manager.getRecord(record.parentAgentId) : undefined;
         const parentKey = record.parentAgentId ? taskKey({ sourceId: "agent", taskId: record.parentAgentId, runId: record.parentRunId ?? parent?.runId ?? "0" }) : record.workflowId ? taskKey(workflowTaskIdentity(record.workflowId)) : undefined;
         const status: TaskStatus = record.status === "queued" ? "queued" : record.status === "running" ? record.starting ? "starting" : "running" :
-          record.status === "error" ? "failed" : record.status === "stopped" || record.status === "aborted" ? "stopped" : "completed";
+          record.status === "error" ? "failed" : record.status === "interrupted" ? "stopped" : record.status === "stopped" || record.status === "aborted" ? "stopped" : "completed";
         const artifacts: TaskView["artifacts"][number][] = [];
         if (record.outputFile) artifacts.push(Object.freeze({ kind: "conversation", path: record.outputFile }));
         if (record.sessionFile) artifacts.push(Object.freeze({ kind: "conversation", path: record.sessionFile }));

@@ -52,6 +52,7 @@ import { describeMention, handleBase, isReservedHandle, parseMention, resolveHan
 import { runMentionClone } from "./mention-clone.ts";
 import { describeModel, type ModelRegistry, resolveModel } from "./model-resolver.ts";
 import { checkModelScope, isScopeModelsEnabled, setScopeModelsEnabled } from "./model-scope.ts";
+import { registryLocatorForRootSession } from "./subagent-registry.ts";
 import { getMaxSubagentDepth, setMaxSubagentDepth } from "./nested-tools.ts";
 import { createOutputFilePath, ensureOutputFile, getOutputTranscriptDefault, sessionTaskDir, setOutputTranscriptDefault, streamToOutputFile, writeInitialEntry } from "./output-file.ts";
 import { applyAndEmitLoaded, loadSettings, type SubagentsSettings, saveAndEmitChanged } from "./settings.ts";
@@ -863,6 +864,14 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
   let rpcHandle: RpcHandle | undefined;
   /** Whether the `@handle` autocomplete wrapper has been stacked on pi's provider. */
   let mentionProviderRegistered = false;
+  /** Root recovery notice is emitted once for this main-session activation. */
+  let rootRecoveryNoticeDelivered = false;
+  /**
+   * A failed sidecar load cannot create a guessed projection. Retain its
+   * concrete error so a caller asking to resume is not incorrectly told that
+   * a persisted instance was merely "not found".
+   */
+  let rootRegistryLoadError: string | undefined;
 
   // Capture ctx from session_start for the RPC spawn handler.
   // This also wires the RPC handlers and broadcasts readiness — on the first
@@ -870,6 +879,32 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
   pi.on("session_start", async (_event, ctx) => {
     if (!active()) return;
     currentCtx ??= ctx;
+    // Restart recovery deliberately projects only root-owned entries here. A
+    // restored child loads its own direct entries when its nested tool is used;
+    // no session start walks or revives descendants automatically.
+    const rootSessionFile = ctx.sessionManager?.getSessionFile?.();
+    if (rootSessionFile) {
+      rootRegistryLoadError = undefined;
+      try {
+        const locator = registryLocatorForRootSession(rootSessionFile);
+        const restored = manager.hydratePersistentAgents(locator, null);
+        const interrupted = restored.filter(record => record.status === "interrupted");
+        if (!rootRecoveryNoticeDelivered && interrupted.length) {
+          rootRecoveryNoticeDelivered = true;
+          void pi.sendMessage({
+            customType: "subagent_recovery",
+            content: JSON.stringify({ kind: "interrupted_children", children: interrupted.map(record => ({ agent_id: record.id, type: record.type, status: record.status })) }),
+            display: false,
+            details: { kind: "interrupted_children", children: interrupted.map(record => record.id) },
+          }, { triggerTurn: false });
+        }
+      } catch (error) {
+        // A malformed/missing sidecar is not a reason to create guessed agents.
+        // Preserve the concrete reason for a later resume request rather than
+        // misreporting a persistence failure as an unknown agent ID.
+        rootRegistryLoadError = error instanceof Error ? error.message : String(error);
+      }
+    }
     if (!unregisterSource) {
       const unsubscribe = coordinator.registerSource(agentSource);
       unregisterSource = unsubscribe;
@@ -1847,10 +1882,34 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       if (params.resume) {
         const existing = manager.getRecord(params.resume);
         if (!existing || !isTopLevelAgent(existing)) {
-          return errorResult(`Agent not found: "${params.resume}". It may have been cleaned up.`);
+          return rootRegistryLoadError
+            ? errorResult(`Cannot resume persisted subagent: ${rootRegistryLoadError}`)
+            : errorResult(`Agent not found: "${params.resume}". It may have been cleaned up.`);
         }
         if (!existing.session) {
-          return errorResult(`Agent "${params.resume}" has no active session to resume.`);
+          // A restart leaves only the registry projection. Resume creates a new
+          // internal execution from the saved transcript; it never revives an
+          // old execution or automatically starts children.
+          let resumed: AgentRecord | undefined;
+          try {
+            resumed = manager.resumePersistent(pi, ctx, existing.id, params.prompt, runInBackground ? undefined : signal, {
+              isBackground: runInBackground,
+              requestedRunInBackground: resolvedConfig.overridden?.runInBackground,
+              maxTurns: effectiveMaxTurns,
+            });
+          } catch (error) {
+            return errorResult(error instanceof Error ? error.message : String(error));
+          }
+          if (!resumed) return errorResult(`Agent "${existing.id}" cannot be resumed while another execution is active.`);
+          const run = manager.getRun(resumed.id);
+          if (!runInBackground && run) {
+            const outcome = await run.terminal;
+            manager.consumeRun(run.identity);
+            return outcome.status === "error"
+              ? errorResult(`Agent failed: ${outcome.error ?? "unknown error"}`)
+              : textResult(outcome.result?.trim() || "No output.");
+          }
+          return textResult(`Agent resumed in background.\nAgent ID: ${resumed.id}\nThis is a new execution of the persisted session; its prior run was interrupted by Pi restart.`);
         }
 
         if (manager.isRunActive(existing.id)) {

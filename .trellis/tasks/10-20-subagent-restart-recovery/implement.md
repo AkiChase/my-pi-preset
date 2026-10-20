@@ -37,7 +37,7 @@
 
 ### 阶段 1 执行记录
 
-- 状态：已实现并通过独立检查；等待本阶段 scoped commit。
+- 状态：已实现、独立检查并提交（`b9a9742 feat(subagents): persist agent instance registry`）。
 - 关键实现：新增 `subagent-registry.ts`；根 session locator 沿嵌套 Agent 传递；所有 Agent session 强制持久化；移除 `rememberAgents` / `persist_session`；在 shutdown 取消前将活动实例写为 `interrupted(pi_exit)`；无持久化父 session 时拒绝创建。
 - 发现并修复：registry schema 对状态、interruption reason、ID、parent、session 路径和 index scope 的校验不足；外部 RPC 可伪造 registry locator；均已修复并增加回归覆盖。
 - 初次完整 Agent 测试失败：强制持久化后，大量成功启动 fixture 未提供临时 root session file。已将成功路径 fixture 迁移到临时持久化 session，并保留无 session 拒绝回归。
@@ -64,6 +64,14 @@
 ### 提交检查点
 
 重启检测、逐层恢复、直属权限与中断通知在同一提交中完成。
+
+### 阶段 2 执行记录
+
+- 状态：已实现、独立检查并通过；等待本阶段 scoped commit。
+- 关键实现：根会话仅投影顶层 registry 条目；恢复后的 Agent 仅投影直属 child；磁盘 resume 保留原 `agent_id` 并创建新的内部运行；中断 child 通知按父 session 生命周期去重；无 live run 的 completed/interrupted 查询、等待和停止均返回明确状态。
+- 独立检查修复：root registry 无法读取时，原本会把后续 resume 错报为“Agent not found”；现在保留并返回具体 registry 错误。
+- 验证：`PI_SDK_DIR=<installed SDK> PI_CODING_AGENT_DIR=<owned temp> pnpm typecheck` 通过；`PI_SDK_DIR=<installed SDK> PI_CODING_AGENT_DIR=<owned temp> node --test extensions/agent-tasks/__tests__/*.test.ts` 通过（298 passed, 0 failed）；`git diff --check` 通过。
+- 原始输出：`/tmp/pi-subagent-restart-recovery.5Pj0Lq`、`/tmp/pi-subagent-stage2.xEnyvg`、`/tmp/pi-subagent-stage2.u8pm0w`、`/tmp/trellis-check-subagent-stage2.Zyc738`。
 
 ## 阶段 3：公开工具与 UI/Task Panel 契约迁移
 
