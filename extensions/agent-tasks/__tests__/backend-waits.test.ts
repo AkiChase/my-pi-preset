@@ -678,3 +678,56 @@ void it("nested questions use the mailbox and deliver notices/replies only to th
     assert.deepEqual((f as unknown as { sent?: unknown[] }).sent ?? [], [], "nested messages never use the root ExtensionAPI");
   } finally { await f.close(); }
 });
+
+void it("source optional paging retains run identity, forwards live history and clears cursors on disposal", async () => {
+  const f = fixture();
+  try {
+    const id = f.spawn(true); await tick();
+    const record = f.manager.getRecord(id)!, identity = f.manager.getRun(id)!.identity;
+    Object.defineProperty(record.session!, "messages", { configurable: true, value: Array.from({ length: 160 }, (_, i) => ({ role: "user", content: `page${i}` })) });
+    const latest = f.coordinator.detail(identity, { conversationPage: {} })!.conversationPage!;
+    assert.equal(latest.entries.length, 64); assert.equal(latest.source, "live");
+    assert.deepEqual(f.coordinator.detail(identity, { conversationPage: { direction: "before", cursor: latest.before } })!.conversationPage!.entries.length, 64);
+    record.compactionCount++;
+    assert.equal(f.coordinator.detail(identity, { conversationPage: { direction: "before", cursor: latest.before } })!.conversationPage!.status, "reset");
+    assert.equal(f.coordinator.detail({ ...identity, runId: "stale" }, { conversationPage: {} }), undefined);
+    f.source.dispose(); assert.equal(f.source.detail(identity, { conversationPage: {} }), undefined);
+  } finally { await f.close(); }
+});
+
+void it("explicit latest paging preserves record-only terminal outcomes without adding them to historical pages", async () => {
+  const f = fixture();
+  try {
+    const id = f.spawn(true); await tick();
+    const record = f.manager.getRecord(id)!, identity = f.manager.getRun(id)!.identity;
+    Object.defineProperty(record.session!, "messages", { configurable: true, value: Array.from({ length: 160 }, (_, i) => ({ role: "user", content: `m${i}` })) });
+    f.calls[0]!.finish("record-only terminal", "terminal error"); await f.manager.getRun(id)!.terminal;
+    const latest = f.coordinator.detail(identity, { conversationPage: {} })!.conversationPage!;
+    assert.ok(latest.entries.some(e => e.kind === "assistant" && e.text === "record-only terminal"));
+    assert.ok(latest.entries.some(e => e.kind === "notice" && e.text === "Error: terminal error"));
+    assert.deepEqual(latest.entries.slice(-2).map(e => e.id), f.coordinator.detail(identity, { conversationPage: {} })!.conversationPage!.entries.slice(-2).map(e => e.id));
+    const older = f.coordinator.detail(identity, { conversationPage: { direction: "before", cursor: latest.before } })!.conversationPage!;
+    assert.ok(older.entries.every(e => e.kind === "user"));
+    record.session = undefined;
+    const unavailable = f.coordinator.detail(identity, { conversationPage: {} })!.conversationPage!;
+    assert.equal(unavailable.status, "unavailable"); assert.equal(unavailable.entries.length, 2);
+  } finally { await f.close(); }
+});
+
+void it("synthetic outcomes respect the page byte cap and retain real round-trip cursors", async () => {
+  const f = fixture();
+  try {
+    const { MAX_PAGE_BYTES } = await import("../src/conversation-paging.ts");
+    const id = f.spawn(true); await tick();
+    const record = f.manager.getRecord(id)!, identity = f.manager.getRun(id)!.identity;
+    Object.defineProperty(record.session!, "messages", { configurable: true, value: Array.from({ length: 160 }, () => ({ role: "user", content: "\u0001".repeat(8000) })) });
+    f.calls[0]!.finish("\u0002".repeat(8000), "\u0003".repeat(2000)); await f.manager.getRun(id)!.terminal;
+    const latest = f.coordinator.detail(identity, { conversationPage: {} })!.conversationPage!;
+    assert.ok(Buffer.byteLength(JSON.stringify(latest.entries)) <= MAX_PAGE_BYTES);
+    assert.ok(latest.entries.some(e => e.id?.endsWith(":outcome")));
+    assert.ok(latest.entries.some(e => e.id?.endsWith(":error")));
+    const older = f.coordinator.detail(identity, { conversationPage: { direction: "before", cursor: latest.before } })!.conversationPage!;
+    const newer = f.coordinator.detail(identity, { conversationPage: { direction: "after", cursor: older.after } })!.conversationPage!;
+    assert.deepEqual(newer.entries.filter(e => e.kind === "user").slice(0, latest.entries.filter(e => e.kind === "user").length).map(e => e.id), latest.entries.filter(e => e.kind === "user").map(e => e.id));
+  } finally { await f.close(); }
+});

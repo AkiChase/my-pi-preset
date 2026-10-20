@@ -134,10 +134,19 @@ export class TaskCoordinator {
     detail(identity: TaskIdentity, request: TaskDetailRequest = {}): TaskDetail | undefined {
         if (this.closed || !this.accepting) return undefined;
         const source = this.sources.get(identity.sourceId)?.source;
-        if (!source || !source.list().some(view => view.key === taskKey(identity) && view.capabilities.details)) return undefined;
+        const current = () => !this.closed && this.accepting && this.sources.get(identity.sourceId)?.source === source;
+        if (!source || !source.list().some(view => view.key === taskKey(identity) && view.capabilities.details) || !current()) return undefined;
         const limit = Number.isFinite(request.limit) ? Math.max(1, Math.min(16_000, Math.floor(request.limit!))) : 16_000;
         const offset = Number.isFinite(request.offset) ? Math.max(0, Math.floor(request.offset!)) : undefined;
-        const detail = source.detail(identity, { limit, offset });
+        const paging = request.conversationPage;
+        if (paging && ((paging.direction !== undefined && !["latest", "before", "after"].includes(paging.direction)) ||
+            (paging.cursor !== undefined && (typeof paging.cursor !== "string" || paging.cursor.length > 256)) ||
+            ((paging.direction === "before" || paging.direction === "after") && !paging.cursor))) return undefined;
+        const conversationPage = paging ? Object.freeze({ ...paging,
+            limit: Number.isFinite(paging.limit) ? Math.max(1, Math.min(64, Math.floor(paging.limit!))) : 64 }) : undefined;
+        const detail = source.detail(identity, { limit, offset, ...(conversationPage ? { conversationPage } : {}) });
+        // A synchronous source callback can unregister, close, or replace the run.
+        if (!current() || !source.list().some(view => view.key === taskKey(identity) && view.capabilities.details) || !current()) return undefined;
         return detail && Object.freeze({ ...detail, text: detail.text.slice(0, limit) });
     }
 

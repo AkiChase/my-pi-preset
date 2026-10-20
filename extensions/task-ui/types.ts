@@ -48,16 +48,51 @@ export type TaskControl = "pause" | "resume" | "skip" | "retry";
 export interface TaskDetailRequest {
     readonly offset?: number;
     readonly limit?: number;
+    readonly conversationPage?: ConversationPageRequest;
 }
 
-export interface ToolCallSummary { readonly name: string; readonly detail?: string }
-/** All text is external and unstyled; renderers sanitize before applying host styles. */
-export type ConversationEntry =
+/** Opaque cursors belong to one source activation and task/run. */
+export interface ConversationPageRequest {
+    readonly direction?: "latest" | "before" | "after";
+    readonly cursor?: string;
+    readonly limit?: number;
+}
+export interface ConversationPage {
+    readonly entries: readonly ConversationEntry[];
+    readonly before?: string;
+    readonly after?: string;
+    readonly hasOlder: boolean;
+    readonly hasNewer: boolean;
+    readonly source: "live" | "transcript" | "unavailable";
+    readonly status: "ok" | "reset" | "unavailable";
+    readonly hint?: string;
+    readonly budgetLimited: boolean;
+    readonly scannedMessages: number;
+    readonly scannedBytes: number;
+    readonly generation: string;
+}
+export interface ToolDataSummary {
+    readonly kind: "read" | "write" | "edit" | "bash";
+    readonly command?: string;
+    readonly path?: string;
+    readonly offset?: number;
+    readonly limit?: number;
+    readonly lines?: number;
+    readonly bytes?: number;
+    readonly addedLines?: number;
+    readonly removedLines?: number;
+}
+export interface ToolCallSummary { readonly name: string; readonly detail?: string; readonly toolCallId?: string; readonly summary?: ToolDataSummary }
+/** All text is external and unstyled; renderers sanitize before applying host styles.
+ * toolResult.elided counts only inspected text; sourceTruncated means additional
+ * blocks were not inspected and must be described without an invented count.
+ */
+export type ConversationEntry = Readonly<{ id?: string }> & (
     | Readonly<{ kind: "user"; text: string }>
     | Readonly<{ kind: "assistant"; text: string; tools: readonly ToolCallSummary[] }>
-    | Readonly<{ kind: "toolResult"; name?: string; text: string; elided: number; error?: boolean }>
+    | Readonly<{ kind: "toolResult"; name?: string; text: string; elided: number; sourceTruncated?: boolean; error?: boolean; toolCallId?: string; summary?: ToolDataSummary; callDetail?: string }>
     | Readonly<{ kind: "bash"; command: string; output: string; elided: number; exitCode?: number }>
-    | Readonly<{ kind: "notice"; text: string }>;
+    | Readonly<{ kind: "notice"; text: string }>);
 
 /** Parent/child message exchange of one execution; text is external and unstyled. */
 export type TaskMessageEntry =
@@ -73,6 +108,8 @@ export interface TaskDetail {
     readonly messagesOmitted?: number;
     /** Structured, bounded, unstyled conversation; renderers prefer it over `text`. */
     readonly conversation?: readonly ConversationEntry[];
+    /** Optional paging metadata; absent on sources without structured history. */
+    readonly conversationPage?: ConversationPage;
     /** True when older conversation entries were dropped by the source bound. */
     readonly conversationTruncated?: boolean;
     readonly path?: string;

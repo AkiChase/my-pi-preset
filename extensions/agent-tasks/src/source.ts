@@ -5,7 +5,8 @@ import type { TaskCoordinator } from "../../task-ui/coordinator.ts";
 import { taskKey, type ConversationEntry, type TaskDetail, type TaskMessageEntry, type TaskDetailRequest, type TaskIdentity, type TaskSource, type TaskStatus, type TaskView } from "../../task-ui/types.ts";
 import type { AgentManager } from "./agent-manager.ts";
 import { extractText } from "./context.ts";
-import { fromMessages, MAX_TEXT, readTranscriptTail } from "./conversation-entries.ts";
+import { MAX_TEXT } from "./conversation-entries.ts";
+import { ConversationPager, MAX_PAGE_BYTES } from "./conversation-paging.ts";
 import type { AgentRecord } from "./types.ts";
 import { getLifetimeTotal } from "./usage.ts";
 import { collapse, displayState, type WorkflowAgentEntry } from "./workflow/progress.ts";
@@ -53,8 +54,8 @@ function withOutcome(entries: readonly ConversationEntry[], record: AgentRecord)
   const result = record.result?.trim();
   const last = [...entries].reverse().find(entry => entry.kind === "assistant");
   if (result && (last?.kind !== "assistant" || last.text.trim() !== result.slice(0, MAX_TEXT).trim()))
-    extra.push(Object.freeze({ kind: "assistant" as const, text: result.slice(0, MAX_TEXT), tools: Object.freeze([]) }));
-  if (record.status === "error" && record.error) extra.push(Object.freeze({ kind: "notice" as const, text: `Error: ${record.error.slice(0, 2_000)}` }));
+    extra.push(Object.freeze({ id: `${taskKey(agentTaskIdentity(record))}:outcome`, kind: "assistant" as const, text: result.slice(0, MAX_TEXT), tools: Object.freeze([]) }));
+  if (record.status === "error" && record.error) extra.push(Object.freeze({ id: `${taskKey(agentTaskIdentity(record))}:error`, kind: "notice" as const, text: `Error: ${record.error.slice(0, 2_000)}` }));
   return extra.length ? Object.freeze([...entries, ...extra]) : entries;
 }
 
@@ -113,6 +114,7 @@ function latestMessage(record: AgentRecord): string | undefined {
 }
 
 export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCoordinator, workflows: ReadonlyMap<string, WorkflowTask>, options: { observe?: boolean; filter?: (record: AgentRecord) => boolean } = {}): TaskSource {
+  const pager = new ConversationPager();
   let revision = 0, disposed = false;
   const listeners = new Set<() => void>();
   const changed = () => {
@@ -200,9 +202,24 @@ export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCo
       }
       const record = manager.getRecord(identity.taskId);
       if (!record || record.runId !== identity.runId || (options.filter && !options.filter(record))) return undefined;
-      // Structured conversation: the live session while it exists, else the transcript tail.
-      const slice = record.session ? fromMessages(record.session.messages) : record.outputFile ? readTranscriptTail(record.outputFile) : undefined;
-      const conversation = slice ? { conversation: withOutcome(slice.entries, record), conversationTruncated: slice.truncated } : {};
+      // The source owns stable IDs and bounded cursors, even for legacy latest reads.
+      const rawPage = record.session
+        ? pager.livePage(taskKey(identity), record.session, record.session.messages, record.compactionCount, request?.conversationPage)
+        : record.outputFile ? pager.transcriptPage(taskKey(identity), record.outputFile, request?.conversationPage) : pager.unavailable();
+      // Terminal annotations are not transcript positions. Only append at the
+      // latest boundary; keep both cursors anchored to real messages unchanged.
+      const tail = rawPage.status === "ok" && !rawPage.hasNewer ||
+        rawPage.status === "unavailable" && (request?.conversationPage?.direction ?? "latest") === "latest";
+      const outcomeEntries = tail ? withOutcome(rawPage.entries, record) : rawPage.entries;
+      const entries = Buffer.byteLength(JSON.stringify(outcomeEntries)) <= MAX_PAGE_BYTES ? outcomeEntries : rawPage.entries;
+      const page = entries === rawPage.entries ? rawPage : Object.freeze({ ...rawPage, entries });
+      const conversation = {
+        ...(request?.conversationPage || page.source !== "unavailable" ? {
+          conversation: page.entries,
+          conversationTruncated: page.hasOlder,
+        } : { conversation: withOutcome([], record).length ? withOutcome([], record) : undefined }),
+        ...(request?.conversationPage ? { conversationPage: page } : {}),
+      };
       const messages = executionMessages(record, identity.runId, range(request).limit);
       if (messages.entries.length || messages.omitted) Object.assign(conversation, { messages: messages.entries, ...(messages.omitted ? { messagesOmitted: messages.omitted } : {}) });
       if (record.outputFile) {
@@ -257,7 +274,7 @@ export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCo
     subscribe(listener) { if (!disposed) listeners.add(listener); return () => { listeners.delete(listener); }; },
     dispose() {
       if (disposed) return;
-      disposed = true; offBackend(); offWaits(); if (options.observe !== false) manager.setOwnerRetention(); listeners.clear();
+      disposed = true; pager.dispose(); offBackend(); offWaits(); if (options.observe !== false) manager.setOwnerRetention(); listeners.clear();
     },
   };
   return Object.freeze(source);

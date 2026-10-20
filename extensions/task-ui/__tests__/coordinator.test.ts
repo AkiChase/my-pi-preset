@@ -102,3 +102,34 @@ void it("callback/cleanup failures still settle the lease and cannot starve sibl
     assert.equal(coordinator.waitCount, 0);
     assert.equal(failed.dispose(), false);
 });
+
+void it("forwards optional paging with bounded limits, preserves raw-only requests and rejects stale identities", () => {
+    const coordinator = new TaskCoordinator();
+    const requests: import("../types.ts").TaskDetailRequest[] = [];
+    let current = true;
+    const view = { ...identity, key: taskKey(identity), capabilities: { details: true, stop: false } } as import("../types.ts").TaskView;
+    coordinator.registerSource({ sourceId: identity.sourceId, revision: 0, list: () => current ? [view] : [],
+        detail: (_identity, request) => { requests.push(request!); return { text: "abcdef" }; }, stop: () => false, subscribe: () => () => {}, dispose() {} });
+    assert.equal(coordinator.detail(identity, { limit: 2 })?.text, "ab");
+    assert.equal("conversationPage" in requests[0]!, false);
+    coordinator.detail(identity, { conversationPage: { direction: "before", cursor: "opaque", limit: 500 } });
+    assert.deepEqual(requests[1]?.conversationPage, { direction: "before", cursor: "opaque", limit: 64 });
+    assert.equal(coordinator.detail(identity, { conversationPage: { direction: "after" } }), undefined);
+    assert.equal(coordinator.detail(identity, { conversationPage: { cursor: "x".repeat(257) } }), undefined);
+    assert.equal(coordinator.detail({ ...identity, runId: "old" }, { conversationPage: {} }), undefined);
+    assert.equal(requests.length, 2);
+    current = false; assert.equal(coordinator.detail(identity), undefined);
+    coordinator.dispose();
+});
+
+for (const phase of ["before", "after"] as const) void it(`detail fences source.list reentrancy ${phase} the read`, () => {
+    const coordinator = new TaskCoordinator();
+    let lists = 0, reads = 0;
+    const view = { ...identity, key: taskKey(identity), capabilities: { details: true, stop: false } } as import("../types.ts").TaskView;
+    coordinator.registerSource({ sourceId: identity.sourceId, revision: 0,
+        list() { lists++; if (lists === (phase === "before" ? 1 : 2)) coordinator.freezeAdmission(); return [view]; },
+        detail() { reads++; return { text: "stale" }; }, stop: () => false, subscribe: () => () => {}, dispose() {} });
+    assert.equal(coordinator.detail(identity), undefined);
+    assert.equal(reads, phase === "before" ? 0 : 1);
+    coordinator.dispose();
+});
