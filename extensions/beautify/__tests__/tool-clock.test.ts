@@ -4,7 +4,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createToolClock } from "../tool-clock.ts";
 import type { RenderContext } from "../types.ts";
 
-test("display clock tracks processing events, redraws quiet calls, freezes and clears", t => {
+test("display clock tracks every top-level call, labels live elapsed time and uses final execution duration", t => {
   t.mock.timers.enable({ apis: ["setInterval"] });
   let now = 0;
   t.mock.method(performance, "now", () => now);
@@ -13,24 +13,30 @@ test("display clock tracks processing events, redraws quiet calls, freezes and c
   const clock = createToolClock(pi);
   let redraws = 0;
   const ctx = { toolCallId: "a", invalidate: () => { redraws++; } } as RenderContext;
-  assert.equal(clock.display(ctx), undefined);
-  handlers.get("tool_execution_start")!({ toolName: "bash", toolCallId: "a" });
-  assert.equal(clock.display(ctx), "0.0s handling");
-  now = 2000; t.mock.timers.tick(1000);
+
+  assert.equal(clock.timing(ctx), undefined);
+  handlers.get("tool_execution_start")!({ toolName: "read", toolCallId: "a" });
+  assert.deepEqual(clock.timing(ctx), { kind: "elapsed", durationMs: 0 });
+  assert.equal(clock.display(ctx), "elapsed 0.0s");
+
+  now = 2500; t.mock.timers.tick(1000);
   assert.equal(redraws, 1);
-  assert.equal(clock.display(ctx), "2.0s handling");
-  handlers.get("tool_execution_start")!({ toolName: "bash", toolCallId: "a" });
+  assert.deepEqual(clock.timing(ctx), { kind: "elapsed", durationMs: 2500 });
+
+  handlers.get("tool_execution_start")!({ toolName: "read", toolCallId: "a" });
   now = 3000;
-  handlers.get("tool_execution_end")!({ toolName: "bash", toolCallId: "a" });
-  assert.equal(clock.display(ctx), "3.0s handling");
+  handlers.get("tool_execution_end")!({ toolName: "read", toolCallId: "a" });
+  assert.equal(clock.timing(ctx), undefined);
+  assert.deepEqual(clock.timing({ ...ctx, durationMs: 2000 }), { kind: "execution", durationMs: 2000 });
+  assert.equal(clock.display({ ...ctx, durationMs: 2000 }), "execution 2.0s");
+
   now = 9000; t.mock.timers.tick(1000);
-  assert.equal(clock.display(ctx), "3.0s handling");
   assert.equal(redraws, 2);
   handlers.get("session_start")!({});
-  assert.equal(clock.display(ctx), undefined);
-  handlers.get("tool_execution_start")!({ toolName: "bash", toolCallId: "a", parentToolCallId: "parent" });
-  assert.equal(clock.display(ctx), undefined);
+  assert.equal(clock.timing(ctx), undefined);
+  handlers.get("tool_execution_start")!({ toolName: "read", toolCallId: "a", parentToolCallId: "parent" });
+  assert.equal(clock.timing(ctx), undefined);
   handlers.get("session_shutdown")!({});
-  handlers.get("tool_execution_start")!({ toolName: "bash", toolCallId: "late" });
-  assert.equal(clock.display({ ...ctx, toolCallId: "late" }), undefined);
+  handlers.get("tool_execution_start")!({ toolName: "read", toolCallId: "late" });
+  assert.equal(clock.timing({ ...ctx, toolCallId: "late" }), undefined);
 });

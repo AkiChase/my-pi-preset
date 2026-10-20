@@ -16,7 +16,8 @@ export function title(name: string, args: Args): string {
   return `${clean(String(args.pattern ?? ""))}${args.path ? ` in ${clean(String(args.path))}` : ""}`;
 }
 interface Cell { result?: Result; ctx: RenderContext; theme: Theme }
-export function renderers(name: string, draw: Draw, describe: Describe = genericMetadata): ToolRenderers {
+export type TimingDisplay = (ctx: RenderContext) => string | undefined;
+export function renderers(name: string, draw: Draw, describe: Describe = genericMetadata, timing?: TimingDisplay): ToolRenderers {
   const key = `beautify.${name}.composition`;
   const cell = (theme: Theme, ctx: RenderContext): Cell => {
     const existing = ctx.state[key] as Cell | undefined;
@@ -30,6 +31,8 @@ export function renderers(name: string, draw: Draw, describe: Describe = generic
       return { invalidate() {}, render(width) {
         const { ctx, result, theme } = current;
         const meta = describe(result, ctx);
+        const display = timing?.(ctx);
+        if (display) meta.stats = [meta.stats, display].filter(Boolean).join(" · ");
         const label = meta.title ?? title(name, ctx.args);
         const suffix = meta.suffix ?? (name === "read" && typeof ctx.args.offset === "number" ? `:${Math.max(1, ctx.args.offset)}` : "");
         return toolHeading(name, label, suffix, meta.stats, width, theme, ctx.expanded, meta.secondary);

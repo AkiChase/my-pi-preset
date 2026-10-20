@@ -42,6 +42,10 @@ test("actual loader/resolver owns six display adapters, original tool execution/
     const runner = resolver(loaded, dir);
     const base = { renderShell: "default" };
     for (const name of ["edit", "write", "ls", "codemode", "subagent_run", "subagent_workflow", "subagent_message", "Agent", "ask_user_question"]) assert.equal(runner.resolveToolRenderers(name, () => base), base);
+    const generic = runner.resolveToolRenderers("foreign_tool", () => undefined)!;
+    assert.equal(generic.renderShell, "self"); assert.ok(generic.renderCall); assert.ok(generic.renderResult);
+    const foreign = { renderShell: "self" as const, renderCall: () => ({ invalidate() {}, render: () => ["foreign"] }) };
+    assert.equal(runner.resolveToolRenderers("foreign_tool", () => foreign), foreign);
     for (const name of ["read", "bash", "find", "grep"]) assert.equal(runner.resolveToolRenderers(name, () => base).renderShell, "default");
     let reads = 0;
     const definition = createReadToolDefinition(dir, { operations: { async access() {}, async readFile() { reads++; return Buffer.from("const x = 1;\nlast"); }, async detectImageMimeType() { return undefined; } } });
@@ -95,7 +99,7 @@ test("four actual host components obey widths/padding/expansion and native metad
       component.setExpanded(false); const compact = plain(component.render(120).join("\n"));
       assert.match(compact, /(?:alt|option)\+o/);
       if (fixture.name === "read") { assert.match(compact, /2 lines/); assert.match(compact, /limited/); }
-      if (fixture.name === "bash") { assert.match(compact, /0ms call/); assert.match(compact, /timeout 5s/); }
+      if (fixture.name === "bash") { assert.match(compact, /execution 0\.0s/); assert.doesNotMatch(compact, /0ms call/); }
       if (fixture.name === "grep") assert.match(compact, /2 matching lines shown/);
       if (fixture.name === "find") assert.match(compact, /3 files shown/);
       component.setExpanded(true); const expanded = plain(component.render(120).join("\n"));
@@ -168,15 +172,56 @@ test("registered bash renderer shows quiet processing time and freezes after end
     const component = new ToolExecutionComponent("bash", "quiet", { command: "quiet", description: "安静调用", background_after_seconds: -1 }, {}, renderer, screen, dir);
     await fire("tool_execution_start", { toolName: "bash", toolCallId: "quiet" });
     component.markExecutionStarted();
-    assert.match(plain(component.render(80).join("\n")), /0\.0s handling/);
+    const initial = plain(component.render(80).join("\n"));
+    assert.match(initial, /elapsed 0\.0s/);
+    assert.equal((initial.match(/elapsed 0\.0s/g) ?? []).length, 1);
     now = 2500;
     component.updateResult({ content: [{ type: "text", text: "" }] }, true);
-    assert.match(plain(component.render(80).join("\n")), /2\.5s handling/);
+    const partial = plain(component.render(80).join("\n"));
+    assert.match(partial, /elapsed 2\.5s/);
+    assert.equal((partial.match(/elapsed 2\.5s/g) ?? []).length, 1);
     await fire("tool_execution_end", { toolName: "bash", toolCallId: "quiet" });
     component.updateResult({ content: [{ type: "text", text: "done" }], durationMs: 2000 });
     now = 10000;
-    assert.match(plain(component.render(80).join("\n")), /2\.5s handling/);
-    assert.doesNotMatch(plain(component.render(80).join("\n")), /2000ms call/);
+    const final = plain(component.render(80).join("\n"));
+    assert.match(final, /execution 2\.0s/);
+    assert.equal((final.match(/execution 2\.0s/g) ?? []).length, 1);
+    assert.doesNotMatch(final, /elapsed 2\.5s|2000ms call/);
+  } finally { await fire("session_shutdown", {}); screen.stop(); rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("registered generic fallback transitions from elapsed to execution and ignores nested or late lifecycle events", async t => {
+  const dir = mkdtempSync(join(tmpdir(), "beautify-generic-clock-")), screen = tui();
+  const loaded = await loadExtensions([entry], dir), runner = resolver(loaded, dir);
+  let now = 0;
+  t.mock.method(performance, "now", () => now);
+  const fire = async (name: string, event: object) => {
+    for (const handler of loaded.extensions[0].handlers.get(name) ?? []) await handler(event, {});
+  };
+  try {
+    const renderer = runner.resolveToolRenderers("foreign_tool", () => undefined);
+    const component = new ToolExecutionComponent("foreign_tool", "foreign-clock", { target: "fixture" }, {}, renderer, screen, dir);
+    await fire("tool_execution_start", { toolName: "foreign_tool", toolCallId: "foreign-clock" });
+    component.markExecutionStarted();
+    assert.match(plain(component.render(80).join("\n")), /Running.*elapsed 0\.0s/);
+    now = 1250;
+    component.updateResult({ content: [{ type: "text", text: "partial" }] }, true);
+    assert.match(plain(component.render(80).join("\n")), /elapsed 1\.3s/);
+    await fire("tool_execution_end", { toolName: "foreign_tool", toolCallId: "foreign-clock" });
+    component.updateResult({ content: [{ type: "text", text: "final" }], durationMs: 900 });
+    assert.match(plain(component.render(80).join("\n")), /Completed.*execution 0\.9s/);
+    assert.doesNotMatch(plain(component.render(80).join("\n")), /elapsed 1\.3s/);
+
+    const nested = new ToolExecutionComponent("foreign_tool", "nested-clock", {}, {}, renderer, screen, dir);
+    await fire("tool_execution_start", { toolName: "foreign_tool", toolCallId: "nested-clock", parentToolCallId: "parent" });
+    nested.markExecutionStarted();
+    assert.doesNotMatch(plain(nested.render(80).join("\n")), /elapsed/);
+
+    await fire("session_shutdown", {});
+    await fire("tool_execution_start", { toolName: "foreign_tool", toolCallId: "late-clock" });
+    const late = new ToolExecutionComponent("foreign_tool", "late-clock", {}, {}, renderer, screen, dir);
+    late.markExecutionStarted();
+    assert.doesNotMatch(plain(late.render(80).join("\n")), /elapsed/);
   } finally { await fire("session_shutdown", {}); screen.stop(); rmSync(dir, { recursive: true, force: true }); }
 });
 

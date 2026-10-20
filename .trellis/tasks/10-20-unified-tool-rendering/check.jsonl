@@ -1,0 +1,16 @@
+{"file": ".trellis/spec/development/index.md", "reason": "Renderer ownership and lifecycle constraints"}
+{"file": ".trellis/spec/testing/index.md", "reason": "Actual-host and natural-exit verification requirements"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Shared-owner review checklist"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Execution-to-view boundary checklist"}
+{"file": "extensions/beautify/card-primitives.ts", "reason": "S1 public title and text-preview primitive"}
+{"file": "extensions/beautify/tool-card.ts", "reason": "S2 public self-shell factory under review"}
+{"file": "extensions/beautify/tool-clock.ts", "reason": "S2 activation-owned elapsed/execution timing"}
+{"file": "extensions/beautify/index.ts", "reason": "Resolver delegation and fallback integration"}
+{"file": "extensions/beautify/tools/shared.ts", "reason": "Existing owned renderer timing integration"}
+{"file": "extensions/beautify/tools/bash.ts", "reason": "Bash timing adapter and final-duration behavior"}
+{"file": "extensions/beautify/tools/read.ts", "reason": "Read timing adapter and specialized body preservation"}
+{"file": "extensions/beautify/tools/find.ts", "reason": "Find timing adapter factory"}
+{"file": "extensions/beautify/tools/grep.ts", "reason": "Grep timing adapter factory"}
+{"file": "extensions/beautify/__tests__/tool-card.test.ts", "reason": "Actual-host generic self-shell coverage"}
+{"file": "extensions/beautify/__tests__/tool-clock.test.ts", "reason": "Clock lifecycle regression coverage"}
+{"file": "extensions/beautify/__tests__/tools.test.ts", "reason": "Actual-loader delegation and timing coverage"}

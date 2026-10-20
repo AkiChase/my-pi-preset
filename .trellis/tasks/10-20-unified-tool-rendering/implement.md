@@ -2,7 +2,7 @@
 
 ## 状态与前提
 
-本计划已获用户批准分阶段实施；当前仅执行 S1。任何涉及产品语义、公共接口边界、范围扩大或无法安全适配的设计问题，先暂停并向用户反馈，不自行延伸。
+本计划已获用户批准分阶段实施。S1 已完成并提交；S2 已完成实现与独立检查，当前待 scoped commit。任何涉及产品语义、公共接口边界、范围扩大或无法安全适配的设计问题，先暂停并向用户反馈，不自行延伸。
 
 开始 S1 前，主会话必须重新读取本任务的 `prd.md`、`design.md`、本文档、实际将修改的完整源文件和相关测试。遵循 development/testing specs：保持 execution owner 不变、保留平行改动、用实际 SDK renderer fixture 验证、所有临时输出写入 owned repository-external run directory。
 
@@ -60,6 +60,12 @@
 **验证重点**：实际 `ToolExecutionComponent`、default/self shell、partial→final、call-owned/result-owned body、并行调用、拒绝、未知工具、历史 duration、session switch/reload/shutdown、timer 自然退出、图片/mouse/invalidation。
 
 **提交检查点**：公共 resolver、clock 与所有 lifecycle 回归同一提交；该跨模块公共合同需要独立 review。
+
+**S2 结果（已完成，待 scoped commit）**：新增 `tool-card.ts` 的公共 self-shell factory。全局 resolver 仅在 `next()` 缺失时创建 generic card；任意下游 custom renderer 完整原样委托。generic card 自有 Box/padding 并保留正文点击展开、三行文本预览与 host image 所有权；不拆分原生/外部 custom renderer。`tool-clock.ts` 改为观测所有顶层工具：运行中返回 `elapsed`，最终优先读取宿主 `durationMs` 并显示 `execution`，不持久化 call 时钟；nested call、session start/shutdown 均清理/忽略。read/bash/find/grep 的既有 owned adapter 接入相同计时显示，Bash 不再显示旧 `call` 标签。
+
+**独立检查与修复**：`trellis-check` 已审查 resolver delegation、self-shell mouse/padding/image、clock lifecycle 和 known adapters。审查提出 Bash 可能重复 timing；主会话复核发现 Bash 将 timing 作为本地 describe closure 传给 `renderers`，未传第四个 shared timing 参数，因此不存在重复 append；增加了同一 `elapsed`/`execution` 只出现一次的回归断言。审查指出 registered generic fallback 尚未和真实 clock 联测，已补实际 loader + `ToolExecutionComponent` 测试，覆盖 `elapsed → execution`、nested 忽略和 shutdown 后 late event。
+
+**S2 验证**：clock/factory 测试先在新 API/module 缺失时分别失败（exit 1），实现后使用临时 `PI_CODING_AGENT_DIR` 运行 `node --test extensions/beautify/__tests__/tool-card.test.ts extensions/beautify/__tests__/tool-clock.test.ts extensions/beautify/__tests__/tools.test.ts`（17/17 PASS，exit 0）；`node --test extensions/beautify/__tests__/*.test.ts`（89/89 PASS，exit 0）；`pnpm typecheck`（exit 0）；`git diff --check` 通过。`pnpm check` 运行至 1596/1597 PASS 后因未改动的 `extensions/process-tasks/__tests__/jobs-read.test.ts` 期望 `task_id`、当前 committed runtime 返回 `agent_id`/`execution_id` 而失败；单独重跑该文件同样 18/19 PASS、1 个相同失败，记录为 S2 无关既有不一致，未越界修复。真实终端视觉、live reload/session switch 与第三方组合仍 NOT_RUN。
 
 ### S3：自有工具结果适配
 
