@@ -4,7 +4,7 @@ import * as hostTui from "@earendil-works/pi-tui";
 import { Markdown, Text, matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi, type TUI, type TuiMouseEvent, type TuiMouseEventResult } from "@earendil-works/pi-tui";
 import { type NativeFrame, type NativeLayout, type NativeLayoutError, layoutError } from "../../../shared/scroll-panel/native-layout.ts";
 import { consumeWheel } from "../../../shared/scroll-panel/wheel.ts";
-import { displayValue, readDocument, readTasks, safeText, taskLabel, type BrowserTask, type TaskDocument, type TaskSnapshot } from "./reader.ts";
+import { displayValue, readDocument, readTasks, safeText, taskLabel, type BrowserTask, type TaskBrowseRange, type TaskDocument, type TaskSnapshot } from "./reader.ts";
 
 const { ScrollView, VStack } = hostTui;
 type ScrollView = hostTui.ScrollView;
@@ -17,7 +17,7 @@ function listCell(text: string, width: number): string {
 	return clipped + " ".repeat(Math.max(0, width - visibleWidth(clipped)));
 }
 
-const SECTIONS = ["Overview", "PRD", "Design", "Implement"] as const;
+const SECTIONS = ["PRD", "Design", "Implement", "Metadata"] as const;
 const DOCUMENT_SECTIONS = ["prd", "design", "implement"] as const;
 function statusColor(status: string): "accent" | "warning" | "success" | "error" | "muted" {
 	return status === "in_progress" ? "accent" : status === "planning" ? "warning" : status === "completed" ? "success" : status === "task_error" ? "error" : "muted";
@@ -99,6 +99,7 @@ export class TaskBrowser {
 	private snapshot: TaskSnapshot;
 	private mode: "list" | "detail" = "list";
 	private selected = 0;
+	private range: TaskBrowseRange = "active";
 	private listScroll: ScrollView;
 	private detailScrolls: ScrollView[];
 	private frame?: NativeFrame;
@@ -132,7 +133,7 @@ export class TaskBrowser {
 		this.nativeLayout = nativeLayout; this.unavailable = unavailable;
 		this.listScroll = this.scrollView(width => this.listBody(width));
 		this.detailScrolls = this.createDetailScrolls();
-		this.snapshot = readTasks(root);
+		this.snapshot = readTasks(root, this.range);
 		this.refreshCurrent();
 	}
 	private get theme(): Theme { return typeof this.themeSource === "function" ? this.themeSource() : this.themeSource; }
@@ -154,15 +155,21 @@ export class TaskBrowser {
 		// Reordering may move a visible selection. Keep it visible on refresh,
 		// but never pull back a viewport the user wheeled away from selection.
 		const selectedVisible = this.selected >= this.listScroll.scrollTop && this.selected < this.listScroll.scrollTop + this.listScroll.viewportHeight;
-		const next = readTasks(this.root);
+		const next = readTasks(this.root, this.range);
 		this.snapshot = next;
 		this.refreshCurrent();
 		const index = next.rows.findIndex(row => row.task.identity === identity);
 		if (selectedVisible && index !== this.selected) this.ensureSelected = true;
-		const total = next.rows.length + next.diagnostics.length;
+		const total = this.listTotal(next);
 		this.selected = index >= 0 ? index : Math.min(this.selected, Math.max(0, total - 1));
 		if (this.detailTask) this.detailTask = next.tasks.find(task => task.identity === this.detailTask!.identity) ?? this.detailTask;
 		this.documents.clear(); this.invalidate();
+	}
+	private hasArchiveEntry(): boolean { return this.range === "active"; }
+	private listTotal(snapshot = this.snapshot): number { return snapshot.rows.length + snapshot.months.length + snapshot.diagnostics.length + (this.hasArchiveEntry() ? 1 : 0); }
+	private setRange(range: TaskBrowseRange): void {
+		this.range = range; this.snapshot = readTasks(this.root, range); this.refreshCurrent();
+		this.selected = 0; this.documents.clear(); this.invalidate(); this.ensureSelected = true;
 	}
 	private scrollView(render: (width: number) => string[]): ScrollView {
 		return new ScrollView({ render, invalidate: () => this.invalidate() }, {
@@ -193,18 +200,23 @@ export class TaskBrowser {
 		try { this.applyInput(data); } catch (cause) { this.refuse(cause); }
 	}
 	private applyInput(data: string): void {
-		if (matchesKey(data, "ctrl+c") || (matchesKey(data, "escape") && this.mode === "list")) {
-			this.closed = true; this.done(); return;
+		if (matchesKey(data, "ctrl+c")) { this.closed = true; this.done(); return; }
+		if (matchesKey(data, "escape")) {
+			if (this.mode === "detail") { this.mode = "list"; this.frame = undefined; }
+			else if (typeof this.range === "object") this.setRange("archive-months");
+			else if (this.range === "archive-months") this.setRange("active");
+			else { this.closed = true; this.done(); return; }
 		}
-		if (matchesKey(data, "escape")) { this.mode = "list"; this.frame = undefined; }
 		else if (matchesKey(data, "r")) this.refresh();
 		else if (this.mode === "list") {
-			const total = this.snapshot.rows.length + this.snapshot.diagnostics.length;
+			const total = this.listTotal();
 			if (matchesKey(data, "up")) { this.selected = Math.max(0, this.selected - 1); this.ensureSelected = true; }
 			else if (matchesKey(data, "down")) { this.selected = Math.min(Math.max(0, total - 1), this.selected + 1); this.ensureSelected = true; }
-			else if (matchesKey(data, "enter") && this.snapshot.rows[this.selected]) {
-				this.detailTask = this.snapshot.rows[this.selected].task;
-				this.mode = "detail"; this.section = 0; this.detailScrolls = this.createDetailScrolls(); this.documents.clear(); this.invalidate();
+			else if (matchesKey(data, "enter")) {
+				const row = this.snapshot.rows[this.selected];
+				if (row) { this.detailTask = row.task; this.mode = "detail"; this.section = 0; this.detailScrolls = this.createDetailScrolls(); this.documents.clear(); this.invalidate(); }
+				else if (this.range === "active" && this.selected === this.snapshot.rows.length) this.setRange("archive-months");
+				else if (this.range === "archive-months" && this.selected < this.snapshot.months.length) this.setRange({ kind: "archive-month", month: this.snapshot.months[this.selected] });
 			}
 		} else {
 			if (matchesKey(data, "left")) { this.section = (this.section + SECTIONS.length - 1) % SECTIONS.length; this.frame = undefined; }
@@ -225,14 +237,25 @@ export class TaskBrowser {
 			...(this.isCurrent(task) ? [this.theme.fg("accent", "Current task")] : []),
 		].join("\n"), 0, 0).render(width);
 	}
+	private documentSummary(task: BrowserTask, width: number): string[] {
+		const values = [
+			this.theme.bold(this.theme.fg("text", taskLabel(task))),
+			this.theme.fg(statusColor(task.status), `Status: ${safeText(task.status)}`),
+			...(this.isCurrent(task) ? [this.theme.fg("accent", "Current task")] : []),
+			...(typeof task.record.priority === "string" && task.record.priority ? [this.theme.fg("muted", `Priority: ${safeText(task.record.priority)}`)] : []),
+			...(typeof task.record.assignee === "string" && task.record.assignee ? [this.theme.fg("muted", `Assignee: ${safeText(task.record.assignee)}`)] : []),
+		];
+		return new Text(values.join(" · "), 0, 0).render(width);
+	}
 	private detailBody(width: number, section: number): string[] {
 		const task = this.detailTask!;
 		const key = `${task.identity}:${section}:${width}`;
 		if (this.cachedBody?.key === key) return this.cachedBody.lines;
-		let lines = this.metadata(task, width);
+		let lines: string[] = [];
 		if (!this.snapshot.tasks.some(item => item.identity === task.identity)) {
 			lines = lines.concat(new Text("Task no longer available. Press Esc to return to the list.", 0, 0).render(width));
-		} else if (section === 0) {
+		} else if (section === 3) {
+			lines = this.metadata(task, width);
 			const fields: string[] = [];
 			for (const [field, label] of [["id", "ID"], ["name", "Name"], ["title", "Title"], ["description", "Description"], ["priority", "Priority"], ["assignee", "Assignee"], ["createdAt", "Created"], ["completedAt", "Completed"], ["branch", "Branch"], ["parent", "Parent"]]) {
 				const value = task.record[field];
@@ -241,8 +264,9 @@ export class TaskBrowser {
 			if (Array.isArray(task.record.children)) fields.push(`Children: ${task.record.children.map(value => safeText(displayValue(value))).join(", ") || "None"}`);
 			lines = lines.concat("", new Text(this.theme.fg("text", fields.join("\n") || "No additional metadata"), 0, 0).render(width));
 		} else {
+			lines = this.documentSummary(task, width);
 			let document = this.documents.get(section);
-			if (!document) { document = readDocument(this.root, task, DOCUMENT_SECTIONS[section - 1]); this.documents.set(section, document); }
+			if (!document) { document = readDocument(this.root, task, DOCUMENT_SECTIONS[section]); this.documents.set(section, document); }
 			lines.push("");
 			if (document.state === "ready") {
 				try {
@@ -294,12 +318,19 @@ export class TaskBrowser {
 			if (layout.title > 0 && title !== name) {
 				line += this.theme.fg("dim", " · ") + this.theme.fg("text", truncateToWidth(title, layout.title, "…"));
 			}
-		} else line = this.theme.fg("error", `Warning: ${this.snapshot.diagnostics[index - this.snapshot.rows.length]}`);
+		} else if (this.range === "active" && index === this.snapshot.rows.length) {
+			line = this.theme.fg("accent", "  Browse archive →");
+		} else if (this.range === "archive-months" && index < this.snapshot.months.length) {
+			line = this.theme.fg("accent", `  ${this.snapshot.months[index]} →`);
+		} else {
+			const offset = index - this.snapshot.rows.length - (this.hasArchiveEntry() ? 1 : 0) - (this.range === "archive-months" ? this.snapshot.months.length : 0);
+			line = this.theme.fg("error", `Warning: ${this.snapshot.diagnostics[offset]}`);
+		}
 		line = truncateToWidth(line, width, "…");
 		return index === this.selected ? this.theme.bg("userMessageBg", line + " ".repeat(Math.max(0, width - visibleWidth(line)))) : line;
 	}
 	private listBody(width: number): string[] {
-		const total = this.snapshot.rows.length + this.snapshot.diagnostics.length;
+		const total = this.listTotal();
 		const layout = this.listLayout(width);
 		return total ? Array.from({ length: total }, (_, index) => this.listLine(index, width, layout)) : [this.theme.fg("muted", "No tasks found")];
 	}
@@ -325,18 +356,21 @@ export class TaskBrowser {
 	}
 	private renderFrame(width: number, rows: number): string[] {
 		const header = [this.theme.bold(this.theme.fg("accent", "Trellis Tasks"))];
-		if (this.mode === "list") header.push(this.theme.fg("muted", `${this.snapshot.tasks.length} tasks${this.snapshot.complete ? "" : " · Incomplete data"} · Directory descending · Current tree first · * Current task`));
+		if (this.mode === "list") {
+			const scope = this.range === "active" ? "Active" : this.range === "archive-months" ? "Archive months" : `Archive ${this.range.month}`;
+			header.push(this.theme.fg("muted", `${scope} · ${this.range === "archive-months" ? this.snapshot.months.length + " months" : this.snapshot.tasks.length + " tasks"}${this.snapshot.complete ? "" : " · Incomplete data"} · * Current task`));
+		}
 		else if (width < 38) header.push(this.theme.fg("accent", `${SECTIONS[this.section]} (${this.section + 1}/${SECTIONS.length}) · ←/→`));
 		else header.push(SECTIONS.map((label, index) => index === this.section ? this.theme.bold(this.theme.fg("accent", label)) : this.theme.fg("muted", label)).join(" | "));
 		header.push(this.theme.fg("dim", "─".repeat(width)));
 		const hints = width < 70
-			? this.mode === "list" ? "Esc Close · r Refresh · ↑/↓ · Enter" : "Esc Back · r Refresh · ←/→ · ↑/↓"
-			: this.mode === "list" ? "↑/↓ Select · Enter Open · r Refresh · Esc Close" : "←/→ Section · ↑/↓ Scroll · r Refresh · Esc Back";
+			? this.mode === "list" ? `Esc ${this.range === "active" ? "Close" : "Back"} · r Refresh · ↑/↓ · Enter` : "Esc Back · r Refresh · ←/→ · ↑/↓"
+			: this.mode === "list" ? `↑/↓ Select · Enter Open · r Refresh · Esc ${this.range === "active" ? "Close" : "Back"}` : "←/→ Section · ↑/↓ Scroll · r Refresh · Esc Back";
 		// Collapse secondary fixed rows on tiny terminals; native layout still owns
 		// the body allocation (including zero-height viewports).
 		while (header.length > Math.max(1, rows - 2)) header.splice(1, 1);
 		const footerRows = rows > 1 ? 1 : 0;
-		const total = this.snapshot.rows.length + this.snapshot.diagnostics.length;
+		const total = this.listTotal();
 		this.selected = Math.max(0, Math.min(this.selected, Math.max(0, total - 1)));
 		const scroll = this.activeScroll;
 		let frame: NativeFrame;

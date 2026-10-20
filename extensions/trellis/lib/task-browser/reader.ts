@@ -14,7 +14,8 @@ export interface BrowserTask {
 	record: Record<string, unknown>;
 }
 export interface TaskRow { task: BrowserTask; prefix: string }
-export interface TaskSnapshot { tasks: BrowserTask[]; rows: TaskRow[]; diagnostics: string[]; complete: boolean }
+export interface TaskSnapshot { tasks: BrowserTask[]; rows: TaskRow[]; months: string[]; diagnostics: string[]; complete: boolean }
+export type TaskBrowseRange = "active" | "archive-months" | { kind: "archive-month"; month: string };
 export type DocumentSection = "prd" | "design" | "implement";
 export type TaskDocument = { state: "ready" | "empty"; text: string } | { state: "missing" | "removed" | "error"; diagnostic?: string };
 const MAX_DOCUMENT_BYTES = 2 * 1024 * 1024;
@@ -114,55 +115,74 @@ function archivedLink(root: string, store: string, archive: string, ref: string)
 	return identities.size === 1;
 }
 
-/** Immediate visible directories only; archive lookups never broaden task containment. */
-export function readTasks(root: string): TaskSnapshot {
-	const snapshot: TaskSnapshot = { tasks: [], rows: [], diagnostics: [], complete: true };
+/** Read a browsing snapshot without widening task-store containment. */
+export function readTasks(root: string, range: TaskBrowseRange = "active"): TaskSnapshot {
+	const snapshot: TaskSnapshot = { tasks: [], rows: [], months: [], diagnostics: [], complete: true };
 	const warn = (text: string) => {
 		snapshot.complete = false;
 		if (snapshot.diagnostics.length < MAX_DIAGNOSTICS) snapshot.diagnostics.push(safeText(text).slice(0, 320));
 		else if (snapshot.diagnostics.length === MAX_DIAGNOSTICS) snapshot.diagnostics.push("Further diagnostics omitted; inspect the task store.");
 	};
-	const aliases = new Map<string, BrowserTask>();
-	let isArchived = (_ref: string): boolean => false;
+	const addTask = (store: string, archive: string, dir: string, identities: Map<string, BrowserTask>, aliases?: Map<string, BrowserTask>, container?: string) => {
+		try {
+			if (!statSync(join(root, dir)).isDirectory()) return;
+			const task = resolveTaskPath(root, dir), identity = realpathSync(task);
+			if (!containsPath(store, identity)) throw new Error("Task escapes its task store");
+			if (container && !containsPath(container, identity)) throw new Error("Task escapes its selected archive month");
+			if (range === "active" && containsPath(archive, identity)) return;
+			const existing = identities.get(identity);
+			if (existing) {
+				const name = basename(dir); aliases?.set(name, existing); aliases?.set(dir, existing); return;
+			}
+			const value: unknown = JSON.parse(readTextFile(regularTaskFile(task, "task.json"), 1024 * 1024, "task.json"));
+			if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid task.json");
+			const record = value as Record<string, unknown>;
+			validateRecord(record);
+			const item: BrowserTask = { identity, dir, record, title: String(record.title ?? record.name ?? record.id ?? basename(dir)), status: typeof record.status === "string" ? record.status : "unknown" };
+			identities.set(identity, item); aliases?.set(basename(dir), item); aliases?.set(dir, item); snapshot.tasks.push(item);
+		} catch (error) { warn(`${dir}: ${diagnosticText(error)}`); }
+	};
 	try {
 		const store = join(root, ".trellis", "tasks");
 		const actualStore = realpathSync(store);
 		let archive = join(actualStore, "archive");
+		let archiveExists = true;
 		try { lstatSync(archive); archive = realpathSync(archive); }
 		catch (error) {
 			if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-			// A dangling archive is not a missing archive.
+			archiveExists = false;
 			try { lstatSync(archive); throw new Error("Archive path cannot be resolved"); }
 			catch (probe) { if ((probe as NodeJS.ErrnoException).code !== "ENOENT") throw probe; }
 		}
-		isArchived = ref => archivedLink(root, actualStore, archive, ref);
-		const identities = new Map<string, BrowserTask>();
-		for (const name of readdirSync(store).sort().reverse()) {
-			if (name === "archive") continue;
-			const dir = join(".trellis", "tasks", name);
-			try {
-				if (!statSync(join(root, dir)).isDirectory()) continue;
-				const task = resolveTaskPath(root, dir), identity = realpathSync(task);
-				if (containsPath(archive, identity)) continue;
-				const existing = identities.get(identity);
-				if (existing) { aliases.set(name, existing); aliases.set(dir, existing); continue; }
-				const file = regularTaskFile(task, "task.json");
-				const value: unknown = JSON.parse(readTextFile(file, 1024 * 1024, "task.json"));
-				if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid task.json");
-				const record = value as Record<string, unknown>;
-				validateRecord(record);
-				const item: BrowserTask = {
-					identity, dir, record,
-					title: String(record.title ?? record.name ?? record.id ?? name),
-					status: typeof record.status === "string" ? record.status : "unknown",
-				};
-				identities.set(identity, item);
-				aliases.set(name, item); aliases.set(dir, item);
-				snapshot.tasks.push(item);
-			} catch (error) { warn(`${dir}: ${diagnosticText(error)}`); }
+		if (range === "archive-months") {
+			if (!archiveExists) return snapshot;
+			for (const month of readdirSync(archive).sort().reverse()) {
+				if (!/^\d{4}-\d{2}$/.test(month)) continue;
+				try {
+					const directory = realpathSync(join(archive, month));
+					if (!containsPath(actualStore, directory) || !containsPath(archive, directory)) throw new Error("Archive month escapes its archive/task store");
+					if (statSync(directory).isDirectory()) snapshot.months.push(month);
+				} catch (error) { warn(`archive/${month}: ${diagnosticText(error)}`); }
+			}
+			return snapshot;
 		}
+		if (typeof range === "object") {
+			if (!/^\d{4}-\d{2}$/.test(range.month)) { warn("Invalid archive month"); return snapshot; }
+			if (!archiveExists) return snapshot;
+			const directory = realpathSync(join(archive, range.month));
+			if (!containsPath(actualStore, directory) || !containsPath(archive, directory) || !statSync(directory).isDirectory()) throw new Error("Archive month escapes its archive/task store");
+			const identities = new Map<string, BrowserTask>();
+			for (const name of readdirSync(directory).sort().reverse()) addTask(actualStore, archive, join(".trellis", "tasks", "archive", range.month, name), identities, undefined, directory);
+			snapshot.rows = snapshot.tasks.map(task => ({ task, prefix: "" }));
+			return snapshot;
+		}
+		const aliases = new Map<string, BrowserTask>(), identities = new Map<string, BrowserTask>();
+		const isArchived = (ref: string) => archivedLink(root, actualStore, archive, ref);
+		for (const name of readdirSync(store).sort().reverse()) {
+			if (name !== "archive") addTask(actualStore, archive, join(".trellis", "tasks", name), identities, aliases);
+		}
+		snapshot.rows = projectTree(snapshot.tasks, aliases, isArchived, warn);
 	} catch (error) { warn(`Unable to read task store: ${diagnosticText(error)}`); }
-	snapshot.rows = projectTree(snapshot.tasks, aliases, isArchived, warn);
 	return snapshot;
 }
 

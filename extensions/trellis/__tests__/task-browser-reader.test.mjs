@@ -312,3 +312,41 @@ test("terminal sanitization strips input controls without translating Unicode or
   assert.equal(value, "# 中文\n- [x] é🙂     red");
   assert.doesNotMatch(value.replace(/\n/g, ""), /[\x00-\x1f\x7f-\x9f]/);
 });
+
+test("archive ranges discover descending months and expose a flat month snapshot", t => {
+  const f = fixture(t);
+  f.record("active", { title: "Active", status: "planning" });
+  f.record("archive/2026-09/old", { title: "September", status: "completed", parent: "outside" });
+  f.record("archive/2026-10/new", { title: "October", status: "completed", children: ["old"] });
+  f.record("archive/2026-10/other", { title: "Other", status: "completed" });
+  assert.deepEqual(readTasks(f.root).tasks.map(task => task.title), ["Active"]);
+  assert.deepEqual(readTasks(f.root, "archive-months").months, ["2026-10", "2026-09"]);
+  const october = readTasks(f.root, { kind: "archive-month", month: "2026-10" });
+  assert.equal(october.complete, true, october.diagnostics.join("\n"));
+  assert.deepEqual(october.rows.map(row => [row.task.title, row.prefix]), [["Other", ""], ["October", ""]]);
+  assert.equal(readDocument(f.root, october.tasks.find(task => task.title === "October"), "prd").state, "missing");
+});
+
+test("archive range rejects escaped months and reports malformed month input safely", t => {
+  const f = fixture(t);
+  f.put("secret/old/task.json", '{"status":"completed"}');
+  mkdirSync(join(f.root, ".trellis/tasks/archive"), { recursive: true });
+  symlinkSync(join(f.root, "secret"), join(f.root, ".trellis/tasks/archive/2026-10"));
+  const months = readTasks(f.root, "archive-months");
+  assert.equal(months.complete, false);
+  assert.match(months.diagnostics.join("\n"), /escapes/);
+  const invalid = readTasks(f.root, { kind: "archive-month", month: "../secret" });
+  assert.equal(invalid.complete, false);
+  assert.match(invalid.diagnostics.join("\n"), /Invalid archive month/);
+});
+
+test("archive month snapshots reject task aliases escaping the selected month", t => {
+  const f = fixture(t);
+  f.record("archive/2026-09/old", { status: "completed" });
+  mkdirSync(join(f.root, ".trellis/tasks/archive/2026-10"), { recursive: true });
+  symlinkSync("../2026-09/old", join(f.root, ".trellis/tasks/archive/2026-10/old-alias"));
+  const value = readTasks(f.root, { kind: "archive-month", month: "2026-10" });
+  assert.equal(value.tasks.length, 0);
+  assert.equal(value.complete, false);
+  assert.match(value.diagnostics.join("\n"), /selected archive month/);
+});
