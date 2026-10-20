@@ -88,6 +88,8 @@
 
 **S3a 验证**：在临时 `PI_CODING_AGENT_DIR` 下，最终运行 `node --test extensions/beautify/__tests__/tool-clock.test.ts extensions/beautify/__tests__/tool-card.test.ts extensions/beautify/__tests__/tools.test.ts extensions/beautify/__tests__/registered-agent.test.ts extensions/agent-tasks/__tests__/backend-waits.test.ts extensions/agent-tasks/__tests__/tool-waits.test.ts extensions/agent-tasks/__tests__/loading.test.ts`（104/104 PASS，natural exit）；`pnpm typecheck`（exit 0）；`git diff --check`（exit 0）。最终独立 check 在实际 host/loader 集合 4/4、resolver delegation 15/15、typecheck 与 whitespace 检查均通过。完整 Beautify suite、process/workflow/notification scope、真实终端视觉仍属于后续 S3/S4/S5，NOT_RUN。
 
+**S3b 嵌套 `subagent_run` / `subagent_message`（已完成，待 scoped commit）**：两个 nested 工具直接采用公共 cooperative self-shell，摘要分别保留 child 类型/描述及 child id/实际 guidance 或 question；正文以 `text(result)` 合并全部 text blocks，因此 expanded 不丢 held reply/message。未触碰 nested manager、registry、mailbox、delivery、wait、timer 或 lifecycle。独立检查发现 message 标题错误显示 `wait`/`notify` 控制模式而未显示用户消息；已改为实际 message 并加入 actual-host 标题断言。最终回归在临时 `PI_CODING_AGENT_DIR` 下运行 `node --test extensions/beautify/__tests__/nested-agent-card.test.ts extensions/agent-tasks/__tests__/backend-waits.test.ts extensions/agent-tasks/__tests__/parent-delivery.test.ts`（43/43 PASS，natural exit），`pnpm typecheck` 与 `git diff --check` 均通过。已检查的范围以外的 workflow/process/notification 适配仍 NOT_RUN。
+
 ### S4：通知、reply/notice、monitor batch 与 Trellis Check
 
 **目的**：迁移后台通知、父会话消息和诊断报告；保留实际 delivery 粒度与消息语义。

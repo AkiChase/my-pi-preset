@@ -1,6 +1,7 @@
 import { copyAgentExecutionConfig, agentExecutionSummary } from "../../runtime-tasks/execution-config.ts";
 import { nullableControl } from "../../shared/tool-arguments.ts";
-import { createToolCallHeading } from "../../beautify/tool-call-heading.ts";
+import { createToolCardRenderers } from "../../beautify/tool-card.ts";
+import { text } from "../../beautify/types.ts";
 import { launchMetadata, launchText } from "../../runtime-tasks/launch.ts";
 import type { Model } from "@earendil-works/pi-ai";
 import {
@@ -254,10 +255,21 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
     return getAvailableTypesIn(registry).filter(name => allowed === undefined || allowed.has(name));
   };
 
+  const agentCardRenderers = createToolCardRenderers(NESTED_TOOL_NAMES[0], undefined, (args, result) => ({
+    identity: NESTED_TOOL_NAMES[0],
+    summary: [String(args.subagent_type ?? ""), String(args.description ?? "")].filter(Boolean).join(" · "),
+    bodyText: result ? text(result) : undefined,
+  }));
+  const messageCardRenderers = createToolCardRenderers(NESTED_TOOL_NAMES[1], undefined, (args, result) => ({
+    identity: NESTED_TOOL_NAMES[1],
+    summary: [String(args.agent_id ?? ""), typeof args.message === "string" ? args.message : ""].filter(Boolean).join(" · "),
+    bodyText: result ? text(result) : undefined,
+  }));
+
   const agentTool = defineTool({
     name: NESTED_TOOL_NAMES[0],
     label: "subagent_run",
-    renderCall: (args, theme, context) => createToolCallHeading({ name: "subagent_run", detail: `${args.subagent_type ?? ""} · ${args.description ?? ""}`, theme, context }),
+    ...agentCardRenderers,
     description:
       "Launch a child-safe nested subagent for bounded delegated work. " +
       "Only use agent types allowed by this parent agent; nesting is depth-limited.",
@@ -544,6 +556,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
   const steerTool = defineTool({
     name: NESTED_TOOL_NAMES[1],
     label: "subagent_message",
+    ...messageCardRenderers,
     description: "Send guidance or a question to a running nested agent owned by this parent.",
     promptSnippet: "Send guidance or a question to a running owned child",
     promptGuidelines: messageToolGuidance({ reply: true }),

@@ -18,3 +18,7 @@
 {"file": "extensions/beautify/__tests__/registered-agent.test.ts", "reason": "Actual cross-loader cooperative timing and agent card regression"}
 {"file": "extensions/agent-tasks/__tests__/loading.test.ts", "reason": "Host-loader event ownership regression"}
 {"file": "extensions/agent-tasks/__tests__/tool-waits.test.ts", "reason": "Top-level agent lifecycle preservation regression"}
+{"file": "extensions/agent-tasks/src/nested-tools.ts", "reason": "S3b cooperative nested subagent tool card adapters"}
+{"file": "extensions/beautify/__tests__/nested-agent-card.test.ts", "reason": "Actual-host nested card and cooperative timing regression"}
+{"file": "extensions/agent-tasks/__tests__/backend-waits.test.ts", "reason": "Nested execution and wait semantics regression"}
+{"file": "extensions/agent-tasks/__tests__/parent-delivery.test.ts", "reason": "Nested reply/held message delivery preservation"}
