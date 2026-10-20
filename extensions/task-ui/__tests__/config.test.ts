@@ -63,3 +63,18 @@ void it("backgroundReminderInterval defaults to 8, accepts 0 and positive intege
         }
     } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+void it("animations defaults on, accepts explicit static fallback and rejects non-booleans", () => {
+    const dir = mkdtempSync(join(tmpdir(), "task-ui-config-"));
+    try {
+        assert.equal(loadConfig(dir).config.animations, true);
+        for (const value of [false, true]) {
+            writeFileSync(join(dir, CONFIG_FILENAME), JSON.stringify({ animations: value }));
+            assert.equal(loadConfig(dir).config.animations, value); assert.deepEqual(loadConfig(dir).warnings, []);
+        }
+        for (const value of [0, "false", null]) {
+            writeFileSync(join(dir, CONFIG_FILENAME), JSON.stringify({ animations: value }));
+            assert.equal(loadConfig(dir).config.animations, true); assert.equal(loadConfig(dir).warnings.length, 1);
+        }
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+});

@@ -8,6 +8,8 @@ export interface TaskUIConfig {
     readonly shortcutTaskPanel: ShortcutBinding;
     /** Empty focused editor Down opens the panel; independent of explicit chords. */
     readonly downOpener: boolean;
+    /** Animate active-task status indicators in an open panel. */
+    readonly animations?: boolean;
     /** Main-model requests between background-task reminders; 0 disables periodic reminders. */
     readonly backgroundReminderInterval: number;
 }
@@ -16,6 +18,7 @@ export const DEFAULTS: TaskUIConfig = Object.freeze({
     shortcutBackground: Object.freeze(["ctrl+shift+b"]),
     shortcutTaskPanel: Object.freeze(["shift+down"]),
     downOpener: true,
+    animations: true,
     backgroundReminderInterval: 8,
 });
 
@@ -51,6 +54,7 @@ export function loadConfig(agentDir = getConfigDir()): { config: TaskUIConfig; w
     }
     for (const key of Object.keys(raw)) if (!(key in DEFAULTS)) warnings.push(`${path}: unknown key "${key}"`);
     if (raw.downOpener !== undefined && typeof raw.downOpener !== "boolean") warnings.push("downOpener: expected a boolean — using default");
+    if (raw.animations !== undefined && typeof raw.animations !== "boolean") warnings.push("animations: expected a boolean — using default");
     const interval = raw.backgroundReminderInterval;
     const validInterval = typeof interval === "number" && Number.isSafeInteger(interval) && interval >= 0;
     if (interval !== undefined && !validInterval) warnings.push("backgroundReminderInterval: expected a non-negative integer — using default");
@@ -58,6 +62,7 @@ export function loadConfig(agentDir = getConfigDir()): { config: TaskUIConfig; w
         shortcutBackground: Object.freeze(raw.shortcutBackground === undefined ? [...DEFAULTS.shortcutBackground] : parseShortcut(raw.shortcutBackground, "shortcutBackground", warnings) ?? [...DEFAULTS.shortcutBackground]),
         shortcutTaskPanel: Object.freeze(raw.shortcutTaskPanel === undefined ? [...DEFAULTS.shortcutTaskPanel] : parseShortcut(raw.shortcutTaskPanel, "shortcutTaskPanel", warnings) ?? [...DEFAULTS.shortcutTaskPanel]),
         downOpener: typeof raw.downOpener === "boolean" ? raw.downOpener : DEFAULTS.downOpener,
+        animations: typeof raw.animations === "boolean" ? raw.animations : DEFAULTS.animations,
         backgroundReminderInterval: validInterval ? interval as number : DEFAULTS.backgroundReminderInterval,
     });
     return { config, warnings, path: found ? path : undefined };

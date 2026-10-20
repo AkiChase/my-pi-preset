@@ -1,14 +1,15 @@
 import { copyToClipboard, type ExtensionContext, type KeybindingsManager } from "@earendil-works/pi-coding-agent";
 import { Input, ScrollView, VStack, isKeyRelease, matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi, type Component, type Focusable, type TUI, type TuiMouseEvent, type TuiMouseEventResult } from "@earendil-works/pi-tui";
 import { layoutError, type NativeFrame, type NativeLayout } from "../shared/scroll-panel/native-layout.ts";
-import { consumeWheel } from "../shared/scroll-panel/wheel.ts";
+import { consumeWheel, contains } from "../shared/scroll-panel/wheel.ts";
 import type { TaskCoordinator } from "./coordinator.ts";
 import type { TaskUIConfig } from "./config.ts";
-import type { TaskControl, TaskDetail } from "./types.ts";
+import type { TaskControl, TaskDetail, ConversationPageRequest } from "./types.ts";
 import { TaskPanelModel, type TaskRow } from "./model.ts";
-import { cleanTaskText, taskLine, taskOneLine, type TaskTheme } from "./presentation.ts";
+import { cleanTaskText, taskLine, taskOneLine, taskStatusLine, type TaskTheme } from "./presentation.ts";
 import { detailRange, renderDetailHeader, renderMessages, sectionTitle } from "./detail-view.ts";
-import { ConversationRenderer } from "./conversation.ts";
+import { ConversationRenderer, type ConversationRange } from "./conversation.ts";
+import { ConversationWindow } from "./conversation-window.ts";
 export { cleanTaskText } from "./presentation.ts";
 const oneLine = taskOneLine;
 
@@ -36,6 +37,14 @@ export class TaskPanel implements Component, Focusable {
     private detailScroll: ScrollView;
     private unsubscribe: () => void = () => {};
     private timer: NodeJS.Timeout | undefined;
+    private animationTimer: NodeJS.Timeout | undefined;
+    private animationFrame = 0;
+    private readonly history = new ConversationWindow();
+    private readonly expandedEntryIds = new Set<string>();
+    private detailRanges: ConversationRange[] = [];
+    private anchor?: { id: string; offset: number; top: number };
+    private detailRevision = -1;
+    private paging = false;
     private disposed = false;
     private detail: TaskDetail | undefined;
     private detailKey: string | undefined;
@@ -60,24 +69,24 @@ export class TaskPanel implements Component, Focusable {
         this.args = args;
         this.copy = args.copy ?? copyToClipboard;
         this.listScroll = this.scrollView(width => this.listBody(width));
-        this.detailScroll = this.scrollView(width => this.detailBody(width));
+        this.detailScroll = this.scrollView(width => this.detailBody(width), "end");
         this.refresh();
         const off = args.coordinator.subscribe(() => this.update());
         if (this.disposed) { off(); return; }
         this.unsubscribe = off;
-        this.timer = setInterval(() => this.update(), 1000);
+        this.timer = setInterval(() => this.update(false), 1000);
         this.timer.unref();
     }
     private get theme(): TaskTheme { return typeof this.args.theme === "function" ? this.args.theme() : this.args.theme; }
-    private scrollView(render: (width: number) => string[]): ScrollView {
+    private scrollView(render: (width: number) => string[], follow: "none" | "end" = "none"): ScrollView {
         return new ScrollView({ render, invalidate: () => this.invalidate() }, {
-            follow: "none", overscroll: "contain", scrollbar: "always",
+            follow, overscroll: "contain", scrollbar: "always",
             scrollbarTrackStyle: text => this.theme.fg("dim", text),
             scrollbarThumbStyle: text => this.theme.fg("accent", text),
         });
     }
     private get activeScroll(): ScrollView { return this.page === "list" ? this.listScroll : this.detailScroll; }
-    getState() { return { page: this.page, selectedKey: this.model.selected?.key, listScrollTop: this.listScroll.scrollTop, detailScrollTop: this.detailScroll.scrollTop }; }
+    getState() { return { page: this.page, selectedKey: this.model.selected?.key, listScrollTop: this.listScroll.scrollTop, detailScrollTop: this.detailScroll.scrollTop, followingEnd: this.detailScroll.isFollowingEnd, historyPages: this.history.pageCount, historyEntries: this.history.entries.length }; }
     private selectedLine(): number {
         const agents = this.rows.filter(row => row.view.kind === "agent" || row.view.kind === "workflow");
         const processes = this.rows.filter(row => row.view.kind === "shell" || row.view.kind === "monitor");
@@ -89,7 +98,7 @@ export class TaskPanel implements Component, Focusable {
         const pi = processes.findIndex(row => row.view.key === this.model.selected?.key);
         return pi >= 0 ? Math.max(1, offset(agents, agents.length)) + 2 + offset(processes, pi) : 0;
     }
-    private refresh(): void {
+    private refresh(readDetail = true): void {
         if (this.disposed) return;
         if (this.refreshing) {
             // Sources can publish synchronously from list/detail. Coalesce that event
@@ -101,9 +110,9 @@ export class TaskPanel implements Component, Focusable {
             return;
         }
         this.refreshing = true;
-        try { this.refreshSnapshot(); } finally { this.refreshing = false; }
+        try { this.refreshSnapshot(readDetail); } finally { this.refreshing = false; }
     }
-    private refreshSnapshot(): void {
+    private refreshSnapshot(readDetail: boolean): void {
         const previous = this.selectedLine();
         const visible = previous >= this.listScroll.scrollTop && previous < this.listScroll.scrollTop + this.listScroll.viewportHeight;
         const hadSelection = this.model.selected !== undefined;
@@ -117,17 +126,68 @@ export class TaskPanel implements Component, Focusable {
         const selected = this.model.selected;
         if (selected?.key !== this.detailKey) {
             this.detailKey = selected?.key; this.detail = undefined; this.composer = undefined;
-            this.detailScroll = this.scrollView(width => this.detailBody(width));
+            this.history.clear(); this.expandedEntryIds.clear(); this.detailRanges = []; this.anchor = undefined; this.detailRevision = -1;
+            this.detailScroll = this.scrollView(width => this.detailBody(width), "end");
         }
-        if (selected) {
-            const detail = this.args.coordinator.detail(selected, { limit: 16_000 });
-            if (this.disposed) return;
-            // Keep the final preview if the source has swept this exact identity.
-            if (detail && selected.key === this.model.selected?.key) this.detail = detail;
+        if (selected && (this.detailRevision < 0 || readDetail && this.detailRevision !== this.args.coordinator.revision)) {
+            this.readDetail({ direction: "latest" }, this.detailScroll.isFollowingEnd);
         }
-        this.invalidate();
+        this.syncAnimation();
+        this.cachedList = undefined; this.frame = undefined;
     }
-    private update(): void { if (!this.disposed) { this.refresh(); if (!this.disposed) this.args.tui.requestRender(); } }
+    private syncAnimation(): void {
+        const active = this.args.config.animations !== false && this.rows.some(row => row.view.status === "running" || row.view.status === "starting");
+        if (!active) { clearInterval(this.animationTimer); this.animationTimer = undefined; return; }
+        if (this.animationTimer || this.disposed) return;
+        this.animationTimer = setInterval(() => {
+            if (this.disposed) return;
+            this.animationFrame++; this.cachedList = undefined; this.frame = undefined;
+            this.args.tui.requestRender();
+        }, 250);
+        this.animationTimer.unref();
+    }
+    private captureAnchor(): void {
+        if (this.page !== "detail" || !this.frame) return;
+        const top = this.detailScroll.scrollTop;
+        const range = this.detailRanges.find(range => range.end > top);
+        if (range) this.anchor = { id: range.id, offset: top - range.start, top };
+    }
+    private readDetail(request: ConversationPageRequest, following: boolean): void {
+        const selected = this.model.selected;
+        if (!selected || this.disposed || this.paging) return;
+        this.paging = true;
+        const revision = this.args.coordinator.revision;
+        try {
+            if (!following) this.captureAnchor();
+            const detail = this.args.coordinator.detail(selected, { limit: 16_000, conversationPage: request });
+            if (this.disposed || selected.key !== this.model.selected?.key || selected.key !== this.detailKey) return;
+            this.detailRevision = revision;
+            if (!detail) return; // Preserve the swept selected terminal snapshot.
+            if (detail.conversationPage) {
+                this.history.accept(detail.conversationPage, request.direction ?? "latest", following);
+                this.detail = { ...detail, conversation: this.history.entries };
+                if (this.history.last?.hasNewer) this.detailScroll.scrollTo(this.detailScroll.scrollTop, { disableFollow: true });
+            } else this.detail = detail;
+            this.cachedDetail = undefined; this.frame = undefined;
+            if (following) { this.anchor = undefined; this.detailScroll.scrollToEnd(); }
+        } catch (error) {
+            this.history.hint = `Conversation unavailable: ${oneLine(String(error))}. Press End to retry.`;
+            this.history.blocked = true; this.cachedDetail = undefined; this.frame = undefined;
+        } finally { this.paging = false; }
+    }
+    /** One request per user edge action; never auto-loop over filtered/empty source pages. */
+    private historyEdge(delta: number): void {
+        if (this.page !== "detail" || this.history.blocked || !delta) return;
+        const scroll = this.detailScroll;
+        if (delta < 0 && scroll.scrollTop === 0 && this.history.first?.hasOlder && this.history.first.before)
+            this.readDetail({ direction: "before", cursor: this.history.first.before }, false);
+        else if (delta > 0 && this.history.last?.hasNewer && this.history.last.after) {
+            const frame = this.ensureInputFrame(), height = this.args.layout.scrollBox(frame, scroll).children[0].rect.height;
+            if (scroll.scrollTop + scroll.viewportHeight >= height)
+                this.readDetail({ direction: "after", cursor: this.history.last.after }, false);
+        }
+    }
+    private update(readDetail = true): void { if (!this.disposed) { this.refresh(readDetail); if (!this.disposed) this.args.tui.requestRender(); } }
     private ensureInputFrame(): NativeFrame {
         const width = Math.max(1, Math.floor(this.args.tui.terminal.columns || this.frame?.width || 80));
         const rows = Math.max(1, Math.floor(this.args.tui.terminal.rows || 24));
@@ -135,9 +195,26 @@ export class TaskPanel implements Component, Focusable {
         return this.frame!;
     }
     handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
-        if (this.disposed || event.type !== "wheel") return undefined;
-        try { return consumeWheel(event, this.args.layout.scrollBox(this.ensureInputFrame(), this.activeScroll).clip, this.activeScroll); }
-        catch (cause) { this.refuse(cause); return { handled: true }; }
+        if (this.disposed || event.type !== "wheel" && (event.type !== "click" || event.button !== "left" || event.shift || event.ctrl || event.alt)) return undefined;
+        try {
+            const box = this.args.layout.scrollBox(this.ensureInputFrame(), this.activeScroll);
+            if (event.type === "wheel") {
+                const result = consumeWheel(event, box.clip, this.activeScroll);
+                if (contains(box.clip, event.x, event.y)) this.historyEdge(event.wheelDelta ?? 0);
+                return result;
+            }
+            if (this.page !== "detail" || this.composer || !contains(box.clip, event.x, event.y) || event.x >= box.rect.x + box.children[0].rect.width) return undefined;
+            const line = event.y - box.rect.y + this.detailScroll.scrollTop;
+            const range = this.detailRanges.find(range => range.collapsible && line >= range.start && line < range.end);
+            if (!range) return undefined;
+            this.captureAnchor();
+            if (this.expandedEntryIds.has(range.id)) this.expandedEntryIds.delete(range.id); else {
+                if (this.expandedEntryIds.size >= 256) this.expandedEntryIds.delete(this.expandedEntryIds.values().next().value!);
+                this.expandedEntryIds.add(range.id);
+            }
+            this.cachedDetail = undefined; this.frame = undefined; this.args.tui.requestRender();
+            return { handled: true };
+        } catch (cause) { this.refuse(cause); return { handled: true }; }
     }
     handleInput(data: string): void {
         if (this.disposed || isKeyRelease(data)) return;
@@ -183,13 +260,15 @@ export class TaskPanel implements Component, Focusable {
                 matchesKey(data, "down") || matchesKey(data, "j") || this.args.keys.matches(data, "tui.select.down") ? 1 : 0;
             if (this.page === "detail") {
                 this.ensureInputFrame();
-                if (matchesKey(data, "home")) this.detailScroll.scrollToStart();
-                else if (matchesKey(data, "end")) this.detailScroll.scrollToEnd();
-                else if (delta) this.detailScroll.scrollBy(delta);
+                if (matchesKey(data, "home")) { this.detailScroll.scrollToStart(); this.historyEdge(-1); }
+                else if (matchesKey(data, "end")) {
+                    this.readDetail({ direction: "latest" }, true); this.detailScroll.scrollToEnd();
+                }
+                else if (delta) { this.detailScroll.scrollBy(delta); this.historyEdge(delta); }
                 else return;
             } else if (matchesKey(data, "enter")) {
                 if (!this.model.selected) return;
-                this.page = "detail"; this.frame = undefined;
+                this.refresh(); this.page = "detail"; this.frame = undefined;
             } else if (this.rows.length) {
                 const index = this.rows.findIndex(row => row.view.key === this.model.selected?.key);
                 if (matchesKey(data, "left")) {
@@ -229,7 +308,7 @@ export class TaskPanel implements Component, Focusable {
         if (this.cachedList?.width === width) return this.cachedList.lines;
         const group = (label: string, rows: TaskRow[]) => [this.theme.fg("accent", label), ...(rows.length ? rows.flatMap(row => [taskLine(row.view, width, this.theme, {
             prefix: row.prefix, children: this.model.isCollapsed(row.view.key) ? row.descendantCount : undefined,
-            selected: row.view.key === this.model.selected?.key, now: this.args.now?.(),
+            selected: row.view.key === this.model.selected?.key, now: this.args.now?.(), animationFrame: this.animationTimer ? this.animationFrame : undefined,
         }), ...messageLine(row, width, this.theme)]) : [this.theme.fg("dim", "No tasks")])];
         const lines = [...group("Agents", this.rows.filter(row => row.view.kind === "agent" || row.view.kind === "workflow")), ...group("Processes", this.rows.filter(row => row.view.kind === "shell" || row.view.kind === "monitor"))].map(line => truncateToWidth(line, width, "…"));
         this.cachedList = { width, lines }; return lines;
@@ -238,17 +317,14 @@ export class TaskPanel implements Component, Focusable {
         if (this.cachedDetail?.width === width) return this.cachedDetail.lines;
         const selected = this.model.selected;
         if (!selected) return [this.theme.fg("dim", "No tasks")];
-        const header = renderDetailHeader(selected, this.theme, width, this.args.now?.());
         const conversation = this.detail?.conversation;
-        let section: string[], body: string[];
+        let body: string[];
         if (conversation) {
-            const count = `${conversation.length} message${conversation.length === 1 ? "" : "s"}${this.detail?.conversationTruncated ? " (latest)" : ""}`;
-            section = sectionTitle("Conversation", this.theme, width, count);
-            const running = selected.status === "running" || selected.status === "starting";
-            body = this.conversation.render(conversation, width, this.theme, { truncated: this.detail?.conversationTruncated,
-                activity: running ? selected.stats.activity : undefined });
+            const rendered = this.conversation.renderModel(conversation, width, this.theme, { truncated: !this.detail?.conversationPage && this.detail?.conversationTruncated,
+                expanded: this.expandedEntryIds });
+            body = rendered.lines;
+            this.detailRanges = rendered.ranges;
         } else {
-            section = sectionTitle("Output", this.theme, width, detailRange(this.detail));
             body = this.detail?.text
                 ? cleanTaskText(this.detail.text).split(/\r\n|\n|\r/).flatMap(part => wrapTextWithAnsi(part, Math.max(1, width)))
                 : [this.theme.fg("dim", "Output not established yet.")];
@@ -259,8 +335,16 @@ export class TaskPanel implements Component, Focusable {
             ? ["", ...sectionTitle("Messages", this.theme, width, `${messageEntries.length}${messagesOmitted ? ` shown · ${messagesOmitted} older omitted` : ""}`),
                 ...(messageEntries.length ? renderMessages(messageEntries, this.theme, width) : [this.theme.fg("dim", "Message content omitted by detail budget.")])]
             : [];
-        const lines = [...header, ...messages, "", ...section, ...body];
+        const hints = this.history.hint ? [this.theme.fg("warning", this.history.hint)] : [];
+        if (conversation) this.detailRanges = this.detailRanges.map(range => ({ ...range, start: range.start + messages.length + hints.length, end: range.end + messages.length + hints.length }));
+        else this.detailRanges = [];
+        const lines = [...messages, ...hints, ...body];
         this.cachedDetail = { width, lines }; return lines;
+    }
+    private detailTitle(width: number): string[] {
+        const entries = this.detail?.conversation;
+        const suffix = entries ? `${entries.length} messages${this.history.first?.hasOlder ? " · ↑ earlier" : ""}${this.history.last?.hasNewer ? " · ↓ newer" : ""}${!this.detail?.conversationPage && this.detail?.conversationTruncated ? " (latest)" : ""}` : detailRange(this.detail);
+        return [truncateToWidth(sectionTitle(entries ? "Conversation" : "Output", this.theme, width, suffix).join(" "), width, "…")];
     }
     private hints(width: number): string {
         const row = this.rows.find(row => row.view.key === this.model.selected?.key);
@@ -303,15 +387,45 @@ export class TaskPanel implements Component, Focusable {
         const clipped = truncateToWidth(text, width, "…"); return clipped + " ".repeat(Math.max(0, width - visibleWidth(clipped)));
     }
     private renderFrame(width: number, rows: number): string[] {
-        const header = rows > 1 ? [this.theme.fg("accent", `Task Panel · ${this.page === "list" ? `Tasks (${this.rows.length})` : "Detail"}`)] : [];
+        const header = rows > (this.page === "detail" ? 3 : 1) ? [this.theme.fg("accent", `Task Panel · ${this.page === "list" ? `Tasks (${this.rows.length})` : "Detail"}`)] : [];
         const scroll = this.activeScroll;
         const footer = { render: () => footerLines, invalidate() {} };
         let footerLines = this.footerLines(width, rows, "");
+        // On tight terminals reserve one body row and the selected status before optional metadata.
+        const compactFooter = this.page === "detail" && (footerLines.length > Math.max(1, rows - 3) || rows <= 3);
+        if (compactFooter) {
+            const budget = Math.max(1, rows - 3);
+            // Long navigation hints must not displace the action row in a tight terminal.
+            const caps = this.model.selected?.capabilities;
+            const actions = [caps?.stop ? "x Stop" : undefined, "c Copy", caps?.steer ? "Enter Message" : undefined,
+                caps?.pause ? "p Pause" : caps?.resume ? "p Resume" : undefined,
+                caps?.skip ? "s Skip" : undefined, caps?.retry ? "r Retry" : undefined,
+                `${this.args.config.shortcutBackground.join("/") || "/task-detach"} All waits`].filter(Boolean).join(" · ");
+            const navigation = this.composer ? this.composer.input.render(width)[0] ?? "" : this.hints(width);
+            const actionLines = wrapTextWithAnsi(actions, width);
+            const keys = [caps?.stop ? "x" : undefined, "c", caps?.steer ? "Enter" : undefined,
+                caps?.pause || caps?.resume ? "p" : undefined, caps?.skip ? "s" : undefined, caps?.retry ? "r" : undefined].filter(Boolean).join("/");
+            const compactActions = `${keys} · ${this.args.config.shortcutBackground.join("/") || "/task-detach"} Detach`;
+            // Preserve every available key and the global detach chord before
+            // optional labels/navigation when the full action text cannot fit.
+            const actionRows = actionLines.length <= budget ? actionLines : wrapTextWithAnsi(compactActions, width).slice(0, budget);
+            footerLines = this.composer ? [navigation, ...actionRows].slice(0, budget)
+                : [...(actionRows.length < budget ? [navigation] : []), ...actionRows];
+            footerLines = footerLines.map(line => this.theme.fg("dim", truncateToWidth(line, width, "…")));
+        }
+        const status = this.page === "detail" && this.model.selected && rows >= 3
+            ? { render: () => [taskStatusLine(this.model.selected!, width, this.theme, this.args.now?.(), this.animationTimer ? this.animationFrame : undefined)], invalidate() {} } : undefined;
+        const fixedBudget = Math.max(0, rows - footerLines.length - header.length - (status ? 1 : 0) - 1);
+        const metadata = this.page === "detail" && this.model.selected
+            ? renderDetailHeader(this.model.selected, this.theme, width, this.args.now?.(), Math.min(8, Math.max(0, fixedBudget - 1))) : [];
+        const title = this.page === "detail" && fixedBudget > 0 ? this.detailTitle(width) : [];
         const headerBudget = Math.max(0, rows - footerLines.length - 1);
         header.splice(headerBudget);
         const root = new VStack([
             { component: { render: () => header.map(line => truncateToWidth(line, width, "…")), invalidate() {} }, basis: header.length, shrink: 0 },
+            { component: { render: () => [...metadata, ...title], invalidate() {} }, basis: metadata.length + title.length, shrink: 0 },
             { component: scroll, basis: 0, grow: 1, minSize: 0 },
+            ...(status ? [{ component: status, basis: 1, shrink: 0 }] : []),
             { component: footer, basis: footerLines.length, shrink: 0 },
         ]);
         if (this.page === "list") {
@@ -327,9 +441,16 @@ export class TaskPanel implements Component, Focusable {
             else if (selected >= scroll.scrollTop + scroll.viewportHeight) scroll.scrollTo(selected - scroll.viewportHeight + 1);
             this.ensureSelected = false; frame = this.args.layout.render(root, width, rows, request);
         }
+        if (this.page === "detail" && this.anchor) {
+            const anchor = this.anchor; this.anchor = undefined;
+            const range = this.detailRanges.find(range => range.id === anchor.id);
+            scroll.scrollTo(range ? range.start + anchor.offset : anchor.top, { disableFollow: true });
+            frame = this.args.layout.render(root, width, rows, request);
+        }
+        if (this.page === "detail" && this.history.last?.hasNewer) scroll.scrollTo(scroll.scrollTop, { disableFollow: true });
         const contentHeight = this.args.layout.scrollBox(frame, scroll).children[0].rect.height;
         const position = this.page === "list" ? `${Math.max(0, this.rows.findIndex(row => row.view.key === this.model.selected?.key) + 1)}/${this.rows.length}` : `${Math.min(contentHeight, scroll.scrollTop + 1)}–${Math.min(contentHeight, scroll.scrollTop + scroll.viewportHeight)}/${contentHeight}`;
-        footerLines = this.footerLines(width, rows, position);
+        if (!compactFooter) footerLines = this.footerLines(width, rows, position).slice(0, footerLines.length);
         this.frame = this.args.layout.render(root, width, rows, request);
         this.args.layout.scrollBox(this.frame, scroll);
         return this.frame.lines.map(line => this.cell(line, width));
@@ -346,7 +467,7 @@ export class TaskPanel implements Component, Focusable {
     close(): void { if (this.disposed) return; this.dispose(); this.args.done(); }
     dispose(): void {
         if (this.disposed) return;
-        this.disposed = true; clearInterval(this.timer); this.timer = undefined; this.unsubscribe();
-        this.composer = undefined; this.model.dispose(); this.conversation.dispose(); this.detail = undefined; this.rows = []; this.invalidate();
+        this.disposed = true; clearInterval(this.timer); this.timer = undefined; clearInterval(this.animationTimer); this.animationTimer = undefined; this.unsubscribe();
+        this.composer = undefined; this.model.dispose(); this.conversation.dispose(); this.history.clear(); this.expandedEntryIds.clear(); this.detailRanges = []; this.anchor = undefined; this.detail = undefined; this.rows = []; this.invalidate();
     }
 }

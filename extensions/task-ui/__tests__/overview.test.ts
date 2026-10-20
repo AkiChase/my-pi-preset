@@ -62,12 +62,12 @@ it("root metadata only, five rows plus hidden count, no child sums/input/detail,
     }
     const lines = overviewLines(selected, 100, 24, theme, 103_000);
     assert.equal(lines.length, 6); assert.equal(lines[5], "+2 hidden");
-    assert.match(lines[0], /^● Description 0 +\[running\] 3s · ↓ 12$/);
+    assert.match(lines[0], /^◌ Description 0 +\[running\] 3s · ↓ 12$/);
     const malicious = view("safe", { description: "中文🙂\u001b]0;BAD\u0007\n描述\u001b[31m", status: "paused" });
     for (const width of [0, 1, 2, 5, 20, 40, 80]) for (const line of overviewLines([malicious], width, 24, theme, 103_000)) {
         assert.ok(visibleWidth(line) <= width); assert.doesNotMatch(stripTerminalSequences(line), /BAD|[\u0000-\u001f]/);
     }
-    assert.match(overviewLines([malicious], 80, 24, theme, 103_000)[0], /^○ 中文🙂 描述/);
+    assert.match(overviewLines([malicious], 80, 24, theme, 103_000)[0], /^Ⅱ 中文🙂 描述/);
 });
 it("retention is unpinned whole-root four seconds, orphan/cycle safe and new run does not resurrect old metadata", () => {
     const model = new TaskOverviewModel(), root = view("parent"), child = view("child", { parentKey: root.key, status: "completed", endedAt: 0 });

@@ -4,6 +4,10 @@ import assert from "node:assert/strict";
 import { it } from "node:test";
 import { createEventBus, SessionManager, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { CURSOR_MARKER, stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
+import "../../agent-tasks/__tests__/source-loader.mjs";
+import type { AgentManager } from "../../agent-tasks/src/agent-manager.ts";
+import type { AgentRecord } from "../../agent-tasks/src/types.ts";
+const { createAgentTaskSource } = await import("../../agent-tasks/src/source.ts");
 import { TaskCoordinator } from "../coordinator.ts";
 import { TaskLifecycle } from "../lifecycle.ts";
 import { DEFAULTS } from "../config.ts";
@@ -50,14 +54,14 @@ void it("shared panel shows all modes, bounded details, list/detail scroll, safe
     try {
         assert.match(h.panel.render(150).join("\n"), /Agents/);
         h.panel.handleInput("\r");
-        assert.match(h.panel.render(150).join("\n"), /running · agent · foreground/);
+        assert.match(h.panel.render(150).join("\n"), /agent · foreground/);
         h.panel.handleInput("\u001b");
         assert.ok(f.reads.some(identity => identity.taskId === a.taskId));
         h.panel.handleInput("j");
         assert.equal(h.panel.model.selected?.key, b.key);
         h.panel.handleInput("\r");
         const rendered = h.panel.render(180).join("\n");
-        assert.match(rendered, /queued · agent · background/); assert.match(rendered, /Waiting\s+2 waits/); assert.match(rendered, /omitted before 8, after 9/);
+        assert.match(rendered, /agent · background/); assert.match(rendered, /queued/); assert.match(rendered, /omitted before 8, after 9/);
         assert.match(rendered, /Tokens\s+12/); assert.match(rendered, /Activity\s+3 tool uses/); assert.doesNotMatch(rendered, /tokens: |toolUses|\{"/);
         h.panel.handleInput("\u001b[H");
         const first = h.panel.render(180).join("\n"); assert.match(first, /line 0/);
@@ -218,7 +222,7 @@ void it("native list/detail wheel containment, fixed frames, keyboard ensure and
     } finally { panel.dispose(); h.panel.dispose(); f.coordinator.dispose(); }
 });
 
-void it("detail preserves full wrapped metadata, command, phases and bounded range while scrolling only the preview", () => {
+void it("detail truncates fixed metadata and keeps body/status/actions visible while scrolling only output", () => {
     const command = "TRELLIS_CONTEXT_ID=source_123 " + "完整命令中文 ".repeat(30) + "COMMAND_END";
     const row = view("long", { kind: "shell", title: "原始标题 ".repeat(20) + "TITLE_END", description: command,
         stats: { phases: Array.from({ length: 12 }, (_, index) => ({ index, title: `Phase-${index}`, detail: "阶段 ".repeat(10) + `PHASE_END_${index}` })) } });
@@ -229,9 +233,16 @@ void it("detail preserves full wrapped metadata, command, phases and bounded ran
         theme: { fg: (_color, text) => text }, keys: { matches: () => false }, tui: { terminal, requestRender() {} } as never, done() {} });
     try {
         panel.handleInput("\r");
-        let all = "";
-        for (let i = 0; i < 400; i++) { all += stripTerminalSequences(panel.render(40).join("\n")) + "\n"; panel.handleInput("j"); }
-        for (const text of ["TITLE_END", "COMMAND_END", "TRELLIS_CONTEXT_ID=source_123", "PHASE_END_11", "log-59", "200–600 / 2000", "after 1400"]) assert.ok(all.includes(text), text);
+        const latest = panel.render(40).map(stripTerminalSequences);
+        assert.match(latest.join("\n"), /log-59/);
+        assert.match(latest.join("\n"), /running/);
+        assert.doesNotMatch(latest.join("\n"), /TITLE_END|COMMAND_END|PHASE_END/);
+        panel.handleInput("\u001b[H");
+        assert.match(panel.render(40).join("\n"), /log-0/);
+        panel.handleInput("j");
+        const fixed = panel.render(40).map(stripTerminalSequences);
+        assert.deepEqual(fixed.slice(0, 2), latest.slice(0, 2));
+        panel.handleInput("\u001b[F");
         const top = panel.getState().detailScrollTop; f.publish([row]); panel.render(40); assert.equal(panel.getState().detailScrollTop, top);
         panel.handleMouse({ type: "wheel", x: 1, y: 4, wheelDelta: 100 } as never); assert.equal(panel.model.selected?.key, row.key);
         panel.handleInput("\u001b"); panel.handleInput("\r"); assert.equal(panel.getState().detailScrollTop, top, "same selected detail retains its independent viewport");
@@ -382,11 +393,11 @@ void it("detail renders kind-specific labelled sections without raw stats or JSO
     try {
         const a = detail(agent.key);
         for (const pattern of [/Inspect the login flow/, /Model\s+provider\/model-x · thinking high/, /Context\s+inherits context/, /Override\s+thinking: low → high/,
-            /Time\s+1m23s/, /Activity\s+4\/20 turns · 1 tool use/, /Tokens\s+51\.2k \(in 40\.1k · out 11\.1k\)/, /Cost\s+\$0\.03/, /Now\s+reading src\/a\.ts/, /── Artifacts/, /── Output · 20–40 \/ 100/])
+            /1m23s/, /Activity\s+4\/20 turns · 1 tool use/, /Tokens\s+51\.2k \(in 40\.1k · out 11\.1k\)/, /\$0\.03/, /reading src\/a\.ts/, /conversation\s+\/tmp\/agent.output/, /── Output · 20–40 \/ 100/])
             assert.match(a, pattern);
         assert.doesNotMatch(a, /\{"|durationMs|inputTokens|Execution config/);
         const s = detail(failed.key);
-        for (const pattern of [/failed · shell · foreground/, /PID\s+42/, /Exit\s+2/, /── Command/, /\$ npm test/, /log\s+\/tmp\/sh\.log/]) assert.match(s, pattern);
+        for (const pattern of [/shell · foreground/, /PID\s+42/, /Exit\s+2/, /\$ npm test/, /log\s+\/tmp\/sh\.log/]) assert.match(s, pattern);
         assert.ok(colors.includes("error:2"), "non-zero exit uses the error color");
         const m = detail(monitor.key);
         assert.match(m, /Monitor\s+deadline 10m · batch 200ms/);
@@ -403,7 +414,7 @@ void it("structured conversation replaces the raw output body, with running acti
     try {
         h.panel.handleInput("\r");
         const frame = stripTerminalSequences(h.panel.render(100).join("\n"));
-        for (const pattern of [/── Conversation · 2 messages \(latest\)/, /older messages omitted/, /User/, /do it/, /Assistant/, /done/, /⏺ read {2}a\.ts/, /▍ reading a\.ts/]) assert.match(frame, pattern);
+        for (const pattern of [/── Conversation · 2 messages \(latest\)/, /older messages omitted/, /User/, /do it/, /Assistant/, /done/, /⏺ read {2}a\.ts/, /reading a\.ts/]) assert.match(frame, pattern);
         assert.doesNotMatch(frame, /"type":"user"|── Output|\*\*done\*\*/);
     } finally { h.panel.dispose(); f.coordinator.dispose(); }
 });
@@ -479,5 +490,213 @@ void it("steering composer forwards focus for the IME cursor and keeps footer he
         assert.equal(open.findIndex(line => /waiting 0/.test(line)), before.findIndex(line => /waiting 0/.test(line)), "action rows keep their position");
         panel.focused = false;
         assert.ok(!panel.render(18).some(line => line.includes(CURSOR_MARKER)), "blur propagates to the composer");
+    } finally { panel.dispose(); f.coordinator.dispose(); }
+});
+
+void it("paged detail anchors prepend/eviction, preserves history on source events and End fetches actual latest", () => {
+    const row = view("paged"), f = sourceFixture([row]);
+    const requests: string[] = [];
+    let latest = 5;
+    let afterAnchor: string | undefined;
+    let snapshotAtAfter: (() => string | undefined) | undefined;
+    const make = (n: number) => ({ entries: Array.from({ length: 8 }, (_, i) => ({ id: `${n}:${i}`, kind: "user" as const, text: `PAGE-${n}-ENTRY-${i}` })),
+        before: `before:${n}`, after: `after:${n}`, hasOlder: n > 0, hasNewer: n < latest, source: "live" as const,
+        status: "ok" as const, budgetLimited: false, scannedBytes: 100, scannedMessages: 8, generation: "g" });
+    f.source.detail = (_identity, request) => {
+        const p = request?.conversationPage, direction = p?.direction ?? "latest";
+        requests.push(direction);
+        if (direction === "after") afterAnchor = snapshotAtAfter?.();
+        const cursor = Number(p?.cursor?.split(":")[1]);
+        const n = direction === "latest" ? latest : direction === "before" ? cursor - 1 : cursor + 1;
+        const page = make(n);
+        return { text: "", conversation: page.entries, conversationPage: page };
+    };
+    const terminal = { rows: 18, columns: 80 };
+    const panel = new TaskPanel({ coordinator: f.coordinator, config: DEFAULTS, layout, ctx: { ui: { notify() {} } } as unknown as ExtensionContext,
+        theme: { fg: (_color, text) => text }, keys: { matches: () => false }, tui: { terminal, requestRender() {} } as never, done() {} });
+    const plain = () => panel.render(80).map(stripTerminalSequences);
+    const body = () => plain().filter(line => /PAGE-/.test(line)).map(line => line.trim());
+    snapshotAtAfter = () => {
+        const state = panel as unknown as { cachedDetail?: { lines: string[] } };
+        return state.cachedDetail?.lines.slice(panel.getState().detailScrollTop).map(stripTerminalSequences).find(line => /PAGE-/.test(line))?.trim();
+    };
+    try {
+        panel.handleInput("\r"); assert.match(plain().join("\n"), /PAGE-5-ENTRY-7/); assert.equal(panel.getState().followingEnd, true);
+        panel.handleInput("\u001b[H"); plain();
+        assert.equal(requests.at(-1), "before"); assert.equal(panel.getState().historyPages, 2);
+        assert.match(body()[0], /PAGE-5-ENTRY-0/, "prepend keeps first visible stable entry and row offset");
+        // Every Home is a user request, not an unbounded automatic empty-page loop.
+        for (let n = 0; n < 3; n++) {
+            panel.handleInput("\u001b[H"); plain();
+            assert.match(body()[0], new RegExp(`PAGE-${4 - n}-ENTRY-0`), "prepend plus far-tail eviction preserve the anchor");
+            assert.ok(panel.getState().historyPages <= 3);
+        }
+        assert.equal(panel.getState().historyPages, 3);
+        const before = body(), top = panel.getState().detailScrollTop;
+        latest = 6; f.publish([row]);
+        assert.deepEqual(body(), before); assert.equal(panel.getState().detailScrollTop, top);
+        assert.equal(panel.getState().followingEnd, false, "latest source updates cannot steal history position");
+        // Scroll into the newer evicted edge; the source after cursor reloads it.
+        panel.handleMouse({ type: "wheel", x: 1, y: 11, wheelDelta: 10000 } as never); plain();
+        assert.equal(requests.at(-1), "after"); assert.ok(panel.getState().historyPages <= 3);
+        assert.equal(body()[0]?.replace(/\s+[│┃]$/, ""), afterAnchor, "forward prepend eviction preserves the first visible entry and its nonzero page offset");
+        panel.handleInput("\u001b[F");
+        assert.equal(requests.at(-1), "latest"); assert.match(plain().join("\n"), /PAGE-6-ENTRY-7/);
+        assert.equal(panel.getState().followingEnd, true); assert.equal(panel.getState().historyPages, 1);
+        latest = 7; f.publish([row]); assert.match(plain().join("\n"), /PAGE-7-ENTRY-7/);
+        assert.equal(panel.getState().historyPages, 1, "ordinary latest refresh cannot accumulate pages");
+        terminal.columns = 24; terminal.rows = 9;
+        assert.equal(panel.render(24).length, 9);
+    } finally { panel.dispose(); f.coordinator.dispose(); }
+});
+
+void it("native clipped mouse clicks expand only one stable entry, after scrolling; other text/buttons pass through", () => {
+    const row = view("click"), f = sourceFixture([row]);
+    const entries = Array.from({ length: 5 }, (_, i) => ({ id: `tool-${i}`, kind: "toolResult" as const, name: "read", text: Array.from({ length: 20 }, (_, n) => `TOOL-${i}-LINE-${n}`).join("\n"), elided: 0 }));
+    f.details.set(row.key, { text: "", conversation: entries });
+    const terminal = { rows: 18, columns: 80 };
+    const panel = new TaskPanel({ coordinator: f.coordinator, config: DEFAULTS, layout, ctx: { ui: { notify() {} } } as unknown as ExtensionContext,
+        theme: { fg: (_color, text) => text }, keys: { matches: () => false }, tui: { terminal, requestRender() {} } as never, done() {} });
+    const click = (x: number, y: number, button = "left") => panel.handleMouse({ type: "click", button, x, y } as never);
+    try {
+        panel.handleInput("\r"); panel.render(80);
+        panel.handleMouse({ type: "wheel", x: 1, y: 11, wheelDelta: -5 } as never);
+        const before = panel.render(80).map(stripTerminalSequences);
+        const hit = before.findIndex(line => /TOOL-4-LINE/.test(line)); assert.ok(hit >= 0);
+        assert.equal(click(1, hit, "right"), undefined); assert.equal(click(1, 0), undefined); assert.equal(click(79, hit), undefined);
+        assert.deepEqual(click(1, hit), { handled: true });
+        let after = panel.render(80).map(stripTerminalSequences);
+        assert.ok(after.some(line => /click to collapse/.test(line)), "scrollTop/native clip must map to the clicked tool ID");
+        panel.handleInput("\u001b[F"); after = panel.render(80).map(stripTerminalSequences);
+        // End re-reads same-task raw source without losing per-entry expansion.
+        assert.ok(after.some(line => /TOOL-4-LINE-19/.test(line)));
+        panel.handleInput("\u001b[H"); const first = panel.render(80).map(stripTerminalSequences);
+        assert.ok(first.some(line => /click to expand/.test(line)), "other entries remain collapsed");
+        f.publish([row]); panel.handleInput("\u001b[F"); assert.match(panel.render(80).join("\n"), /TOOL-4-LINE-19/);
+        f.details.set(row.key, { text: "", conversation: [{ id: "text", kind: "user", text: "NORMAL TEXT" }] }); f.publish([row]); panel.handleInput("\u001b[F");
+        const normal = panel.render(80).map(stripTerminalSequences).findIndex(line => /NORMAL TEXT/.test(line));
+        assert.equal(click(1, normal), undefined);
+    } finally { panel.dispose(); f.coordinator.dispose(); }
+});
+
+void it("clock/spinner refresh perform zero detail IO and dispose clears active/static timers", t => {
+    t.mock.timers.enable({ apis: ["setInterval"] });
+    for (const animations of [true, false]) {
+        const f = sourceFixture([view("clock", { startedAt: 0 })]);
+        let renders = 0;
+        const panel = new TaskPanel({ coordinator: f.coordinator, config: { ...DEFAULTS, animations }, layout, ctx: { ui: { notify() {} } } as unknown as ExtensionContext,
+            theme: { fg: (_color, text) => text }, keys: { matches: () => false }, tui: { terminal: { rows: 18, columns: 80 }, requestRender() { renders++; } } as never, done() {} });
+        try {
+            panel.handleInput("\r"); const first = stripTerminalSequences(panel.render(80).join("\n")), reads = f.reads.length;
+            t.mock.timers.tick(250); const second = stripTerminalSequences(panel.render(80).join("\n"));
+            if (animations) assert.notEqual(second, first); else assert.equal(second, first);
+            t.mock.timers.tick(2000); panel.render(80); assert.equal(f.reads.length, reads);
+            panel.dispose(); const count = renders; t.mock.timers.tick(5000);
+            assert.equal(renders, count); assert.equal(f.reads.length, reads);
+        } finally { panel.dispose(); f.coordinator.dispose(); }
+    }
+});
+
+void it("reset/unavailable retain a single-generation window, signal retry and never loop paging in render", () => {
+    const row = view("reset"), f = sourceFixture([row]);
+    let status: "ok" | "reset" | "unavailable" = "ok", generation = "g", reads = 0;
+    f.source.detail = () => {
+        reads++;
+        const page = { entries: [{ id: generation, kind: "user" as const, text: `GENERATION-${generation}` }], before: "b", after: "a",
+            hasOlder: true, hasNewer: false, source: "live" as const, status, hint: status === "ok" ? undefined : `${status}: Press End to retry`,
+            budgetLimited: false, scannedMessages: 1, scannedBytes: 1, generation };
+        return { text: "", conversation: page.entries, conversationPage: page };
+    };
+    const h = component(f);
+    try {
+        h.panel.handleInput("\r"); h.panel.render(100);
+        status = "reset"; h.panel.handleInput("\u001b[H");
+        const failed = h.panel.render(100).join("\n"); assert.match(failed, /GENERATION-g/); assert.match(failed, /reset: Press End/);
+        const count = reads; for (let n = 0; n < 10; n++) { h.panel.handleInput("k"); h.panel.render(100); }
+        assert.equal(reads, count, "failed edge cannot launch an unbounded reset retry loop");
+        status = "unavailable"; h.panel.handleInput("\u001b[F"); assert.match(h.panel.render(100).join("\n"), /GENERATION-g/);
+        assert.match(h.panel.render(100).join("\n"), /unavailable: Press End/);
+        status = "ok"; generation = "new"; h.panel.handleInput("\u001b[F"); const restored = h.panel.render(100).join("\n");
+        assert.match(restored, /GENERATION-new/); assert.doesNotMatch(restored, /GENERATION-g\b/); assert.equal(h.panel.getState().historyPages, 1);
+    } finally { h.panel.dispose(); f.coordinator.dispose(); }
+});
+
+void it("tiny detail terminals prioritize body, selected status and actions over long metadata/navigation", () => {
+    const row = view("tiny", { description: "metadata ".repeat(100) }), f = sourceFixture([row]);
+    f.details.set(row.key, { text: "BODY" });
+    const terminal = { rows: 3, columns: 40 };
+    const panel = new TaskPanel({ coordinator: f.coordinator, config: DEFAULTS, layout, ctx: { ui: { notify() {} } } as unknown as ExtensionContext,
+        theme: { fg: (_color, text) => text }, keys: { matches: () => false }, tui: { terminal, requestRender() {} } as never, done() {} });
+    try {
+        panel.handleInput("\r");
+        const frame = panel.render(40).map(stripTerminalSequences);
+        assert.equal(frame.length, 3); assert.match(frame[0], /BODY/); assert.match(frame[1], /running/); assert.match(frame[2], /x Stop · c Copy/); assert.match(frame[2], /ctrl\+shift\+b All waits/);
+        assert.doesNotMatch(frame.join("\n"), /metadata/);
+        terminal.rows = 8; assert.match(panel.render(40).join("\n"), /BODY/);
+    } finally { panel.dispose(); f.coordinator.dispose(); }
+});
+
+void it("actual unavailable Agent source preserves bounded terminal answer/error on first open and retry", () => {
+    for (const status of ["completed", "error"] as const) {
+        const record: AgentRecord = { id: "no-transcript", runId: "run", type: "general-purpose", description: "no history",
+            status, result: "TERMINAL_ANSWER", error: status === "error" ? "TERMINAL_ERROR" : undefined,
+            startedAt: Date.now() - 1000, completedAt: Date.now(), toolUses: 0, compactionCount: 0,
+            lifetimeUsage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 } };
+        const manager = { listAgents: () => [record], getRecord: () => record } as unknown as AgentManager;
+        const coordinator = new TaskCoordinator(), source = createAgentTaskSource(manager, coordinator, new Map(), { observe: false });
+        coordinator.registerSource(source);
+        const row = coordinator.list()[0]!;
+        const sourceDetail = coordinator.detail(row, { conversationPage: { direction: "latest" } })!;
+        assert.equal(sourceDetail.conversationPage?.status, "unavailable");
+        assert.ok(sourceDetail.conversation?.some(entry => entry.kind === "assistant" && entry.text === "TERMINAL_ANSWER"));
+        const panel = new TaskPanel({ coordinator, config: DEFAULTS, layout, ctx: { ui: { notify() {} } } as unknown as ExtensionContext,
+            theme: { fg: (_color, text) => text }, keys: { matches: () => false }, tui: { terminal: { rows: 24, columns: 100 }, requestRender() {} } as never, done() {} });
+        try {
+            panel.handleInput("\r");
+            for (let n = 0; n < 2; n++) {
+                const frame = stripTerminalSequences(panel.render(100).join("\n"));
+                assert.match(frame, /TERMINAL_ANSWER/);
+                if (status === "error") assert.match(frame, /TERMINAL_ERROR/);
+                assert.match(frame, /Conversation unavailable/);
+                assert.doesNotMatch(frame, /waiting for first message/);
+                assert.ok(panel.getState().historyPages <= 1);
+                panel.handleInput("\u001b[F");
+            }
+        } finally { panel.dispose(); coordinator.dispose(); }
+    }
+});
+
+void it("actual unavailable Agent source adds an outcome when initialization fails after an empty first preview", () => {
+    const record: AgentRecord = { id: "starting", runId: "run", type: "general-purpose", description: "initializing", status: "queued",
+        startedAt: Date.now(), toolUses: 0, compactionCount: 0, lifetimeUsage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 } };
+    const coordinator = new TaskCoordinator();
+    const source = createAgentTaskSource({ listAgents: () => [record], getRecord: () => record } as unknown as AgentManager,
+        coordinator, new Map(), { observe: false });
+    coordinator.registerSource(source);
+    const panel = new TaskPanel({ coordinator, config: DEFAULTS, layout, ctx: { ui: { notify() {} } } as unknown as ExtensionContext,
+        theme: { fg: (_color, text) => text }, keys: { matches: () => false }, tui: { terminal: { rows: 24, columns: 100 }, requestRender() {} } as never, done() {} });
+    try {
+        panel.handleInput("\r"); panel.render(100);
+        record.status = "error"; record.error = "INITIALIZATION_FAILED"; record.completedAt = Date.now();
+        panel.handleInput("\u001b[F");
+        assert.match(panel.render(100).join("\n"), /INITIALIZATION_FAILED/);
+    } finally { panel.dispose(); coordinator.dispose(); }
+});
+
+void it("tight detail footer retains selected controls and global detach instead of truncating the action tail", () => {
+    const row = view("tiny-actions", { capabilities: { stop: true, details: true, steer: true, pause: true, skip: true, retry: true } });
+    const f = sourceFixture([row]); f.details.set(row.key, { text: "BODY" });
+    const terminal = { rows: 3, columns: 40 };
+    const panel = new TaskPanel({ coordinator: f.coordinator, config: DEFAULTS, layout, ctx: { ui: { notify() {} } } as unknown as ExtensionContext,
+        theme: { fg: (_color, text) => text }, keys: { matches: () => false }, tui: { terminal, requestRender() {} } as never, done() {} });
+    try {
+        panel.handleInput("\r");
+        for (const rows of [3, 8]) {
+            terminal.rows = rows;
+            const frame = stripTerminalSequences(panel.render(40).join("\n"));
+            assert.match(frame, /BODY/); assert.match(frame, /running/);
+            for (const key of ["x", "c", "Enter", "p", "s", "r", "ctrl\\+shift\\+b"]) assert.match(frame, new RegExp(key));
+            assert.match(frame, /Detach|All waits/);
+        }
     } finally { panel.dispose(); f.coordinator.dispose(); }
 });

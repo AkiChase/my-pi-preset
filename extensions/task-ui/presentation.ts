@@ -19,11 +19,23 @@ export function taskTitle(view: TaskView): string {
     return taskOneLine(view.taskId) || view.kind;
 }
 
-export const taskDot = (view: TaskView): string => view.status === "running" ? "●" : "○";
+const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+/** Only real runtime states; callers opt into animation while their panel is open. */
+export function taskDot(view: TaskView, frame?: number): string {
+    switch (view.status) {
+        case "queued": return "○";
+        case "starting": case "running": return frame === undefined ? "◌" : SPINNER[Math.abs(Math.floor(frame)) % SPINNER.length];
+        case "paused": return "Ⅱ";
+        case "completed": return "✓";
+        case "failed": return "✕";
+        case "stopped": return "■";
+    }
+}
 export function taskStatusColor(view: TaskView): Parameters<Theme["fg"]>[0] {
     switch (view.status) {
         case "running": return "accent";
-        case "starting": case "queued": case "paused": return "warning";
+        case "starting": case "paused": return "warning";
+        case "queued": return "muted";
         case "completed": return "success";
         case "failed": return "error";
         case "stopped": return "dim";
@@ -41,7 +53,7 @@ export function taskTokens(tokens: number | undefined): string | undefined {
 }
 
 export type TaskTheme = Pick<Theme, "fg"> & Partial<Pick<Theme, "bg" | "bold">>;
-export interface TaskLineOptions { prefix?: string; children?: number; selected?: boolean; now?: number }
+export interface TaskLineOptions { prefix?: string; children?: number; selected?: boolean; now?: number; animationFrame?: number }
 
 /** One bounded task line. Protect state/wait first, then statistics, before title/indentation. */
 export function taskLine(view: TaskView, width: number, theme: TaskTheme, options: TaskLineOptions = {}): string {
@@ -51,7 +63,7 @@ export function taskLine(view: TaskView, width: number, theme: TaskTheme, option
     const state = `[${view.status}${view.waitCount > 0 ? ` · waiting ${view.waitCount}` : ""}]`;
     const stats = [taskDuration(view, options.now), taskTokens(view.stats.tokens) === undefined ? undefined : `↓ ${taskTokens(view.stats.tokens)}`].filter(Boolean).join(" · ");
     // Narrow terminals drop secondary numbers/indentation, never all evidence of state.
-    const dot = theme.fg(taskStatusColor(view), taskDot(view));
+    const dot = theme.fg(taskStatusColor(view), taskDot(view, options.animationFrame));
     const budget = Math.max(0, width - 2);
     let suffix = state;
     if (stats && visibleWidth(state + " " + stats) + 8 <= budget) suffix += ` ${stats}`;
@@ -75,4 +87,15 @@ export function taskLine(view: TaskView, width: number, theme: TaskTheme, option
     const open = paintedSpace.slice(0, paintedSpace.indexOf(" "));
     return theme.bg("userMessageBg", line.replace(/\u001b\[([0-9;]*)m/g, (sgr, codes: string) =>
         codes.split(";").some(code => code === "" || code === "0" || code === "49") ? sgr + open : sgr));
+}
+
+/** Fixed selected status: protect lifecycle/name/activity before secondary counters. */
+export function taskStatusLine(view: TaskView, width: number, theme: TaskTheme, now?: number, frame?: number): string {
+    const state = theme.fg(taskStatusColor(view), `${taskDot(view, frame)} ${view.status}`);
+    const name = truncateToWidth(taskOneLine(view.title), Math.max(0, Math.floor(width / 3)), "…");
+    const primary = `${state} · ${name}`;
+    const activity = view.stats.activity ? ` · ${taskOneLine(view.stats.activity)}` : "";
+    const secondary = [taskDuration(view, now), view.stats.turnCount === undefined ? undefined : `${view.stats.turnCount} turns`,
+        view.stats.toolUses === undefined ? undefined : `${view.stats.toolUses} tools`, taskTokens(view.stats.tokens)].filter(Boolean).join(" · ");
+    return truncateToWidth(primary + activity + (secondary ? ` · ${secondary}` : ""), width, "…");
 }

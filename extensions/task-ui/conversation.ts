@@ -6,6 +6,10 @@ import { cleanTaskText, taskOneLine, type TaskTheme } from "./presentation.ts";
 /** Keep source that only looks like Markdown (renumbered lists, escapes) intact. */
 const MARKDOWN_OPTIONS: MarkdownOptions = { preserveOrderedListMarkers: true, preserveBackslashEscapes: true };
 const CACHE_LIMIT = 128;
+const PREVIEW_LINES = 5;
+const EXPANDED_LINES = 40;
+export interface ConversationRange { id: string; start: number; end: number; collapsible: boolean }
+export interface ConversationRenderModel { lines: string[]; ranges: ConversationRange[] }
 
 const sgr = (on: number, off: number) => (text: string) => `\x1b[${on}m${text}\x1b[${off}m`;
 const bold = (theme: TaskTheme) => (text: string) => theme.bold ? theme.bold(text) : sgr(1, 22)(text);
@@ -32,40 +36,64 @@ export class ConversationRenderer {
     private mdTheme?: MarkdownTheme;
     private themeRef?: TaskTheme;
 
-    render(entries: readonly ConversationEntry[], width: number, theme: TaskTheme, options: { activity?: string; truncated?: boolean } = {}): string[] {
+    render(entries: readonly ConversationEntry[], width: number, theme: TaskTheme, options: { activity?: string; truncated?: boolean; expanded?: ReadonlySet<string> } = {}): string[] {
+        return this.renderModel(entries, width, theme, options).lines;
+    }
+
+    renderModel(entries: readonly ConversationEntry[], width: number, theme: TaskTheme, options: { activity?: string; truncated?: boolean; expanded?: ReadonlySet<string> } = {}): ConversationRenderModel {
         width = Math.max(1, Math.floor(width));
         if (theme !== this.themeRef) { this.themeRef = theme; this.mdTheme = undefined; this.cache.clear(); }
-        const lines: string[] = [];
+        const lines: string[] = [], ranges: ConversationRange[] = [];
         if (options.truncated) lines.push(theme.fg("dim", "… older messages omitted"), "");
         if (!entries.length) lines.push(theme.fg("dim", "(waiting for first message…)"));
         entries.forEach((entry, i) => {
             if (i) lines.push("");
-            lines.push(...this.entry(entry, width, theme));
+            const start = lines.length;
+            lines.push(...this.entry(entry, width, theme, !!entry.id && !!options.expanded?.has(entry.id)));
+            if (entry.id) ranges.push({ id: entry.id, start, end: lines.length, collapsible: entry.kind === "bash" || entry.kind === "toolResult" });
         });
         if (options.activity) lines.push("", theme.fg("accent", "▍ ") + theme.fg("dim", taskOneLine(options.activity)));
-        return lines.map(line => truncateToWidth(line, width, "…"));
+        return { lines: lines.map(line => truncateToWidth(line, width, "…")), ranges };
     }
 
     dispose(): void { this.cache.clear(); this.mdTheme = undefined; this.themeRef = undefined; }
 
-    private entry(entry: ConversationEntry, width: number, theme: TaskTheme): string[] {
+    private entry(entry: ConversationEntry, width: number, theme: TaskTheme, expanded: boolean): string[] {
         const b = bold(theme);
-        const wrapDim = (text: string, indent = "  ") => cleanTaskText(text).split(/\r\n|\n|\r/)
-            .flatMap(part => wrapTextWithAnsi(part, Math.max(1, width - indent.length)).map(line => indent + theme.fg("dim", line)));
+        const preview = (text: string, indent: string, tail = false): string[] => {
+            const cap = expanded ? EXPANDED_LINES : PREVIEW_LINES;
+            const visual = cleanTaskText(text).split(/\r\n|\n|\r/).flatMap(part => wrapTextWithAnsi(part, Math.max(1, width - indent.length)));
+            const shown = tail ? visual.slice(-cap) : visual.slice(0, cap);
+            return [...shown.map(line => indent + theme.fg("dim", line)),
+                ...(visual.length > cap ? [theme.fg("dim", `  … ${visual.length - cap} more visual lines`)] : [])];
+        };
         const elided = (count: number) => count ? [theme.fg("dim", `  … ${count.toLocaleString("en-US")} more characters`)] : [];
+        const toggle = entry.id ? expanded ? " [click to collapse]" : " [click to expand]" : "";
         switch (entry.kind) {
             case "user":
                 return [b(theme.fg("accent", "User")), ...cleanTaskText(entry.text).split(/\r\n|\n|\r/).flatMap(part => wrapTextWithAnsi(part, width))];
             case "assistant":
                 return [b(theme.fg("success", "Assistant")), ...(entry.text ? this.markdown(cleanTaskText(entry.text), width, theme) : []),
                     ...entry.tools.map(tool => this.toolLine(tool.name, tool.detail, width, theme))];
-            case "toolResult":
-                return [theme.fg(entry.error ? "error" : "muted", `  ${entry.error ? "✗" : "↳"} ${taskOneLine(entry.name ?? "result")}${entry.error ? " failed" : ""}`),
-                    ...(entry.text ? wrapDim(entry.text, "    ") : []), ...elided(entry.elided)];
+            case "toolResult": {
+                const summary = entry.summary;
+                const facts = summary ? [summary.path, summary.command,
+                    summary.offset === undefined ? undefined : `from line ${summary.offset}`,
+                    summary.limit === undefined ? undefined : `limit ${summary.limit}`,
+                    summary.lines === undefined ? undefined : `${summary.lines} lines`,
+                    summary.bytes === undefined ? undefined : `${summary.bytes} bytes`,
+                    summary.addedLines === undefined ? undefined : `+${summary.addedLines} lines`,
+                    summary.removedLines === undefined ? undefined : `−${summary.removedLines} lines`].filter(Boolean).map(value => taskOneLine(String(value))).join(" · ") : entry.callDetail;
+                const successWrite = summary?.kind === "write" && !entry.error;
+                return [truncateToWidth(theme.fg(entry.error ? "error" : "muted", `  ${entry.error ? "✗" : "↳"} ${taskOneLine(entry.name ?? summary?.kind ?? "result")}${entry.error ? " failed" : ""}${toggle}`), width, "…"),
+                    ...(facts ? [truncateToWidth("  " + theme.fg("muted", taskOneLine(facts)), width, "…")] : []),
+                    ...(!successWrite && entry.text ? preview(entry.text, "    ", summary?.kind === "bash") : []), ...elided(entry.elided),
+                    ...(entry.sourceTruncated ? [theme.fg("dim", "  … additional content omitted")] : [])];
+            }
             case "bash":
-                return [theme.fg("bashMode", "$ ") + theme.fg("mdCode", taskOneLine(entry.command)) +
-                    (entry.exitCode !== undefined && entry.exitCode !== 0 ? theme.fg("error", ` (exit ${entry.exitCode})`) : ""),
-                    ...(entry.output ? wrapDim(entry.output) : []), ...elided(entry.elided)];
+                return [truncateToWidth(theme.fg("bashMode", "$ ") + theme.fg("mdCode", taskOneLine(entry.command)) +
+                    (entry.exitCode !== undefined ? theme.fg(entry.exitCode ? "error" : "dim", ` (exit ${entry.exitCode})`) : "") + theme.fg("dim", toggle), width, "…"),
+                    ...(entry.output ? preview(entry.output, "  ", true) : []), ...elided(entry.elided)];
             case "notice":
                 return wrapTextWithAnsi(theme.fg("warning", taskOneLine(entry.text)), width);
         }

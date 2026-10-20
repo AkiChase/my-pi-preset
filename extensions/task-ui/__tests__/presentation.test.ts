@@ -25,7 +25,7 @@ void it("kind-aware titles preserve process prose and fallback without changing 
 void it("status dots are execution-state based and selected styling does not change them", () => {
     for (const status of ["starting", "queued", "running", "paused", "completed", "failed", "stopped"] as const) {
         const row = view(status, { status, waitCount: 2, stats: { tokens: 1234, durationMs: 61200 } });
-        const dot = status === "running" ? "●" : "○";
+        const dot = { starting: "◌", queued: "○", running: "◌", paused: "Ⅱ", completed: "✓", failed: "✕", stopped: "■" }[status];
         assert.equal(taskDot(row), dot);
         const selected = taskLine(row, 100, theme, { selected: true });
         assert.equal(stripTerminalSequences(selected), taskLine(row, 100, theme));
@@ -119,4 +119,18 @@ void it("collapsed cyclic trees do not resurrect indirect hidden descendants as 
         model.refresh([cyclicA, b, c]); model.select(cyclicA); model.collapse(a.key);
         assert.deepEqual(model.refresh([cyclicA, b, c]).map(row => row.view.key), [a.key]);
     } finally { model.dispose(); }
+});
+
+void it("all lifecycle symbols/colors remain readable without animation, only active states animate", () => {
+    const seen: string[] = [];
+    const themed = { fg: (color: string, text: string) => { seen.push(color); return text; } } as never;
+    for (const status of ["queued", "starting", "running", "paused", "completed", "failed", "stopped"] as const) {
+        const row = view(status, { status });
+        const plain = taskLine(row, 80, themed);
+        assert.match(plain, new RegExp(status)); assert.doesNotMatch(plain, /waiting/);
+        if (status === "starting" || status === "running") assert.notEqual(taskDot(row, 0), taskDot(row, 1));
+        else assert.equal(taskDot(row, 0), taskDot(row, 1));
+    }
+    assert.ok(seen.includes("muted")); assert.ok(seen.includes("warning")); assert.ok(seen.includes("accent"));
+    assert.ok(seen.includes("success")); assert.ok(seen.includes("error")); assert.ok(seen.includes("dim"));
 });

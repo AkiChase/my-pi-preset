@@ -1,8 +1,7 @@
 import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import type { TaskDetail, TaskMessageEntry, TaskView } from "./types.ts";
-import { cleanTaskText, taskDot, taskDuration, taskOneLine, taskStatusColor, taskTokens, type TaskTheme } from "./presentation.ts";
+import { cleanTaskText, taskOneLine, taskTokens, type TaskTheme } from "./presentation.ts";
 
-type Color = Parameters<TaskTheme["fg"]>[0];
 const LABEL_WIDTH = 10;
 
 /** Human duration for configured millisecond budgets (not elapsed task time). */
@@ -64,7 +63,6 @@ function differences(view: TaskView, theme: TaskTheme): string[] {
 /** Kind-specific labelled fields; absent facts are omitted instead of shown raw. */
 function fields(view: TaskView, theme: TaskTheme, now: number | undefined): [string, string][] {
     const s = view.stats, rows: [string, string][] = [];
-    const duration = taskDuration(view, now);
     if (view.kind === "agent") {
         const model = s.model ?? (view.executionConfig?.kind === "agent" ? view.executionConfig.model : undefined);
         const thinking = s.thinking ?? (view.executionConfig?.kind === "agent" ? view.executionConfig.thinking : undefined);
@@ -73,7 +71,6 @@ function fields(view: TaskView, theme: TaskTheme, now: number | undefined): [str
         if (config) rows.push(["Context", config]);
         for (const diff of differences(view, theme)) rows.push(["Override", diff]);
     }
-    if (duration) rows.push(["Time", duration]);
     if (view.kind === "agent" || view.kind === "workflow") {
         const turns = s.turnCount === undefined ? undefined : s.maxTurns ? `${s.turnCount}/${s.maxTurns} turns` : `${s.turnCount} turns`;
         const tools = s.toolUses === undefined ? undefined : `${s.toolUses} tool ${s.toolUses === 1 ? "use" : "uses"}`;
@@ -84,10 +81,9 @@ function fields(view: TaskView, theme: TaskTheme, now: number | undefined): [str
         if (total) {
             const split = s.inputTokens !== undefined || s.outputTokens !== undefined
                 ? theme.fg("dim", ` (in ${taskTokens(s.inputTokens ?? 0)} · out ${taskTokens(s.outputTokens ?? 0)})`) : "";
-            rows.push(["Tokens", total + split]);
+            rows.push(["Tokens", total + split + (s.cost !== undefined && Number.isFinite(s.cost) && s.cost > 0
+                ? ` · $${s.cost < 0.01 ? s.cost.toFixed(4) : s.cost.toFixed(2)}` : "")]);
         }
-        if (s.cost !== undefined && Number.isFinite(s.cost) && s.cost > 0) rows.push(["Cost", `$${s.cost < 0.01 ? s.cost.toFixed(4) : s.cost.toFixed(2)}`]);
-        if (s.activity) rows.push(["Now", theme.fg("accent", taskOneLine(s.activity))]);
     }
     if (view.kind === "shell" || view.kind === "monitor") {
         if (s.pid !== undefined) rows.push(["PID", String(s.pid)]);
@@ -99,7 +95,6 @@ function fields(view: TaskView, theme: TaskTheme, now: number | undefined): [str
             `batch ${formatMs(config.batch_interval_ms)}`,
         ])]);
     }
-    if (view.waitCount > 0) rows.push(["Waiting", theme.fg("warning", `${view.waitCount} wait${view.waitCount === 1 ? "" : "s"}`)]);
     rows.push(["ID", theme.fg("dim", `${taskOneLine(view.taskId)} · run ${taskOneLine(view.runId)}`)]);
     return rows;
 }
@@ -111,40 +106,28 @@ export function detailRange(detail: TaskDetail | undefined): string {
     return [span, omitted].filter(Boolean).join(" · ") || "complete";
 }
 
-/** Summary card plus kind-specific sections; the bounded output body is appended by the caller. */
-export function renderDetailHeader(view: TaskView, theme: TaskTheme, width: number, now?: number): string[] {
+/** Non-scrolling metadata summary. Values are single-line and height-bounded. */
+export function renderDetailHeader(view: TaskView, theme: TaskTheme, width: number, now?: number, maxLines = 8): string[] {
     width = Math.max(1, Math.floor(width));
-    const color: Color = taskStatusColor(view);
-    const mode = view.executionMode === "owned" ? "owned" : view.executionMode;
-    const status = `${theme.fg(color, taskDot(view) + " " + view.status)}${sep(theme)}${theme.fg("muted", view.kind)}${sep(theme)}${theme.fg("dim", mode)}`;
-    const lines = [truncateToWidth(status, width, "…")];
-    // Agent title is a handle/type; its description is the delegated prose (shown in full below).
-    const title = cleanTaskText(view.title);
-    lines.push(...wrapTextWithAnsi(theme.fg("toolTitle", title.replace(/\s+/g, " ").trim()), width));
-    const isProcess = view.kind === "shell" || view.kind === "monitor";
-    if (view.description && !isProcess && taskOneLine(view.description) !== taskOneLine(view.title)) {
-        for (const part of cleanTaskText(view.description).split(/\r\n|\n|\r/)) lines.push(...wrapTextWithAnsi(part, width));
+    const lines = [theme.fg("toolTitle", taskOneLine(view.title)),
+        theme.fg("dim", `${view.kind} · ${view.executionMode}`)];
+    if (view.description && taskOneLine(view.description) !== taskOneLine(view.title))
+        lines.push(`${view.kind === "shell" || view.kind === "monitor" ? "$ " : ""}${taskOneLine(view.description)}`);
+    const metadata = fields(view, theme, now);
+    // Compact configuration differences into one bounded row, leaving core statistics room.
+    const overrides = metadata.filter(([label]) => label === "Override");
+    const context = metadata.findIndex(([label]) => label === "Context");
+    if (overrides.length && context >= 0) {
+        metadata[context][1] += " · " + overrides.map(([, value]) => `Override ${value}`).join(" · ");
+        for (let i = metadata.length - 1; i >= 0; i--) if (metadata[i][0] === "Override") metadata.splice(i, 1);
     }
-    lines.push("");
-    for (const [label, value] of fields(view, theme, now)) lines.push(...field(label, value, theme, width));
-    if (isProcess && view.description) {
-        lines.push("", ...sectionTitle("Command", theme, width));
-        const command = cleanTaskText(view.description).split(/\r\n|\n|\r/);
-        command.forEach((part, i) => lines.push(...wrapTextWithAnsi((i ? "  " : theme.fg("dim", "$ ")) + theme.fg("mdCode", part), width)));
-    }
-    const phases = view.stats.phases ?? [];
-    if (phases.length) {
-        lines.push("", ...sectionTitle("Phases", theme, width));
-        for (const phase of phases) {
-            lines.push(...wrapTextWithAnsi(`${theme.fg("dim", String(phase.index).padStart(2))} ${cleanTaskText(phase.title)}`, width));
-            if (phase.detail) lines.push(...wrapTextWithAnsi(theme.fg("dim", "   " + cleanTaskText(phase.detail)), width));
-        }
-    }
-    if (view.artifacts.length) {
-        lines.push("", ...sectionTitle("Artifacts", theme, width));
-        for (const artifact of view.artifacts) lines.push(...field(artifact.kind, cleanTaskText(artifact.path), theme, width));
-    }
-    return lines.map(line => truncateToWidth(line, width, "…"));
+    // Artifacts remain in the summary even when statistics overflow it. Copy retains full paths.
+    const artifact = view.artifacts[0];
+    const budget = Math.max(0, Math.floor(maxLines));
+    const available = Math.max(0, budget - lines.length - (artifact ? 1 : 0));
+    lines.push(...metadata.slice(0, available).map(([label, value]) => `${theme.fg("dim", label)}  ${value}`));
+    if (artifact && budget > lines.length) lines.push(`${theme.fg("dim", artifact.kind)}  ${taskOneLine(artifact.path)}${view.artifacts.length > 1 ? ` (+${view.artifacts.length - 1})` : ""}`);
+    return lines.slice(0, budget).map(line => truncateToWidth(line, width, "…"));
 }
 
 function clock(at: number): string {
