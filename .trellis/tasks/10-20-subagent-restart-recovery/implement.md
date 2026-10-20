@@ -97,7 +97,7 @@
 
 ### 阶段 3 执行记录
 
-- 状态：已实现、独立检查并验证；本提交为本阶段 scoped checkpoint。
+- 状态：已实现、独立检查并验证；Stage 3 checkpoint 为 `4d2c417 feat(subagents): migrate public identity to agent IDs`，手工冒烟发现的补全回归修复为 `1b26075 fix(subagents): restore agent mention autocomplete`。
 - 关键实现：删除实例 handle/alias/tombstone 与 mention-clone 路径；`agent_manage` 对 subagent 使用完整 `agent_id`，对 workflow 保留 `execution_id`；旧 subagent execution handle 在 backend 前拒绝；公开 launch metadata、RPC spawn reply、后台提醒、parent-delivery 持久 entry、Task Panel 与 Trellis dispatch 均不再泄露内部 execution；`@agent:create:<type>` 与直属 scope 的 `@agent:resume:<type>_<index>` 取代普通实例 mention；Task Panel 展示完整 ID 和 interrupted 状态。
 - 诊断并修复：旧 subagent execution ID 被错误分派导致 `execution-id.test.ts` pending Promise；`tool-waits` fixture 签名迁移遗漏导致 workflow/lifecycle host seam 被忽略；Task UI 与 beautify fixture 缺失持久 root/child session；独立检查另发现并删除未注册的 mention-clone 死代码和遗漏的 parent-delivery 旧 ID 断言，同时保留 auxiliary lifecycle 中非 clone 的 workflow/RPC 回归。最终独立检查发现 legacy `exec_…` 曾可通过解析进入 stale lookup、public metadata 曾接受该内部 fencing，已收紧为 workflow-only `wf_…` execution ID，并增加拒绝/泄露回归。
 - 验证：`PI_SDK_DIR=<installed SDK> PI_CODING_AGENT_DIR=<owned temp> pnpm typecheck` 通过；`node --test --test-timeout=30000 extensions/agent-tasks/__tests__/*.test.ts extensions/runtime-tasks/__tests__/*.test.ts extensions/task-ui/__tests__/*.test.ts extensions/beautify/__tests__/registered-agent.test.ts extensions/trellis/__tests__/dispatch.test.mjs` 通过（464 passed, 0 failed，约21秒）；`git diff --check` 通过。独立 `trellis-check` 在修复前后分别通过 354/354 与 16/16 相关测试并完成复审。`pnpm check` 未运行；项目未定义独立 lint script。
@@ -106,7 +106,7 @@
 - 手工冒烟发现并修复：`createMentionProvider` 将已经带 `@` 的匹配结果再次加前缀，导致 `@agent:` 补全无法匹配。现修正为单一前缀并新增 `agent-mention.test.ts`；tmux 重测时 `@agent:resume:` 的 Tab 补全插入 `general_purpose_0`，而建议标签保持完整 persistent ID。用户文档补充带连字符类型的规范化 resume 简写。
 - 后续验证：同一临时隔离环境中 `node --test --test-timeout=30000 extensions/agent-tasks/__tests__/*.test.ts extensions/task-ui/__tests__/*.test.ts` 通过（384 passed, 0 failed）；`pnpm typecheck` 与 `git diff --check` 通过。
 - 原始自动化输出：`/tmp/pi-subagent-restart-recovery.5Pj0Lq`、`/tmp/pi-subagent-stage3.DY1Bzi`、`/tmp/trellis-check-stage3.4zDPX9`、`/tmp/trellis-check-stage3-rerun.6ueXhz`、`/tmp/trellis-check-stage3-type-final.Zg7aj7`、`/tmp/trellis-check-stage3.NG3lya`。
-- 原始手工运行材料：`/tmp/pi-subagent-restart-smoke.rdJchs`；在本次检查和记录完成后按 owned temporary directory 规则清理。
+- 原始手工运行材料：`/tmp/pi-subagent-restart-smoke.rdJchs`；已在确认测试结果、Git 状态和记录后清理该本次运行自有目录。
 
 ## 最终验证
 
