@@ -15,7 +15,7 @@ export function createMentionProvider(current: AutocompleteProvider, roster: () 
       const text = lines[line] ?? "";
       const match = MENTION_TRIGGER.exec(text.slice(0, column));
       if (!state || !match) return theirs;
-      const prefix = `@${match[2]}`;
+      const prefix = match[2];
       const typed = match[2].toLowerCase();
       const items: AutocompleteItem[] = [];
       for (const type of state.types) {
