@@ -16,6 +16,7 @@ import type { RunResult } from "../../agent-tasks/src/agent-runner.ts";
 import { TaskCoordinator } from "../../task-ui/coordinator.ts";
 import { TaskLifecycle } from "../../task-ui/lifecycle.ts";
 import { managementContract } from "../tools/management.ts";
+import { withToolCardTiming } from "../tool-card.ts";
 import { executionId } from "../../runtime-tasks/execution-id.ts";
 const rawAgentContract = managementContract("agent");
 const complete = (args: Record<string, unknown>) => ({ agent_id: null, execution_id: null, kind: null, verbose: null, ...args });
@@ -82,11 +83,30 @@ test("actual registered Agent launch/manage renders config, lifecycle outcomes a
     const capabilities: RuntimeTaskCapability[] = [];
     agentTasks(pi, { coordinator, lifecycle, managerDependencies: dependencies, onManagement: c => capabilities.push(c) });
     registerManagementTool(pi, "agent", capabilities);
+    const fireBeautify = async (name: string, event: object) => {
+      for (const handler of loaded.extensions[0].handlers.get(name) ?? []) await handler(event, {});
+    };
+    const sourceRenderer = tools.get("subagent_run")!;
+    assert.ok(withToolCardTiming(sourceRenderer, () => ({ kind: "elapsed", durationMs: 0 })), "agent tool definition retains the cooperative timing seam");
+    const cooperativeRenderer = beauty.resolveToolRenderers("subagent_run", () => sourceRenderer);
+    const cooperative = new ToolExecutionComponent(
+      "subagent_run", "agent-clock", { subagent_type: "general-purpose", description: "Clock contract" }, { outputPad: 2 },
+      cooperativeRenderer, screen, cwd,
+    );
+    await fireBeautify("tool_execution_start", { toolName: "subagent_run", toolCallId: "agent-clock" });
+    cooperative.markExecutionStarted();
+    assert.match(plain(cooperative.render(160).join("\n")), /Running.*elapsed \d+\.\ds/);
+    await fireBeautify("tool_execution_end", { toolName: "subagent_run", toolCallId: "agent-clock" });
+    cooperative.updateResult({ content: [{ type: "text", text: "clock final" }], durationMs: 1200, isError: false });
+    assert.match(plain(cooperative.render(160).join("\n")), /Completed.*execution 1\.2s/);
     await handlers.get("session_start")![0]!(undefined, ctx);
     const notFound = await execute({ action: "output", agent_id: "absent" }); assert.equal(agentContract({ action: "output", agent_id: "absent" }, notFound, viewContext({ action: "output", agent_id: "absent" }))?.stats, "stale");
     const launchArgs = completeToolCall(tools.get("subagent_run")!.parameters, { subagent_type: "general-purpose", description: "Actual description", prompt: "offline", run_in_background: true });
     const launched = await tools.get("subagent_run")!.execute("launch", launchArgs, undefined, undefined, ctx);
     const launchComponent = display("subagent_run", launchArgs, launched as Awaited<ReturnType<typeof execute>>);
+    const launchCard = plain(launchComponent.render(160).join("\n"));
+    assert.match(launchCard, /Completed/);
+    assert.equal((launchCard.match(/subagent_run/g) ?? []).length, 1, "public factory must not leave a second legacy title");
     launchComponent.setExpanded(true);
     assert.match(plain(launchComponent.render(160).join("\n")), /pending session confirmation/);
     assert.match(plain(launchComponent.render(160).join("\n")), /inherit_context: false/);
@@ -168,8 +188,23 @@ test("actual registered Agent launch/manage renders config, lifecycle outcomes a
     const failedResult = await failedRun;
     assert.ok(failedResult.isError);
     const failedComponent = display("subagent_run", foregroundArgs, failedResult as Awaited<ReturnType<typeof execute>>);
+    failedComponent.setExpanded(false);
+    const collapsedFailure = plain(failedComponent.render(160).join("\n"));
+    const collapsedFailureRows = failedComponent.render(160).map((row: string) => plain(row).trim()).filter(Boolean);
+    assert.equal(collapsedFailureRows.length, 3, "title plus the compact two-row error body");
+    assert.match(collapsedFailure, /Failed/);
+    assert.match(collapsedFailure, /offline provider failure/);
+    for (const width of [20, 40, 160]) {
+      const compact = plain(failedComponent.render(width).join("\n"));
+      const errorRows = failedComponent.render(width).map((row: string) => plain(row).trim()).filter((row: string) => /^(?:Error:|Target:)/.test(row));
+      assert.ok(errorRows.length <= 2, `error body rows at width ${width}`);
+      assert.match(compact, /Error:|Target:/);
+      assert.doesNotMatch(compact, /model:|Execution config/);
+    }
     failedComponent.setExpanded(true);
-    assert.match(plain(failedComponent.render(160).join("\n")), /offline provider failure/);
+    const failedCard = plain(failedComponent.render(160).join("\n"));
+    assert.match(failedCard, /Failed/);
+    assert.match(failedCard, /offline provider failure/);
     for (const config of [
       { kind: "agent", phase: "resolved" },
       { kind: "agent", phase: "session-effective", thinking: "off", mode: "foreground", model: "offline/model", differences: [{ field: "thinking", requested: "high", actual: "off", reason: "session-adjustment" }] },
@@ -208,7 +243,10 @@ test("actual registered Agent launch/manage renders config, lifecycle outcomes a
     finalWaitComponent.setExpanded(true);
     assert.match(plain(finalWaitComponent.render(160).join("\n")), /State: stopped/);
     for (const fields of [{ tags: {} }, { cost: "invalid" }, { spinnerFrame: {} }, { turnCount: {} }, { tokens: {} }]) {
-      const c = display("subagent_run", launchArgs, { ...finalLaunch, content: [{ type: "text" as const, text: "Malformed fallback body" }], details: { ...finalLaunch.details, status: "running", ...fields } } as unknown as Awaited<ReturnType<typeof execute>>, true);
+      const c = display("subagent_run", launchArgs, { ...finalLaunch, content: [{ type: "text" as const, text: Array.from({ length: 8 }, () => "Malformed fallback body").join("\n") }], details: { ...finalLaunch.details, status: "running", ...fields } } as unknown as Awaited<ReturnType<typeof execute>>, true);
+      c.setExpanded(false);
+      const collapsed = c.render(160).map((row: string) => plain(row).trim()).filter(Boolean);
+      assert.ok(collapsed.length <= 4, "title plus the three-row fallback budget");
       c.setExpanded(true);
       assert.match(plain(c.render(160).join("\n")), /Malformed fallback body/);
       assert.doesNotMatch(plain(c.render(160).join("\n")), /Execution config/);

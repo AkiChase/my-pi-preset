@@ -3,16 +3,16 @@ import { test } from "node:test";
 import { stripVTControlCharacters as plain } from "node:util";
 import { TuiMainScreen } from "@earendil-works/pi-tui";
 import { ToolExecutionComponent, themeSdk } from "./renderer-host.mjs";
-import { createToolCardRenderers } from "../tool-card.ts";
+import { createToolCardRenderers, withToolCardTiming } from "../tool-card.ts";
 
 const screen = new TuiMainScreen({ columns: 120, rows: 40, kittyProtocolActive: false, start() {}, stop() {}, async drainInput() {}, write() {}, moveBy() {}, hideCursor() {}, showCursor() {}, clearLine() {}, clearFromCursor() {}, clearScreen() {}, setTitle() {}, setProgress() {}, setProgramStatus() {} });
 screen.requestRender = () => {};
 const visibleRows = (component: InstanceType<typeof ToolExecutionComponent>, width = 100) => component.render(width).map((row: string) => plain(row).trimEnd()).filter((row: string) => row.trim());
 
 test("self-shell fallback owns a generic title/body card without changing host image ownership", () => {
-  const renderer = createToolCardRenderers("foreign_tool", ctx => ctx.durationMs === undefined
+  const renderer = withToolCardTiming(createToolCardRenderers("foreign_tool"), ctx => ctx.durationMs === undefined
     ? { kind: "elapsed", durationMs: 1250 }
-    : { kind: "execution", durationMs: ctx.durationMs });
+    : { kind: "execution", durationMs: ctx.durationMs })!;
   assert.equal(renderer.renderShell, "self");
 
   const component = new ToolExecutionComponent("foreign_tool", "foreign", { target: "very-long-target", retries: 2 }, { outputPad: 2 }, renderer, screen, "/fixture");

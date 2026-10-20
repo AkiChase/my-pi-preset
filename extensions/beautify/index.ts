@@ -5,7 +5,7 @@ import { createBashRenderers } from "./tools/bash.ts";
 import { createToolClock } from "./tool-clock.ts";
 import { createFindRenderers } from "./tools/find.ts";
 import { createGrepRenderers } from "./tools/grep.ts";
-import { createToolCardRenderers } from "./tool-card.ts";
+import { createToolCardRenderers, withToolCardTiming } from "./tool-card.ts";
 import { optionalRenderers } from "./tools/optional.ts";
 import { monitorContract } from "./tools/monitor.ts";
 import { managementContract } from "./tools/management.ts";
@@ -24,6 +24,8 @@ export default function beautify(pi: ExtensionAPI): void {
   pi.registerToolRenderer((name, next) => {
     if (Object.hasOwn(tools, name)) return tools[name as keyof typeof tools];
     const original = next();
+    const cooperative = withToolCardTiming(original, context => clock.timing(context));
+    if (cooperative) return cooperative;
     if (name === "process_manage" || name === "agent_manage") return optionalRenderers(name, original, managementContract(name === "process_manage" ? "process" : "agent"));
     if (name === "monitor") return optionalRenderers(name, original, monitorContract);
     return original ?? createToolCardRenderers(name, ctx => clock.timing(ctx));

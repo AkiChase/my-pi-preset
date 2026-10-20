@@ -82,6 +82,12 @@
 
 **提交检查点**：按 agent/process/workflow 可独立验证的子集拆分；任何 producer/consumer metadata 改动与消费测试同一提交。
 
+**S3a 顶层 `subagent_run`（已完成，待 scoped commit）**：顶层 agent 工具改为在自身注册处直接使用公共 `createToolCardRenderers()`，提供不含旧标题/shell 的目标状态正文；所有 `text` content blocks 在 expanded 时保留。由于 Beautify 必须对未知 custom renderer 原样委托，agent 工具不能自行监听 `tool_execution_*` 或持有第二个 clock。改为公共 factory 的明确协作 timing adapter：它以可枚举字符串属性跨实际 loader 保留，Beautify activation 唯一持有 lifecycle/clock，只对显式 adapter 注入 timing；不透明 renderer 仍完整委托。collapsed 的结构化失败正文先显示真实 error reason 和 target state，窄宽以 clip 保持两行；普通自有正文按实际 `render(width)` 物理行裁至三行，溢出时替换末行为诚实 `… expand`，expanded 保留 config 与全部正文。
+
+**S3a 检查、失败与修复**：早期宽范围 agent 回归曾在 `tool-waits.test.ts` 的两项 registered launch/management 断言报告 `executionConfig` 未定义；隔离重跑又出现一次 legacy background turn-limit `undefined !== 7`，后续同文件 54/54 通过。没有通过放宽断言或改变 agent 调度/交付语义掩盖问题；经实际 loader 路径复核，将错误的子扩展本地 clock 方案替换为协作 adapter。独立检查先发现失败卡 collapsed 未显示真正错误原因，补充 error-first 回归后，又发现窄宽 custom body 未受公共 text preview 限制；正文改为自身严格裁行。随后通过 malformed metadata 的多行 fallback 回归发现早期 fallback return 绕过了裁行，已将其纳入同一 `compactRows` 路径。最终独立检查确认 valid/foreign body 预算、renderer/loader ownership、计时 seam 与 expanded preservation；中间还报告了新测试的 `TS7006`，主会话已补 `string` 注解并重跑 typecheck。
+
+**S3a 验证**：在临时 `PI_CODING_AGENT_DIR` 下，最终运行 `node --test extensions/beautify/__tests__/tool-clock.test.ts extensions/beautify/__tests__/tool-card.test.ts extensions/beautify/__tests__/tools.test.ts extensions/beautify/__tests__/registered-agent.test.ts extensions/agent-tasks/__tests__/backend-waits.test.ts extensions/agent-tasks/__tests__/tool-waits.test.ts extensions/agent-tasks/__tests__/loading.test.ts`（104/104 PASS，natural exit）；`pnpm typecheck`（exit 0）；`git diff --check`（exit 0）。最终独立 check 在实际 host/loader 集合 4/4、resolver delegation 15/15、typecheck 与 whitespace 检查均通过。完整 Beautify suite、process/workflow/notification scope、真实终端视觉仍属于后续 S3/S4/S5，NOT_RUN。
+
 ### S4：通知、reply/notice、monitor batch 与 Trellis Check
 
 **目的**：迁移后台通知、父会话消息和诊断报告；保留实际 delivery 粒度与消息语义。

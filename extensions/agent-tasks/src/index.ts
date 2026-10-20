@@ -1,9 +1,10 @@
 import { executionConfigRows } from "../../beautify/execution-config.ts";
-import { clean, wrap } from "../../beautify/layout.ts";
+import { clean, clip, wrap } from "../../beautify/layout.ts";
 import { component } from "../../beautify/tools/shared.ts";
 import { copyAgentExecutionConfig, agentExecutionSummary } from "../../runtime-tasks/execution-config.ts";
 import { registerBuiltinSkills } from "./builtin-skills.ts";
 import { nullableControl } from "../../shared/tool-arguments.ts";
+import { createToolCardRenderers } from "../../beautify/tool-card.ts";
 import { createToolCallHeading } from "../../beautify/tool-call-heading.ts";
 import { launchMetadata, launchText, isLaunchMetadata } from "../../runtime-tasks/launch.ts";
 import { createAgentManagement } from "./management.ts";
@@ -28,7 +29,7 @@ import { TaskCoordinator } from "../../task-ui/coordinator.ts";
 
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
-import { defineTool, type ExtensionAPI, type ExtensionCommandContext, type ExtensionContext, getAgentDir, getSettingsListTheme } from "@earendil-works/pi-coding-agent";
+import { defineTool, type ExtensionAPI, type ExtensionCommandContext, type ExtensionContext, getAgentDir, getSettingsListTheme, type Theme as HostTheme, type ToolRenderers } from "@earendil-works/pi-coding-agent";
 import { Container, Key, matchesKey, type SettingItem, SettingsList, Spacer, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { StringEnum } from "@earendil-works/pi-ai";
@@ -247,6 +248,134 @@ function buildDetails(
     error: record.error,
     ...overrides,
   };
+}
+
+type RenderedToolResult = Parameters<NonNullable<ToolRenderers["renderResult"]>>[0];
+
+/** Header-free target-status body for the public subagent_run card shell. */
+function renderSubagentResultBody(
+  result: RenderedToolResult,
+  theme: HostTheme,
+  renderContext: { args: Record<string, unknown>; expanded: boolean; isPartial: boolean; isError: boolean },
+  showCost: boolean,
+) {
+  const supplied = result.details as (AgentDetails & { runtimeLaunch?: unknown }) | undefined;
+  const resultText = result.content.filter(block => block.type === "text").map(block => block.text ?? "").join("\n");
+  const compactRows = (rows: string[], width: number): string[] => {
+    if (rows.length <= 3) return rows;
+    const hint = clip("… expand", width, "");
+    return hint ? [...rows.slice(0, 2), theme.fg("muted", hint)] : rows.slice(0, 3);
+  };
+  const nonnegative = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0;
+  // Metadata may be historical or foreign. Validate every field used by the
+  // target-status body before formatting; a valid config does not validate its
+  // neighboring counters, spinner or legacy tags.
+  if (supplied && (
+    !nonnegative(supplied.toolUses) || typeof supplied.tokens !== "string" || !nonnegative(supplied.durationMs) ||
+    [supplied.cost, supplied.turnCount, supplied.maxTurns].some(value => value !== undefined && !nonnegative(value)) ||
+    (supplied.spinnerFrame !== undefined && (!Number.isInteger(supplied.spinnerFrame) || supplied.spinnerFrame < 0 || supplied.spinnerFrame >= SPINNER.length)) ||
+    (supplied.tags !== undefined && (!Array.isArray(supplied.tags) || supplied.tags.some(tag => typeof tag !== "string"))) ||
+    [supplied.modelName, supplied.activity, supplied.error].some(value => value !== undefined && typeof value !== "string")
+  )) return component(width => {
+    const rows = wrap(resultText, width).map(row => theme.fg(renderContext.isError ? "error" : "toolOutput", row));
+    return renderContext.expanded ? rows : compactRows(rows, width);
+  });
+
+  const identity = supplied?.runtimeLaunch;
+  const snapshot = copyAgentExecutionConfig(supplied?.executionConfig);
+  const config = isLaunchMetadata(identity) && "kind" in identity && identity.kind === "subagent" &&
+    (supplied?.agentId === undefined || supplied.agentId === identity.agent_id) &&
+    (typeof renderContext.args.resume !== "string" || renderContext.args.resume === identity.agent_id) &&
+    (snapshot?.mode === undefined || snapshot.mode === identity.mode) &&
+    typeof supplied?.status === "string" && ["queued", "running", "completed", "steered", "aborted", "stopped", "error", "background"].includes(supplied.status) &&
+    typeof supplied.toolUses === "number" && Number.isFinite(supplied.toolUses) &&
+    typeof supplied.tokens === "string" && typeof supplied.durationMs === "number" && Number.isFinite(supplied.durationMs) &&
+    (supplied.activity === undefined || typeof supplied.activity === "string") && (supplied.error === undefined || typeof supplied.error === "string")
+    ? snapshot : undefined;
+  // Legacy/foreign results retain their readable target status styles, never
+  // live tool-call timing or a second tool title.
+  const details = config && supplied ? { ...supplied, modelName: undefined, tags: undefined, tokens: clean(supplied.tokens),
+    activity: supplied.activity === undefined ? undefined : clean(supplied.activity),
+    error: supplied.error === undefined ? undefined : clean(supplied.error) } : supplied;
+  const legacy = (expanded: boolean) => {
+    // Pi reports pre-execution failures (extension block, abort, argument
+    // validation) as a text-only error with no target status.
+    if (renderContext.isError || !details?.status) return new Text(resultText, 0, 0);
+
+    const stats = (d: AgentDetails) => {
+      const parts: string[] = [];
+      if (d.modelName) parts.push(d.modelName);
+      if (d.tags) parts.push(...d.tags);
+      if (d.turnCount != null && d.turnCount > 0) parts.push(formatTurns(d.turnCount, d.maxTurns));
+      if (d.toolUses > 0) parts.push(`${d.toolUses} tool use${d.toolUses === 1 ? "" : "s"}`);
+      if (d.tokens) parts.push(d.tokens);
+      if (showCost) {
+        const costText = formatCost(d.cost ?? 0);
+        if (costText) parts.push(costText);
+      }
+      return parts.map(part => fgPreservingNestedStyles(theme, "dim", part)).join(" " + theme.fg("dim", "·") + " ");
+    };
+
+    if (renderContext.isPartial || details.status === "running") {
+      const frame = SPINNER[details.spinnerFrame ?? 0];
+      return renderRunningAgentStatus(frame, stats(details), details.activity ?? "thinking…", theme);
+    }
+    if (details.status === "background") return new Text(theme.fg("dim", `  ⎿  Target: running in background (ID: ${details.agentId})`), 0, 0);
+    if (details.status === "completed" || details.status === "steered") {
+      const isSteered = details.status === "steered";
+      const icon = isSteered ? theme.fg("warning", "✓") : theme.fg("success", "✓");
+      const targetRuntime = `runtime ${formatMs(details.durationMs)}`;
+      let line = icon + (stats(details) ? " " + stats(details) : "");
+      line += " " + theme.fg("dim", "·") + " " + theme.fg("dim", targetRuntime);
+      if (expanded) {
+        if (resultText) {
+          const lines = resultText.split("\n").slice(0, 50);
+          for (const lineText of lines) line += "\n" + theme.fg("dim", `  ${lineText}`);
+          if (resultText.split("\n").length > 50) line += "\n" + theme.fg("muted", "  ... (use agent_manage action=output with agent_id and verbose for full output)");
+        }
+      } else {
+        const doneText = isSteered ? "Target: turn limit reached" : "Target: completed";
+        line += "\n" + theme.fg("dim", `  ⎿  ${doneText}`);
+      }
+      return new Text(line, 0, 0);
+    }
+    if (details.status === "stopped") {
+      const s = stats(details);
+      return new Text(theme.fg("dim", "■") + (s ? " " + s : "") + "\n" + theme.fg("dim", "  ⎿  Target: stopped"), 0, 0);
+    }
+    if (details.status !== "error" && details.status !== "aborted") return new Text(resultText, 0, 0);
+
+    const s = stats(details);
+    let line = theme.fg("error", "✗") + (s ? " " + s : "");
+    if (details.status === "error") line += "\n" + theme.fg("error", `  ⎿  Error: ${details.error ?? (resultText || "unknown")}`);
+    else line += "\n" + theme.fg("warning", "  ⎿  Target: aborted (max turns exceeded)");
+    return new Text(line, 0, 0);
+  };
+  const errorReason = () => (details?.error ?? resultText).split("\n").find(line => line.trim())?.trim() || "unknown";
+  if (!config) {
+    const body = legacy(renderContext.expanded);
+    return renderContext.expanded ? body : component(width => compactRows(body.render(width), width));
+  }
+  return component(width => {
+    if (!renderContext.expanded && renderContext.isError) {
+      return [
+        theme.fg("error", clip(`Error: ${errorReason()}`, width, "")),
+        theme.fg("muted", clip(`Target: ${details?.status ?? "unknown"}`, width, "")),
+      ].filter(Boolean);
+    }
+    const status = renderContext.isError
+      ? new Text(theme.fg("error", `✗ Error · observed ${details?.status ?? "unknown"}`), 0, 0)
+      : legacy(false);
+    const rows = [
+      ...status.render(width),
+      ...wrap(`Target state: ${details?.status ?? "unknown"}`, width).map(row => theme.fg("muted", row)),
+      ...(renderContext.isError ? [theme.fg("error", clip(`Error: ${errorReason()}`, width, ""))] : []),
+      ...(renderContext.expanded ? executionConfigRows(config, true, width, theme) : []),
+      ...(renderContext.expanded ? result.content.filter(block => block.type === "text").flatMap(block =>
+        wrap(block.text ?? "", width).map(row => theme.fg(renderContext.isError ? "error" : "toolOutput", row))) : []),
+    ];
+    return renderContext.expanded ? rows : compactRows(rows, width);
+  });
 }
 
 /** Build notification details for the custom message renderer. */
@@ -1260,6 +1389,21 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
 
   // ---- subagent_run tool ----
 
+  // The public factory advertises an explicit timing seam. Beautify injects its
+  // activation-owned clock only when resolving this cooperative renderer.
+  const agentCardRenderers = createToolCardRenderers(
+    SUBAGENT_TOOL_NAMES.AGENT,
+    undefined,
+    (args, result, context, theme) => {
+      const detail = [String(args.subagent_type ?? ""), String(args.description ?? "")].filter(Boolean).join(" · ");
+      return {
+        identity: SUBAGENT_TOOL_NAMES.AGENT,
+        summary: detail,
+        ...(result ? { body: renderSubagentResultBody(result, theme, context, showCost) } : {}),
+      };
+    },
+  );
+
   // Held rather than registered inline: the mention clone reuses this exact
   // definition, so the agent it starts is an ordinary top-level spawn instead
   // of a second implementation that has to be kept in step with this one.
@@ -1309,145 +1453,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       ...isolationParam(isWorktreeIsolationEnabled()),
     }, { additionalProperties: false }),
 
-    // ---- Custom rendering: Claude Code style ----
-
-    renderCall(args, theme, context) {
-      const detail = [String(args.subagent_type ?? ""), String(args.description ?? "")].filter(Boolean).join(" · ");
-      return createToolCallHeading({ name: "subagent_run", detail, theme, context });
-    },
-
-    renderResult(result, { expanded, isPartial }, theme, renderContext) {
-      const supplied = result.details as (AgentDetails & { runtimeLaunch?: unknown }) | undefined;
-      const text = result.content[0]?.type === "text" ? result.content[0].text : "";
-      const nonnegative = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0;
-      // Metadata may be historical or foreign. Validate every field used by the
-      // status renderer before formatting; a valid config does not validate its
-      // neighboring counters, spinner or legacy tags.
-      if (supplied && (
-        !nonnegative(supplied.toolUses) || typeof supplied.tokens !== "string" || !nonnegative(supplied.durationMs) ||
-        [supplied.cost, supplied.turnCount, supplied.maxTurns].some(value => value !== undefined && !nonnegative(value)) ||
-        (supplied.spinnerFrame !== undefined && (!Number.isInteger(supplied.spinnerFrame) || supplied.spinnerFrame < 0 || supplied.spinnerFrame >= SPINNER.length)) ||
-        (supplied.tags !== undefined && (!Array.isArray(supplied.tags) || supplied.tags.some(tag => typeof tag !== "string"))) ||
-        [supplied.modelName, supplied.activity, supplied.error].some(value => value !== undefined && typeof value !== "string")
-      )) return component(width => wrap(text, width).map(row => theme.fg(renderContext.isError ? "error" : "toolOutput", row)));
-      const identity = supplied?.runtimeLaunch;
-      const snapshot = copyAgentExecutionConfig(supplied?.executionConfig);
-      const config = isLaunchMetadata(identity) && "kind" in identity && identity.kind === "subagent" &&
-        (supplied?.agentId === undefined || supplied.agentId === identity.agent_id) &&
-        (typeof renderContext.args.resume !== "string" || renderContext.args.resume === identity.agent_id) &&
-        (snapshot?.mode === undefined || snapshot.mode === identity.mode) &&
-        typeof supplied?.status === "string" && ["queued", "running", "completed", "steered", "aborted", "stopped", "error", "background"].includes(supplied.status) &&
-        typeof supplied.toolUses === "number" && Number.isFinite(supplied.toolUses) &&
-        typeof supplied.tokens === "string" && typeof supplied.durationMs === "number" && Number.isFinite(supplied.durationMs) &&
-        (supplied.activity === undefined || typeof supplied.activity === "string") && (supplied.error === undefined || typeof supplied.error === "string")
-        ? snapshot : undefined;
-      // Legacy/foreign results retain the original readable renderer. Verified
-      // snapshots supplement its existing status styles, never live state.
-      const details = config && supplied ? { ...supplied, modelName: undefined, tags: undefined, tokens: clean(supplied.tokens),
-        activity: supplied.activity === undefined ? undefined : clean(supplied.activity),
-        error: supplied.error === undefined ? undefined : clean(supplied.error) } : supplied;
-      const legacy = (expanded: boolean) => {
-        // Pi reports pre-execution failures (extension block, abort, argument
-        // validation) as `{ content: [reason], details: {} }` with isError set —
-        // no status to render, so show the reason instead of inventing one (#199).
-        if (renderContext.isError || !details?.status) {
-          return new Text(text, 0, 0);
-        }
-
-        // Helper: build "haiku · thinking: high · ↻5≤30 · 3 tool uses · 33.8k tokens" stats string
-        const stats = (d: AgentDetails) => {
-          const parts: string[] = [];
-          if (d.modelName) parts.push(d.modelName);
-          if (d.tags) parts.push(...d.tags);
-          if (d.turnCount != null && d.turnCount > 0) {
-            parts.push(formatTurns(d.turnCount, d.maxTurns));
-          }
-          if (d.toolUses > 0) parts.push(`${d.toolUses} tool use${d.toolUses === 1 ? "" : "s"}`);
-          if (d.tokens) parts.push(d.tokens);
-          if (showCost) {
-            const costText = formatCost(d.cost ?? 0);
-            if (costText) parts.push(costText);
-          }
-          return parts.map(p => fgPreservingNestedStyles(theme, "dim", p)).join(" " + theme.fg("dim", "·") + " ");
-        };
-
-        // ---- While running (streaming) ----
-        if (isPartial || details.status === "running") {
-          const frame = SPINNER[details.spinnerFrame ?? 0];
-          const s = stats(details);
-          return renderRunningAgentStatus(frame, s, details.activity ?? "thinking…", theme);
-        }
-
-        // ---- Background agent launched ----
-        if (details.status === "background") {
-          return new Text(theme.fg("dim", `  ⎿  Running in background (ID: ${details.agentId})`), 0, 0);
-        }
-
-        // ---- Completed / Steered ----
-        if (details.status === "completed" || details.status === "steered") {
-          const duration = formatMs(details.durationMs);
-          const isSteered = details.status === "steered";
-          const icon = isSteered ? theme.fg("warning", "✓") : theme.fg("success", "✓");
-          const s = stats(details);
-          let line = icon + (s ? " " + s : "");
-          line += " " + theme.fg("dim", "·") + " " + theme.fg("dim", duration);
-
-          if (expanded) {
-            const resultText = result.content[0]?.type === "text" ? result.content[0].text : "";
-            if (resultText) {
-              const lines = resultText.split("\n").slice(0, 50);
-              for (const l of lines) {
-                line += "\n" + theme.fg("dim", `  ${l}`);
-              }
-              if (resultText.split("\n").length > 50) {
-                line += "\n" + theme.fg("muted", "  ... (use agent_manage action=output with agent_id and verbose for full output)");
-              }
-            }
-          } else {
-            const doneText = isSteered ? "Wrapped up (turn limit)" : "Done";
-            line += "\n" + theme.fg("dim", `  ⎿  ${doneText}`);
-          }
-          return new Text(line, 0, 0);
-        }
-
-        // ---- Stopped (user-initiated abort) ----
-        if (details.status === "stopped") {
-          const s = stats(details);
-          let line = theme.fg("dim", "■") + (s ? " " + s : "");
-          line += "\n" + theme.fg("dim", "  ⎿  Stopped");
-          return new Text(line, 0, 0);
-        }
-
-        // Anything left ("queued", or a status added later) has no rendering of
-        // its own — the turn-limit wording below must not be the catch-all.
-        if (details.status !== "error" && details.status !== "aborted") {
-          return new Text(text, 0, 0);
-        }
-
-        // ---- Error / Aborted (hard max_turns) ----
-        const s = stats(details);
-        let line = theme.fg("error", "✗") + (s ? " " + s : "");
-
-        if (details.status === "error") {
-          line += "\n" + theme.fg("error", `  ⎿  Error: ${details.error ?? "unknown"}`);
-        } else {
-          line += "\n" + theme.fg("warning", "  ⎿  Aborted (max turns exceeded)");
-        }
-
-        return new Text(line, 0, 0);
-      };
-      if (!config) return legacy(expanded);
-      const status = renderContext.isError
-        ? new Text(theme.fg("error", `✗ Error · observed ${details?.status ?? "unknown"}`), 0, 0)
-        : legacy(false);
-      return component(width => [
-        ...status.render(width),
-        ...wrap(`State: ${details?.status ?? "unknown"}`, width).map(row => theme.fg("muted", row)),
-        ...executionConfigRows(config, expanded, width, theme),
-        ...(expanded ? result.content.filter(block => block.type === "text").flatMap(block =>
-          wrap(block.text, width).map(row => theme.fg(renderContext.isError ? "error" : "toolOutput", row))) : []),
-      ]);
-    },
+    ...agentCardRenderers,
 
     // ---- Execute ----
 

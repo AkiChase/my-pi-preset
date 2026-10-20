@@ -19,8 +19,23 @@ export interface ToolCardDescription {
   bodyText?: string;
 }
 
-export type ToolCardDescribe = (args: Args, result: HostResult | undefined, context: RenderContext) => ToolCardDescription | undefined;
+export type ToolCardDescribe = (args: Args, result: HostResult | undefined, context: RenderContext, theme: Theme) => ToolCardDescription | undefined;
 export type ToolTimingSource = (context: RenderContext) => ToolTiming | undefined;
+
+export const TOOL_CARD_TIMING_ADAPTER = "__pi_preset_tool_card_timing_adapter" as const;
+
+export interface CooperativeToolCardRenderers extends ToolRenderers {
+  [TOOL_CARD_TIMING_ADAPTER]?: (timing: ToolTimingSource) => ToolRenderers;
+}
+
+/**
+ * Rebuild only an explicitly cooperative factory renderer with an activation-
+ * owned timing source. Opaque third-party renderers never satisfy this seam.
+ */
+export function withToolCardTiming(renderers: ToolRenderers | undefined, timing: ToolTimingSource): ToolRenderers | undefined {
+  const adapter = (renderers as CooperativeToolCardRenderers | undefined)?.[TOOL_CARD_TIMING_ADAPTER];
+  return typeof adapter === "function" ? adapter(timing) : undefined;
+}
 
 interface Cell {
   args: Args;
@@ -66,7 +81,7 @@ function defaultDescription(name: string, cell: Cell): ToolCardDescription {
 
 function resolveDescription(name: string, describe: ToolCardDescribe | undefined, cell: Cell): ToolCardDescription {
   if (!describe) return defaultDescription(name, cell);
-  try { return describe(cell.args, cell.result, cell.context) ?? defaultDescription(name, cell); }
+  try { return describe(cell.args, cell.result, cell.context, cell.theme) ?? defaultDescription(name, cell); }
   catch { return defaultDescription(name, cell); }
 }
 
@@ -147,7 +162,7 @@ export function createToolCardRenderers(name: string, timing?: ToolTimingSource,
     return cell;
   };
 
-  return {
+  const renderers: CooperativeToolCardRenderers = {
     renderShell: "self",
     renderCall: (_args, theme, context) => {
       const cell = getCell(theme, context as RenderContext);
@@ -160,4 +175,9 @@ export function createToolCardRenderers(name: string, timing?: ToolTimingSource,
       return { invalidate() {}, render() { return []; } };
     },
   };
+  Object.defineProperty(renderers, TOOL_CARD_TIMING_ADAPTER, {
+    value: (nextTiming: ToolTimingSource) => createToolCardRenderers(name, nextTiming, describe),
+    enumerable: true,
+  });
+  return renderers;
 }

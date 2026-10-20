@@ -14,3 +14,7 @@
 {"file": "extensions/beautify/__tests__/tool-card.test.ts", "reason": "Actual-host generic self-shell coverage"}
 {"file": "extensions/beautify/__tests__/tool-clock.test.ts", "reason": "Clock lifecycle regression coverage"}
 {"file": "extensions/beautify/__tests__/tools.test.ts", "reason": "Actual-loader delegation and timing coverage"}
+{"file": "extensions/agent-tasks/src/index.ts", "reason": "S3a cooperative subagent_run card adapter and target-status body"}
+{"file": "extensions/beautify/__tests__/registered-agent.test.ts", "reason": "Actual cross-loader cooperative timing and agent card regression"}
+{"file": "extensions/agent-tasks/__tests__/loading.test.ts", "reason": "Host-loader event ownership regression"}
+{"file": "extensions/agent-tasks/__tests__/tool-waits.test.ts", "reason": "Top-level agent lifecycle preservation regression"}
