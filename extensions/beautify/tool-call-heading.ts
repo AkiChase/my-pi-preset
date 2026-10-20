@@ -1,6 +1,6 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
-import { toolHeading } from "./layout.ts";
+import { createCardHeading, type CardField } from "./card-primitives.ts";
 
 /** Stateless title component; importing it does not activate the extension. */
 export function createToolCallHeading(options: {
@@ -11,11 +11,15 @@ export function createToolCallHeading(options: {
   theme: Theme;
   context: { expanded: boolean };
 }): Component {
-  return {
-    invalidate() {},
-    render(width) {
-      return toolHeading(options.name, options.detail ?? "", "", options.stats ?? "", width,
-        options.theme, options.context.expanded, options.secondary ?? "", false);
-    },
-  };
+  const statistics: CardField[] = [
+    ...(options.stats ? [{ label: options.stats, tone: "muted" as const }] : []),
+    ...((options.secondary ?? "").split(" · ").filter(Boolean).map(label => ({ label, tone: "muted" as const }))),
+  ];
+  return createCardHeading({
+    identity: options.name,
+    summary: options.detail ?? "",
+    statistics,
+    theme: options.theme,
+    context: options.context,
+  });
 }

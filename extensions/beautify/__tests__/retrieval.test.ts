@@ -154,7 +154,7 @@ test("unknown formats delegate original slots/state/shell, known→unknown switc
   const fallback = new ToolExecutionComponent("task_manage", "generic", {}, {}, optionalRenderers("task_manage", undefined, taskManageContract), screen, "/fixture");
   const text = Array.from({ length: 15 }, (_, i) => `line${i}`).join("\n");
   fallback.updateResult({ ...raw(text), isError: false });
-  assert.match(rows(fallback).join("\n"), /5 more lines/); assert.doesNotMatch(rows(fallback).join("\n"), /line14/);
+  assert.match(rows(fallback).join("\n"), /12 more lines/); assert.doesNotMatch(rows(fallback).join("\n"), /line14/);
   fallback.setExpanded(true); assert.match(rows(fallback).join("\n"), /line14/);
 });
 

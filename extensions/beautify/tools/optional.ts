@@ -1,7 +1,8 @@
 import { executionConfigRows } from "../execution-config.ts";
 import { keyHint, type Theme, type ToolRenderers } from "@earendil-works/pi-coding-agent";
 import { Box, Container, Text, type Component } from "@earendil-works/pi-tui";
-import { clean, toolHeading, wrap } from "../layout.ts";
+import { clean, clip, toolHeading, wrap } from "../layout.ts";
+import { textPreview } from "../card-primitives.ts";
 import { text, type Args, type RenderContext } from "../types.ts";
 import { component, type Metadata } from "./shared.ts";
 import type { RetrievalContract } from "./task-manage.ts";
@@ -72,11 +73,14 @@ export function optionalRenderers(name: string, original: ToolRenderers | undefi
       if (result && phase === "result") {
         const resultCtx = { ...ctx, state: cell.originalState, lastComponent: cell.originalResult };
         const fallback = () => component(width => {
-          const lines = clean(text(result)).split("\n");
-          if (!text(result)) return [];
-          const shown = ctx.expanded ? lines : lines.slice(0, 10);
-          const rows = shown.flatMap(line => wrap(line, width).map(row => theme.fg("toolOutput", row)));
-          if (shown.length < lines.length) rows.push(...wrap(`... (${lines.length - shown.length} more lines, ${clean(keyHint("app.tools.expand", "to expand"))})`, width).map(row => theme.fg("muted", row)));
+          const output = text(result);
+          if (!output) return [];
+          const preview = textPreview(output, width, { expanded: ctx.expanded });
+          const rows = preview.rows.map(line => theme.fg(ctx.isError ? "error" : "toolOutput", line));
+          if (preview.hidden) {
+            const hint = clip(`… (${preview.omittedRows} more lines, ${clean(keyHint("app.tools.expand", "to expand"))})`, width, "");
+            if (hint) rows.push(theme.fg("muted", hint));
+          }
           return rows;
         });
         try {
