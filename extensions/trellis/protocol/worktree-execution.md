@@ -4,7 +4,7 @@
 
 ## 材料来源与执行目录
 
-主 worktree 是任务、项目 workflow、规范和角色 JSONL 的唯一权威来源。子 worktree 用于产品代码和测试，不保存本任务的执行材料副本。派发提供经过宿主验证的绝对 sourceRoot/materialRoot、taskPath/specRoot/workflowPath，以及独立 executionRoot 和子上下文身份；不把材料正文放进 prompt，也没有“已完整注入”捷径。
+主 worktree 是任务、项目 workflow、规范和角色 JSONL 的唯一权威来源。子 worktree 用于产品代码和测试，不保存本任务的执行材料副本。派发保留固定四行 header：任务路径、子上下文身份、角色和 authority JSON。JSON 仅含 sourceRoot、executionRoot、requirementsFingerprint；宿主重新查询 native 材料与 binding 并校验完整身份，完整路径和引用事实只保留在宿主内部。子 agent 从 sourceRoot + taskDir 定位任务、从 sourceRoot/.trellis/workflow.md 和 sourceRoot/.trellis/spec 定位 workflow/spec，再按角色定位任务 manifest；manifest 是模型侧唯一完整引用清单。不把材料正文放进 prompt，也没有“已完整注入”捷径。
 
 子 agent 先完整读取源 PRD、可选 design/implement 和 workflow，再读取本角色 JSONL 及全部选中引用；research 不要求 implement/check manifest。材料相对路径从 sourceRoot 解析，代码和测试在 executionRoot 操作；单次 read 截断必须分页补齐。目标 checkout 自然存在的 `.trellis` 保持原样，即使其中任务/spec 过时或缺失也不参与当前材料解析。源材料失效时明确报错，**不回退目标副本**。
 

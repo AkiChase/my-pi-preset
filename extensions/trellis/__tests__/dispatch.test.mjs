@@ -15,6 +15,7 @@ import { readSourceExecution } from '../lib/source-executions.ts';
 import { readBinding } from '../lib/bindings.ts';
 import { queryWorktree } from '../lib/worktree-query.ts';
 import { mockPython } from './runtime-fixture.mjs';
+import { parseDispatchFacts } from '../lib/task-context.ts';
 
 // Build the initialized Git/Trellis project once and copy it per case.
 // Cases run serially; the root test runner owns file-level concurrency.
@@ -138,6 +139,7 @@ test('dispatch requires ready, uses target cwd/off, returns real id and prevents
  await assert.rejects(f.dispatch(),/ready worktree/);await f.run({action:'prepare'});
  const first=await f.dispatch();assert.equal(first.details.agentId,'agent-1');
  assert.equal(f.replies[0].options.cwd,c.binding.worktreePath);assert.equal(f.replies[0].options.isolation,'off');
+ const authority=JSON.parse(f.replies[0].prompt.split('\n')[3].slice('Trellis authority: '.length));assert.deepEqual(Object.keys(authority),['sourceRoot','executionRoot','requirementsFingerprint']);assert.equal(parseDispatchFacts(f.replies[0].prompt).executionRoot,f.replies[0].options.cwd);assert.doesNotMatch(f.replies[0].prompt,/spec\.md|raw SHA-256|source label|bytes/);
  assert.match(f.replies[0].prompt,/Review base:/);assert.doesNotMatch(f.replies[0].prompt,/BASE target spec|trellis-hook-injected/);assert.match(f.replies[0].prompt,/Source authority contract/);
  await assert.rejects(f.dispatch('trellis-check'),/running\/unknown/);
  f.bus.emit('subagents:completed',{id:'agent-1'});
@@ -257,6 +259,7 @@ test('unbound source dispatch uses shared cwd, current materials, no binding and
  const f=await fixture(t);f.put(f.task+'/prd.md','UNCOMMITTED source material');
  const first=await f.dispatch();assert.equal(first.details.mode,'source');assert.equal(first.details.cwd,f.root);
  assert.equal(f.replies[0].options.cwd,f.root);assert.equal(f.replies[0].options.isolation,'off');
+ const authority=JSON.parse(f.replies[0].prompt.split('\n')[3].slice('Trellis authority: '.length));assert.deepEqual(Object.keys(authority),['sourceRoot','executionRoot','requirementsFingerprint']);assert.equal(parseDispatchFacts(f.replies[0].prompt).executionRoot,f.replies[0].options.cwd);assert.doesNotMatch(f.replies[0].prompt,/spec\.md|raw SHA-256|source label|bytes/);
  assert.doesNotMatch(f.replies[0].prompt,/UNCOMMITTED source material|trellis-hook-injected/);assert.match(f.replies[0].prompt,/Trellis authority:/);assert.match(f.replies[0].prompt,/Shared directory: Other agents/);
  assert.doesNotMatch(f.replies[0].prompt,/Review base:|Trellis material revision:/);assert.equal(readBinding(f.root,f.task),undefined);
  await assert.rejects(f.dispatch(),/running\/unknown/);await assert.rejects(f.run(),/source execution/);
@@ -394,5 +397,7 @@ const smoke=new Set([
  'modified target runtime is rejected before execution/spawn, even if it attempts lock-time material changes',
  'unbound source dispatch uses shared cwd, current materials, no binding and per-task overlap',
  'target checkout changes during final native query refuse managed spawn with no lease',
+ 'selected role isolation: broken check does not block implement/research, but invalid role source spawns zero',
+ 'source/managed source requirements changed after first role query refuse spawn with no lease',
 ]);
 describe('dispatch smoke integrations',()=>{for(const c of cases.filter(({name})=>smoke.has(name)))it(c.name,scoped(c.fn));});

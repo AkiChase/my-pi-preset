@@ -45,8 +45,8 @@ test("implement/check read verified source paths fully without injection or loca
     assert.match(text, /followed by a blank line/);
     assert.match(text, /text alone is not authorization/);
     assert.match(text, /Do not run local `task\.py current`/);
-    assert.match(text, /sourceRoot.*materialRoot/);
-    assert.match(text, /absolute `taskPath`/);
+    assert.match(text, /contains only `sourceRoot`, `executionRoot` and `requirementsFingerprint`/);
+    assert.match(text, /Derive the source task path from `sourceRoot` \+ taskDir/);
     assert.match(text, /executionRoot/);
     assert.match(text, /Never fall back to the execution checkout/);
     assert.match(text, /Skip placeholder rows/);
@@ -68,7 +68,7 @@ test("research reads source artifacts without role manifests and persists only a
   const { text } = agent("research");
   assert.match(text, /exact first four dispatch lines/);
   assert.match(text, /Trellis authority: <JSON>/);
-  assert.match(text, /sourceRoot.*materialRoot/);
+  assert.match(text, /contains only `sourceRoot`, `executionRoot` and `requirementsFingerprint`/);
   assert.match(text, /Research has no implement\/check manifest requirement/);
   assert.match(text, /Fully read source `prd.md`/);
   assert.match(text, /Paginate read offset\/limit/);

@@ -164,6 +164,9 @@ test('workflow and entry skills keep source authority separate from execution an
   assert.match(text, /host-validated exact four-line header/);
   assert.match(text, /Trellis authority: <JSON>/);
   assert.match(text, /then a blank line/);
+  assert.match(text, /Authority JSON contains only\nsourceRoot, executionRoot and requirementsFingerprint/);
+  assert.match(text, /re-queries native source materials and binding facts/);
+  assert.match(text, /manifest is the only complete model-facing reference selection list/);
   assert.match(text, /No task\/spec\nexecution copy is prepared/);
   assert.match(text, /Git-checkout `.trellis` stays unchanged/);
   assert.match(text, /selected source JSONL and all references/);
@@ -178,7 +181,7 @@ test('workflow and entry skills keep source authority separate from execution an
  for (const name of ['start']) {
   const text = readFileSync(at(`skills/trellis-${name}/SKILL.md`), 'utf8');
   assert.match(text, /exact four-line header/);
-  assert.match(text, /absolute sourceRoot\/materialRoot/);
+  assert.match(text, /Authority JSON contains only absolute sourceRoot/);
   assert.match(text, /no local `task.py current`/);
   assert.match(text, /paginate read offset\/limit until complete/);
   assert.match(text, /Main owns integration, reference repair and lifecycle/);
@@ -200,7 +203,7 @@ test('all bundled skills use source materials and separate product execution roo
   assert.ok(boundaries.length <= 2, path);
   const boundary = boundaries.at(-1);
   assert.match(boundary, /(?:Main-session `\.trellis\/\.\.\.` paths are relative to the source project|In the main session, `\.trellis(?:\/\.\.\.)?` material paths resolve from the source project root)/, path);
-  assert.match(boundary, /Dispatched roles (?:use verified (?:absolute source material paths|authority to read absolute source material paths)|read absolute source material paths from verified authority)/, path);
+  assert.match(boundary, /Dispatched roles (?:use verified absolute source material paths|derive absolute source material paths from host-verified sourceRoot, taskDir and role manifest)/, path);
   assert.match(boundary, /(?:separate executionRoot for code\/tests|code\/tests and their execution cwd (?:stay at|at) `executionRoot`|code and tests stay at `executionRoot`)/, path);
   assert.doesNotMatch(text, /All `\.trellis(?:\/\.\.\.)?`(?:\/`\.pi` project)? paths (?:are relative to the execution project|resolve from the execution root)/, path);
  }

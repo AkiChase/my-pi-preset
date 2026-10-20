@@ -47,10 +47,11 @@ export function readTaskRecord(sourceRoot: string, taskDir: string): Record<stri
 	if (!record || typeof record !== "object" || Array.isArray(record)) throw new Error("Invalid task.json");
 	return record;
 }
-export interface DispatchFacts {
-	taskDir: string; contextId: string; role: TrellisRole; sourceRoot: string; materialRoot: string;
-	executionRoot: string; taskPath: string; specRoot: string; workflowPath: string; requirementsFingerprint: string;
-	artifacts: string[]; manifest: string | null; references: SourceMaterials["references"];
+export interface DispatchAuthority {
+	sourceRoot: string; executionRoot: string; requirementsFingerprint: string;
+}
+export interface DispatchFacts extends DispatchAuthority {
+	taskDir: string; contextId: string; role: TrellisRole;
 }
 /** Syntax is not authorization. Consumers must compare against native source/binding facts. */
 export function parseDispatchFacts(prompt: string): DispatchFacts | undefined {
@@ -61,25 +62,19 @@ export function parseDispatchFacts(prompt: string): DispatchFacts | undefined {
 	const contextId = /^Trellis context id: ([A-Za-z0-9_-]{1,128})$/.exec(lines[1] ?? "")?.[1];
 	const role = /^Trellis agent: (.+)$/.exec(lines[2] ?? "")?.[1];
 	const raw = /^Trellis authority: (.+)$/.exec(lines[3] ?? "")?.[1];
-	if (!contextId || !isTrellisRole(role) || !raw || Buffer.byteLength(raw) > 512 * 1024) return undefined;
+	if (!contextId || !isTrellisRole(role) || !raw || Buffer.byteLength(raw) > 64 * 1024) return undefined;
 	try {
 		const a = JSON.parse(raw);
-		const keys = ["sourceRoot", "materialRoot", "executionRoot", "taskPath", "specRoot", "workflowPath", "requirementsFingerprint", "artifacts", "manifest", "references"];
+		const keys = ["sourceRoot", "executionRoot", "requirementsFingerprint"];
 		if (!a || typeof a !== "object" || Array.isArray(a) || Object.keys(a).length !== keys.length || keys.some(k => !Object.hasOwn(a, k))) return undefined;
-		for (const k of keys.slice(0, 6)) if (!absolutePath(a[k])) return undefined;
-		if (a.materialRoot !== a.sourceRoot || !/^[a-f0-9]{64}$/.test(a.requirementsFingerprint) || !Array.isArray(a.artifacts) || a.artifacts.length < 3 || a.artifacts.length > 5 || a.artifacts.some((p: unknown) => !absolutePath(p)) || new Set(a.artifacts).size !== a.artifacts.length) return undefined;
-		if (role === "trellis-research" ? a.manifest !== null : !absolutePath(a.manifest)) return undefined;
-		if (!Array.isArray(a.references) || a.references.length > 512 || (role === "trellis-research" ? a.references.length !== 0 : !a.references.length)) return undefined;
-		for (const r of a.references) if (!r || typeof r !== "object" || Array.isArray(r) || !safeText(r.label) || isAbsolute(r.label) || r.label.includes("\\") || r.label.split("/").includes("..") || !absolutePath(r.path) || !/^[a-f0-9]{64}$/.test(r.sha256) || !Number.isSafeInteger(r.bytes) || r.bytes < 0 || r.bytes > 16 * 1024 * 1024) return undefined;
+		if (!absolutePath(a.sourceRoot) || !absolutePath(a.executionRoot) || typeof a.requirementsFingerprint !== "string" || !/^[a-f0-9]{64}$/.test(a.requirementsFingerprint)) return undefined;
 		const taskDir = lines[0].slice("Active task: ".length);
 		if (!/^\.trellis\/tasks\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(taskDir)) return undefined;
 		return { taskDir, contextId, role, ...a };
 	} catch { return undefined; }
 }
-export function dispatchAuthority(materials: SourceMaterials, executionRoot: string): Omit<DispatchFacts, "taskDir" | "contextId" | "role"> {
-	return { sourceRoot: materials.sourceRoot, materialRoot: materials.materialRoot, executionRoot,
-		taskPath: materials.taskPath, specRoot: materials.specRoot, workflowPath: materials.workflowPath,
-		requirementsFingerprint: materials.sourceFingerprint, artifacts: materials.artifacts, manifest: materials.manifest, references: materials.references };
+export function dispatchAuthority(materials: SourceMaterials, executionRoot: string): DispatchAuthority {
+	return { sourceRoot: materials.sourceRoot, executionRoot, requirementsFingerprint: materials.sourceFingerprint };
 }
 export function stripDispatchClaims(prompt: string): string {
 	return prompt.replace(/<!-- pi-trellis:task-context:start -->[\s\S]*?<!-- pi-trellis:task-context:end -->/g, "")
@@ -98,7 +93,6 @@ export function assembleDispatchPrompt(options: { prompt: string; contextId: str
 		"Required read order: fully read the following task artifacts, then workflow, then this role's manifest and every selected reference:",
 		...artifacts.map(p => `- ${p}`), `- ${m.workflowPath}`,
 		...(m.manifest ? [`- ${m.manifest} (resolve project-relative rows from sourceRoot; expand directory rows and read every selected file)`] : ["Research has no implement/check manifest requirement."]),
-		...m.references.map(r => `- ${r.path} (source label ${JSON.stringify(r.label)}; raw SHA-256 ${r.sha256}; ${r.bytes} bytes)`),
 		"Paginate until every required file is fully read; a tool's truncated result is not completion. Missing/unreadable/changed source paths are explicit errors: report source path/manifest line to main, never use target copies.",
 		"Fingerprints describe source requirements, not proof of actual/full reads or a filesystem transaction. Report what you read and any source changes observed.",
 		"Work only within the assigned approved scope. Main owns task/spec/lifecycle integration. Source materials are read-only by default; research may write source task research only when explicitly authorized. Put authorized implementation/review evidence under this task's evidence/, never research/.",

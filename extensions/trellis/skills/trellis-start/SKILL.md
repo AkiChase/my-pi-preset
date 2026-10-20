@@ -10,8 +10,11 @@ Initialize a Trellis-managed development session. Pi supplies a session overview
 ## Dispatched Role: Source Materials, Execution Code
 
 A dispatched role requires the host-validated exact four-line header (`Active task`, `Trellis context id`,
-`Trellis agent`, `Trellis authority`), followed by a blank line. Use its absolute sourceRoot/materialRoot,
-taskPath/specRoot/workflowPath and separate executionRoot. Missing or invalid authority is a blocker;
+`Trellis agent`, `Trellis authority`), followed by a blank line. Authority JSON contains only absolute sourceRoot,
+executionRoot and requirementsFingerprint. The host re-queries native materials and binding facts;
+complete paths/references remain host-internal. Derive task materials from sourceRoot + taskDir,
+workflow from sourceRoot/.trellis/workflow.md, specs from sourceRoot/.trellis/spec and the selected
+role manifest from the source task path. Missing or invalid authority is a blocker;
 report to main and stop, with no local `task.py current` or execution-checkout `.trellis` fallback.
 Fully read source PRD, optional design/implement, workflow and the selected implement/check JSONL plus
 all references; research has no implement/check manifest requirement. Resolve relative materials from

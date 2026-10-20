@@ -26,7 +26,7 @@ import { stripVTControlCharacters } from "node:util";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { assembleDispatchPrompt, dispatchAuthority, stripDispatchClaims, isTrellisRole, parseDispatchFacts, readTaskRecord, resolveTaskPath, type DispatchFacts } from "./lib/task-context.ts";
-import { queryWorktree, requireMaterials, requireSourcePath, type MaterialRole } from "./lib/worktree-query.ts";
+import { queryWorktree, requireMaterials, requireSourcePath, type MaterialRole, type SourceMaterials } from "./lib/worktree-query.ts";
 import { registerDispatchTool } from "./lib/subagent-rpc.ts";
 import { readBinding, readMarker, sameIdentity, type WorktreeBinding } from "./lib/bindings.ts";
 import { canonicalPath, containsPath } from "./lib/config.ts";
@@ -102,7 +102,9 @@ const keyBySession = new Map<string, string>();
 const taskBySession = new Map<string, string>();
 // Display provenance only, never authorization or an active-pointer override.
 const roleBySession = new Map<string, string>();
-const authorityBySession = new Map<string, DispatchFacts>();
+// Full paths/references are native facts retained only inside the host.
+type VerifiedDispatchFacts = DispatchFacts & Pick<SourceMaterials, "taskPath" | "specRoot" | "workflowPath" | "artifacts" | "manifest" | "references">;
+const authorityBySession = new Map<string, VerifiedDispatchFacts>();
 // Remember immutable native identity, not just a reused source/target pathname.
 const bindingBySession = new Map<string, WorktreeBinding | null>();
 const sourceRootBySession = new Map<string, string>();
@@ -816,14 +818,13 @@ async function inheritDispatchTask(current: Session, facts: DispatchFacts): Prom
 	].join("\n"), facts.taskDir]);
 	if (!result || result.code !== 0) throw new Error("Could not bind dispatched task to source child session; no parent context inherited");
 	bindingBySession.set(current.identity, native.binding ? { ...native.binding } : null);
-	authorityBySession.set(current.identity, facts);
+	authorityBySession.set(current.identity, { ...facts, taskPath: m.taskPath, specRoot: m.specRoot,
+		workflowPath: m.workflowPath, artifacts: m.artifacts, manifest: m.manifest, references: m.references });
 	authorityErrors.delete(current.identity);
 	invalidateTask(m.sourceRoot, key);
 }
 function dispatchAuthorityFromFacts(f: DispatchFacts) {
-	return { sourceRoot: f.sourceRoot, materialRoot: f.materialRoot, executionRoot: f.executionRoot, taskPath: f.taskPath,
-		specRoot: f.specRoot, workflowPath: f.workflowPath, requirementsFingerprint: f.requirementsFingerprint,
-		artifacts: f.artifacts, manifest: f.manifest, references: f.references };
+	return { sourceRoot: f.sourceRoot, executionRoot: f.executionRoot, requirementsFingerprint: f.requirementsFingerprint };
 }
 
 async function requireChildAuthority(current: Session): Promise<void> {
@@ -1106,9 +1107,10 @@ export default function (pi: ExtensionAPI): void {
 				authorityErrors.set(current.identity, "Incomplete/invalid source authority header; no pointer fallback");
 			}
 			const priorAuthority = authorityBySession.get(current.identity);
-			if (facts && priorAuthority && taskBySession.get(current.identity) === facts.taskDir && roleBySession.get(current.identity) === facts.role && JSON.stringify(priorAuthority) !== JSON.stringify(facts)) {
+			if (facts && priorAuthority && (priorAuthority.taskDir !== facts.taskDir || priorAuthority.role !== facts.role || JSON.stringify(dispatchAuthorityFromFacts(priorAuthority)) !== JSON.stringify(dispatchAuthorityFromFacts(facts)) || priorAuthority.contextId !== facts.contextId)) {
 				authorityErrors.set(current.identity, "Dispatch authority changed within this child session; main must review/re-dispatch, no pointer fallback");
 			}
+			if (authorityErrors.has(current.identity) && priorAuthority) throw new Error(authorityErrors.get(current.identity));
 			if (facts && (taskBySession.get(current.identity) !== facts.taskDir || roleBySession.get(current.identity) !== facts.role)) {
 				await inheritDispatchTask(current, facts);
 				taskBySession.set(current.identity, facts.taskDir);
