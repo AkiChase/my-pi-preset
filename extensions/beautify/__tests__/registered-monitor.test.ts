@@ -56,14 +56,18 @@ test("actual loader monitor and process host cards show snapshots/ranges/stats a
       themeSdk.initTheme(theme, false);
       const c = display("monitor", args, launch);
       assert.match(body(c), /timeout: no deadline|timeout=no deadline/);
-      assert.match(body(c), /silence reminder: disabled/);
-      assert.match(body(c), /startup batch configuration: 3456ms/);
+      assert.match(body(c), /silence reminder=disabled/);
+      assert.match(body(c), /startup batch configuration=3456ms/);
       c.setExpanded(false); assert.doesNotMatch(body(c), /startup batch configuration/);
       assert.match(body(c), /expand/);
       assert.ok(c.render(160).some((row: string) => row.includes(themeSdk.theme.getBgAnsi("toolSuccessBg"))));
     }
-    const originalCall = tools.get("monitor")!.renderCall!(args, themeSdk.theme, { expanded: true } as never);
-    assert.match(plain(originalCall.render(40).join("\n")), /^monitor/);
+    const originalCall = tools.get("monitor")!.renderCall!(args, themeSdk.theme, {
+      args, toolCallId: "original-monitor-call", invalidate() {}, lastComponent: undefined, state: {}, cwd: dir,
+      executionStarted: true, argsComplete: true, isPartial: false, expanded: true, showImages: true,
+      isError: false, durationMs: undefined, outputPad: 0,
+    } satisfies RenderContext);
+    assert.match(plain(originalCall.render(40).join("\n")).trimStart(), /^monitor/);
     assert.equal(job.outcomeSurfaced, noConsumption);
     writeFileSync(job.logPath, "中文🧠\n".repeat(25));
     for (const action of ["status", "output"]) {

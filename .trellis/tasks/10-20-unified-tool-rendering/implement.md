@@ -119,7 +119,7 @@
 
 **S4b process/monitor notifications（已完成，提交 `2b2d1b6`）**：`extensions/process-tasks/notification-renderer.ts` 作为 presentation-only adapter 接入已存在的 custom-message renderer。正常 process terminal 保留现有 `failureTailLinesShown` collapsed 预算、expanded 下保留全部已交付 tail；monitor 单源和 stall 使用公共三物理行 preview；monitor batch 仍是一张中性 batch card，不虚构 aggregate terminal state，body 保留每个 source 的原状态与 manifest/overflow 文本。未改 `notify.ts`、`monitor-notifications.ts` 或 `monitoring.ts` 的 delivery、batch、manifest、`outcomeSurfaced`、retry/wait 语义。`node --test extensions/process-tasks/__tests__/notification-renderer.test.ts extensions/process-tasks/__tests__/index.test.ts`（12/12 PASS，natural exit）、`pnpm typecheck`、`git diff --check` 通过；独立 check PASS。真实终端视觉 NOT_RUN。
 
-**S4c Trellis Check report（已完成，待 scoped commit）**：`registerDiagnosticReport()` 使用公共 notification shell，但将 `diagnosticReportLines()` 生成的带 tone `Text` 作为 opaque rich body。`isDiagnosticReport()`、malformed-restored-details fallback、compact/expanded selection、line/report budget、计数 tone 与 Check 菜单/消息/toast 所有权不变；rich body 特意不走第二次三行 preview。`node --test extensions/trellis/__tests__/diagnostic-report.test.mjs`（11/11 PASS，natural exit）、`pnpm typecheck`、`git diff --check` 通过；独立 check PASS。真实终端视觉 NOT_RUN。
+**S4c Trellis Check report（已完成，提交 `f80b8b5`）**：`registerDiagnosticReport()` 使用公共 notification shell，但将 `diagnosticReportLines()` 生成的带 tone `Text` 作为 opaque rich body。`isDiagnosticReport()`、malformed-restored-details fallback、compact/expanded selection、line/report budget、计数 tone 与 Check 菜单/消息/toast 所有权不变；rich body 特意不走第二次三行 preview。`node --test extensions/trellis/__tests__/diagnostic-report.test.mjs`（11/11 PASS，natural exit）、`pnpm typecheck`、`git diff --check` 通过；独立 check PASS。真实终端视觉 NOT_RUN。
 
 ### S5：集成、独立检查与收尾评估
 
@@ -131,6 +131,12 @@
 - 独立 `trellis-check` 审查公共 renderer 合同、计时/资源清理、delivery 语义和测试缺口；
 - 运行 selected focused checks、typecheck/full suite、`git diff --check`；
 - 评估是否需更新开发 spec 或用户文档。仅在实际用户可见行为需要说明时修改文档；不添加内部测试教程。
+
+**S5 结果（已完成，待 final scoped commit）**：修正 `registered-monitor` actual-host fixture，使断言匹配既有 `monitorExecutionSummary()` 的 `=` 格式，并为 direct `renderCall` 提供完整公开 `RenderContext`；未改产品行为。隔离 SDK/临时 agent 目录下完整 Beautify natural-exit suite 为 94/94 PASS（含实际 host Bash timing：live `elapsed` 与最终 `execution` 各仅出现一次，裁定先前 delayed duplicate-timing 疑虑不成立）。独立 cross-layer `trellis-check` PASS（144/144 focused actual-host tests、typecheck、diff/check-manifest JSONL）；审查无 task-scope finding。
+
+完整 natural-exit 命令 `node --test --test-concurrency=8 "extensions/**/__tests__/*.test.ts" "extensions/**/__tests__/*.test.mjs" "scripts/*.test.mjs"` 为 1608/1609 PASS、exit 1；唯一复现失败是未改动的 `extensions/process-tasks/__tests__/jobs-read.test.ts:178`，旧断言期待 `output requires task_id`，实际 runtime-management 文案为 `agent_id`/`execution_id`。最终 `pnpm check` 同为 1608/1609、exit 1，原因相同；其 typecheck 子阶段通过。独立 reviewer 的并发 full run 另一次观察到未改动 `waits.test.ts:102` 的 `before-kill` 空输出，但主会话随后两次隔离 full run 未复现，故记录为未复现的既有并发测试失败，未越界修改。
+
+未运行真实终端视觉、live reload/session switch、任意外部 custom renderer 组合和不可达 HTML 路径；不将 actual-host fixture 覆盖表述为这些环境的视觉验收。已评估，无需新增 project spec 或用户文档：本任务产出是已有 presentation ownership 合同下的本地 adapter/测试覆盖，不构成跨任务通用开发规则。任务仍未归档；`branch === base_branch === main` 需在用户验收/归档或 PR 前单独处理。
 
 ## 验证命令
 

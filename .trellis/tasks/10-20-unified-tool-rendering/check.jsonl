@@ -50,3 +50,4 @@
 {"file": "extensions/trellis/lib/initialization/diagnostics.ts", "reason": "Diagnostic line/report budget and tone source contract"}
 {"file": "extensions/trellis/lib/initialization/command.ts", "reason": "Check menu/message/toast ownership must remain unchanged"}
 {"file": "extensions/trellis/__tests__/diagnostic-report.test.mjs", "reason": "S4 diagnostic report shell, budget, menu, and renderer regression coverage"}
+{"file": "extensions/beautify/__tests__/registered-monitor.test.ts", "reason": "S5 actual-host monitor card regression and complete renderer context fixture"}
