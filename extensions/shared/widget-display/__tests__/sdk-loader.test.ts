@@ -60,3 +60,32 @@ pi.events.on("fixture:facade", ack=>ack(pi.events)); };`);
         assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`); assert.equal(result.error, undefined);
     } finally { rmSync(directory, { recursive: true, force: true }); }
 });
+it("actual loader accepts coupled Footer entries and cleans metric subscriptions with either entry order", async () => {
+    const { initTheme, createEventBus, SessionManager } = await import("@earendil-works/pi-coding-agent");
+    const { createExtensionRuntime, loadExtensionsCached } = await import(new URL("./core/extensions/loader.js", import.meta.resolve("@earendil-works/pi-coding-agent")).href);
+    initTheme("dark", false);
+    const { theme } = await import(new URL("./modes/interactive/theme/theme.js", import.meta.resolve("@earendil-works/pi-coding-agent")).href);
+    const ownerPath = new URL("../../../widget-display.ts", import.meta.url).pathname;
+    const statusPath = new URL("../../../status-bar.ts", import.meta.url).pathname;
+    for (const paths of [[ownerPath, statusPath], [statusPath, ownerPath]]) {
+        const runtime = createExtensionRuntime(), bus = createEventBus();
+        const loaded = await loadExtensionsCached(paths, process.cwd(), bus, runtime);
+        assert.deepEqual(loaded.errors, []);
+        let footer: import("../contracts.ts").WidgetComponent | undefined, subscriptions = 0;
+        const ctx = { hasUI: true, mode: "tui", sessionManager: SessionManager.inMemory("/tmp"), getContextUsage: () => undefined, ui: { theme,
+            setFooter(factory: Parameters<import("@earendil-works/pi-coding-agent").ExtensionContext["ui"]["setFooter"]>[0]) {
+                footer?.dispose?.(); footer = factory?.({ requestRender() {} } as never, theme, {
+                    getExtensionStatuses: () => new Map(), getAvailableProviderCount: () => 1,
+                    onBranchChange() { subscriptions++; return () => { subscriptions--; }; },
+                } as never);
+            },
+        } };
+        // The real loader API's execution facade needs a runtime binding for SDK getSettings/exec.
+        runtime.getSettings = () => ({});
+        runtime.exec = async () => ({ code: 1, stdout: "", stderr: "" });
+        for (const extension of loaded.extensions) for (const handler of extension.handlers.get("session_start") ?? []) await handler({}, ctx);
+        assert.equal(subscriptions, 1);
+        for (const extension of loaded.extensions) for (const handler of extension.handlers.get("session_shutdown") ?? []) await handler({}, ctx);
+        assert.equal(subscriptions, 0); runtime.invalidate("fixture done");
+    }
+});

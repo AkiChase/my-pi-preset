@@ -2,7 +2,7 @@
 
 Task composition 把命令进程、Monitor、子 Agent 和 workflow 放进同一个任务面板。底栏按 `shell`、`monitor`、`agent`、`workflow` 显示活动和排队数量，前台任务也会计入；父任务及其子任务不会重复算作独立工作。底栏还显示实际等待数量及配置的全局解除等待入口；未绑定快捷键时显示 `/task-detach`。等待与后台运行独立，所属子任务不等于主会话正在等待。没有活动、排队或等待任务时，摘要隐藏。
 
-编辑器下方通过 [Widget Display](widget-display.md) 显示只读 Agent／workflow 根任务概览，不显示 Shell／Monitor，不展开子任务，也不接管输入或导航。每行优先显示任务描述，使用与面板一致的状态图标（概览中的活动状态为静态 `◌`）；耗时与 `↓ tokens` 靠右排列。最多五个根任务，小终端减少行数并提示隐藏数量；极端拥挤时 Pi 仍可能裁剪概览或底栏，隐藏数量不保证始终可见。空态隐藏，终态短暂保留四秒。
+底部 Footer 的用量行之后通过 [Widget Display](widget-display.md) 紧接显示只读 Agent／workflow 根任务概览，不显示 Shell／Monitor，不展开子任务，也不接管输入或导航。每行优先显示任务描述，使用与面板一致的状态图标（概览中的活动状态为静态 `◌`）；耗时与 `↓ tokens` 靠右排列。最多五个根任务，小终端减少行数并提示隐藏数量；极端拥挤时 Pi 仍可能裁剪概览或底栏，隐藏数量不保证始终可见。空态隐藏，终态短暂保留四秒。
 
 概览使用根任务自身统计，不累加子任务。Agent tokens 包含 input、output、cacheWrite，不含 cacheRead；继续会话时 tokens 为累计值，耗时为本轮运行。Workflow 的统计可能稍有延迟。请保持 Widget Display 启用；没有共享展示入口时概览不显示，但底栏和 Task Panel 仍可使用。命令等待只由共享底栏／面板说明，没有独立命令提示。
 

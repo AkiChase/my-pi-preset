@@ -1,12 +1,12 @@
-import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
-import { Container, Text, type TUI } from "@earendil-works/pi-tui";
-import { CONNECT, SESSION_START, SLOTS, type ConnectRequest, type Slot, type WidgetComponent, type WidgetContent, type WidgetHandle } from "./contracts.ts";
+import type { ExtensionAPI, ExtensionContext, ReadonlyFooterDataProvider, Theme } from "@earendil-works/pi-coding-agent";
+import { Container, Text, stripTerminalSequences, truncateToWidth, wrapTextWithAnsi, type TUI } from "@earendil-works/pi-tui";
+import { CONNECT, SESSION_START, REGISTRY, type DisplayRegistry, type InlineComponent, type Region, type ConnectRequest, type WidgetComponent, type WidgetContent, type WidgetHandle } from "./contracts.ts";
 
-type Placement = "aboveEditor" | "belowEditor";
-const placements = ["aboveEditor", "belowEditor"] as const;
+type Placement = Region;
+const placements = ["aboveEditor", "belowEditor", "footer"] as const;
 interface Entry { token: object; revision: number; content?: WidgetContent; component?: WidgetComponent; building: boolean }
-interface Mount { component: WidgetComponent; active: boolean }
-interface Surface { entries: Map<Slot, Entry>; leases: Map<Slot, Entry>; mount?: Mount; tui?: TUI; theme?: Theme }
+interface Mount { component: WidgetComponent; active: boolean; hostOwned: boolean }
+interface Surface { retired?: boolean; entries: Map<string, Entry>; leases: Map<string, Entry>; mount?: Mount; tui?: TUI; theme?: Theme; footerData?: ReadonlyFooterDataProvider }
 interface Session { manager: ExtensionContext["sessionManager"]; id: string; ctx: ExtensionContext; surfaces: Record<Placement, Surface> }
 const key = (placement: Placement) => `preset.widgets.${placement}`;
 const surface = (): Surface => ({ entries: new Map(), leases: new Map() });
@@ -18,8 +18,14 @@ function textComponent(lines: readonly string[]): WidgetComponent {
     return container;
 }
 
-/** Sole host-widget publisher. State and event subscriptions belong to this activation. */
-export default function registerWidgetDisplay(pi: ExtensionAPI): void {
+/** Sole host widget/Footer publisher. State and event subscriptions belong to this activation. */
+export default function registerWidgetDisplay(pi: ExtensionAPI, registry: DisplayRegistry = REGISTRY): void {
+    for (const group of Object.values(registry.groups)) {
+        if (!placements.includes(group.region) || !Number.isFinite(group.order) ||
+            (group.layout !== "block" && group.layout !== "inline") ||
+            (group.layout === "inline" && (typeof group.separator !== "string" || !["wrap", "truncate"].includes(group.overflow ?? "")))) throw new Error("Invalid display group");
+    }
+    for (const item of Object.values(registry.items)) if (!registry.groups[item.group] || !Number.isFinite(item.order)) throw new Error("Invalid display item");
     let closed = false;
     let current: Session | undefined;
     let started = false;
@@ -29,16 +35,20 @@ export default function registerWidgetDisplay(pi: ExtensionAPI): void {
     const published = new Map<Placement, { session: Session; mount?: Mount }>();
     function owns(session: Session): boolean { return !closed && current === session && session.manager.getSessionId() === session.id; }
     function ordered(s: Surface): Entry[] {
-        return [...s.entries].sort(([a], [b]) => SLOTS[a].order - SLOTS[b].order || a.localeCompare(b)).map(([, entry]) => entry);
+        return [...s.entries].sort(([a], [b]) => {
+            const ia = registry.items[a], ib = registry.items[b];
+            const ga = registry.groups[ia.group], gb = registry.groups[ib.group];
+            return ga.order - gb.order || ia.group.localeCompare(ib.group) || ia.order - ib.order || a.localeCompare(b);
+        }).map(([, entry]) => entry);
     }
     function releaseEntry(entry: Entry): void { const old = entry.component; entry.component = undefined; dispose(old); }
     function retireMount(s: Surface): void {
         const mount = s.mount; s.mount = undefined;
         if (mount) mount.active = false;
-        s.tui = undefined; s.theme = undefined;
+        s.tui = undefined; s.theme = undefined; s.footerData = undefined;
     }
     function clear(session: Session): void {
-        // Close BOTH regions before any consumer cleanup can reenter.
+        // Close ALL regions before any consumer cleanup can reenter.
         const entries = placements.flatMap(p => [...session.surfaces[p].entries.values()]);
         for (const placement of placements) {
             const s = session.surfaces[placement];
@@ -58,7 +68,7 @@ export default function registerWidgetDisplay(pi: ExtensionAPI): void {
         // A captured client context cannot switch the owner back to an old session.
         if (current && !fromStart) return undefined;
         const previous = current;
-        const next: Session = { manager, id, ctx, surfaces: { aboveEditor: surface(), belowEditor: surface() } };
+        const next: Session = { manager, id, ctx, surfaces: { aboveEditor: surface(), belowEditor: surface(), footer: surface() } };
         current = next;
         if (previous) clear(previous);
         return owns(next) ? next : undefined;
@@ -69,7 +79,8 @@ export default function registerWidgetDisplay(pi: ExtensionAPI): void {
             const revision = entry.revision, content = entry.content;
             entry.building = true;
             let component: WidgetComponent | undefined;
-            try { component = typeof content === "function" ? content(s.tui, s.theme) : textComponent(content); }
+            try { component = typeof content === "function" ? content(s.tui, s.theme) : Array.isArray(content) ? textComponent(content) :
+                "kind" in content ? (content.kind === "footer" ? (s.footerData ? content.factory(s.tui, s.theme, s.footerData) : undefined) : content.factory(s.tui, s.theme, s.footerData)) : undefined; }
             catch {
                 if (entry.revision === revision) {
                     for (const [slot, candidate] of s.entries) if (candidate === entry) s.entries.delete(slot);
@@ -82,13 +93,38 @@ export default function registerWidgetDisplay(pi: ExtensionAPI): void {
         }
     }
     function makeMount(session: Session, placement: Placement, s: Surface): Mount {
-        const mount: Mount = { active: true, component: {
+        const mount: Mount = { active: true, hostOwned: false, component: {
             render(width) {
                 if (!owns(session) || !mount.active || s.mount !== mount) return [];
                 const rows: string[] = [];
-                for (const entry of ordered(s)) {
-                    if (!owns(session) || !mount.active || s.mount !== mount) return [];
-                    try { rows.push(...(entry.component?.render(width) ?? [])); } catch { /* A bad slot must not break unrelated rendering. */ }
+                const groups = Object.entries(registry.groups).filter(([, g]) => g.region === placement)
+                    .sort(([a, ga], [b, gb]) => ga.order - gb.order || a.localeCompare(b));
+                for (const [name, group] of groups) {
+                    const entries = [...s.entries].filter(([item]) => registry.items[item].group === name)
+                        .sort(([a], [b]) => registry.items[a].order - registry.items[b].order || a.localeCompare(b));
+                    const fragments: string[] = [];
+                    for (const [, entry] of entries) {
+                        if (!owns(session) || !mount.active || s.mount !== mount) return [];
+                        try {
+                            if (group.layout === "block") rows.push(...(entry.component?.render(width) ?? []));
+                            else {
+                                const text = (entry.component as InlineComponent | undefined)?.renderText(width) ?? "";
+                                // Preserve ANSI styling; strip non-style controls and explicit line breaks.
+                                const clean = text.replace(/\x1b\](?:(?!\x07|\x1b\\)[\s\S])*(?:\x07|\x1b\\|$)/g, "")
+                                    .replace(/\x1b(?:\[[0-?]*[ -/]*[@-~]|[^[])/g, sequence => /^\x1b\[[0-9;:]*m$/.test(sequence) ? sequence : "")
+                                    .replace(/[\x00-\x1f\x7f-\x9f]/g, c => c === "\x1b" ? c : " ").trim();
+                                if (stripTerminalSequences(clean).trim()) fragments.push(clean);
+                            }
+                        } catch { /* A bad item must not break unrelated rendering. */ }
+                    }
+                    if (fragments.length && width > 0) {
+                        let separator = group.separator ?? "", ellipsis = "…";
+                        const theme = session.ctx.ui.theme ?? s.theme;
+                        try { separator = theme?.fg("borderMuted", separator) ?? separator; } catch { /* Theme fallback. */ }
+                        try { ellipsis = theme?.fg("dim", ellipsis) ?? ellipsis; } catch { /* Theme fallback. */ }
+                        const text = fragments.join(separator);
+                        rows.push(...(group.overflow === "wrap" ? wrapTextWithAnsi(text, width) : [truncateToWidth(text, width, ellipsis)]));
+                    }
                 }
                 return owns(session) && mount.active && s.mount === mount ? rows : [];
             },
@@ -97,7 +133,10 @@ export default function registerWidgetDisplay(pi: ExtensionAPI): void {
                 for (const entry of ordered(s)) try { entry.component?.invalidate(); } catch { /* Isolate slot invalidation. */ }
             },
             dispose() {
+                mount.hostOwned = false;
                 if (!mount.active || s.mount !== mount) return;
+                if (placement === "footer") s.retired = true;
+                if (published.get(placement)?.mount === mount) published.delete(placement);
                 retireMount(s);
                 for (const entry of ordered(s)) releaseEntry(entry);
             },
@@ -115,17 +154,18 @@ export default function registerWidgetDisplay(pi: ExtensionAPI): void {
                 const old = published.get(placement);
                 const session = current && owns(current) ? current : undefined;
                 const s = session?.surfaces[placement];
-                const rows = session?.ctx.mode === "rpc" && s ? ordered(s).flatMap(entry => Array.isArray(entry.content) ? [...entry.content] : []) : undefined;
-                const visible = s && (rows ? rows.length > 0 : s.entries.size > 0);
+                if (s?.retired && placement === "footer") continue;
+                const rows = session?.ctx.mode === "rpc" && placement !== "footer" && s ? ordered(s).flatMap(entry => Array.isArray(entry.content) ? [...entry.content] : []) : undefined;
+                const visible = s && (placement !== "footer" || session?.ctx.mode === "tui") && (rows ? rows.length > 0 : s.entries.size > 0);
                 if (!session || !s || !visible) {
                     if (s) retireMount(s);
                     if (old) {
                         published.delete(placement);
-                        try { old.session.ctx.ui.setWidget(key(placement), undefined); } catch { success = false; }
+                        try { if (placement === "footer") { if (old.mount?.hostOwned) old.session.ctx.ui.setFooter(undefined); } else old.session.ctx.ui.setWidget(key(placement), undefined); } catch { success = false; }
                     }
                     continue;
                 }
-                if (session.ctx.mode === "rpc") {
+                if (session.ctx.mode === "rpc" && placement !== "footer") {
                     published.set(placement, { session });
                     try { session.ctx.ui.setWidget(key(placement), rows, { placement }); }
                     catch {
@@ -144,23 +184,29 @@ export default function registerWidgetDisplay(pi: ExtensionAPI): void {
                 published.set(placement, { session, mount });
                 let failed = false;
                 try {
-                    session.ctx.ui.setWidget(key(placement), (tui, theme) => {
+                    const factory = (tui: TUI, theme: Theme, footerData?: ReadonlyFooterDataProvider) => {
+                        mount.hostOwned = true;
                         if (owns(session) && mount.active && s.mount === mount) {
-                            s.tui = tui; s.theme = theme;
+                            s.tui = tui; s.theme = theme; s.footerData = footerData;
                             for (const entry of ordered(s)) build(session, s, entry);
                             if (!s.entries.size) { pending.add(placement); if (!writing) drain(); }
                         }
                         return mount.component;
-                    }, { placement });
+                    };
+                    if (placement === "footer") session.ctx.ui.setFooter(factory);
+                    else session.ctx.ui.setWidget(key(placement), factory, { placement });
                 } catch {
                     failed = true; success = false;
                     if (s.mount === mount) {
                         retireMount(s);
                         for (const entry of ordered(s)) releaseEntry(entry);
                     }
-                    // Even a setter that installed and then threw needs finite rollback.
+                    // Roll back only while the supplied component still proves Footer ownership.
                     published.delete(placement);
-                    try { session.ctx.ui.setWidget(key(placement), undefined); } catch { /* No recursive retries. */ }
+                    try {
+                        if (placement === "footer") { if (mount.hostOwned) session.ctx.ui.setFooter(undefined); }
+                        else session.ctx.ui.setWidget(key(placement), undefined);
+                    } catch { /* No recursive retries. */ }
                 }
                 if (!failed && (!owns(session) || !mount.active || s.mount !== mount)) pending.add(placement);
             }
@@ -170,15 +216,17 @@ export default function registerWidgetDisplay(pi: ExtensionAPI): void {
     function refresh(session: Session, placement: Placement): boolean {
         if (!owns(session)) return false;
         pending.add(placement);
-        return drain() && owns(session);
+        return drain() && owns(session) && !session.surfaces[placement].retired;
     }
     const offConnect = pi.events.on(CONNECT, (data: unknown) => {
         if (closed || !data || typeof data !== "object") return;
         const request = data as ConnectRequest;
-        if (request.version !== 1 || !Object.hasOwn(SLOTS, request.slot) || !request.token || typeof request.token !== "object" || typeof request.accept !== "function" || !request.ctx?.sessionManager) return;
+        if (request.version !== 1 || !Object.hasOwn(registry.items, request.slot) || !request.token || typeof request.token !== "object" || typeof request.accept !== "function" || !request.ctx?.sessionManager) return;
         const acceptedSession = activate(request.ctx); if (!acceptedSession) return;
         const session: Session = acceptedSession;
-        const placement = SLOTS[request.slot].placement, s = session.surfaces[placement];
+        const group = registry.groups[registry.items[request.slot].group];
+        const placement = group.region, s = session.surfaces[placement];
+        if (placement === "footer" && session.ctx.mode !== "tui") return;
         const previous = s.leases.get(request.slot);
         if (previous && previous.token !== request.token) return;
         // A duplicate request never creates another independently live lease.
@@ -190,7 +238,13 @@ export default function registerWidgetDisplay(pi: ExtensionAPI): void {
         const handle: WidgetHandle = {
             set(content) {
                 if (!valid() || (typeof content === "function" && session.ctx.mode !== "tui")) return false;
-                if (content !== undefined && typeof content !== "function" && (!Array.isArray(content) || content.some(line => typeof line !== "string"))) return false;
+                if (content !== undefined) {
+                    if (Array.isArray(content)) { if (group.layout === "inline" || content.some(line => typeof line !== "string")) return false; }
+                    else if (typeof content === "function") { if (group.layout === "inline") return false; }
+                    else if (!content || typeof content !== "object" || !("kind" in content) || typeof content.factory !== "function" ||
+                        (group.layout === "inline" ? content.kind !== "inline" : content.kind !== "footer" || placement !== "footer")) return false;
+                    if (!Array.isArray(content) && session.ctx.mode !== "tui") return false;
+                }
                 const revision = ++entry.revision; entry.content = content;
                 if (content === undefined) s.entries.delete(request.slot); else s.entries.set(request.slot, entry);
                 releaseEntry(entry);

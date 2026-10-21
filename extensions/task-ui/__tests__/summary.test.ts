@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { it } from "node:test";
 import { createEventBus, SessionManager, type ExtensionAPI, type ExtensionContext, type Theme, type ThemeColor } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
+import widgetDisplay from "../../shared/widget-display/owner.ts";
 import statusBar from "../../status-bar.ts";
 import { TaskCoordinator } from "../coordinator.ts";
 import { TaskLifecycle } from "../lifecycle.ts";
@@ -32,7 +33,7 @@ function fixture(shortcuts = DEFAULTS.shortcutTaskPanel) {
         setStatus(key: string, text: string | undefined) { if (text === undefined) statuses.delete(key); else statuses.set(key, text); },
         setFooter(factory: Parameters<ExtensionContext["ui"]["setFooter"]>[0]) {
             footer?.dispose?.();
-            footer = factory?.({ requestRender() {} } as never, theme, {
+            footer = factory?.({ terminal: { rows: 24 }, requestRender() {} } as never, theme, {
                 getExtensionStatuses: () => statuses, onBranchChange: () => () => {}, getAvailableProviderCount: () => 1,
             } as never);
         },
@@ -41,13 +42,14 @@ function fixture(shortcuts = DEFAULTS.shortcutTaskPanel) {
         const list = handlers.get(event) ?? []; list.push(handler); handlers.set(event, list);
         return () => { const index = list.indexOf(handler); if (index >= 0) list.splice(index, 1); };
     }, registerCommand() {}, getSettings: () => ({}), exec: async () => ({ code: 1, stdout: "", stderr: "" }) } as unknown as ExtensionAPI;
+    widgetDisplay(pi);
     const owner = createTaskUIOwner(pi, coordinator, lifecycle, { ...DEFAULTS, shortcutTaskPanel: shortcuts });
     statusBar(pi);
     for (const handler of handlers.get("session_start") ?? []) handler({} as never, ctx);
     return { statuses,
         publish(next: readonly TaskView[]) { views = next; revision++; for (const listener of listeners) listener(); },
         render(width: number) { return footer!.render(width); },
-        dispose() { owner.dispose(); footer?.dispose?.(); coordinator.dispose(); },
+        dispose() { owner.dispose(); for (const handler of [...handlers.get("session_shutdown") ?? []]) handler({} as never, ctx); coordinator.dispose(); },
     };
 }
 const count = (n: number, state: "active" | "queued") => `${fg("text", String(n))} ${fg(state === "active" ? "success" : "warning", state)}`;
@@ -70,7 +72,7 @@ void it("owner publishes semantic monitor fields and configured shortcut; actual
         assert.equal(visibleWidth(expected), visibleWidth("monitor: 2 active · ctrl+alt+t"));
         for (const width of [0, 1, 7, 19, 35, 50, 100, 240]) {
             for (const rendered of f.render(width)) assert.ok(visibleWidth(rendered) <= width);
-            assert.equal(stripTerminalSequences(f.render(width)[2]!), stripTerminalSequences(line).slice(0, Math.max(0, width - 1)) + (visibleWidth(line) > width && width > 0 ? "…" : ""));
+            assert.equal(stripTerminalSequences(f.render(width)[2] ?? ""), stripTerminalSequences(line).slice(0, Math.max(0, width - 1)) + (visibleWidth(line) > width && width > 0 ? "…" : ""));
         }
     } finally { f.dispose(); }
 });

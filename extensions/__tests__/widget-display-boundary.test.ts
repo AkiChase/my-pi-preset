@@ -15,9 +15,9 @@ it("only the shared widget owner may reference the host setter in production exp
         function visit(node: ts.Node): void {
             // Includes optional calls and aliases/destructuring; type-only SDK slices are allowed.
             if (ts.isTypeNode(node)) return;
-            const setter = (ts.isPropertyAccessExpression(node) && node.name.text === "setWidget") ||
-                (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression) && node.argumentExpression.text === "setWidget") ||
-                (ts.isBindingElement(node) && (node.propertyName ?? node.name).getText(source).replaceAll(/["']/g, "") === "setWidget");
+            const setter = (ts.isPropertyAccessExpression(node) && ["setWidget", "setFooter"].includes(node.name.text)) ||
+                (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression) && ["setWidget", "setFooter"].includes(node.argumentExpression.text)) ||
+                (ts.isBindingElement(node) && ["setWidget", "setFooter"].includes((node.propertyName ?? node.name).getText(source).replaceAll(/["']/g, "")));
             if (setter) violations.push(`${file}:${source.getLineAndCharacterOfPosition(node.getStart()).line + 1}`);
             ts.forEachChild(node, visit);
         }
