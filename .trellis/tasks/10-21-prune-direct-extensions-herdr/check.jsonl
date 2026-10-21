@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/development/index.md", "reason": "Review sync safety, extension lifecycle ownership, package resource declaration, and documentation constraints."}
+{"file": ".trellis/spec/testing/index.md", "reason": "Review required isolated sync and lifecycle regression evidence."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Review manifest-to-filesystem and lifecycle-to-Herdr side-effect boundaries."}

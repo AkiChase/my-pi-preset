@@ -20,7 +20,7 @@ curl -fsSL https://raw.githubusercontent.com/AkiChase/my-pi-preset/main/install.
 ./install.sh
 ```
 
-完成后在 Pi 中 `/reload`，或重启 Pi。脚本只管理用户级包及 agent 目录配置，不修改项目 `.pi/`。
+完成后在 Pi 中 `/reload`，或重启 Pi。脚本只管理用户级包、agent 目录内的受管配置和直接扩展入口，不修改项目 `.pi/`。
 
 ### 使用本地检出
 
@@ -92,17 +92,18 @@ pi update --extensions
 ./install.sh
 ./install.sh --sync settings
 ./install.sh --sync packages,settings --dry-run
+./install.sh --sync extensions --prune extensions --dry-run
 ./install.sh --prune
 ```
 
 | 选项 | 用途 |
 | --- | --- |
-| `--sync <域>` | 选择 `packages`、`settings`、`keybindings`、`files`，逗号分隔；支持 `all` / `none`，默认全部。 |
+| `--sync <域>` | 选择 `packages`、`settings`、`keybindings`、`files`、`extensions`，逗号分隔；支持 `all` / `none`，默认全部。 |
 | `--prune [<域>]` | 在选定域删除未声明内容；默认不删除，裸写表示清理全部已选域。 |
 | `--dev` | 只把本仓库切为执行同步脚本所在的本地检出。 |
-| `--dry-run` | 读取并打印计划，不执行安装、更新、移除或配置写入。 |
+| `--dry-run` | 读取并打印计划，不执行安装、更新、移除、扩展删除或配置写入。 |
 
-默认 **merge**：对齐清单声明的内容，保留未声明值；**prune**：删除选定域中未声明且未受保护的内容。不能 prune 未被 sync 选中的域。`conflicts` 中的包即使在 merge 模式也会移除。
+默认 **merge**：对齐清单声明的内容，保留未声明值；**prune**：删除选定域中未声明且未受保护的内容。不能 prune 未被 sync 选中的域。`conflicts` 中的包即使在 merge 模式也会移除。`extensions` 域只处理用户 agent 目录下的直接 Pi 扩展入口，使用 `--prune` 前应先看 dry-run。
 
 ### 受管理的配置
 
@@ -120,8 +121,10 @@ pi update --extensions
 
 `settings` 和 `files` 按嵌套叶子合并；数组和标量整体替换。`keybindings` 按完整动作 ID 对齐。`null` 表示删除声明项，`[]` 可用于禁用键位；仅从清单移除一个键不会在 merge 模式自动删除本机值。
 
-`preserve` 为 prune 保留机器各自的偏好，当前包括主题、默认 provider、模型和思考等级。声明与保护路径不能重叠。Pi 自己维护的 `settings.packages` 和 `lastChangelogVersion` 不受同步管理。
+`preserve` 为 prune 保留机器各自的偏好，当前包括主题、默认 provider、模型和思考等级。`preserve.extensions` 可保留用户扩展目录中指定的直接入口名；它不安装或更新这些入口。声明与保护路径不能重叠。Pi 自己维护的 `settings.packages` 和 `lastChangelogVersion` 不受同步管理。
 
 `files` 只接受 agent 根目录内声明的 `.json` 文件名；不支持子目录或其他配置根目录。未声明的文件不会被读取、写入或清理。认证、信任、模型等受保护文件不能加入此域。prune 会清理声明文件中的未保护叶子，使用前先看 dry-run。
+
+`extensions` 只扫描 agent 根目录 `extensions/` 第一层的直接 `.ts` / `.js` 文件，以及带 `index.ts`、`index.js` 或 Pi package 扩展声明的直接子目录；隐藏项和 `node_modules` 不在范围内。merge 模式不会改动它们；prune 会删除未列入 `preserve.extensions` 的入口。普通 JSON 和其他非扩展文件不会被递归清理；如果 `extensions/` 根目录自身是一个 Pi extension package / index，脚本会拒绝 prune，避免误删共享目录内容。
 
 配置内容不变时不会重写；遇到坏 JSON 会报错，不覆盖。日志写入 stderr，便于看出同步进行到哪一步。更新配置后 `/reload`；个别影响工具开关的插件设置需要重启，见各插件文档。

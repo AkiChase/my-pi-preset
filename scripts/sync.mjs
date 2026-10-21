@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 // Reconcile this machine with the preset declared in pi-preset.json.
 //
-// Four domains, each selected independently and each running in one of two
+// Five domains, each selected independently and each running in one of two
 // modes:
 //
 //   packages     -> `pi install` / `pi update` / `pi remove`
 //   settings     -> <agent-dir>/settings.json
 //   keybindings  -> <agent-dir>/keybindings.json
 //   files        -> <agent-dir>/<name>.json, one per extension that reads one
+//   extensions   -> direct entries under <agent-dir>/extensions/
 //
 //   merge (default)  only the declared entries are aligned; anything the
 //                    manifest does not mention is left alone. A declared
@@ -19,7 +20,7 @@
 //   node scripts/sync.mjs [--manifest <path>] [--dev] [--sync <domains>] [--prune [<domains>]] [--dry-run]
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, rmdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, rmdirSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,7 +30,7 @@ const UNPINNED = new Set(["", "*", "latest"]);
 const ANSI = /\u001B\[[0-9;]*m/g;
 const COMMAND_TIMEOUT_MS = 10 * 60 * 1000;
 
-const DOMAINS = ["packages", "settings", "keybindings", "files"];
+const DOMAINS = ["packages", "settings", "keybindings", "files", "extensions"];
 const SELF_IDENTITY = "git:github.com/akichase/my-pi-preset";
 
 // pi owns these two keys in settings.json: `packages` is maintained by
@@ -42,6 +43,8 @@ const PI_OWNED_SETTINGS = new Set(["packages", "lastChangelogVersion"]);
 // `~/.config/...` configs (rpiv-ask-user-question) are deliberately out of
 // scope: a second root would need its own XDG resolution.
 const FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*\.json$/;
+const DIRECT_EXTENSION_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+const DIRECT_EXTENSION_FILE = /\.(?:ts|js)$/;
 
 // Files `files` must not touch, each for its own reason:
 //   settings.json / keybindings.json  have their own domain
@@ -304,14 +307,14 @@ function readManifest(path) {
 
   const rawPreserve = parsed?.preserve ?? {};
   if (!isPlainObject(rawPreserve)) {
-    fail(`manifest ${path} field "preserve" must be an object with "settings", "keybindings" and/or "files" entries`);
+    fail(`manifest ${path} field "preserve" must be an object with "settings", "keybindings", "files" and/or "extensions" entries`);
   }
   for (const key of Object.keys(rawPreserve)) {
-    if (key !== "settings" && key !== "keybindings" && key !== "files") {
-      fail(`"preserve.${key}" is not a domain; use "settings", "keybindings" or "files"`);
+    if (key !== "settings" && key !== "keybindings" && key !== "files" && key !== "extensions") {
+      fail(`"preserve.${key}" is not a domain; use "settings", "keybindings", "files" or "extensions"`);
     }
   }
-  const preserve = { settings: [], keybindings: [], files: {} };
+  const preserve = { settings: [], keybindings: [], files: {}, extensions: [] };
   for (const domain of ["settings", "keybindings"]) {
     const list = rawPreserve[domain] ?? [];
     if (!Array.isArray(list)) fail(`"preserve.${domain}" must be an array`);
@@ -353,6 +356,18 @@ function readManifest(path) {
       const clash = target.declared.find((declared) => overlaps(entry, declared.path));
       if (clash) fail(`"${formatPath(entry)}" in ${name} is both declared and preserved`);
     }
+  }
+
+  const rawPreserveExtensions = rawPreserve.extensions ?? [];
+  if (!Array.isArray(rawPreserveExtensions)) fail(`"preserve.extensions" must be an array of direct extension entry names`);
+  preserve.extensions = rawPreserveExtensions.map((value, index) => {
+    if (typeof value !== "string" || !DIRECT_EXTENSION_NAME.test(value) || value === "node_modules") {
+      fail(`"preserve.extensions[${index}]" must be a plain direct extension entry name`);
+    }
+    return value;
+  });
+  if (new Set(preserve.extensions).size !== preserve.extensions.length) {
+    fail(`"preserve.extensions" cannot contain duplicate entry names`);
   }
 
   info(`${entries.length} packages declared: ${entries.join(", ")}`);
@@ -575,6 +590,101 @@ function runPi(action, source) {
   }
   if (result.status !== 0) return `pi ${args.join(" ")} exited with ${result.status} (after ${seconds}s)`;
   return undefined;
+}
+
+// ---------------------------------------------------------------------------
+// direct user extensions
+// ---------------------------------------------------------------------------
+
+function isFile(path) {
+  try {
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function isDirectory(path) {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/** Mirrors Pi's package-manifest check closely enough to identify one direct directory entry. */
+function hasPiExtensionEntry(directory) {
+  const packageJson = join(directory, "package.json");
+  if (!existsSync(packageJson)) return false;
+  try {
+    const parsed = JSON.parse(readFileSync(packageJson, "utf8").replace(/^\uFEFF/, ""));
+    const entries = parsed?.pi?.extensions;
+    return Array.isArray(entries) && entries.every((entry) => typeof entry === "string") &&
+      entries.some((entry) => existsSync(resolve(directory, entry)));
+  } catch {
+    return false;
+  }
+}
+
+/** Pi treats a directory package manifest first, then its conventional index files. */
+function isDirectExtensionDirectory(directory) {
+  return hasPiExtensionEntry(directory) || isFile(join(directory, "index.ts")) || isFile(join(directory, "index.js"));
+}
+
+/**
+ * Discover only direct Pi extension roots. A package/index at the shared root changes Pi's
+ * discovery semantics for every child, so prune refuses that ambiguous layout rather than
+ * deleting unrelated support files beside it.
+ */
+function readDirectExtensions(directory, prune) {
+  if (!existsSync(directory)) return [];
+  if (!isDirectory(directory)) fail(`extensions root ${directory} is not a directory`);
+  if (isDirectExtensionDirectory(directory)) {
+    if (prune) fail(`cannot prune extensions: ${directory} is itself a Pi extension; move that package out of the shared extensions root first`);
+    return [{ path: directory, target: ".", directory: true, root: true }];
+  }
+
+  let names;
+  try {
+    names = readdirSync(directory).sort();
+  } catch {
+    // An unavailable user extensions root has no safely discoverable entries;
+    // it is not an error for an otherwise selected sync domain.
+    return [];
+  }
+
+  const entries = [];
+  for (const name of names) {
+    // Pi's automatic extension discovery ignores hidden entries and node_modules.
+    if (name.startsWith(".") || name === "node_modules") continue;
+    const path = join(directory, name);
+    if (isFile(path) && DIRECT_EXTENSION_FILE.test(name)) {
+      entries.push({ path, target: name, directory: false, root: false });
+    } else if (isDirectory(path) && isDirectExtensionDirectory(path)) {
+      entries.push({ path, target: name, directory: true, root: false });
+    }
+  }
+  return entries;
+}
+
+export function buildExtensionPlan(entries, preserve, prune) {
+  const protectedEntries = new Set(preserve);
+  return entries.map((entry) => {
+    if (entry.root) {
+      return { domain: "extensions", action: "keep", target: entry.target, path: entry.path, directory: entry.directory, reason: "extensions root is itself a Pi extension" };
+    }
+    if (!prune) {
+      return { domain: "extensions", action: "keep", target: entry.target, path: entry.path, directory: entry.directory, reason: "not in manifest (merge mode)" };
+    }
+    if (protectedEntries.has(entry.target)) {
+      return { domain: "extensions", action: "preserve", target: entry.target, path: entry.path, directory: entry.directory, reason: "listed in preserve.extensions" };
+    }
+    return { domain: "extensions", action: "remove", target: entry.target, path: entry.path, directory: entry.directory, reason: "not in preserve.extensions" };
+  });
+}
+
+function removeExtension(entry) {
+  rmSync(entry.path, { recursive: entry.directory, force: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -816,7 +926,7 @@ if (values.help) {
   console.log(`Usage: node scripts/sync.mjs [options]
 
   --manifest <path>   Manifest to apply (default: pi-preset.json next to this script's parent)
-  --sync <domains>    Domains to reconcile: packages, settings, keybindings, files, all, none
+  --sync <domains>    Domains to reconcile: packages, settings, keybindings, files, extensions, all, none
                       (default: all)
   --prune [<domains>] Domains the manifest owns completely; bare --prune, or --prune all,
                       means every domain --sync selected (default: none)
@@ -829,7 +939,9 @@ a declared null removes one entry. In a pruned domain, whatever the manifest
 does not declare is removed, except the "preserve" lists and the settings keys
 pi maintains itself (packages, lastChangelogVersion). Pruning "files" reaches
 only the files "files" declares; a file the manifest never mentions is never
-read, written or removed.`);
+read, written or removed. Pruning "extensions" reaches only direct Pi extension
+entries under the user extensions root; it never recursively treats JSON or other
+ordinary files as extensions.`);
   process.exit(0);
 }
 
@@ -856,6 +968,9 @@ const fileTargets = syncDomains.has("files")
       const path = join(agentDir, entry.file);
       return { ...entry, path, current: readJsonFile(path, `files ${entry.file}`) };
     })
+  : [];
+const extensionEntries = syncDomains.has("extensions")
+  ? readDirectExtensions(join(agentDir, "extensions"), pruneDomains.has("extensions"))
   : [];
 
 step("comparing manifest with this machine");
@@ -908,6 +1023,10 @@ for (const target of fileTargets) {
   );
 }
 
+if (syncDomains.has("extensions")) {
+  plan.push(...buildExtensionPlan(extensionEntries, manifest.preserve.extensions, pruneDomains.has("extensions")));
+}
+
 const modeLine = DOMAINS.filter((domain) => syncDomains.has(domain))
   .map((domain) => `${domain} ${pruneDomains.has(domain) ? "prune" : "merge"}`)
   .join(", ");
@@ -943,6 +1062,7 @@ if (values["dry-run"]) {
 }
 
 const packageSteps = plan.filter((entry) => entry.domain === "packages" && entry.action !== "keep");
+const extensionSteps = plan.filter((entry) => entry.domain === "extensions" && entry.action === "remove");
 const isWrite = (entry) => entry.action === "set" || entry.action === "unset";
 // One write step per file, in the order they are applied.
 const writeTargets = [
@@ -954,7 +1074,7 @@ const writeTargets = [
     plan.filter((entry) => entry.domain === "files" && entry.file === target.path && isWrite(entry)),
   ]),
 ].filter(([, , steps]) => steps.length > 0);
-const totalSteps = packageSteps.length + writeTargets.length;
+const totalSteps = packageSteps.length + writeTargets.length + extensionSteps.length;
 
 if (totalSteps === 0) {
   console.error("");
@@ -1000,6 +1120,17 @@ for (const [label, file, steps] of writeTargets) {
   } catch (error) {
     console.error(`  failed: ${error.message}`);
     failures.push(`${label}: ${error.message}`);
+  }
+}
+
+for (const entry of extensionSteps) {
+  step(`remove extension ${entry.target}`, totalSteps);
+  try {
+    removeExtension(entry);
+    info("ok");
+  } catch (error) {
+    console.error(`  failed: ${error.message}`);
+    failures.push(`${entry.target}: ${error.message}`);
   }
 }
 
