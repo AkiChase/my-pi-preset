@@ -11,5 +11,9 @@ export function parseAgentInput(text: string): AgentInput | null {
 }
 /** User-friendly, scope-local resume spelling. */
 export function resumeKey(type: string, index: number): string {
-  return `${type.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "agent"}_${index}`;
+  return `${type.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "agent"}-${index}`;
+}
+
+export function matchesResumeKey(type: string, index: number, target: string): boolean {
+  return resumeKey(type, index) === target.toLowerCase();
 }

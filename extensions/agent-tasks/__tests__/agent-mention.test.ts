@@ -3,8 +3,9 @@ import { it } from "node:test";
 import type { AutocompleteProvider } from "@earendil-works/pi-tui";
 import type { AgentManager } from "../src/agent-manager.ts";
 import { createMentionProvider } from "../src/ui/agent-mention.ts";
+import { matchesResumeKey, resumeKey } from "../src/mention.ts";
 
-void it("explicit agent autocomplete displays stable IDs and inserts normalized resume keys", async () => {
+void it("explicit agent autocomplete displays and inserts compact hyphenated resume keys", async () => {
   const delegated = { items: [{ value: "@README.md", label: "README.md" }], prefix: "@" };
   const current = {
     async getSuggestions() { return delegated; },
@@ -29,11 +30,16 @@ void it("explicit agent autocomplete displays stable IDs and inserts normalized 
   assert.deepEqual(resumeSuggestions, {
     prefix: resume,
     items: [{
-      value: "@agent:resume:general_purpose_0 ",
-      label: "agent_general_purpose_0_12345678",
+      value: "@agent:resume:general-purpose-0 ",
+      label: "general-purpose-0",
       description: "resume · interrupted",
     }, ...delegated.items],
   });
+
+  assert.equal(resumeKey("general-purpose", 0), "general-purpose-0");
+  assert.equal(resumeKey("General purpose!", 2), "general-purpose-2");
+  assert.equal(matchesResumeKey("general-purpose", 0, "GENERAL-PURPOSE-0"), true);
+  assert.equal(matchesResumeKey("general-purpose", 0, "general_purpose_0"), false);
 
   const create = "@agent:create:g";
   const createSuggestions = await provider.getSuggestions([create], 0, create.length, {} as never);

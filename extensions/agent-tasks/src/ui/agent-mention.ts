@@ -4,7 +4,7 @@ import { MENTION_TRIGGER, resumeKey } from "../mention.ts";
 
 export type TypeInfo = { name: string; description: string };
 
-/** Suggestions are explicit commands: full IDs are visible while insertion stays concise. */
+/** Suggestions are explicit commands using the same compact resume key as task UI labels. */
 export function createMentionProvider(current: AutocompleteProvider, roster: () => { manager: AgentManager; types: readonly TypeInfo[] } | undefined, isEnabled: () => boolean): AutocompleteProvider {
   return {
     triggerCharacters: ["@"],
@@ -24,7 +24,7 @@ export function createMentionProvider(current: AutocompleteProvider, roster: () 
       }
       for (const record of state.manager.listAgents().filter(record => record.parentAgentId === undefined)) {
         const value = `@agent:resume:${resumeKey(record.type, record.registryIndex ?? -1)} `;
-        if (value.toLowerCase().startsWith(prefix.toLowerCase())) items.push({ value, label: record.id, description: `resume · ${record.status}` });
+        if (value.toLowerCase().startsWith(prefix.toLowerCase())) items.push({ value, label: resumeKey(record.type, record.registryIndex ?? -1), description: `resume · ${record.status}` });
       }
       if (!items.length) return theirs;
       return theirs ? { items: [...items, ...theirs.items], prefix } : { items, prefix };

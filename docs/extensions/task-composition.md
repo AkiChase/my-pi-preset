@@ -117,10 +117,10 @@ workflow 用脚本编排多步工作，可以调用 Agent，也可以不启动 A
 
 ```text
 @agent:create:Explore 检查 registry
-@agent:resume:explore_0 继续检查
+@agent:resume:explore-0 继续检查
 ```
 
-`create` 后是已注册的 Agent 类型；`resume` 后是直属父级范围内的规范化 `type_index` 简写（例如 `general-purpose` 使用 `general_purpose_0`）。补全会展示完整 `agent_id`，但插入简写。其他普通 `@…` 输入仍由 Pi 的文件补全和原有行为处理。
+`create` 后是已注册的 Agent 类型；`resume` 后是直属父级范围内的规范化 `type-index` 简写（例如 `general-purpose` 使用 `general-purpose-0`）。补全会显示并插入该简写。其他普通 `@…` 输入仍由 Pi 的文件补全和原有行为处理。
 
 ## 后台任务提醒
 

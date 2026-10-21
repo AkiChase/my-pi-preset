@@ -48,7 +48,7 @@ import { type RpcHandle, registerRpcHandlers } from "./cross-extension-rpc.ts";
 import { loadCustomAgents } from "./custom-agents.ts";
 import { GroupJoinManager } from "./group-join.ts";
 import { isolationParam, resolveAgentInvocationConfig, resolveJoinMode, THINKING_LEVELS, thinkingParam } from "./invocation-config.ts";
-import { parseAgentInput, resumeKey } from "./mention.ts";
+import { matchesResumeKey, parseAgentInput } from "./mention.ts";
 import { describeModel, type ModelRegistry, resolveModel } from "./model-resolver.ts";
 import { checkModelScope, isScopeModelsEnabled, setScopeModelsEnabled } from "./model-scope.ts";
 import { registryLocatorForRootSession } from "./subagent-registry.ts";
@@ -1094,8 +1094,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       } catch (error) { if (active()) ctx.ui.notify(`Could not start ${input.target}: ${error instanceof Error ? error.message : String(error)}`, "error"); }
       return { action: "handled" as const };
     }
-    const wanted = input.target.toLowerCase();
-    const record = manager.listAgents().find(candidate => candidate.parentAgentId === undefined && resumeKey(candidate.type, candidate.registryIndex ?? -1) === wanted);
+    const record = manager.listAgents().find(candidate => candidate.parentAgentId === undefined && matchesResumeKey(candidate.type, candidate.registryIndex ?? -1, input.target));
     if (!record) { ctx.ui.notify(`No direct subagent matches @agent:resume:${input.target}.`, "warning"); return { action: "handled" as const }; }
     try {
       const resumed = record.session ? await startBackgroundResume(ctx, record, input.message, { outputTranscript: getAgentConfig(record.type)?.outputTranscript ?? getOutputTranscriptDefault(), maxTurns: normalizeMaxTurns(getAgentConfig(record.type)?.maxTurns ?? getDefaultMaxTurns()) })

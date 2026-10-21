@@ -5,6 +5,7 @@ import type { TaskCoordinator } from "../../task-ui/coordinator.ts";
 import { taskKey, type ConversationEntry, type TaskDetail, type TaskMessageEntry, type TaskDetailRequest, type TaskIdentity, type TaskSource, type TaskStatus, type TaskView } from "../../task-ui/types.ts";
 import type { AgentManager } from "./agent-manager.ts";
 import { extractText } from "./context.ts";
+import { resumeKey } from "./mention.ts";
 import { MAX_TEXT } from "./conversation-entries.ts";
 import { ConversationPager, MAX_PAGE_BYTES } from "./conversation-paging.ts";
 import type { AgentRecord } from "./types.ts";
@@ -151,7 +152,7 @@ export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCo
         if (record.sessionFile) artifacts.push(Object.freeze({ kind: "conversation", path: record.sessionFile }));
         if (record.worktree) artifacts.push(Object.freeze({ kind: "worktree", path: record.worktree.path }));
         return Object.freeze({ ...identity, key: taskKey(identity), parentKey, kind: "agent" as const,
-          title: record.id, description: `${record.type} · ${record.description}${record.status === "interrupted" ? " · interrupted by Pi exit; resume to continue" : ""}`, status,
+          title: Number.isSafeInteger(record.registryIndex) && record.registryIndex! >= 0 ? resumeKey(record.type, record.registryIndex!) : record.id, description: `${record.type} · ${record.description}${record.status === "interrupted" ? " · interrupted by Pi exit; resume to continue" : ""}`, status,
           executionMode: parentKey ? "owned" as const : record.isBackground === false ? "foreground" as const : "background" as const,
           waitCount: coordinator.countWaits(identity), startedAt: record.startedAt, endedAt: record.completedAt,
           executionConfig: copyAgentExecutionConfig(record.executionConfig),

@@ -638,7 +638,7 @@ void it("tiny detail terminals prioritize body, selected status and actions over
 
 void it("actual unavailable Agent source preserves bounded terminal answer/error on first open and retry", () => {
     for (const status of ["completed", "error"] as const) {
-        const record: AgentRecord = { id: "no-transcript", runId: "run", type: "general-purpose", description: "no history",
+        const record: AgentRecord = { id: "no-transcript", runId: "run", type: "general-purpose", registryIndex: 2, description: "no history",
             status, result: "TERMINAL_ANSWER", error: status === "error" ? "TERMINAL_ERROR" : undefined,
             startedAt: Date.now() - 1000, completedAt: Date.now(), toolUses: 0, compactionCount: 0,
             lifetimeUsage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 } };
@@ -646,6 +646,8 @@ void it("actual unavailable Agent source preserves bounded terminal answer/error
         const coordinator = new TaskCoordinator(), source = createAgentTaskSource(manager, coordinator, new Map(), { observe: false });
         coordinator.registerSource(source);
         const row = coordinator.list()[0]!;
+        assert.equal(row.title, "general-purpose-2");
+        assert.equal(row.taskId, "no-transcript");
         const sourceDetail = coordinator.detail(row, { conversationPage: { direction: "latest" } })!;
         assert.equal(sourceDetail.conversationPage?.status, "unavailable");
         assert.ok(sourceDetail.conversation?.some(entry => entry.kind === "assistant" && entry.text === "TERMINAL_ANSWER"));
