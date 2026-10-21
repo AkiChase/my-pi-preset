@@ -1,0 +1,3 @@
+{"file":".trellis/spec/development/index.md","reason":"Review source authority validation and resource ownership"}
+{"file":".trellis/spec/testing/index.md","reason":"Verify actual executed regressions and evidence limits"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Review native query to child context trust boundary"}

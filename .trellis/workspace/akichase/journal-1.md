@@ -1535,3 +1535,268 @@ Task Panel 重构完成并归档：删除 feedback 行；分区详情视图；�
 ### Status
 
 [OK] **Completed**
+
+
+## Session 47: 精简派发上下文并改进任务面板体验
+<!-- trellis-session: v=2 fp=af91b8d445680222 -->
+
+**Date**: 2026-10-20
+**Task**: 精简派发上下文并改进任务面板体验
+**Branch**: `main`
+
+### Summary
+
+完成 Trellis authority 精简、子代理会话有界分页和 Task Panel 详情交互改造；完成自动检查与 tmux 终端验收。
+
+### Main Changes
+
+- 将派发 authority 精简为最小字段，完整引用仅由宿主 native query 保留和验证。
+- 新增有界双向会话分页、稳定 entry ID、终态与 JSONL 边界修复。
+- 重构 Task Detail 分区、滚动跟随、工具结果鼠标展开、状态图标和动画配置。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `17a9546` | refactor(trellis): minimize dispatch authority prompts |
+| `b680208` | feat(agent-tasks): add bounded conversation history paging |
+| `8071409` | feat(task-ui): add bounded conversation detail interactions |
+
+### Testing
+
+- [OK] pnpm check：1591/1591 通过。
+- [OK] Task UI/shared scroll 独立审查后自然退出测试 102/102 通过；真实 tmux 组件挂载验收通过，物理鼠标仍未运行。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 如需在真实子代理和物理鼠标环境中进一步验收，使用已部署资源重启 Pi 后执行。
+
+
+## Session 48: Clarify status-bar cache metrics
+<!-- trellis-session: v=2 fp=588fac81f455e39c -->
+
+**Date**: 2026-10-20
+**Task**: Clarify status-bar cache metrics
+**Branch**: `main`
+
+### Summary
+
+Clarified latest-request and session cache metrics in the unified status bar, with optimizer-absent coverage.
+
+### Main Changes
+
+- Moved the latest request hit rate into a concise req chip after the optional optimizer aggregate; removed the ambiguous H label.
+- Added status-bar rendering regressions for optimizer present/absent states and width safety.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a0429fb` | fix(status-bar): clarify cache metric scopes |
+| `8ac5387` | chore(task): archive 10-20-status-bar-cache-metrics |
+
+### Testing
+
+- [OK] node --test extensions/__tests__/status-bar.test.ts (2 passed)
+- [OK] pnpm typecheck
+- [OK] pnpm test (1593 passed)
+
+### Status
+
+[OK] **Completed**
+
+
+## Session 49: 完成子 Agent 重启恢复与人工冒烟验证
+<!-- trellis-session: v=2 fp=2952013526b4a69a -->
+
+**Date**: 2026-10-20
+**Task**: 完成子 Agent 重启恢复与人工冒烟验证
+**Branch**: `main`
+
+### Summary
+
+完成持久化 registry、逐层恢复和公开 agent_id 迁移；在 tmux 中用真实 Pi 会话验证退出中断、重启恢复和 @agent 输入。
+
+### Main Changes
+
+- 持久化顶层与嵌套 Agent registry，Pi 重启后保持 agent_id 并由直属父级恢复。
+- 将公开管理、RPC、UI、提醒和 Task Panel 迁移到 agent_id，workflow 保留 execution_id。
+- 修复 @agent 补全前缀并记录真实 tmux 冒烟验证。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b9a9742` | feat(subagents): persist agent instance registry |
+| `e32d56f` | feat(subagents): recover persisted agent sessions |
+| `4d2c417` | feat(subagents): migrate public identity to agent IDs |
+| `1b26075` | fix(subagents): restore agent mention autocomplete |
+| `746f852` | docs(task): record subagent smoke verification |
+| `f81d245` | chore(task): archive 10-20-subagent-restart-recovery |
+
+### Testing
+
+- [OK] 跨层自动化回归：464 passed, 0 failed；后续 Agent/Task UI 回归：384 passed, 0 failed。
+- [OK] pnpm typecheck、git diff --check 通过；真实 Pi tmux 冒烟验证通过。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 任务已归档；无需继续实现，后续仅按需要观察真实使用反馈。
+
+
+## Session 50: 完成统一工具卡片与后台通知渲染
+<!-- trellis-session: v=2 fp=edbf90b166d42704 -->
+
+**Date**: 2026-10-21
+**Task**: 完成统一工具卡片与后台通知渲染
+**Branch**: `main`
+
+### Summary
+
+完成公共工具/通知卡片、agent/process/monitor/Trellis Check 适配和 process_manage 缺失 task_id 文案修复；已在无 PR 的 main 任务记录下归档。
+
+### Main Changes
+
+- 新增公共 card primitives、generic/cooperative tool cards 与 activation-owned timing。
+- 迁移 agent、nested agent、monitor、workflow、reply/notice、process notifications 与 Trellis Check 报告。
+- 修复 process_manage 缺失 task_id 时误报 agent 身份字段的问题。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `817cfb7` | feat(beautify): add reusable card primitives |
+| `221b358` | feat(beautify): add generic tool card rendering |
+| `698e4b6` | docs(trellis): record S2 verification |
+| `53ef147` | feat(agent-tasks): adopt public subagent card |
+| `9409042` | feat(agent-tasks): render nested agent cards |
+| `91eeed9` | feat(process-tasks): render monitor tool cards |
+| `71addc6` | feat(agent-tasks): render live workflow cards |
+| `4d530aa` | docs(trellis): record S3 verification |
+| `ee697d7` | docs(trellis): refine S4 notification scope |
+| `5d2e6a5` | feat(beautify): add notification card primitive |
+| `2b2d1b6` | feat(process-tasks): render notification cards |
+| `f80b8b5` | feat(trellis): render diagnostic report cards |
+| `f779168` | test(beautify): fix monitor card host fixture |
+| `a9985f3` | fix(runtime-tasks): report missing process task id |
+| `56e6a86` | docs(trellis): record S5a validation |
+| `6a66575` | chore(task): archive 10-20-unified-tool-rendering |
+
+### Testing
+
+- [OK] pnpm check: 1609/1609 PASS；focused management validation: 21/21 PASS。
+- [OK] 隔离 tmux 实际 Pi CLI 加载当前 checkout，在 100/40 列验证 process/agent missing-ID card 文案与正常退出。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 任务已归档；无待办。
+
+
+## Session 51: 统一 Widget 与 Footer 展示规范
+<!-- trellis-session: v=2 fp=daed41f9a9498e67 -->
+
+**Date**: 2026-10-21
+**Task**: 统一 Widget 与 Footer 展示规范
+**Branch**: `main`
+
+### Summary
+
+完成region/group/item注册、block/inline组合与Footer迁移，删除/statusbar；独立审查后合并main，全量1619/1619通过，隔离tmux效果验证完成，任务归档并释放worktree。
+
+### Main Changes
+
+- Agent概览位于token信息之后，零空行，原状态栏统一接入。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `590246f` | feat(display): unify widget and footer group composition |
+| `7ca07ab` | docs(display): define footer composition contracts and verification |
+| `0b5f8eb` | Merge unified footer display |
+
+### Testing
+
+- [OK] 独立review focused53/53、broader160/160自然退出；原全量missing task_id失败在main独立修复后，合并working tree全量1619/1619及strict tsc通过。
+- [OK] Pi1.3.0隔离offline tmux宽/窄/resize/empty及最终代码加载通过；ANSI渲染PNG保留，临时进程已退出。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 无push或个人reload；其他会话动画与journal改动保留。journal混有并行内容，本次no-commit记录不提交整文件。
+
+
+## Session 52: 精简 Agent 运行时标签
+<!-- trellis-session: v=2 fp=af09ab008ed51abc -->
+
+**Date**: 2026-10-21
+**Task**: 精简 Agent 运行时标签
+**Branch**: `main`
+
+### Summary
+
+将 Task Panel、footer 与 @agent:resume 自动补全统一为 general-purpose-2 短名；旧下划线简写不再兼容，完整 agent_id 保持管理与诊断身份。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7a3ee61` | chore(task): archive 10-21-shorten-agent-runtime-labels |
+
+### Status
+
+[OK] **Completed**
+
+
+## Session 53: 同步 pi-btw 并收尾任务概览动画
+<!-- trellis-session: v=2 fp=36215a30df45ac8a -->
+
+**Date**: 2026-10-21
+**Task**: 同步 pi-btw 并收尾任务概览动画
+**Branch**: `main`
+
+### Summary
+
+将 pi-btw 纳入预设同步清单，验证未来同步安装计划；归档该任务及已验证完成的任务概览低频动画任务。
+
+### Main Changes
+
+- 在 pi-preset.json 声明 npm:@narumitw/pi-btw: latest，添加中文说明和同步隔离回归。
+- 归档 10-20-sync-pi-btw 与 10-21-task-overview-spinner（均为未 PR-backed 的 main 任务）。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a9d5030` | feat(preset): sync pi-btw package |
+| `ef07f54` | chore(task): archive 10-20-sync-pi-btw |
+| `9076ea8` | feat(task-ui): animate active overview status indicators |
+| `60274ee` | chore(task): archive 10-21-task-overview-spinner |
+
+### Testing
+
+- [OK] [OK] node --test scripts/sync.test.mjs：7 PASS；JSON 解析、README 链接断言与 git diff --check 通过。
+- [OK] [OK] 任务概览动画在 9076ea8 中已记录 task-ui 定向 133 PASS 与 pnpm check 1623 PASS。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 未运行个人 Pi 同步、/reload 或真实 TUI 验收；按任务范围保留。

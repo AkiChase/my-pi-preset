@@ -20,6 +20,9 @@ export const DEFAULT_AGENTS: Map<string, AgentConfig> = new Map([
       // Setting them to false would lock callsite intent (see resolveAgentInvocationConfig in invocation-config.ts).
       extensions: true,
       skills: true,
+      // General-purpose agents may delegate one bounded nested layer. The
+      // project-wide maxSubagentDepth (default 2) prevents further descent.
+      allowedSubagents: "all",
       systemPrompt: "",
       promptMode: "append",
       isDefault: true,

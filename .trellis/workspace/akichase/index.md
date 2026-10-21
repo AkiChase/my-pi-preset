@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 46
-- **Last Active**: 2026-10-20
+- **Total Sessions**: 53
+- **Last Active**: 2026-10-21
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1537 | Active |
+| `journal-1.md` | ~1802 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,13 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 53 | 2026-10-21 | 同步 pi-btw 并收尾任务概览动画 | `a9d5030`, `ef07f54`, `9076ea8`, `60274ee` | `main` |
+| 52 | 2026-10-21 | 精简 Agent 运行时标签 | `7a3ee61` | `main` |
+| 51 | 2026-10-21 | 统一 Widget 与 Footer 展示规范 | `590246f`, `7ca07ab`, `0b5f8eb` | `main` |
+| 50 | 2026-10-21 | 完成统一工具卡片与后台通知渲染 | `817cfb7`, `221b358`, `698e4b6`, `53ef147`, `9409042`, `91eeed9`, `71addc6`, `4d530aa`, `ee697d7`, `5d2e6a5`, `2b2d1b6`, `f80b8b5`, `f779168`, `a9985f3`, `56e6a86`, `6a66575` | `main` |
+| 49 | 2026-10-20 | 完成子 Agent 重启恢复与人工冒烟验证 | `b9a9742`, `e32d56f`, `4d2c417`, `1b26075`, `746f852`, `f81d245` | `main` |
+| 48 | 2026-10-20 | Clarify status-bar cache metrics | `a0429fb`, `8ac5387` | `main` |
+| 47 | 2026-10-20 | 精简派发上下文并改进任务面板体验 | `17a9546`, `b680208`, `8071409` | `main` |
 | 46 | 2026-10-20 | 完成 Task Viewer 文档优先与归档浏览 | `093ab67`, `c82b3ec` | `main` |
 | 45 | 2026-10-20 | 完成子代理与父代理中途消息 | `27ab63b`, `84b768d`, `85c3fdd`, `937f238`, `b60fed8`, `77f730d` | `main` |
 | 44 | 2026-10-19 | 恢复 Trellis 小任务分流与 AGENTS 区块更新 | `8555152`, `859d132`, `24c5045`, `c2445a2` | `main` |
