@@ -101,4 +101,6 @@ Commit only after direct Herdr state tests, declaration discovery, full typechec
 - **Task context:** `check.jsonl` validates with three curated entries. `implement.jsonl` remains intentionally empty because implementation was performed by the main session; task start used `--allow-empty-context` accordingly.
 - **Commit checkpoint:** `98e9e61 feat(herdr): report Pi state directly`.
 
-_Final Git review is pending; the real host migration remains intentionally unrun._
+- **Final Git review:** completed after `bcff5c5 docs(spec): capture extension sync and Herdr contracts`; working tree was clean and `git diff --check` passed. The implementation commits are `74327e1`, `98e9e61`, and `bcff5c5`.
+
+_The real host migration remains intentionally unrun._
