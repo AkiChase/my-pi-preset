@@ -33,13 +33,12 @@ export function taskDot(view: TaskView): string {
 }
 export function taskStatusColor(view: TaskView): Parameters<Theme["fg"]>[0] {
     switch (view.status) {
-        case "running": return "accent";
-        case "starting": case "paused": return "warning";
+        case "starting": case "running": return "accent";
         case "queued": return "muted";
+        case "paused": case "interrupted": return "warning";
         case "completed": return "success";
         case "failed": return "error";
         case "stopped": return "dim";
-        case "interrupted": return "warning";
     }
 }
 export function taskDuration(view: TaskView, now = Date.now()): string | undefined {

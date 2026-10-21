@@ -3,7 +3,7 @@ import { it } from "node:test";
 import { visibleWidth, stripTerminalSequences } from "@earendil-works/pi-tui";
 import { taskKey, type TaskView } from "../types.ts";
 import { TaskPanelModel } from "../model.ts";
-import { cleanTaskText, taskDot, taskDuration, taskLine, taskTokens, taskTitle } from "../presentation.ts";
+import { cleanTaskText, taskDot, taskDuration, taskLine, taskStatusColor, taskTokens, taskTitle } from "../presentation.ts";
 
 const theme = { fg: (_: string, text: string) => text, bg: (_: string, text: string) => `\u001b[44m${text}\u001b[0m` };
 function view(id: string, patch: Partial<TaskView> = {}): TaskView {
@@ -27,6 +27,7 @@ void it("status dots are execution-state based and selected styling does not cha
         const row = view(status, { status, waitCount: 2, stats: { tokens: 1234, durationMs: 61200 } });
         const dot = { starting: "●", queued: "○", running: "●", paused: "Ⅱ", completed: "✓", failed: "✕", stopped: "■" }[status];
         assert.equal(taskDot(row), dot);
+        assert.equal(taskStatusColor(row), ({ starting: "accent", running: "accent", queued: "muted", paused: "warning", completed: "success", failed: "error", stopped: "dim" }[status]));
         const selected = taskLine(row, 100, theme, { selected: true });
         assert.equal(stripTerminalSequences(selected), taskLine(row, 100, theme));
         assert.ok(selected.startsWith("\u001b[44m"));
@@ -130,6 +131,6 @@ void it("all lifecycle symbols/colors remain readable without animation", () => 
         assert.doesNotMatch(plain, /\[(?:queued|starting|running|paused|completed|failed|stopped)\]|waiting/);
         assert.equal(taskDot(row), status === "starting" || status === "running" ? "●" : ({ queued: "○", paused: "Ⅱ", completed: "✓", failed: "✕", stopped: "■" }[status] ?? ""));
     }
-    assert.ok(seen.includes("muted")); assert.ok(seen.includes("warning")); assert.ok(seen.includes("accent"));
+    assert.ok(seen.includes("muted")); assert.ok(seen.includes("accent"));
     assert.ok(seen.includes("success")); assert.ok(seen.includes("error")); assert.ok(seen.includes("dim"));
 });
