@@ -13,7 +13,7 @@
 - [At Path Completion](extensions/at-path-completion.md)
 - [Status Bar](extensions/status-bar.md)
 - [SSE Normalize](extensions/sse-normalize.md)
-- [Blocked Signal](extensions/blocked-signal.md)
+- [Herdr State：向 Herdr 上报 Pi 状态](extensions/herdr-state.md)
 - [Trellis：项目任务与工作流](extensions/trellis.md)
 - [Memory：项目记忆](extensions/memory.md)
 

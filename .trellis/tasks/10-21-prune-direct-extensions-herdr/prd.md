@@ -20,7 +20,7 @@
 
 - 创建 Trellis 任务并完成设计后实施。
 - `--prune` 应全量清理未被清单声明的、可由 Pi 从用户扩展目录直接加载的手工扩展；用户接受该清理的完整范围。
-- 仅把可加载扩展及其明确归属的侧车文件视为本次新清理域；非加载型 JSON 配置（包括 `pi-recap.json`）不因该域被删除。
+- 仅把可加载扩展入口视为本次新清理域；非加载型 JSON 配置（包括 `pi-recap.json`）和其他未知文件不因该域被删除。
 - 将 Herdr 专用行为重构为本预设内置的 `extensions/herdr-state.ts`，由该扩展直接连接 Herdr，而不是经 `herdr:blocked` 事件委托给手工 Herdr 扩展。
 - 遗留 `herdr-agent-state.ts` 仅在用户显式执行 `--prune` 时删除；不为未清理的旧文件提供运行时检测、事件桥接、禁用或其他兼容逻辑。用户将通过 prune 后 reload / 重启完成迁移。
 
@@ -50,13 +50,13 @@
 
 ## Acceptance Criteria
 
-- [ ] `./install.sh --sync <new-domain> --prune <new-domain> --dry-run` 能识别用户扩展目录中的直接 `.ts` / `.js` 扩展以及直接入口子目录，不修改文件，并逐项输出计划。
-- [ ] 在 prune 模式下，未声明的手工可加载扩展会被删除；非加载型 `pi-recap.json` 保留不变；在 merge 模式下二者均保持不变。
-- [ ] 裸 `./install.sh --prune --dry-run` 将新域显示为 prune 模式。
-- [ ] 新的 `extensions/herdr-state.ts` 可在 Herdr 环境中直接报告 session、working、blocked、idle，而无需已加载的 `herdr-agent-state.ts` 或中间 `herdr:blocked` 事件。
-- [ ] 用户先执行 prune 并 reload / 重启后的迁移路径已验证：旧 Herdr 文件消失，新直连实现加载；不测试或支持旧文件仍存在时的兼容运行。
-- [ ] cmux 专用实现、文档和测试已移除，且仓库类型检查、完整测试套件通过。
-- [ ] 文档明确说明全量手工扩展 prune 的清理范围和用户负责恢复任何外部集成的边界。
+- [x] `./install.sh --sync <new-domain> --prune <new-domain> --dry-run` 能识别用户扩展目录中的直接 `.ts` / `.js` 扩展以及直接入口子目录，不修改文件，并逐项输出计划。
+- [x] 在 prune 模式下，未声明的手工可加载扩展会被删除；非加载型 `pi-recap.json` 保留不变；在 merge 模式下二者均保持不变。
+- [x] 裸 `./install.sh --prune --dry-run` 将新域显示为 prune 模式。
+- [x] 新的 `extensions/herdr-state.ts` 可在 Herdr 环境中直接报告 session、working、blocked、idle，而无需已加载的 `herdr-agent-state.ts` 或中间 `herdr:blocked` 事件。
+- [ ] 用户先执行 prune 并 reload / 重启后的真实宿主迁移路径未运行：该步骤会修改个人用户扩展目录，保留给用户执行；隔离测试已验证清理和新包入口发现。
+- [x] cmux 专用实现、文档和测试已移除，且仓库类型检查、完整测试套件通过。
+- [x] 文档明确说明全量手工扩展 prune 的清理范围和用户负责恢复任何外部集成的边界。
 
 ## Out of Scope
 

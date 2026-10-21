@@ -59,7 +59,7 @@ PI_BIN=/path/to/pi ./install.sh
 | [At Path Completion](docs/extensions/at-path-completion.md) | 接受 `@` 目录后继续显示原生补全候选。 |
 | [Status Bar](docs/extensions/status-bar.md) | 汇总路径、Git、上下文、用量和扩展状态。 |
 | [SSE Normalize](docs/extensions/sse-normalize.md) | 规整 SSE 响应换行，减少特定流解析错误。 |
-| [Blocked Signal](docs/extensions/blocked-signal.md) | 在受支持的终端宿主中提示正在等待用户回答。 |
+| [Herdr State](docs/extensions/herdr-state.md) | 向 Herdr 上报 Pi 的工作、等待和空闲状态。 |
 | [Trellis](docs/extensions/trellis.md) | 按任务推进开发：先规划、经批准再分阶段实施检查，验收后归档。 |
 | [Memory](docs/extensions/memory.md) | 记住项目偏好、约定与参考资料，按需读取。 |
 

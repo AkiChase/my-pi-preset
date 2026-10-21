@@ -2,7 +2,7 @@
 
 ## Authorization and Constraints
 
-- 用户已授权创建并规划本任务；尚未审阅并批准本实施计划，因此不得开始产品代码修改或执行 `task.py start`。
+- 用户已审阅并批准本实施计划；任务已启动并按阶段执行。
 - 用户明确选择全量 prune 手工扩展；不保留 cmux 支持，也不保留遗留 Herdr 脚本的运行时兼容逻辑。
 - 默认工作流允许每个已验证阶段创建本地提交；不授权 push、依赖安装、实际个人 Pi 同步、reload 或 Herdr 集成安装。
 - 所有命令输出使用本次任务在仓库外创建的临时目录；仅将最终命令、退出码、失败和 rerun 关系记录到本文件。
@@ -83,5 +83,18 @@ Commit only after direct Herdr state tests, declaration discovery, full typechec
   - `git diff --check` — PASS.
 - **Earlier failure retained:** during independent review, a first rerun failed only because the unreadable-root fixture's temporary-directory cleanup occurred before its permissions were restored (`ENOTEMPTY`); the fixture cleanup order was fixed and the rerun passed.
 - **Raw output:** retained during the task in the owned external directory `/tmp/my-pi-preset-prune-extensions.2SznWq`; no raw logs were copied into the repository.
+- **Commit checkpoint:** `74327e1 feat(sync): prune direct user extensions`。
 
-_No implementation has started for Stage 2._
+### Stage 2 — direct Herdr state extension
+
+- **Result:** PASS after main-session implementation and an independent `trellis-check` review.
+- **Behavior delivered:** replaced the event-forwarding extension with `extensions/herdr-state.ts`, which directly reports session, working, blocked and idle state through the Herdr protocol. The implementation owns prompt/questionnaire tracking, state coalescing, socket retry/failure isolation and shutdown fencing. It intentionally contains no compatibility branch for the old hand-placed reporter and no non-Herdr host path.
+- **Checks:**
+  - `node --test extensions/__tests__/herdr-state.test.ts scripts/pi-manifest.test.mjs` — PASS.
+  - `pnpm check` under an owned temporary user agent directory — PASS, 1,619 tests, exit 0.
+  - independent `trellis-check` protocol/template, lifecycle, documentation-link and diff review — PASS; no scoped defects found.
+  - `git diff --check` — PASS.
+- **Known limit:** no real Herdr socket server and no real Pi reload were invoked; direct protocol behavior is covered with the typed transport seam and compared against the local Herdr v9 template.
+- **Raw output:** retained during the task in `/tmp/my-pi-preset-prune-extensions.2SznWq` and the reviewer-owned `/tmp/my-pi-preset-herdr-review.zAVpYx`; no raw logs were copied into the repository.
+
+_Stage 2 commit and final Git review are pending._
