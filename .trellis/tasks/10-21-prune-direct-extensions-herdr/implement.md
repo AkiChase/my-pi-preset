@@ -97,4 +97,8 @@ Commit only after direct Herdr state tests, declaration discovery, full typechec
 - **Known limit:** no real Herdr socket server and no real Pi reload were invoked; direct protocol behavior is covered with the typed transport seam and compared against the local Herdr v9 template.
 - **Raw output:** retained during the task in `/tmp/my-pi-preset-prune-extensions.2SznWq` and the reviewer-owned `/tmp/my-pi-preset-herdr-review.zAVpYx`; no raw logs were copied into the repository.
 
-_Stage 2 commit and final Git review are pending._
+- **Spec capture:** added `.trellis/spec/development/direct-user-extensions.md` and `.trellis/spec/development/herdr-state.md`, linked from the development index. They record the CLI/env contracts, destructive boundaries, error matrices and required regression assertions.
+- **Task context:** `check.jsonl` validates with three curated entries. `implement.jsonl` remains intentionally empty because implementation was performed by the main session; task start used `--allow-empty-context` accordingly.
+- **Commit checkpoint:** `98e9e61 feat(herdr): report Pi state directly`.
+
+_Final Git review is pending; the real host migration remains intentionally unrun._

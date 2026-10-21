@@ -14,6 +14,8 @@ Preserve vendor originals, exact baselines, licenses and intentional local devia
 
 ## Extension Execution and State
 
+For direct Herdr state reporting, follow [Herdr State Extension Contract](herdr-state.md).
+
 - Keep one execution owner per tool. Appearance adapters do not re-register execution or alter model-visible results. Recognize narrow verified optional renderer envelopes and delegate unknown formats; preserve execution/result state, partial-to-final behavior and host shell/background contracts.
 - Validate schemas and untrusted input before effects. Fixed parameter objects (including nested fixed objects) use `additionalProperties: false`; keep free-form script data open. Tool names and display labels use lowercase snake_case.
 - Host `validateToolArguments` converts before validation: `Type.Integer` can truncate `1.5` to `1`. For integer-only input, use `Type.Number({ multipleOf: 1, ...bounds })` and retain direct-call safe-integer checks; verify numeric and string fractions against the actual host validator. String scalar conversion and optional-null normalization are host behavior, not proof of raw input validity.
@@ -78,6 +80,8 @@ Use injected themes and SDK terminal-column helpers, not string length/hard-code
 Task Panel operations beyond stop (steer, workflow pause/resume, child skip/retry) are optional `TaskView.capabilities` flags plus optional `TaskSource.steer/control`. The source computes flags from the same current-window predicate it rechecks inside the action; the coordinator routes only to an identity that `list()` still advertises; panels gate keys and footer hints on the flags and target the identity captured at key press or composer open. Results show through view state, never inserted feedback rows that shift fixed layout. Structured detail (`TaskDetail.conversation`) is bounded, unstyled external text built by the source; the panel sanitizes before styling.
 
 ## Synchronization and Configuration Safety
+
+For direct user-extension pruning, follow [Direct User Extension Sync Contract](direct-user-extensions.md).
 
 `pi-preset.json` owns desired state; `install.sh` bootstraps and delegates to dependency-free `scripts/sync.mjs`, including downloaded installer use. User commands/action tables belong in README, not another sync manual.
 
