@@ -8,7 +8,7 @@ export interface TaskUIConfig {
     readonly shortcutTaskPanel: ShortcutBinding;
     /** Empty focused editor Down opens the panel; independent of explicit chords. */
     readonly downOpener: boolean;
-    /** Animate active-task status indicators in an open panel. */
+    /** Animate active-task status indicators in the overview and open panel. */
     readonly animations?: boolean;
     /** Main-model requests between background-task reminders; 0 disables periodic reminders. */
     readonly backgroundReminderInterval: number;

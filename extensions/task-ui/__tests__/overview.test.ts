@@ -16,20 +16,20 @@ function view(id: string, patch: Partial<TaskView> = {}): TaskView {
     return { ...identity, key: taskKey(identity), kind: "agent", title: `alias-${id}`, description: `Description ${id}`, status: "running", executionMode: "background", waitCount: 0,
         startedAt: 100_000, stats: { tokens: 12 }, artifacts: [], capabilities: { stop: true, details: true }, ...patch };
 }
-function fixture(display = true, shortcutBackground = DEFAULTS.shortcutBackground) {
+function fixture(display = true, shortcutBackground = DEFAULTS.shortcutBackground, animations = true) {
     const handlers = new Map<string, Set<(event: never, ctx: ExtensionContext) => unknown>>();
     const pi = { events: createEventBus(), on(event: string, handler: (event: never, ctx: ExtensionContext) => unknown) {
         const set = handlers.get(event) ?? new Set(); set.add(handler); handlers.set(event, set); return () => { set.delete(handler); };
     } } as unknown as ExtensionAPI;
     const terminal = { columns: 100, rows: 24 }, widgets = new Map<string, Component>();
-    let status: string | undefined, writes = 0, reenter: (() => void) | undefined;
+    let status: string | undefined, writes = 0, renders = 0, refreshes = 0, reenter: (() => void) | undefined;
     const ctx = { sessionManager: SessionManager.inMemory("/tmp"), hasUI: true, mode: "tui", ui: { theme,
         setStatus(_key: string, text: string | undefined) { status = text; },
         setFooter(content: unknown) {
             const key = "preset.footer";
             const old = widgets.get(key) as Component & { dispose?(): void } | undefined; old?.dispose?.();
             widgets.delete(key); writes++;
-            if (typeof content === "function") widgets.set(key, content({ terminal, requestRender() {} }, theme));
+            if (typeof content === "function") widgets.set(key, content({ terminal, requestRender() { renders++; } }, theme));
             reenter?.();
         },
         setWidget(key: string, content: unknown) {
@@ -42,13 +42,13 @@ function fixture(display = true, shortcutBackground = DEFAULTS.shortcutBackgroun
     const coordinator = new TaskCoordinator(), lifecycle = new TaskLifecycle(coordinator);
     let views: readonly TaskView[] = [], reads = 0;
     const listeners = new Set<() => void>();
-    const source: TaskSource = { sourceId: "overview", revision: 0, list: () => views, detail() { reads++; throw new Error("overview may not read detail"); }, stop: () => false,
+    const source: TaskSource = { sourceId: "overview", revision: 0, list: () => { refreshes++; return views; }, detail() { reads++; throw new Error("overview may not read detail"); }, stop: () => false,
         subscribe(fn) { listeners.add(fn); return () => { listeners.delete(fn); }; }, dispose() { listeners.clear(); } };
     coordinator.registerSource(source);
-    const owner = createTaskUIOwner(pi, coordinator, lifecycle, { ...DEFAULTS, shortcutBackground });
+    const owner = createTaskUIOwner(pi, coordinator, lifecycle, { ...DEFAULTS, shortcutBackground, animations });
     function emit(event: string, fresh = ctx) { for (const handler of [...handlers.get(event) ?? []]) handler({} as never, fresh); }
     emit("session_start");
-    return { ctx, terminal, coordinator, lifecycle, owner, widgets, emit, reads: () => reads, writes: () => writes, status: () => status,
+    return { ctx, terminal, coordinator, lifecycle, owner, widgets, emit, reads: () => reads, refreshes: () => refreshes, renders: () => renders, writes: () => writes, status: () => status,
         publish(next: readonly TaskView[]) { views = next; for (const fn of listeners) fn(); },
         render(width = terminal.columns) { return [...widgets.values()].flatMap(component => component.render(width)); },
         reenter(fn?: () => void) { reenter = fn; },
@@ -194,5 +194,91 @@ it("theme/resize use current presentation; synchronous session reset during publ
         assert.equal(f.widgets.size, 0); assert.equal(f.status(), undefined);
         const writes = f.writes(); t.mock.timers.tick(10000); assert.equal(f.writes(), writes);
         assert.equal(f.reads(), 0);
+    } finally { f.dispose(); }
+});
+
+it("overview frames animate only real active states with static fallback and unchanged layout", () => {
+    for (const status of ["starting", "running", "queued", "paused", "completed", "failed", "stopped", "interrupted"] as const) {
+        const root = view(status, { status });
+        const first = overviewLines([root], 100, 24, theme, 100_000, 0)[0];
+        const next = overviewLines([root], 100, 24, theme, 100_000, 1)[0];
+        if (status === "starting" || status === "running") {
+            assert.match(first, /^⠋ /); assert.match(next, /^⠙ /);
+            assert.match(overviewLines([root], 100, 24, theme, 100_000)[0], /^◌ /);
+        } else assert.equal(first, next);
+        assert.equal(visibleWidth(first), 100);
+    }
+});
+it("visible active roots share one aligned clock across source events and stop at non-active states", t => {
+    t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 100_000 });
+    const f = fixture();
+    try {
+        f.publish([view("a", { status: "starting" }), view("b")]);
+        assert.ok(f.render().every(line => line.startsWith("⠋ ")));
+        const reads = f.refreshes(), renders = f.renders(), writes = f.writes();
+        t.mock.timers.tick(100);
+        f.publish([view("a"), view("b")]);
+        t.mock.timers.tick(149); assert.ok(f.render().every(line => line.startsWith("⠋ ")));
+        t.mock.timers.tick(1); assert.ok(f.render().every(line => line.startsWith("⠙ ")));
+        assert.equal(f.refreshes(), reads + 2, "one source refresh plus one shared tick, not one timer per root");
+        assert.equal(f.renders(), renders + 2, "source update and animation tick request actual host redraws");
+        assert.equal(f.writes(), writes, "animation does not reinstall the shared Footer");
+        f.publish([view("a", { status: "completed", endedAt: 100_250 }), view("b")]);
+        assert.match(f.render()[0], /^✓ /);
+        t.mock.timers.tick(250); assert.match(f.render()[1], /^⠹ /);
+        f.publish([view("a", { status: "completed", endedAt: 100_250 }), view("b", { status: "paused" })]);
+        const pausedReads = f.refreshes();
+        t.mock.timers.tick(250); assert.equal(f.refreshes(), pausedReads);
+        assert.match(f.render()[1], /^Ⅱ /);
+        f.publish([]); t.mock.timers.tick(4000);
+        const emptyReads = f.refreshes(); t.mock.timers.tick(10000); assert.equal(f.refreshes(), emptyReads);
+    } finally { f.dispose(); }
+});
+it("disabled, missing and failed displays never retain an animation clock", t => {
+    t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 100_000 });
+    for (const mode of ["disabled", "missing", "failed"] as const) {
+        const f = fixture(mode !== "missing", DEFAULTS.shortcutBackground, mode !== "disabled");
+        try {
+            if (mode === "failed") f.reenter(() => { throw new Error("sink failed"); });
+            f.publish([view(mode)]);
+            const reads = f.refreshes();
+            t.mock.timers.tick(999); assert.equal(f.refreshes(), reads);
+            if (mode === "disabled") {
+                assert.match(f.render()[0], /^◌ /);
+                t.mock.timers.tick(1); assert.equal(f.refreshes(), reads + 1, "retain the existing duration clock");
+            } else {
+                t.mock.timers.tick(10000); assert.equal(f.refreshes(), reads);
+            }
+        } finally { f.dispose(); }
+    }
+});
+it("hidden active roots do not animate while visible roots keep the existing duration clock", t => {
+    t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 100_000 });
+    const f = fixture();
+    try {
+        const roots = [...Array.from({ length: 5 }, (_, i) => view(String(i), { status: "paused" })), view("hidden")];
+        f.publish(roots);
+        const reads = f.refreshes();
+        assert.doesNotMatch(f.render().join("\n"), /alias-hidden/);
+        t.mock.timers.tick(999); assert.equal(f.refreshes(), reads);
+        // A source transition makes an existing visible root active.
+        f.publish([view("0"), ...roots.slice(1)]);
+        t.mock.timers.tick(1); assert.match(f.render()[0], /^⠼ /);
+        const visibleReads = f.refreshes(); t.mock.timers.tick(250); assert.equal(f.refreshes(), visibleReads + 1);
+        f.terminal.rows = 14;
+        f.publish([view("0", { status: "paused" }), ...roots.slice(1)]);
+        const narrowReads = f.refreshes(); t.mock.timers.tick(250); assert.equal(f.refreshes(), narrowReads);
+        f.terminal.rows = 24;
+        f.publish([view("0", { status: "starting", startedAt: undefined })]);
+        const startingReads = f.refreshes(); t.mock.timers.tick(250); assert.equal(f.refreshes(), startingReads + 1);
+        // Third-party Footer takeover retires the display lease; the next tick
+        // must stop without reinstalling our surface or retrying forever.
+        f.ctx.ui.setFooter(undefined);
+        t.mock.timers.tick(250);
+        const retiredReads = f.refreshes(), retiredWrites = f.writes();
+        t.mock.timers.tick(10000);
+        assert.equal(f.refreshes(), retiredReads); assert.equal(f.writes(), retiredWrites);
+        f.owner.dispose(); const disposedReads = f.refreshes();
+        t.mock.timers.tick(10000); assert.equal(f.refreshes(), disposedReads);
     } finally { f.dispose(); }
 });

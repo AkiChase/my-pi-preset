@@ -35,18 +35,23 @@ export class TaskOverviewModel {
     clear(): void { this.retained.clear(); }
 }
 
+/** The same conservative row budget drives rendering and visible-task animation. */
+export function overviewRootCount(rootCount: number, terminalRows: number): number {
+    const budget = Math.min(6, Math.max(1, Math.floor(terminalRows) - 12));
+    return Math.min(5, rootCount, budget - (rootCount > Math.min(5, budget) ? 1 : 0));
+}
+
 /** Public widgets have width only. Reserve most terminal rows for conversation/editor/footer;
  * the host may still shrink this dock further in an extremely crowded layout. */
-export function overviewLines(roots: readonly TaskView[], width: number, terminalRows: number, theme: TaskTheme, now: number): string[] {
+export function overviewLines(roots: readonly TaskView[], width: number, terminalRows: number, theme: TaskTheme, now: number, animationFrame?: number): string[] {
     width = Math.max(0, Math.floor(width));
     if (!width || !roots.length) return [];
-    const budget = Math.min(6, Math.max(1, Math.floor(terminalRows) - 12));
-    const count = Math.min(5, roots.length, budget - (roots.length > Math.min(5, budget) ? 1 : 0));
+    const count = overviewRootCount(roots.length, terminalRows);
     const lines = roots.slice(0, count).map(view => {
         const stats = [taskDuration(view, now), taskTokens(view.stats.tokens) === undefined ? undefined : `↓ ${taskTokens(view.stats.tokens)}`].filter(Boolean).join(" · ");
         const state = `[${view.status}${view.waitCount ? ` · waiting ${view.waitCount}` : ""}]`;
         const suffix = truncateToWidth(state + (stats ? ` ${stats}` : ""), Math.max(0, width - 3), "…");
-        const left = truncateToWidth(`${theme.fg(taskStatusColor(view), taskDot(view))} ${taskTitle(view)}`, Math.max(0, width - visibleWidth(suffix) - 1), "…");
+        const left = truncateToWidth(`${theme.fg(taskStatusColor(view), taskDot(view, animationFrame))} ${taskTitle(view)}`, Math.max(0, width - visibleWidth(suffix) - 1), "…");
         return left + " ".repeat(Math.max(0, width - visibleWidth(left) - visibleWidth(suffix))) + theme.fg(taskStatusColor(view), suffix);
     });
     if (count < roots.length) lines.push(theme.fg("dim", truncateToWidth(`+${roots.length - count} hidden`, width, "…")));

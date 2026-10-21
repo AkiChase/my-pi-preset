@@ -20,7 +20,7 @@ export function taskTitle(view: TaskView): string {
 }
 
 const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-/** Only real runtime states; callers opt into animation while their panel is open. */
+/** Only real runtime states; callers opt into animation on active UI surfaces. */
 export function taskDot(view: TaskView, frame?: number): string {
     switch (view.status) {
         case "queued": return "○";

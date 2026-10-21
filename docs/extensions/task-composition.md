@@ -2,7 +2,7 @@
 
 Task composition 把命令进程、Monitor、子 Agent 和 workflow 放进同一个任务面板。底栏按 `shell`、`monitor`、`agent`、`workflow` 显示活动和排队数量，前台任务也会计入；父任务及其子任务不会重复算作独立工作。底栏还显示实际等待数量及配置的全局解除等待入口；未绑定快捷键时显示 `/task-detach`。等待与后台运行独立，所属子任务不等于主会话正在等待。没有活动、排队或等待任务时，摘要隐藏。
 
-底部 Footer 的用量行之后通过 [Widget Display](widget-display.md) 紧接显示只读 Agent／workflow 根任务概览，不显示 Shell／Monitor，不展开子任务，也不接管输入或导航。每行优先显示任务描述，使用与面板一致的状态图标（概览中的活动状态为静态 `◌`）；耗时与 `↓ tokens` 靠右排列。最多五个根任务，小终端减少行数并提示隐藏数量；极端拥挤时 Pi 仍可能裁剪概览或底栏，隐藏数量不保证始终可见。空态隐藏，终态短暂保留四秒。
+底部 Footer 的用量行之后通过 [Widget Display](widget-display.md) 紧接显示只读 Agent／workflow 根任务概览，不显示 Shell／Monitor，不展开子任务，也不接管输入或导航。每行优先显示任务描述，使用与面板一致的状态图标（starting／running 默认播放低频 spinner，关闭动画时使用静态 `◌`）；耗时与 `↓ tokens` 靠右排列。最多五个根任务，小终端减少行数并提示隐藏数量；极端拥挤时 Pi 仍可能裁剪概览或底栏，隐藏数量不保证始终可见。空态隐藏，终态短暂保留四秒。
 
 概览使用根任务自身统计，不累加子任务。Agent tokens 包含 input、output、cacheWrite，不含 cacheRead；继续会话时 tokens 为累计值，耗时为本轮运行。Workflow 的统计可能稍有延迟。请保持 Widget Display 启用；没有共享展示入口时概览不显示，但底栏和 Task Panel 仍可使用。命令等待只由共享底栏／面板说明，没有独立命令提示。
 
@@ -49,7 +49,7 @@ Task Panel 覆盖整个终端，列表上方是 Agents（含 workflow），下�
 
 对话区分 User／Assistant，Assistant 正文按 Markdown 渲染。工具结果默认只预览最多 5 个视觉行；鼠标左键点击该条结果可单独展开／收起，展开也最多预览 40 个视觉行。没有键盘或全局展开入口。read、write、edit、bash 显示可用的路径、命令和统计；write 成功仅显示摘要，不回显写入正文。已知省略量会说明，来源未检查的额外内容只提示“additional content omitted”，不猜数量。
 
-状态图标不只靠颜色区分：queued `○`、starting／running 活动指示、paused `Ⅱ`、completed `✓`、failed `✕`、stopped `■`，文字状态始终保留。仅面板打开且有活动任务时播放轻量动画，可通过配置关闭为静态 `◌`。实际等待次数是独立的等待信息，不表示 Agent 有 waiting 执行状态。停止等操作通过状态变化体现，不额外插入提示行。
+状态图标不只靠颜色区分：queued `○`、starting／running 活动指示、paused `Ⅱ`、completed `✓`、failed `✕`、stopped `■`，文字状态始终保留。概览有可显示的活动任务、或面板打开且有活动任务时播放轻量动画，可通过配置关闭为静态 `◌`。实际等待次数是独立的等待信息，不表示 Agent 有 waiting 执行状态。停止等操作通过状态变化体现，不额外插入提示行。
 
 消息输入框打开后，所有按键都输入到框内：Enter 发送给该 Agent，Esc 取消。消息会在 Agent 当前工具执行完后送达；workflow 子 Agent 不接受直接消息。暂停 workflow 后，已在运行的 Agent 会继续完成，只是不再启动新的；跳过让该 Agent 的调用返回空结果，重试只对运行中的 Agent 有效。
 
@@ -156,7 +156,7 @@ workflow 用脚本编排多步工作，可以调用 Agent，也可以不启动 A
 
 `backgroundReminderInterval` 是[后台任务提醒](#后台任务提醒)的模型请求间隔，接受非负整数；`0` 关闭周期提醒，压缩后的提醒仍保留。无效值会记录警告并使用默认值 `8`。
 
-`animations: false` 关闭 Task Panel 的活动指示动画，仍保留静态图标和状态文字；默认 `true`，无效值会警告并回退默认。
+`animations: false` 关闭概览和 Task Panel 的活动指示动画，仍保留静态图标和状态文字；默认 `true`，无效值会警告并回退默认。
 
 空输入框 Down 不可用时仍可用 `/tasks` 或 `Shift+Down`；第三方编辑器不一定支持这个增强。
 
