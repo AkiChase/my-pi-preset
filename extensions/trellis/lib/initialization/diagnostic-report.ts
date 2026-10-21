@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Box, Text } from "@earendil-works/pi-tui";
+import { Text } from "@earendil-works/pi-tui";
+import { createNotificationCard } from "../../../beautify/notification-card.ts";
 import { DIAGNOSTIC_LIMITS, type DiagnosticReport, type DiagnosticReportLine } from "./diagnostics.ts";
 
 export const CHECK_REPORT_TYPE = "trellis-check-report";
@@ -28,7 +29,6 @@ export function diagnosticReportLines(details: unknown, content: unknown, expand
 export function registerDiagnosticReport(pi: ExtensionAPI): void {
 	pi.registerMessageRenderer(CHECK_REPORT_TYPE, (message, { expanded, outputPad }, theme) => {
 		const lines = diagnosticReportLines(message.details, message.content, expanded);
-		const box = new Box(outputPad, 1, text => theme.bg("customMessageBg", text));
 		const styled = lines.map(line => {
 			// Counts carry their own status colors; zero errors/warnings are not alerts.
 			if (!/^[✗⊘]/u.test(line.text) || line.text.includes("[")) return theme.fg(line.tone, line.text);
@@ -37,7 +37,11 @@ export function registerDiagnosticReport(pi: ExtensionAPI): void {
 				return theme.fg(tone, match);
 			});
 		});
-		box.addChild(new Text(styled.join("\n"), 0, 0));
-		return box;
+		// The diagnostic builder already owns compact/expanded selection and report
+		// budgets. Keep its rich text body opaque to the shared notification shell.
+		return createNotificationCard({
+			identity: "trellis_check",
+			body: new Text(styled.join("\n"), 0, 0),
+		}, { expanded, outputPad }, theme);
 	});
 }

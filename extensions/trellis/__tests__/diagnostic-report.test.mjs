@@ -5,7 +5,7 @@ import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {buildDiagnosticReport,formatDiagnostics,DIAGNOSTIC_LIMITS} from '../lib/initialization/diagnostics.ts';
-import {diagnosticReportLines,isDiagnosticReport,CHECK_REPORT_TYPE} from '../lib/initialization/diagnostic-report.ts';
+import {diagnosticReportLines,isDiagnosticReport,CHECK_REPORT_TYPE,registerDiagnosticReport} from '../lib/initialization/diagnostic-report.ts';
 import {registerInitCommand,ACTIONS} from '../lib/initialization/command.ts';
 const row=(status='pass',severity='info',summary=status)=>({id:summary,category:'runtime',status,severity,summary,evidence:['resource-path'],impact:'impact detail',advice:'next action'});
 const result=(items=[],omitted=0)=>({schemaVersion:1,scope:{cwd:'/project'},items,omitted,facts:{}});
@@ -55,6 +55,20 @@ test('snapshots sanitize external controls and reject unsafe restored details; f
  }
  assert.ok(Buffer.byteLength(text(diagnosticReportLines(null,'字'.repeat(20000),false)))<=DIAGNOSTIC_LIMITS.report);
 });
+
+test('notification shell preserves report-owned compact and expanded budgets without a second text preview',()=>{
+ let renderer;
+ registerDiagnosticReport({registerMessageRenderer:(_type, value)=>{renderer=value;}});
+ const report=buildDiagnosticReport(result(Array.from({length:8},(_,i)=>row('issue','error','error '+i))));
+ const theme={fg:(_tone,text)=>text,bg:(_tone,text)=>text};
+ const compact=renderer({content:text(report.expanded),details:report},{expanded:false,outputPad:0},theme).render(160).join('\n');
+ assert.match(compact,/trellis_check/);
+ assert.equal((compact.match(/\[Error\]/g)||[]).length,3);
+ assert.match(compact,/5 more items hidden/);
+ const expanded=renderer({content:text(report.expanded),details:report},{expanded:true,outputPad:0},theme).render(160).join('\n');
+ assert.equal((expanded.match(/\[Error\]/g)||[]).length,8);
+});
+
 
 test('menu Check registers renderer and publishes one persistent message, no notification/model turn',async t=>{
  const root=mkdtempSync(join(tmpdir(),'trellis-report-menu-'));t.after(()=>rmSync(root,{recursive:true,force:true}));

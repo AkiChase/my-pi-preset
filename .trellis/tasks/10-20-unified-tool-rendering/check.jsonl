@@ -46,3 +46,7 @@
 {"file": "extensions/process-tasks/monitoring.ts", "reason": "Stall and terminal notification payload ownership must remain unchanged"}
 {"file": "extensions/process-tasks/__tests__/notification-renderer.test.ts", "reason": "S4 process notification adapter card, batch, preview, and malformed-detail coverage"}
 {"file": "extensions/process-tasks/__tests__/index.test.ts", "reason": "Actual extension registration, monitor batch, lifecycle, and width safety coverage"}
+{"file": "extensions/trellis/lib/initialization/diagnostic-report.ts", "reason": "S4 diagnostic custom-message adapter and report-owned rich-body rendering"}
+{"file": "extensions/trellis/lib/initialization/diagnostics.ts", "reason": "Diagnostic line/report budget and tone source contract"}
+{"file": "extensions/trellis/lib/initialization/command.ts", "reason": "Check menu/message/toast ownership must remain unchanged"}
+{"file": "extensions/trellis/__tests__/diagnostic-report.test.mjs", "reason": "S4 diagnostic report shell, budget, menu, and renderer regression coverage"}
