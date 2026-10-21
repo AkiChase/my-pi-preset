@@ -31,6 +31,8 @@
   - `node --test extensions/agent-tasks/__tests__/*.test.ts extensions/task-ui/__tests__/*.test.ts`：PASS；随后 `pnpm check`：PASS，1623 tests / 79 suites。
   - `git diff --check`：PASS。
 - Stage 1 提交：`0921d85 feat(agent-tasks): shorten runtime agent labels`。
+- 检查路径：该变更局部、低风险且有聚焦的 parser/TaskSource/UI 覆盖，因此采用主会话自检而非独立 reviewer；这不是独立审查。
+- 最终任务校验：`task.py validate` 按预期因未使用的空 `implement.jsonl` 和 `check.jsonl` 返回 exit 1；任务已通过 `--allow-empty-context` 直接启动，未将其描述为完整 validation PASS。
 
 ### 修改范围
 
