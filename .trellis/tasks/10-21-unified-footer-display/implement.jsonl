@@ -1,0 +1,4 @@
+{"file":".trellis/spec/development/index.md","reason":"Extension ownership, SDK, UI and lifecycle constraints"}
+{"file":".trellis/spec/development/widget-display.md","reason":"Existing shared display contract to extend within approved scope"}
+{"file":".trellis/spec/testing/index.md","reason":"Offline isolation, natural-exit and actual SDK regression requirements"}
+{"file":".trellis/spec/guides/index.md","reason":"Shared development checklist"}

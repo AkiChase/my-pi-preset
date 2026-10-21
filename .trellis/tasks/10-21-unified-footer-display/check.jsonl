@@ -1,0 +1,5 @@
+{"file":".trellis/spec/development/index.md","reason":"Review public contracts, ownership and lifecycle compliance"}
+{"file":".trellis/spec/development/widget-display.md","reason":"Review shared widget and approved Footer extension boundaries"}
+{"file":".trellis/spec/testing/index.md","reason":"Verify actual SDK, isolation and natural-exit evidence"}
+{"file":".trellis/spec/testing/tmux.md","reason":"Review authorized real terminal isolation and evidence limitations"}
+{"file":".trellis/spec/guides/index.md","reason":"Review cross-layer and reuse checklist"}

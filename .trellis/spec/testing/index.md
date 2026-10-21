@@ -92,9 +92,9 @@ Use the runtime-tasks, process-tasks, task-ui, Agent tool-waits/backend-waits/lo
 
 Test public tool labels and registered renderCall through the shared heading component with narrow/wide Unicode, plain/control text, folded/expanded and no Beautify activation/global theme. Compare public v2 identities across launch/list/results/notifications; historical renderer fallback is not a legacy execution alias. Monitor tests must assert host and direct-call rejection before registry/source effects, positive finite optional times and command/ws XOR, while preserving cadence, silence, termination and session cleanup.
 
-## Shared Widget Display Checks
+## Shared Widget and Footer Display Checks
 
-Run `node --test extensions/shared/widget-display/__tests__/*.test.ts extensions/__tests__/widget-*.test.ts scripts/pi-manifest.test.mjs` under the isolation rules above. Also run affected consumer tests when changing their integration. The boundary test enforces the [shared widget contract](../development/widget-display.md); detailed scenarios belong in test code. Fake UI sinks do not establish real terminal appearance.
+Run `node --test extensions/shared/widget-display/__tests__/*.test.ts extensions/__tests__/widget-*.test.ts extensions/__tests__/status-bar.test.ts scripts/pi-manifest.test.mjs` under the isolation rules above. Also run affected Task UI, Recap and Trellis consumer tests. Verify region/group/item order, shared block/inline groups, independent leases, empty groups/separators, ANSI/Unicode wrap/truncate, non-TUI boundaries and existing metric/status semantics. Actual installed SDK Footer factory/setter/reset/dispose and both lifecycle registration orderings must pass; third-party takeover cannot be cleared or reclaimed. The production boundary test enforces the exact owner for both setters under the [shared display contract](../development/widget-display.md). Detailed scenarios belong in test code. Fake UI sinks do not establish real terminal appearance; isolated tmux verification is a separate evidence layer.
 
 ## Reporting and Documentation Gates
 
