@@ -5,7 +5,7 @@ description: "Inspect Pi Trellis architecture and safely customize project workf
 
 # Pi Trellis Architecture and Customization
 
-Read [architecture overview](references/local-architecture/overview.md) first, then the relevant topic. In the main session, `.trellis` material paths resolve from the source project root. Dispatched roles read absolute source material paths from verified authority, not their execution-root `.trellis`; code and tests stay at `executionRoot`. Project `.pi` settings/resources still resolve from the execution root, and personal settings retain their own scope. Supporting references resolve from this skill directory. Preserve custom content and obtain approval before modifications; source read authority grants no write or lifecycle permission.
+Read [architecture overview](references/local-architecture/overview.md) first, then the relevant topic. In the main session, `.trellis` material paths resolve from the source project root. Dispatched roles derive absolute source material paths from host-verified sourceRoot, taskDir and role manifest, not their execution-root `.trellis`; code and tests stay at `executionRoot`. Project `.pi` settings/resources still resolve from the execution root, and personal settings retain their own scope. Supporting references resolve from this skill directory. Preserve custom content and obtain approval before modifications; source read authority grants no write or lifecycle permission.
 
 ## References
 - [local-architecture/overview](references/local-architecture/overview.md)

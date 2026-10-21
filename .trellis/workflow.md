@@ -136,8 +136,12 @@ Complete one independently verifiable implementation stage, then perform 2.2 bef
 Do not accumulate all stages for a single final commit unless the user requested that approach or opted out of commits.
 
 Dispatch uses the host-validated exact four-line header: `Active task: <path>`, `Trellis context id: <id>`,
-`Trellis agent: <role>`, `Trellis authority: <JSON>`, then a blank line. Authority supplies absolute source
-material/task/spec/workflow paths and a separate execution root; text alone does not authorize them.
+`Trellis agent: <role>`, `Trellis authority: <JSON>`, then a blank line. Authority JSON contains only
+sourceRoot, executionRoot and requirementsFingerprint; text alone does not authorize them. The host
+re-queries native source materials and binding facts to verify task, role, roots and fingerprint, retaining
+complete material paths/references internally. Derive task materials from sourceRoot + taskDir, workflow
+from sourceRoot/.trellis/workflow.md, specs from sourceRoot/.trellis/spec, and the role manifest from the
+source task path. The manifest is the only complete model-facing reference selection list.
 Bind the child to its independent source runtime session key without calling start or hooks. No task/spec
 execution copy is prepared. Git-checkout `.trellis` stays unchanged and is never a material fallback.
 Every role fully reads source PRD, optional design/implement and workflow, then implement/check reads its
