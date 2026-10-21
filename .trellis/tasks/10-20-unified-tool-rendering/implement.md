@@ -115,7 +115,9 @@
 
 **提交检查点**：agent delivery 与 process/Trellis 范围可以分别提交；每个提交都有对应 renderer 及 owner 边界测试。
 
-**S4a notification primitive + parent entry（已完成，待 scoped commit）**：新增无注册副作用的 `createNotificationCard()`，只拥有 `customMessageBg` shell、共享标题、`outputPad` 与 plain-text 的真实物理行预览；rich body 原样交由 producer。`renderSubagentMessageCard()` 改用该 adapter，标题为 `subagent_message` + label + reply/notice marker。未修改 `appendEntry`、hold/timer、`take`、`sendMessage`、wait 匹配或 `formatHeldMessages`；用户已接受 entry 与 held result 同时可见时的重复。`node --test extensions/beautify/__tests__/notification-card.test.ts extensions/agent-tasks/__tests__/parent-delivery.test.ts`（14/14 PASS，natural exit）、`pnpm typecheck`、`git diff --check` 通过；独立 check PASS。真实终端视觉 NOT_RUN。
+**S4a notification primitive + parent entry（已完成，提交 `5d2e6a5`）**：新增无注册副作用的 `createNotificationCard()`，只拥有 `customMessageBg` shell、共享标题、`outputPad` 与 plain-text 的真实物理行预览；rich body 原样交由 producer。`renderSubagentMessageCard()` 改用该 adapter，标题为 `subagent_message` + label + reply/notice marker。未修改 `appendEntry`、hold/timer、`take`、`sendMessage`、wait 匹配或 `formatHeldMessages`；用户已接受 entry 与 held result 同时可见时的重复。`node --test extensions/beautify/__tests__/notification-card.test.ts extensions/agent-tasks/__tests__/parent-delivery.test.ts`（14/14 PASS，natural exit）、`pnpm typecheck`、`git diff --check` 通过；独立 check PASS。真实终端视觉 NOT_RUN。
+
+**S4b process/monitor notifications（已完成，待 scoped commit）**：`extensions/process-tasks/notification-renderer.ts` 作为 presentation-only adapter 接入已存在的 custom-message renderer。正常 process terminal 保留现有 `failureTailLinesShown` collapsed 预算、expanded 下保留全部已交付 tail；monitor 单源和 stall 使用公共三物理行 preview；monitor batch 仍是一张中性 batch card，不虚构 aggregate terminal state，body 保留每个 source 的原状态与 manifest/overflow 文本。未改 `notify.ts`、`monitor-notifications.ts` 或 `monitoring.ts` 的 delivery、batch、manifest、`outcomeSurfaced`、retry/wait 语义。`node --test extensions/process-tasks/__tests__/notification-renderer.test.ts extensions/process-tasks/__tests__/index.test.ts`（12/12 PASS，natural exit）、`pnpm typecheck`、`git diff --check` 通过；独立 check PASS。真实终端视觉 NOT_RUN。
 
 ### S5：集成、独立检查与收尾评估
 

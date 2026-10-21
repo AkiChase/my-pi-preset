@@ -91,7 +91,7 @@ const uiCtx = {
         notify() {},
         setWidget() {},
         setStatus() {},
-        theme: { fg: (_c: string, t: string) => t },
+        theme: { fg: (_c: string, t: string) => t, bg: (_c: string, t: string) => t },
     },
 };
 
@@ -190,16 +190,18 @@ after(() => {
 });
 
 test("AC10: monitor progress and terminal renderer show identity/state/log/omissions, width/control safe", () => {
-    const h = startExtension(); const theme = { fg: (_: string, text: string) => text };
+    const h = startExtension(); const theme = { fg: (_: string, text: string) => text, bg: (_: string, text: string) => text };
     for (const type of [EVENT.monitorEvent, EVENT.taskNotification]) {
         const content = "[monitor m00000001 · absent] 中文 watch\nlog: /tmp/monitor.log\n\u001b[2Joutput\n[notification omitted: 2 whole lines]";
-        const rendered = h.renderers.get(type)!({ content, details: { monitor: { state: "absent" } } }, {}, theme);
+        const rendered = h.renderers.get(type)!({ content, details: { monitor: { state: "absent", description: "中文 watch" } } }, { expanded: true, outputPad: 0 }, theme);
         const wide = rendered.render(100).join("\n");
         assert.match(wide, /m00000001.*absent/); assert.match(wide, /log: \/tmp\/monitor.log/); assert.match(wide, /omitted: 2/);
-        assert.ok(!wide.includes("\u001b")); assert.ok(rendered.render(10).every(line => visibleWidth(line) <= 10));
+        const compact = h.renderers.get(type)!({ content, details: { monitor: { state: "absent", description: "中文 watch" } } }, { expanded: false, outputPad: 0 }, theme);
+        assert.ok(!wide.includes("\u001b")); assert.ok(compact.render(10).every(line => visibleWidth(line) <= 10));
     }
-    const shell = h.renderers.get(EVENT.taskNotification)!({ content: "x", details: { status: "failed", summary: "shell failure", outputTail: "tail" } }, {}, theme);
-    assert.deepEqual(shell.render(100), ["● shell failure", "  │ tail"]);
+    const shell = h.renderers.get(EVENT.taskNotification)!({ content: "x", details: { status: "failed", summary: "shell failure", outputTail: "tail" } }, { expanded: false, outputPad: 0 }, theme);
+    assert.match(shell.render(100).join("\n"), /shell failure/);
+    assert.match(shell.render(100).join("\n"), /tail/);
 });
 
 test("factory batches command and WS; session fallback cancels old windows; batch renderer remains safe", async t => {
@@ -233,7 +235,7 @@ test("factory batches command and WS; session fallback cancels old windows; batc
         assert.match(batch.content, /command event/); assert.match(batch.content, /socket event/);
         assert.equal(batch.details.monitorBatch.length, 2);
         for (const item of batch.details.monitorBatch) { assert.ok(batch.content.includes(item.jobId)); assert.ok(batch.content.includes(item.logPath)); }
-        const renderer = h.renderers.get(EVENT.monitorEvent)!(batch, {}, uiCtx.ui.theme);
+        const renderer = h.renderers.get(EVENT.monitorEvent)!(batch, { expanded: false, outputPad: 0 }, uiCtx.ui.theme);
         for (const width of [1, 12, 80]) for (const line of renderer.render(width)) {
             assert.ok(visibleWidth(line) <= width); assert.doesNotMatch(line.replace(/\u001b\[[0-9;]*m/g, ""), /\u001b|\u0007/);
         }
@@ -366,7 +368,7 @@ test("actual factory retains hundreds of terminals beyond admission: bounded sin
             }
         }
         assert.notEqual(message.details.monitorBatchOverflow.manifestPath, second.details.monitorBatchOverflow.manifestPath);
-        const renderer = h.renderers.get(EVENT.taskNotification)!(message, {}, uiCtx.ui.theme);
+        const renderer = h.renderers.get(EVENT.taskNotification)!(message, { expanded: false, outputPad: 0 }, uiCtx.ui.theme);
         assert.match(renderer.render(100).join("\n"), /sources omitted inline/);
         for (const width of [1, 16, 100]) for (const line of renderer.render(width)) {
             assert.ok(visibleWidth(line) <= width); assert.doesNotMatch(line.replace(/\u001b\[[0-9;]*m/g, ""), /\u001b|\u0007/);

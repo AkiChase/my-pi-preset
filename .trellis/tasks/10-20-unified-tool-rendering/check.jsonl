@@ -39,3 +39,10 @@
 {"file": "extensions/beautify/__tests__/notification-card.test.ts", "reason": "Notification primitive width and rich-body regression"}
 {"file": "extensions/agent-tasks/src/parent-delivery.ts", "reason": "S4 parent reply/notice entry adapter without delivery changes"}
 {"file": "extensions/agent-tasks/__tests__/parent-delivery.test.ts", "reason": "Parent entry/wait/reply delivery and notification-card regression"}
+{"file": "extensions/process-tasks/index.ts", "reason": "S4 process custom-message registration and adapter wiring"}
+{"file": "extensions/process-tasks/notification-renderer.ts", "reason": "S4 process/monitor notification mapping and terminal-tail budget preservation"}
+{"file": "extensions/process-tasks/notify.ts", "reason": "Completion notification delivery and outcome ownership must remain unchanged"}
+{"file": "extensions/process-tasks/monitor-notifications.ts", "reason": "Monitor batch delivery, manifest, and source-count semantics must remain unchanged"}
+{"file": "extensions/process-tasks/monitoring.ts", "reason": "Stall and terminal notification payload ownership must remain unchanged"}
+{"file": "extensions/process-tasks/__tests__/notification-renderer.test.ts", "reason": "S4 process notification adapter card, batch, preview, and malformed-detail coverage"}
+{"file": "extensions/process-tasks/__tests__/index.test.ts", "reason": "Actual extension registration, monitor batch, lifecycle, and width safety coverage"}

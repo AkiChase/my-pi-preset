@@ -9,8 +9,6 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createBashToolDefinition } from "@earendil-works/pi-coding-agent";
-import { stripTerminalSequences, truncateToWidth } from "@earendil-works/pi-tui";
-import type { MonitorNotificationPayload } from "./notify.ts";
 import { BackgroundRegistry } from "./state.ts";
 import { createProcessLifecycleParticipant, detectNonInteractive, terminateJobSilently } from "./lifecycle.ts";
 import { startRegistrySweep, stopRegistrySweep, stopSidebarTicker } from "./registry.ts";
@@ -25,6 +23,7 @@ import { loadConfig as loadUIConfig, type TaskUIConfig } from "../task-ui/config
 import { registerTaskControls } from "../task-ui/controls.ts";
 import { createProcessTaskSource } from "./source.ts";
 import { createTaskUIOwner } from "../task-ui/owner.ts";
+import { renderProcessNotification } from "./notification-renderer.ts";
 
 import { createProcessManagement } from "./management.ts";
 import type { RuntimeTaskCapability } from "../runtime-tasks/facade.ts";
@@ -73,51 +72,18 @@ export default function (pi: ExtensionAPI, options: ProcessTasksOptions = {}) {
     registerCommands(pi, reg, { configPath, warnings });
 
     // ── Message rendering ─────────────────────────────────────────
-    // <task-notification> messages render as one colored line: green for
-    // completed, red for failed, yellow for killed and for the statusless
-    // stall warning (CC's unread/attention color).
-    const renderTaskNotification = (
-        message: { content: unknown; details?: unknown },
-        theme: { fg(colour: string, text: string): string }
-    ) => {
-        const details = message.details as
-            | { status?: string; summary?: string; outputTail?: string; monitor?: MonitorNotificationPayload; monitorBatch?: unknown }
-            | undefined;
-        if (details?.monitor || details?.monitorBatch) {
-            const text = stripTerminalSequences(String(message.content)).replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, "");
-            return { render: (width: number) => text.split("\n").map((line) =>
-                truncateToWidth(theme.fg("dim", line), Math.max(0, width))), invalidate: () => {} };
-        }
-        const colour =
-            details?.status === "completed"
-                ? "success"
-                : details?.status === "failed"
-                  ? "error"
-                  : "warning";
-        const line = theme.fg(colour, `● ${details?.summary ?? String(message.content)}`);
-        // A backgrounded job's output never appears anywhere else in the TUI, so
-        // a failure summary alone leaves the user with nothing to look at. Show
-        // the last few lines of the inlined tail (the model gets all of it in
-        // the XML); the full log is at details.outputFile.
-        // `slice(-0)` is `slice(0)` — the whole array — so 0 must be handled
-        // explicitly or "show no tail" would show all of it.
-        const tail =
-            details?.outputTail && config.failureTailLinesShown > 0
-                ? details.outputTail
-                      .split("\n")
-                      .slice(-config.failureTailLinesShown)
-                      .map((l) => theme.fg("dim", `  │ ${l}`))
-                : [];
-        return { render: () => [line, ...tail], invalidate: () => {} };
-    };
-    pi.registerMessageRenderer(EVENT.taskNotification, (message, _options, theme) =>
-        renderTaskNotification(message, theme)
+    // Delivery, batching, and terminal-outcome ownership remain in notify.ts
+    // and monitor-notifications.ts. This is only the custom-message view.
+    const renderTaskNotification = (message: { content: unknown; details?: unknown }, options: { expanded: boolean; outputPad: number }, theme: Parameters<typeof renderProcessNotification>[2]) =>
+        renderProcessNotification(message, options, theme, config);
+    pi.registerMessageRenderer(EVENT.taskNotification, (message, options, theme) =>
+        renderTaskNotification(message, options, theme)
     );
-    pi.registerMessageRenderer(EVENT.monitorEvent, (message, _options, theme) =>
-        renderTaskNotification(message, theme)
+    pi.registerMessageRenderer(EVENT.monitorEvent, (message, options, theme) =>
+        renderTaskNotification(message, options, theme)
     );
-    pi.registerMessageRenderer(EVENT.stall, (message, _options, theme) =>
-        renderTaskNotification(message, theme)
+    pi.registerMessageRenderer(EVENT.stall, (message, options, theme) =>
+        renderTaskNotification(message, options, theme)
     );
 
     // ── Session start ─────────────────────────────────────────────
