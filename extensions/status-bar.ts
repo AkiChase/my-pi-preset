@@ -1,39 +1,11 @@
 import type { ExtensionAPI, ExtensionContext, ReadonlyFooterDataProvider, Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
-import type { Component, TUI } from "@earendil-works/pi-tui";
+import type { TUI } from "@earendil-works/pi-tui";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
-// A unified three-line status bar that replaces pi's built-in footer.
-//
-// Why a custom footer instead of another `setStatus()` entry: pi renders every
-// extension status on one shared line below the footer, so each extension that
-// publishes one adds another line of unaligned text. Taking over
-// `ctx.ui.setFooter()` is the only way to lay all of it out together.
-//
-// Conflict surface (checked against the installed package set):
-//   - setFooter: nothing else uses it, so this extension owns the footer. If a
-//     second extension ever calls setFooter, the last one to call it wins and
-//     this layout silently disappears -- that is the only real conflict.
-//   - setStatus: pi-cache-optimizer ("pi-cache-stats") and shared task-ui
-//     ("task-ui") publish statuses. The built-in
-//     footer drew them; a custom footer must draw them itself or they vanish.
-//     `renderChips()` below does that: known keys get a compact chip, unknown
-//     keys fall through to their raw (sanitized) text so a newly installed
-//     extension is never swallowed.
-//   - setWidget: pi-subagents renders above the editor, not in the footer, so
-//     it is unaffected.
-//
-// Layout (width permitting):
-//   ~/tools/pi-trellis  main ●2 +1 ↑2   session name
-//   ▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 39% 157k/400k (auto)        mp-messages·claude-opus-5·medium
-//   ↑112 ↓30k R5.3M W260k $0.42   │   ⛁ 96% 1.2M/1.3M · req 83%   │   ⚙ 2 jobs
-//
-// `req` is the hit rate of the latest request. ⛁ is pi-cache-optimizer's
-// session running total, which is why it carries the cumulative token pair.
-//
-// Before the first response nothing has a value yet, so the spend line draws a
-// dim skeleton (`↑– ↓– $–  │  ⛁ –`) instead of collapsing to whichever single
-// chip happens to exist -- a lone red `⛁0%` reads as an error when it only
-// means "no requests yet".
+import { createWidgetClient } from "./shared/widget-display/client.ts";
+import type { Slot } from "./shared/widget-display/contracts.ts";
+
+// Metrics belong to this consumer; regional composition belongs to the shared owner.
 
 const CACHE_STATUS_KEY = "pi-cache-stats";
 const GIT_REFRESH_MS = 3000;
@@ -255,7 +227,7 @@ export function parseCacheStatus(status: string): { chip: string; percent: numbe
 	return { chip: `⛁ ${percent}% ${pair}${suffix}`, percent };
 }
 
-/** Hit-rate coloring, shared by the H field and the cache chip. */
+/** Hit-rate coloring, shared by the request field and the cache chip. */
 function hitRateColor(percent: number): ThemeColor {
 	if (percent >= 80) return "success";
 	if (percent >= 50) return "warning";
@@ -287,10 +259,13 @@ function padBetween(left: string, right: string, width: number): string {
 
 export default function (pi: ExtensionAPI) {
 	let ctx: ExtensionContext | undefined;
-	let enabled = true;
+	let closed = false;
+	let epoch = 0;
+	let sessionId: string | undefined;
+	const slots = ["location", "context", "tokens", "cache_metrics", "task_summary", "external_statuses"] as const satisfies readonly Slot[];
+	const clients = slots.map(slot => createWidgetClient(pi, slot));
 
-	// Shared across footer instances so a session switch does not restart the
-	// git poll from scratch.
+	// One Git snapshot/poll across metric items, fenced to the owning session.
 	let git: GitState | null = null;
 	let gitFetchedAt = 0;
 	let gitInFlight = false;
@@ -298,11 +273,13 @@ export default function (pi: ExtensionAPI) {
 	const refreshGit = async (cwd: string, onChange: () => void) => {
 		if (gitInFlight) return;
 		gitInFlight = true;
+		const stamp = epoch;
 		try {
 			const result = await pi.exec("git", ["status", "--porcelain=v2", "--branch"], {
 				cwd,
 				timeout: GIT_TIMEOUT_MS,
 			});
+			if (closed || epoch !== stamp) return;
 			const next = result.code === 0 ? parseGitStatus(result.stdout) : null;
 			const changed = JSON.stringify(next) !== JSON.stringify(git);
 			git = next;
@@ -310,23 +287,30 @@ export default function (pi: ExtensionAPI) {
 		} catch {
 			// Not a repo, git missing, or the call timed out: drop the git chip
 			// rather than surfacing an error in the status bar.
-			if (git !== null) {
+			if (!closed && epoch === stamp && git !== null) {
 				git = null;
 				onChange();
 			}
 		} finally {
-			gitFetchedAt = Date.now();
-			gitInFlight = false;
+			if (epoch === stamp) { gitFetchedAt = Date.now(); gitInFlight = false; }
 		}
 	};
 
-	const buildFooter = (tui: TUI, theme: Theme, footerData: ReadonlyFooterDataProvider): Component & { dispose?(): void } => {
+	const buildMetrics = (tui: TUI, initialTheme: Theme, footerData: ReadonlyFooterDataProvider) => {
+		const origin = ctx, stamp = epoch;
+		let disposed = false;
+		const live = () => !disposed && !closed && ctx?.sessionManager === origin?.sessionManager && epoch === stamp;
+		const redraw = () => { if (live()) tui.requestRender(); };
+		let theme = initialTheme;
 		const unsubscribe = footerData.onBranchChange(() => {
 			// A ref change invalidates the counts too, so force the next render
 			// to re-run git instead of waiting out the poll interval.
+			if (!live()) return;
 			gitFetchedAt = 0;
-			tui.requestRender();
+			redraw();
 		});
+
+		if (!live()) { disposed = true; unsubscribe(); throw new Error("Retired metric subscription"); }
 
 		let statsCache:
 			| {
@@ -363,7 +347,6 @@ export default function (pi: ExtensionAPI) {
 		};
 		// A label/value pair: the glyph recedes, the number carries the color.
 		const field = (label: string, value: string, token: ThemeColor): string => paint("dim", label) + paint(token, value);
-		const divider = () => paint("borderMuted", "│");
 
 		const gitChip = (): string => {
 			if (!git?.branch) return "";
@@ -421,7 +404,7 @@ export default function (pi: ExtensionAPI) {
 		 * Draw every `setStatus()` entry. Known keys are compressed; unknown keys
 		 * pass through so an extension installed later is still visible here.
 		 */
-		const renderChips = (requestHitRate: string | undefined): string[] => {
+		const renderChips = (requestHitRate: string | undefined) => {
 			// Cache first (it belongs with the token counts to its left), then the
 			// rest alphabetically so chip order stays stable between renders.
 			const statuses = [...footerData.getExtensionStatuses()].sort(([a], [b]) => {
@@ -432,6 +415,7 @@ export default function (pi: ExtensionAPI) {
 
 			let cacheChip: string | undefined;
 			const chips: string[] = [];
+			let task = "";
 			for (const [key, text] of statuses) {
 				if (!text?.trim()) continue;
 				if (key === CACHE_STATUS_KEY) {
@@ -443,7 +427,7 @@ export default function (pi: ExtensionAPI) {
 				}
 				if (key === "task-ui") {
 					// The shared task owner already styles each semantic field.
-					chips.push(sanitize(text));
+					task = sanitize(text);
 					continue;
 				}
 				// Foreign text: `muted` rather than `dim` so a status that another
@@ -455,23 +439,24 @@ export default function (pi: ExtensionAPI) {
 			// not cumulative R/W token totals. It still renders alone when the
 			// optimizer extension is unavailable.
 			const cacheMetrics = [cacheChip, requestHitRate].filter((chip): chip is string => chip !== undefined);
-			if (cacheMetrics.length) chips.unshift(cacheMetrics.join(paint("dim", " · ")));
-			return chips;
+			return { cache: cacheMetrics.join(paint("dim", " · ")), task, external: chips.join(paint("borderMuted", "  │  ")) };
 		};
 
 		return {
-			dispose: unsubscribe,
+			dispose() { if (disposed) return; disposed = true; unsubscribe(); },
 			invalidate() {
 				statsCache = undefined;
 			},
-			render(width: number): string[] {
+			render(width: number) {
+				if (!live()) return { location: "", context: "", tokens: "", cache_metrics: "", task_summary: "", external_statuses: "" };
+				theme = ctx?.ui.theme ?? initialTheme;
 				const sm = ctx?.sessionManager;
 				const cwd = sm?.getCwd() ?? ctx?.cwd ?? process.cwd();
 
 				// Kick the poll from render: the footer is the only consumer, so it
 				// stops as soon as the footer stops drawing.
 				if (Date.now() - gitFetchedAt > GIT_REFRESH_MS) {
-					void refreshGit(cwd, () => tui.requestRender());
+					void refreshGit(cwd, redraw);
 				}
 
 				// Line 1: where am I -- path, git, session name.
@@ -502,56 +487,56 @@ export default function (pi: ExtensionAPI) {
 					tokenParts.push(field("$", amount, "accent"));
 				}
 
-				// Groups are separated by a rule so the eye can tell pi's own numbers
-				// from text that belongs to another extension.
-				const groups: string[] = [];
-				// Nothing spent yet: keep the line at its full shape with dim
-				// placeholders, so the first response fills values in instead of
-				// pushing a third line into existence.
-				groups.push(tokenParts.length ? tokenParts.join(" ") : paint("dim", `↑${NO_VALUE} ↓${NO_VALUE} $${NO_VALUE}`));
-
-				const requestHitRate = latestCacheHitRate === undefined
-					? undefined
-					: field("req ", `${latestCacheHitRate.toFixed(0)}%`, hitRateColor(latestCacheHitRate));
-				groups.push(...renderChips(requestHitRate));
-
-				const lines = [line1, line2];
-				if (groups.length) lines.push(truncateToWidth(groups.join(`  ${divider()}  `), width, paint("dim", "…")));
-				return lines;
+				const tokens = tokenParts.length ? tokenParts.join(" ") : paint("dim", `↑${NO_VALUE} ↓${NO_VALUE} $${NO_VALUE}`);
+				const requestHitRate = latestCacheHitRate === undefined ? undefined : field("req ", `${latestCacheHitRate.toFixed(0)}%`, hitRateColor(latestCacheHitRate));
+				const chips = renderChips(requestHitRate);
+				return { location: line1, context: line2, tokens, cache_metrics: chips.cache, task_summary: chips.task, external_statuses: chips.external };
 			},
 		};
 	};
 
-	// The footer component reads everything through `ctx` at render time, so the
-	// context only has to be kept current -- the component itself is installed
-	// once. `installed` keeps repeated events from rebuilding it (which would
-	// drop the git cache and the branch subscription).
-	let installed = false;
-
-	const apply = (context: ExtensionContext, force = false) => {
-		ctx = context;
-		if (context.mode !== "tui") return; // setFooter is a no-op outside the TUI.
-		if (installed && !force) return;
-		context.ui.setFooter(enabled ? buildFooter : undefined);
-		installed = true;
+	type Metrics = ReturnType<typeof buildMetrics>;
+	let shared: { model: Metrics; refs: number } | undefined;
+	const apply = (context: ExtensionContext) => {
+		if (closed) return;
+		const changed = ctx?.sessionManager !== context.sessionManager || sessionId !== context.sessionManager.getSessionId();
+		ctx = context; sessionId = context.sessionManager.getSessionId();
+		if (changed) {
+			epoch++; git = null; gitFetchedAt = 0; gitInFlight = false;
+			shared?.model.dispose(); shared = undefined;
+		}
+		if (context.mode !== "tui") return;
+		// One business model, scan cache and branch subscription across all six independently leased items.
+		const stamp = epoch;
+		slots.forEach((slot, index) => {
+			if (closed || stamp !== epoch || ctx?.sessionManager !== context.sessionManager) return;
+			const factory = (tui: TUI, theme: Theme, footerData: ReadonlyFooterDataProvider | undefined) => {
+				if (!footerData) throw new Error("Footer data unavailable");
+				const state = shared ??= { model: buildMetrics(tui, theme, footerData), refs: 0 };
+				state.refs++;
+				let disposed = false;
+				return {
+					render(width: number) { return disposed ? [] : [state.model.render(width)[slot]]; },
+					renderText(width: number) { return disposed ? "" : state.model.render(width)[slot]; },
+					invalidate() { state.model.invalidate(); },
+					dispose() {
+						if (disposed) return; disposed = true;
+						if (--state.refs === 0) { state.model.dispose(); if (shared === state) shared = undefined; }
+					},
+				};
+			};
+			clients[index].set(context, slot === "location" || slot === "context" ? { kind: "footer", factory } : { kind: "inline", factory });
+		});
 	};
-
-	pi.on("session_start", async (_event, context) => {
-		apply(context);
+	pi.on("session_start", (_event, context) => { apply(context); });
+	pi.on("turn_start", (_event, context) => {
+		if (closed) return;
+		if (!ctx) apply(context);
+		else if (ctx.sessionManager === context.sessionManager && sessionId === context.sessionManager.getSessionId()) ctx = context;
 	});
-
-	// After `/reload` the extension is re-instantiated without a fresh
-	// session_start, so claim the footer at the next sign of life too.
-	pi.on("turn_start", async (_event, context) => {
-		apply(context);
-	});
-
-	pi.registerCommand("statusbar", {
-		description: "Toggle the unified status bar (off restores pi's built-in footer)",
-		handler: async (_args, context) => {
-			enabled = !enabled;
-			apply(context, true);
-			context.ui.notify(enabled ? "Unified status bar enabled" : "Built-in footer restored", "info");
-		},
+	pi.on("session_shutdown", () => {
+		closed = true; epoch++;
+		for (const client of clients) client.dispose();
+		shared?.model.dispose(); shared = undefined; ctx = undefined;
 	});
 }

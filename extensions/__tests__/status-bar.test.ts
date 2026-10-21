@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { it } from "node:test";
 import type { ExtensionAPI, ExtensionContext, Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
+import { createEventBus } from "@earendil-works/pi-coding-agent";
+import widgetDisplay from "../shared/widget-display/owner.ts";
 import statusBar from "../status-bar.ts";
 
 const colors: Partial<Record<ThemeColor, number>> = { accent: 36, text: 97, success: 32, warning: 33, dim: 90, muted: 37, borderMuted: 90, error: 31 };
@@ -24,12 +26,14 @@ function fixture(entries: Entry[]) {
 		getSessionName: () => undefined,
 	};
 	const context = {
+		hasUI: true,
 		mode: "tui",
 		cwd: "/tmp/status-bar-test",
 		sessionManager,
 		getContextUsage: () => undefined,
-		ui: {
+		ui: { theme,
 			setFooter(factory: Parameters<ExtensionContext["ui"]["setFooter"]>[0]) {
+				footer?.dispose?.();
 				footer = factory?.(
 					{ requestRender() {} } as never,
 					theme,
@@ -43,6 +47,7 @@ function fixture(entries: Entry[]) {
 		},
 	} as unknown as ExtensionContext;
 	const pi = {
+		events: createEventBus(),
 		on(event: string, handler: (event: never, context: ExtensionContext) => unknown) {
 			const registered = handlers.get(event) ?? [];
 			registered.push(handler);
@@ -54,6 +59,7 @@ function fixture(entries: Entry[]) {
 		exec: async () => ({ code: 1, stdout: "", stderr: "" }),
 	} as unknown as ExtensionAPI;
 
+	widgetDisplay(pi);
 	statusBar(pi);
 	for (const handler of handlers.get("session_start") ?? []) handler({} as never, context);
 	return {
@@ -62,7 +68,7 @@ function fixture(entries: Entry[]) {
 			return footer!.render(width);
 		},
 		dispose() {
-			footer?.dispose?.();
+			for (const handler of handlers.get("session_shutdown") ?? []) handler({} as never, context);
 		},
 	};
 }

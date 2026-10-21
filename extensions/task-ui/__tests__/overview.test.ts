@@ -25,6 +25,13 @@ function fixture(display = true, shortcutBackground = DEFAULTS.shortcutBackgroun
     let status: string | undefined, writes = 0, reenter: (() => void) | undefined;
     const ctx = { sessionManager: SessionManager.inMemory("/tmp"), hasUI: true, mode: "tui", ui: { theme,
         setStatus(_key: string, text: string | undefined) { status = text; },
+        setFooter(content: unknown) {
+            const key = "preset.footer";
+            const old = widgets.get(key) as Component & { dispose?(): void } | undefined; old?.dispose?.();
+            widgets.delete(key); writes++;
+            if (typeof content === "function") widgets.set(key, content({ terminal, requestRender() {} }, theme));
+            reenter?.();
+        },
         setWidget(key: string, content: unknown) {
             widgets.delete(key); writes++;
             if (typeof content === "function") widgets.set(key, content({ terminal, requestRender() {} }, theme));
@@ -91,7 +98,7 @@ it("actual widget owner/client hide at expiry without source events; clocks and 
     try {
         assert.equal(f.widgets.size, 0);
         f.publish([view("root", { kind: "workflow" })]);
-        assert.equal(f.widgets.size, 1); assert.ok(f.widgets.has("preset.widgets.belowEditor"));
+        assert.equal(f.widgets.size, 1); assert.ok(f.widgets.has("preset.footer"));
         assert.match(f.render().join("\n"), /0s/);
         t.mock.timers.tick(1000); assert.match(f.render().join("\n"), /1s/);
         const cached = [...f.widgets.values()][0];

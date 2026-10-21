@@ -3,9 +3,11 @@ import { it } from "node:test";
 import { SessionManager, createEventBus, type ExtensionAPI, type ExtensionContext, type ExtensionEvent } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
 import owner from "../owner.ts";
+import { REGISTRY, type DisplayRegistry, type Slot } from "../contracts.ts";
+import { visibleWidth } from "@earendil-works/pi-tui";
 import { createWidgetClient } from "../client.ts";
 
-function harness(mode = "tui") {
+function harness(mode = "tui", registry: DisplayRegistry = REGISTRY) {
     const bus = createEventBus();
     const callbacks: { name: string; callback: (event: ExtensionEvent, ctx: ExtensionContext) => unknown }[] = [];
     const pi = () => ({ events: { on: bus.on, emit: bus.emit }, on(name: string, callback: (event: ExtensionEvent, ctx: ExtensionContext) => unknown) {
@@ -19,6 +21,7 @@ function harness(mode = "tui") {
     let defer = false;
     let fail = false;
     const ctx = { sessionManager: SessionManager.inMemory("/tmp"), hasUI: true, mode, ui: { theme,
+        setFooter(content: unknown) { this.setWidget("preset.footer", content); },
         setWidget(key: string, content: unknown) {
             beforeSet?.();
             if (fail) throw new Error("sink failed");
@@ -30,8 +33,8 @@ function harness(mode = "tui") {
             } else value = content as string[] | undefined;
             onSet?.(); if (value) widgets.set(key, value); writes.push(key);
         } } } as unknown as ExtensionContext;
-    const api = pi(); owner(api);
-    const client = (slot: "recap" | "trellis" | "agent_overview") => createWidgetClient(pi(), slot);
+    const api = pi(); owner(api, registry);
+    const client = (slot: string) => createWidgetClient(pi(), slot as Slot);
     const lines = () => [...widgets.values()].flatMap(value => Array.isArray(value) ? value : value.render(100));
     return { ctx, widgets, writes, lines, client, pi,
         setBeforeSet(fn: (() => void) | undefined) { beforeSet = fn; },
@@ -198,4 +201,65 @@ it("the same client reconnects when a manager returns to a previous session ID",
     manager.getSessionId = () => "second"; await h.emit("session_start");
     manager.getSessionId = () => first; await h.emit("session_start");
     assert.equal(recap.set(h.ctx, ["returned"]), true); assert.match(h.lines().join("\n"), /returned/); await h.emit("session_shutdown");
+});
+
+const inline = (text: string) => ({ kind: "inline" as const, factory: () => ({ renderText: () => text, render: () => [], invalidate() {} }) });
+for (const overflow of ["wrap", "truncate"] as const) it(`shared groups keep independent leases and two-level order, ANSI/Unicode ${overflow} and no empty separators`, async () => {
+    const registry: DisplayRegistry = { groups: {
+        first: { region: "footer", order: 10, layout: "block" },
+        second: { region: "footer", order: 20, layout: "inline", separator: " | ", overflow },
+        below: { region: "belowEditor", order: 10, layout: "block" },
+    }, items: { a: { group: "first", order: 100 }, b: { group: "first", order: 200 }, x: { group: "second", order: 1 }, y: { group: "second", order: 2 }, z: { group: "second", order: 3 }, below: { group: "below", order: 1 } } };
+    const h = harness("tui", registry), a = h.client("a"), b = h.client("b"), x = h.client("x"), y = h.client("y"), z = h.client("z");
+    y.set(h.ctx, inline("🙂 tail")); b.set(h.ctx, () => ({ render: () => ["block b", "second row"], invalidate() {} }));
+    x.set(h.ctx, inline("\x1b[31m中文 alpha\x1b[39m")); a.set(h.ctx, () => ({ render: () => ["block a"], invalidate() {} })); z.set(h.ctx, inline(""));
+    assert.deepEqual(h.lines().slice(0, 3), ["block a", "block b", "second row"]);
+    assert.match(h.lines()[3], /中文 alpha.* \| 🙂 tail/); assert.doesNotMatch(h.lines().join("\n"), /tail \|/);
+    const footer = h.widgets.get("preset.footer") as Component;
+    const narrow = footer.render(8).slice(3); assert.ok(narrow.every(line => visibleWidth(line) <= 8));
+    assert.equal(narrow.length > 1, overflow === "wrap"); footer.invalidate();
+    assert.equal(h.client("x").set(h.ctx, inline("steal")), false);
+    assert.equal(h.client("missing").set(h.ctx, ["unknown"]), false);
+    assert.equal(x.set(h.ctx, ["invalid inline component"]), false);
+    x.dispose(); assert.equal(h.client("x").set(h.ctx, inline("replacement")), true);
+    h.client("below").set(h.ctx, ["below capability"]); assert.ok(h.widgets.has("preset.widgets.belowEditor"));
+    await h.emit("session_shutdown"); assert.equal(h.widgets.size, 0);
+});
+it("Footer is TUI-only, retained across unrelated updates, and a later third-party setter is never cleared or reclaimed", async () => {
+    const rpc = harness("rpc"); assert.equal(rpc.client("agent_overview").set(rpc.ctx, ["no fallback"]), false); assert.equal(rpc.widgets.size, 0); await rpc.emit("session_shutdown");
+    const h = harness(), agent = h.client("agent_overview"), location = h.client("location");
+    location.set(h.ctx, ["location"]); const footer = h.widgets.get("preset.footer");
+    agent.set(h.ctx, ["agent"]); assert.equal(h.widgets.get("preset.footer"), footer); assert.deepEqual(h.lines().map(x => x.trim()), ["location", "agent"]);
+    h.ctx.ui.setFooter(() => ({ render: () => ["third party"], invalidate() {} }));
+    assert.equal(agent.set(h.ctx, ["must not reclaim"]), false); await h.emit("session_shutdown");
+    assert.deepEqual(h.lines(), ["third party"]);
+});
+it("inline ANSI-only empty items do not add separators, and OSC ST controls do not swallow following text", async () => {
+    const h = harness(), tokens = h.client("tokens"), cache = h.client("cache_metrics"), task = h.client("task_summary");
+    tokens.set(h.ctx, inline("tokens"));
+    cache.set(h.ctx, inline("\x1b[31m   \x1b[39m"));
+    task.set(h.ctx, inline("\x1b]0;hidden title\x1b\\task"));
+    assert.equal(h.lines()[0], "tokens  │  task");
+    Object.assign(h.ctx.ui, { theme: { fg: (_color: string, text: string) => `\x1b[36m${text}\x1b[39m` } });
+    (h.widgets.get("preset.footer") as Component).invalidate();
+    assert.equal(h.lines()[0], "tokens\x1b[36m  │  \x1b[39mtask", "separator uses the current theme after invalidation");
+    assert.match((h.widgets.get("preset.footer") as Component).render(3)[0], /\x1b\[36m…\x1b\[39m/, "ellipsis retains the styled overflow boundary");
+    await h.emit("session_shutdown");
+});
+it("invalid registry targets and inline layout conflicts reject before any publication", () => {
+    assert.throws(() => harness("tui", { groups: {}, items: { missing: { group: "unknown", order: 1 } } }), /Invalid display item/);
+    assert.throws(() => harness("tui", { groups: { bad: { region: "footer", order: 1, layout: "inline" } }, items: {} }), /Invalid display group/);
+});
+it("late Footer factory after shutdown remains inert", async () => {
+    const h = harness(), agent = h.client("agent_overview"); let builds = 0;
+    h.setDeferred(true); agent.set(h.ctx, () => { builds++; return { render: () => ["late"], invalidate() {} }; });
+    await h.emit("session_shutdown"); assert.deepEqual(h.finishDeferred()?.render(20), []); assert.equal(builds, 0);
+});
+it("Footer setter throwing after factory installation rolls back owned UI without leaking components", async () => {
+    const h = harness(), agent = h.client("agent_overview"); let disposed = 0;
+    h.setOnSet(() => { throw new Error("installed then threw"); });
+    assert.equal(agent.set(h.ctx, () => ({ render: () => ["failed"], invalidate() {}, dispose() { disposed++; } })), false);
+    assert.equal(disposed, 1); assert.equal(h.widgets.size, 0);
+    h.setOnSet(undefined); assert.equal(agent.set(h.ctx, ["retry"]), true);
+    await h.emit("session_shutdown"); assert.equal(h.widgets.size, 0);
 });
