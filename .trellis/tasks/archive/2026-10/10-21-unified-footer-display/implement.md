@@ -64,6 +64,15 @@ git diff --check
 - 最终完整 configured test payload 两次均exit1：1618/1619 PASS，唯一失败仍为已确认无关 jobs-read guidance；不描述全量绿，不修改范围外文件。literal pnpm wrappers NOT_RUN，使用相同 strict编译和完整测试payload避免link步骤改变依赖链接。无独立lint脚本。
 - S1产品／测试／当前用户docs已在目标分支提交 `590246f`（feat(display): unify widget and footer group composition）。源规范和任务记录独立留在源目录，待scoped材料提交；未merge／push／归档。
 
+### 合并与收尾最终结果
+
+- 用户明确授权合并和收尾；普通 merge 无冲突，main 合并提交 `0b5f8eb`（Merge unified footer display），保留源／feature 提交关系。
+- main 已有独立修复 `a9985f3`，解决之前的进程 missing task_id 报错。合并后隔离 `PI_CODING_AGENT_DIR=/tmp/footer-merge.hsxuvY/agent` 运行 `node_modules/.bin/tsc -p tsconfig.json` exit0，以及完整 Node 配置payload（concurrency8／force-exit）exit0，1619/1619 PASS，0 FAIL。原失败事实保留，上述通过不覆盖其历史。
+- 检查发生在main工作目录，包含另一个会话尚未提交的overview动画变更；这些变更未纳入本次merge提交，检查结果反映当时working tree而非纯merge tree，独立feature聚焦证据仍单列。
+- staging与merge检查通过；无冲突文件；其他会话的 Task UI动画、docs/tests和journal内容保留，不纳入本任务提交。
+- 托管remove预览只发现本任务ignored binding marker；确认目标干净且HEAD被0b5f8eb保留后remove成功，worktree和binding已释放，不删除feature分支。
+- 用户已授权archive／journal记录；仅处理本任务。图片保留供用户查看，原失败／审查日志保留支持诊断；无自有活动进程。未push、未个人sync／reload。
+
 ## 当前记录
 
 ### S1 实施自检与主核查（待独立审查完成）
