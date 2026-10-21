@@ -30,6 +30,7 @@
   - `pnpm typecheck`：PASS。
   - `node --test extensions/agent-tasks/__tests__/*.test.ts extensions/task-ui/__tests__/*.test.ts`：PASS；随后 `pnpm check`：PASS，1623 tests / 79 suites。
   - `git diff --check`：PASS。
+- Stage 1 提交：`0921d85 feat(agent-tasks): shorten runtime agent labels`。
 
 ### 修改范围
 
