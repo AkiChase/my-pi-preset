@@ -52,6 +52,13 @@ test("CLI smoke applies package/config plan through the configured pi binary", t
  assert.deepEqual(JSON.parse(readFileSync(join(result.agent, "settings.json"), "utf8")), { retry: { maxRetries: 5 }, theme: "dark" });
 });
 
+test("preset pi-btw declaration is installed by a future package sync", t => {
+ const manifest = JSON.parse(readFileSync(join(root, "pi-preset.json"), "utf8"));
+ const result = cli(t, { manifest, args: ["--sync", "packages"], list: "User packages:" });
+ assert.equal(result.status, 0, result.stderr);
+ assert.ok(result.calls.includes("install npm:@narumitw/pi-btw"));
+});
+
 test("CLI dry-run plans without package calls or writes", t => {
  const result = cli(t, { manifest: { packages: { "npm:one": "latest" }, settings: { retry: { maxRetries: 5 } } }, args: ["--dry-run"], list: "User packages:", files: { "settings.json": '{"theme":"dark"}' } });
  assert.equal(result.status, 0, result.stderr); assert.deepEqual(result.calls, ["list"]); assert.equal(readFileSync(join(result.agent, "settings.json"), "utf8"), '{"theme":"dark"}');

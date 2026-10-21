@@ -73,6 +73,7 @@ Monitor 属于 Task Composition，不是额外顶层入口；Agent、进程和�
 | [pi-input-history](docs/packages/input-history.md) | 跨会话浏览输入历史，并用 `Alt+R` 搜索。 |
 | [pi-web-access](docs/packages/web-access.md) | 提供网页搜索、内容抓取及结果分页读取。 |
 | [rpiv-ask-user-question](docs/packages/ask-user-question.md) | 让模型通过选项问卷澄清需求。 |
+| [pi-btw](docs/packages/pi-btw.md) | 在当前会话中临时开启旁支问题。 |
 
 第三方包由 Pi 安装，本仓库不修改其代码。清单目前使用 `latest`，实际功能以安装版本为准。清单中的 `conflicts` 用于防止功能重复加载，同步时会移除这些冲突来源。
 

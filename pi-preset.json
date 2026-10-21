@@ -4,7 +4,8 @@
     "npm:pi-cache-optimizer": "latest",
     "npm:pi-input-history": "latest",
     "npm:pi-web-access": "latest",
-    "npm:@juicesharp/rpiv-ask-user-question": "latest"
+    "npm:@juicesharp/rpiv-ask-user-question": "latest",
+    "npm:@narumitw/pi-btw": "latest"
   },
   "conflicts": [
     "npm:pi-patty-bg-tasks",
