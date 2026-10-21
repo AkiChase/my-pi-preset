@@ -74,7 +74,7 @@
 - 聚合消息不得选择任一成员状态冒充整体；成员状态在正文保留。
 - agent 的模型分组交付在用户侧按成员显示独立卡片；每张成员卡独立适用三行预算，partial/仍在运行说明保留。
 - monitor 保持实际交付粒度：已有合并 batch 显示为一张卡片，整体适用三行预算；未合并事件显示为独立卡片。UI 不重新拆包或重组。
-- 同一 reply/notice 正文对用户只显示一次：已有、且仍在当前可见 transcript 的 entry 不在工具正文重复；没有 entry 的匹配 waiter reply 保留可见正文。模型 content 与投递/消费语义不变。
+- reply/notice 保留独立 entry 与 held 工具结果的既有双通道；当二者同时可见时允许正文重复，以避免新增 presentation metadata 或改变模型 content、wait、投递/消费语义。匹配 waiter reply 仍保留可见正文。
 - Trellis Check 迁移为公共通知卡片，保留既有诊断校验、计数颜色、报告预算和省略说明；不迁移菜单/toast。
 
 ### R6：工具覆盖规则
@@ -108,7 +108,7 @@
 | AC3 | 运行中显示实时 `elapsed`；最终有 `durationMs` 时显示 `execution`；未执行和缺失历史值不伪造时间。 |
 | AC4 | 调用状态、操作参数、目标 runtime/状态语义不混淆；停止、失败、turn-limit、静默提醒可区分。 |
 | AC5 | 折叠正文最多 3 个实际文本行，错误使用同一预算；图片例外；展开与截断提示诚实。 |
-| AC6 | 失败无 result 的通知显示 error；reply/notice 的独立 entry、held block、匹配 waiter reply 都不会漏显示或重复显示。 |
+| AC6 | 失败无 result 的通知显示 error；reply/notice 的独立 entry、held block、匹配 waiter reply 都不会漏显示；entry 与 held 工具结果同时可见时允许重复，以保持既有模型/交付语义。 |
 | AC7 | agent 用户侧成员卡片与 monitor 实际 batch 粒度符合本 PRD；partial、overflow、manifest/stall/absent/resumed 等状态保留语义。 |
 | AC8 | 未知无 renderer 工具使用通用公共卡片；未知 custom renderer 和宿主原生专用 renderer 不被破坏或强拆。 |
 | AC9 | Trellis Check 使用公共通知卡片，诊断安全校验和报告预算保持。 |

@@ -117,6 +117,15 @@ interface CardView {
 
 ## 通知、消息与 entry
 
+### 公共通知 adapter
+
+通知/entry renderer 不使用 `ToolRenderers`。`extensions/beautify/` 提供无注册副作用的 `createNotificationCard()`：调用方提供身份、摘要、业务 marker/statistics，以及纯文本或 header-free 专用正文；adapter 只拥有 `customMessageBg` shell、`outputPad`、标题布局和纯文本的物理行预览。
+
+- 纯文本 collapsed 按当前 width 最多 3 个真实物理行，展开提示独立一行；expanded 只显示已交付的可用内容。
+- 专用 Component 保留其 invalidation、mouse 和独立语义预算，adapter 不从其输出猜测结构或强制截断。
+- 通知没有工具调用状态/clock；业务 adapter 自行提供准确 marker，公共层不将 raw 状态推断成新的完成/失败枚举。
+- 第一版不劫持 message/entry 的点击展开所有权，只使用宿主提供的 `expanded`；不复用 tool shell 的 mouse padding 规则。
+
 ### 单一对象与聚合消息
 
 - 单一对象通知可把精确业务 label/tone 放到标题，如 `Turn limit reached`、`Stopped`、`Quiet`。
@@ -124,19 +133,13 @@ interface CardView {
 - monitor：维持实际发送消息粒度。现有 monitor batch 渲染为一张公共 card，整体适用三行预算；成员状态、preview、log/manifest 路径和省略说明在正文。未 batch 的 monitor 消息保持单卡。UI 不重新拆包或重组。
 - monitor adapter 必须保留 progress、absent、resumed、completed、failed、killed、input stall、output overflow、mixed-source、manifest 成功/失败含义；silence/stall 不被标成完成。
 
-### reply/notice 去重
+### reply/notice 可见性
 
-现有行为不变：未匹配 waiter 的消息可先成为 entry 再被 held；匹配 waiter 的 reply 只在工具结果中出现。
+现有双通道行为保持：未匹配 waiter 的消息可先成为独立 entry 再被 held，匹配 waiter 的 reply 只在工具结果中出现。
 
-显示层使用真实消息身份 `{executionId, seq, requestId}`，而不是正文相似度：
+独立 entry 与 held 工具结果在同一时刻可见时，允许出现同一正文的两份 UI 文本。这是有意保留的取舍：Pi 没有公开的 model-only tool-result block；若为了 UI 去重新增 presentation metadata 或移走 held 内容，就会扩大严格 result details contract 或改变模型 content、wait/投递/消费时序。渲染迁移只保证不漏显示、所有相关 text blocks 都可用、错误不退化为 `No output.`，不按正文、request id 或状态词做推断式去重。
 
-1. entry payload 增加/保留可用序列身份；
-2. 只有 entry 发布成功、且仍位于当前 `buildContextEntries()` 可见 transcript 时，抑制工具正文中同一身份的显示副本；
-3. compaction/tree 使 entry 不可见后，工具正文恢复可见；
-4. 发布失败、旧记录、非法身份或没有 entry 的 matched reply 一律 fail-open 显示正文；
-5. 原模型 content 不变，适配器遍历所有相关 text blocks，不能只取 `content[0]`。
-
-这表示“已发布到当前可见会话表面”，不声称物理终端像素已被用户看见。
+匹配 waiter reply 没有独立 entry，必须继续在工具结果中完整可见。entry 写入失败、旧记录、compaction/tree 状态和历史 transcript 都不触发额外隐藏逻辑。
 
 ### Trellis Check 与 workflow
 
@@ -157,6 +160,6 @@ interface CardView {
 | --- | --- |
 | 复杂 renderer 被统一外框破坏 | 只迁移自有/协作工具；未知/原生 custom renderer 原样委托。 |
 | native 与公共时间重复 | 自有 adapter 删除旧显示时间；实际 host fixture 覆盖。 |
-| reply 去重遗漏或误抑制 | 只用结构化身份+当前可见 entry；无证据 fail-open。 |
+| reply/notice 重复或误抑制 | 保留独立 entry 与 held result 的双通道；允许偶发重复，不新增 presentation metadata，也不按正文推断身份。 |
 | 三行预览破坏复杂 body | 仅严格裁剪文本 body；组件 body 保留原组件，测试 mouse/invalidation/image。 |
 | timer/activation 泄漏 | session/reload/shutdown、并行调用、自然退出 focused tests。 |

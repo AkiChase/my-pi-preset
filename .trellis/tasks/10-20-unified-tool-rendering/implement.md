@@ -102,13 +102,16 @@
 
 **规则**：
 
+- 新增无注册副作用的公共 notification-card adapter；message/entry adapter 不使用 ToolRenderers、不拥有工具 clock 或调用状态；
 - agent group：用户侧逐成员卡；
 - monitor batch：实际 batch 一张卡，UI 不拆包/重组；
-- reply/notice：结构化身份去重，已有可见 entry 不重复显示，matched reply 不丢；
+- reply/notice：保留独立 entry 与 held result 的既有双通道；两者同时可见时允许重复，不引入 presentation metadata，不改模型 content、wait、投递或消费语义；匹配 waiter reply 不丢；
 - Trellis Check：复用安全校验/预算/计数，不改菜单/toast；
 - process/monitor 的 absent/resumed/stall/overflow/manifest 语义不压成 completed/failed。
 
-**验证重点**：entry append 失败、compaction/tree 可见性变化、held message、匹配 waiter、晚到消息、nested ownership、group partial/consumed/resumed run、monitor batch/overflow/manifest failure/input stall/absent/resumed、坏 entry/message details。
+**S4 已确认边界（用户授权）**：用户批准完整 S4 的独立 notification-card adapter；经消息双通道数据流复核后，明确拒绝为 reply/notice UI 去重扩展 persisted result/details metadata。此处优先保留既有交付和模型语义，接受偶发视觉重复；monitor 没有 entry + held-result 的同类路径，不适用该 metadata。
+
+**验证重点**：entry append 失败、held message、匹配 waiter、晚到消息、nested ownership、group partial/consumed/resumed run、monitor batch/overflow/manifest failure/input stall/absent/resumed、坏 entry/message details；验证重复 entry/result 不改变模型/投递语义，而不是要求消除重复。
 
 **提交检查点**：agent delivery 与 process/Trellis 范围可以分别提交；每个提交都有对应 renderer 及 owner 边界测试。
 
