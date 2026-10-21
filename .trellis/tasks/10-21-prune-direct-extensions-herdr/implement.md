@@ -82,7 +82,7 @@ Commit only after direct Herdr state tests, declaration discovery, full typechec
   - `pnpm typecheck` — PASS, exit 0.
   - `git diff --check` — PASS.
 - **Earlier failure retained:** during independent review, a first rerun failed only because the unreadable-root fixture's temporary-directory cleanup occurred before its permissions were restored (`ENOTEMPTY`); the fixture cleanup order was fixed and the rerun passed.
-- **Raw output:** retained during the task in the owned external directory `/tmp/my-pi-preset-prune-extensions.2SznWq`; no raw logs were copied into the repository.
+- **Raw output:** was kept in the owned external directory `/tmp/my-pi-preset-prune-extensions.2SznWq` during verification and removed after final review; no raw logs were copied into the repository.
 - **Commit checkpoint:** `74327e1 feat(sync): prune direct user extensions`。
 
 ### Stage 2 — direct Herdr state extension
@@ -95,7 +95,7 @@ Commit only after direct Herdr state tests, declaration discovery, full typechec
   - independent `trellis-check` protocol/template, lifecycle, documentation-link and diff review — PASS; no scoped defects found.
   - `git diff --check` — PASS.
 - **Known limit:** no real Herdr socket server and no real Pi reload were invoked; direct protocol behavior is covered with the typed transport seam and compared against the local Herdr v9 template.
-- **Raw output:** retained during the task in `/tmp/my-pi-preset-prune-extensions.2SznWq` and the reviewer-owned `/tmp/my-pi-preset-herdr-review.zAVpYx`; no raw logs were copied into the repository.
+- **Raw output:** main-session output was kept in `/tmp/my-pi-preset-prune-extensions.2SznWq` during verification and removed after final review. The independent review used its own external temporary directory; no raw logs were copied into the repository.
 
 - **Spec capture:** added `.trellis/spec/development/direct-user-extensions.md` and `.trellis/spec/development/herdr-state.md`, linked from the development index. They record the CLI/env contracts, destructive boundaries, error matrices and required regression assertions.
 - **Task context:** `check.jsonl` validates with three curated entries. `implement.jsonl` remains intentionally empty because implementation was performed by the main session; task start used `--allow-empty-context` accordingly.
