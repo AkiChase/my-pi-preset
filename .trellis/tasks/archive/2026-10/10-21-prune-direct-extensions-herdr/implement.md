@@ -104,3 +104,7 @@ Commit only after direct Herdr state tests, declaration discovery, full typechec
 - **Final Git review:** completed after `bcff5c5 docs(spec): capture extension sync and Herdr contracts`; working tree was clean and `git diff --check` passed. The implementation commits are `74327e1`, `98e9e61`, and `bcff5c5`.
 
 _The real host migration remains intentionally unrun._
+
+### Wrap-up Acceptance
+
+用户在已知真实 Herdr socket、个人扩展目录 prune 和 Pi reload 未运行的限制下，明确要求收尾。该外部运行验证留给用户在自己的 pane 中执行；不阻塞本任务的代码、文档和隔离测试交付。
