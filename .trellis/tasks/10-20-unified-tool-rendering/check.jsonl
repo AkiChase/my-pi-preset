@@ -51,3 +51,6 @@
 {"file": "extensions/trellis/lib/initialization/command.ts", "reason": "Check menu/message/toast ownership must remain unchanged"}
 {"file": "extensions/trellis/__tests__/diagnostic-report.test.mjs", "reason": "S4 diagnostic report shell, budget, menu, and renderer regression coverage"}
 {"file": "extensions/beautify/__tests__/registered-monitor.test.ts", "reason": "S5 actual-host monitor card regression and complete renderer context fixture"}
+{"file": "extensions/runtime-tasks/tools.ts", "reason": "S5a process versus agent missing-identity validation owner"}
+{"file": "extensions/runtime-tasks/__tests__/nullable-controls.test.ts", "reason": "S5a direct process/agent validation message regression"}
+{"file": "extensions/process-tasks/__tests__/jobs-read.test.ts", "reason": "S5a registered process-management missing-task_id regression"}

@@ -132,11 +132,13 @@
 - 运行 selected focused checks、typecheck/full suite、`git diff --check`；
 - 评估是否需更新开发 spec 或用户文档。仅在实际用户可见行为需要说明时修改文档；不添加内部测试教程。
 
-**S5 结果（已完成，待 final scoped commit）**：修正 `registered-monitor` actual-host fixture，使断言匹配既有 `monitorExecutionSummary()` 的 `=` 格式，并为 direct `renderCall` 提供完整公开 `RenderContext`；未改产品行为。隔离 SDK/临时 agent 目录下完整 Beautify natural-exit suite 为 94/94 PASS（含实际 host Bash timing：live `elapsed` 与最终 `execution` 各仅出现一次，裁定先前 delayed duplicate-timing 疑虑不成立）。独立 cross-layer `trellis-check` PASS（144/144 focused actual-host tests、typecheck、diff/check-manifest JSONL）；审查无 task-scope finding。
+**S5 结果（已完成，提交 `f779168`）**：修正 `registered-monitor` actual-host fixture，使断言匹配既有 `monitorExecutionSummary()` 的 `=` 格式，并为 direct `renderCall` 提供完整公开 `RenderContext`；未改产品行为。隔离 SDK/临时 agent 目录下完整 Beautify natural-exit suite 为 94/94 PASS（含实际 host Bash timing：live `elapsed` 与最终 `execution` 各仅出现一次，裁定先前 delayed duplicate-timing 疑虑不成立）。独立 cross-layer `trellis-check` PASS（144/144 focused actual-host tests、typecheck、diff/check-manifest JSONL）；审查无 task-scope finding。
 
 完整 natural-exit 命令 `node --test --test-concurrency=8 "extensions/**/__tests__/*.test.ts" "extensions/**/__tests__/*.test.mjs" "scripts/*.test.mjs"` 为 1608/1609 PASS、exit 1；唯一复现失败是未改动的 `extensions/process-tasks/__tests__/jobs-read.test.ts:178`，旧断言期待 `output requires task_id`，实际 runtime-management 文案为 `agent_id`/`execution_id`。最终 `pnpm check` 同为 1608/1609、exit 1，原因相同；其 typecheck 子阶段通过。独立 reviewer 的并发 full run 另一次观察到未改动 `waits.test.ts:102` 的 `before-kill` 空输出，但主会话随后两次隔离 full run 未复现，故记录为未复现的既有并发测试失败，未越界修改。
 
 未运行真实终端视觉、live reload/session switch、任意外部 custom renderer 组合和不可达 HTML 路径；不将 actual-host fixture 覆盖表述为这些环境的视觉验收。已评估，无需新增 project spec 或用户文档：本任务产出是已有 presentation ownership 合同下的本地 adapter/测试覆盖，不构成跨任务通用开发规则。任务仍未归档；`branch === base_branch === main` 需在用户验收/归档或 PR 前单独处理。
+
+**S5a process-management validation repair（用户明确授权，已完成，待 scoped commit）**：全量失败并非单纯旧测试期望：`extensions/runtime-tasks/tools.ts` 的 `validateNormalizedManagementParams()` 在 `group === "process"` 且缺失 `task_id` 时错误返回 agent 专用的 `agent_id`/`execution_id` 文案。最小修复只区分 process 与 agent 的缺失目标错误文本，保持 schema、参数归一化、backend admission、execution、wait/delivery 和 renderer 不变；改动限于该 owner、其 direct validation regression 以及既有 `jobs-read` 实际注册 fixture。`node --test extensions/runtime-tasks/__tests__/nullable-controls.test.ts extensions/process-tasks/__tests__/jobs-read.test.ts`（21/21 PASS，natural exit）、`pnpm typecheck` 与 `git diff --check` 通过；独立 `trellis-check` PASS，并以隔离环境 `pnpm check` 验证 1609/1609 PASS。用户还授权使用 tmux 加载当前本地代码做真实终端验证；该验证不安装依赖、不推送或 reload 全局个人配置，结果待记录。
 
 ## 验证命令
 

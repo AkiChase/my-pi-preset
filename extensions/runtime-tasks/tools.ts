@@ -130,7 +130,11 @@ function validateNormalizedManagementParams(group: ManagementGroup, value: unkno
       ((typeof v.agent_id === "string" && v.agent_id.trim() && v.execution_id === undefined) ||
        (typeof v.execution_id === "string" && v.execution_id.trim() && v.agent_id === undefined))) {
     if (v.execution_id !== undefined && (!parseExecutionId(v.execution_id) || !String(v.execution_id).startsWith("wf_"))) return "Invalid execution_id; workflows require a wf_ execution_id from launch/list. Subagents require agent_id.";
-  } else if (["status", "output", "wait", "stop"].includes(v.action) && (typeof v[target] !== "string" || !v[target].trim())) return `${v.action} requires agent_id for subagents or execution_id for workflows.`;
+  } else if (["status", "output", "wait", "stop"].includes(v.action) && (typeof v[target] !== "string" || !v[target].trim())) {
+    return group === "process"
+      ? `${v.action} requires task_id.`
+      : `${v.action} requires agent_id for subagents or execution_id for workflows.`;
+  }
   if (v.task_id !== undefined && (typeof v.task_id !== "string" || !v.task_id.trim())) return "task_id must be a non-empty string.";
   if (v.agent_id !== undefined && (typeof v.agent_id !== "string" || !v.agent_id.trim())) return "agent_id must be a non-empty string.";
   if (v.execution_id !== undefined && (!parseExecutionId(v.execution_id) || !String(v.execution_id).startsWith("wf_"))) return "Invalid execution_id; workflows require a wf_ execution_id from launch/list. Subagents require agent_id.";

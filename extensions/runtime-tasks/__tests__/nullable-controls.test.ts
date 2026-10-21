@@ -21,6 +21,12 @@ test("Agent management requires all fields and treats only declared null control
     assert.throws(() => parseAgentManagementParams(bad));
     assert.equal((await tool.execute("bad", bad as never, undefined, undefined, {} as never)).isError, true);
   }
+  for (const action of ["status", "stop", "output", "wait"] as const) {
+    assert.equal(
+      validateManagementParams("agent", { action, agent_id: null, execution_id: null, kind: null, verbose: null }),
+      `${action} requires agent_id for subagents or execution_id for workflows.`,
+    );
+  }
   const id = "agent_general_purpose_0_12345678";
   assert.deepEqual(parseAgentManagementParams({ action: "output", agent_id: id, execution_id: null, kind: null, verbose: false }), { action: "output", agent_id: id, verbose: false });
   assert.equal(validateManagementParams("process", processInput({ action: "list" })), undefined);
@@ -55,6 +61,9 @@ test("Process management validates the complete nullable envelope before any cap
   }
   for (const bad of [null, [], { ...input, typo: null }, { ...input, execution_id: null }, { ...input, verbose: null }, { ...input, action: null }, { ...input, action: "other" }]) {
     assert.throws(() => host(bad)); await refuse(bad);
+  }
+  for (const action of ["status", "stop", "output", "wait"] as const) {
+    assert.equal(validateManagementParams("process", processInput({ action })), `${action} requires task_id.`);
   }
   const actions = {
     list: { task_type: "bash" }, stats: { task_type: "monitor" }, status: { task_id: "job" }, stop: { task_id: "job" },
