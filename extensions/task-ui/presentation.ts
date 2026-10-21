@@ -19,12 +19,11 @@ export function taskTitle(view: TaskView): string {
     return taskOneLine(view.taskId) || view.kind;
 }
 
-const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-/** Only real runtime states; callers opt into animation on active UI surfaces. */
-export function taskDot(view: TaskView, frame?: number): string {
+/** Static lifecycle glyphs shared by Footer, task rows, and selected-task status. */
+export function taskDot(view: TaskView): string {
     switch (view.status) {
         case "queued": return "○";
-        case "starting": case "running": return frame === undefined ? "◌" : SPINNER[Math.abs(Math.floor(frame)) % SPINNER.length];
+        case "starting": case "running": return "●";
         case "paused": return "Ⅱ";
         case "completed": return "✓";
         case "failed": return "✕";
@@ -55,32 +54,28 @@ export function taskTokens(tokens: number | undefined): string | undefined {
 }
 
 export type TaskTheme = Pick<Theme, "fg"> & Partial<Pick<Theme, "bg" | "bold">>;
-export interface TaskLineOptions { prefix?: string; children?: number; selected?: boolean; now?: number; animationFrame?: number }
+export interface TaskLineOptions { prefix?: string; children?: number; selected?: boolean; now?: number }
 
 /** One bounded task line. Protect state/wait first, then statistics, before title/indentation. */
 export function taskLine(view: TaskView, width: number, theme: TaskTheme, options: TaskLineOptions = {}): string {
     width = Math.max(0, Math.floor(width));
     if (!width) return "";
     const fit = (text: string, size: number) => truncateToWidth(text, Math.max(0, size), "…");
-    const state = `[${view.status}${view.waitCount > 0 ? ` · waiting ${view.waitCount}` : ""}]`;
     const stats = [taskDuration(view, options.now), taskTokens(view.stats.tokens) === undefined ? undefined : `↓ ${taskTokens(view.stats.tokens)}`].filter(Boolean).join(" · ");
-    // Narrow terminals drop secondary numbers/indentation, never all evidence of state.
-    const dot = theme.fg(taskStatusColor(view), taskDot(view, options.animationFrame));
+    // Narrow terminals drop secondary numbers/indentation, never lifecycle identity.
+    const dot = theme.fg(taskStatusColor(view), taskDot(view));
     const budget = Math.max(0, width - 2);
-    let suffix = state;
-    if (stats && visibleWidth(state + " " + stats) + 8 <= budget) suffix += ` ${stats}`;
+    let suffix = stats;
     suffix = fit(suffix, Math.max(0, budget - (budget >= 5 ? 2 : 0)));
     const leftWidth = Math.max(0, budget - visibleWidth(suffix) - 1);
     const count = options.children ? ` (${options.children})` : "";
     const titleWidth = Math.max(0, leftWidth - visibleWidth(count));
-    const title = `${view.kind} ${taskTitle(view)}`;
-    // Tree spaces are structural, not prose whitespace. Keep the trailing branch
-    // on deep trees even when the full continuation cannot fit.
+    const title = view.kind === "agent" ? taskTitle(view) : `${view.kind} ${taskTitle(view)}`;
     const prefix = cleanTaskText(options.prefix ?? "").replace(/[\r\n]/g, "");
-    const prefixBudget = Math.max(0, titleWidth - 5);
+    const prefixBudget = Math.max(0, titleWidth - 3);
     const tree = visibleWidth(prefix) <= prefixBudget ? prefix : prefixBudget >= 3 ? "…" + prefix.slice(-2) : "";
-    const left = fit(tree ? tree + " " + title : title, titleWidth) + fit(count, leftWidth);
-    let line = fit(`${dot} ${left}${left ? " " : ""}${theme.fg(taskStatusColor(view), suffix)}`, width);
+    const left = fit(`${tree ? tree + " " : ""}${dot} ${title}`, titleWidth) + fit(count, leftWidth);
+    let line = fit(`${left}${left ? " " : ""}${theme.fg(taskStatusColor(view), suffix)}`, width);
     line += " ".repeat(Math.max(0, width - visibleWidth(line)));
     if (!options.selected || !theme.bg) return line;
     // Host foreground wrappers/truncation can emit reset-all or background reset.
@@ -92,10 +87,10 @@ export function taskLine(view: TaskView, width: number, theme: TaskTheme, option
 }
 
 /** Fixed selected status: protect lifecycle/name/activity before secondary counters. */
-export function taskStatusLine(view: TaskView, width: number, theme: TaskTheme, now?: number, frame?: number): string {
-    const state = theme.fg(taskStatusColor(view), `${taskDot(view, frame)} ${view.status}`);
+export function taskStatusLine(view: TaskView, width: number, theme: TaskTheme, now?: number): string {
+    const state = theme.fg(taskStatusColor(view), taskDot(view));
     const name = truncateToWidth(taskOneLine(view.title), Math.max(0, Math.floor(width / 3)), "…");
-    const primary = `${state} · ${name}`;
+    const primary = `${state} ${name}`;
     const activity = view.stats.activity ? ` · ${taskOneLine(view.stats.activity)}` : "";
     const secondary = [taskDuration(view, now), view.stats.turnCount === undefined ? undefined : `${view.stats.turnCount} turns`,
         view.stats.toolUses === undefined ? undefined : `${view.stats.toolUses} tools`, taskTokens(view.stats.tokens)].filter(Boolean).join(" · ");

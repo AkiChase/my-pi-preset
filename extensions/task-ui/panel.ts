@@ -37,8 +37,6 @@ export class TaskPanel implements Component, Focusable {
     private detailScroll: ScrollView;
     private unsubscribe: () => void = () => {};
     private timer: NodeJS.Timeout | undefined;
-    private animationTimer: NodeJS.Timeout | undefined;
-    private animationFrame = 0;
     private readonly history = new ConversationWindow();
     private readonly expandedEntryIds = new Set<string>();
     private detailRanges: ConversationRange[] = [];
@@ -132,19 +130,7 @@ export class TaskPanel implements Component, Focusable {
         if (selected && (this.detailRevision < 0 || readDetail && this.detailRevision !== this.args.coordinator.revision)) {
             this.readDetail({ direction: "latest" }, this.detailScroll.isFollowingEnd);
         }
-        this.syncAnimation();
         this.cachedList = undefined; this.frame = undefined;
-    }
-    private syncAnimation(): void {
-        const active = this.args.config.animations !== false && this.rows.some(row => row.view.status === "running" || row.view.status === "starting");
-        if (!active) { clearInterval(this.animationTimer); this.animationTimer = undefined; return; }
-        if (this.animationTimer || this.disposed) return;
-        this.animationTimer = setInterval(() => {
-            if (this.disposed) return;
-            this.animationFrame++; this.cachedList = undefined; this.frame = undefined;
-            this.args.tui.requestRender();
-        }, 250);
-        this.animationTimer.unref();
     }
     private captureAnchor(): void {
         if (this.page !== "detail" || !this.frame) return;
@@ -308,7 +294,7 @@ export class TaskPanel implements Component, Focusable {
         if (this.cachedList?.width === width) return this.cachedList.lines;
         const group = (label: string, rows: TaskRow[]) => [this.theme.fg("accent", label), ...(rows.length ? rows.flatMap(row => [taskLine(row.view, width, this.theme, {
             prefix: row.prefix, children: this.model.isCollapsed(row.view.key) ? row.descendantCount : undefined,
-            selected: row.view.key === this.model.selected?.key, now: this.args.now?.(), animationFrame: this.animationTimer ? this.animationFrame : undefined,
+            selected: row.view.key === this.model.selected?.key, now: this.args.now?.(),
         }), ...messageLine(row, width, this.theme)]) : [this.theme.fg("dim", "No tasks")])];
         const lines = [...group("Agents", this.rows.filter(row => row.view.kind === "agent" || row.view.kind === "workflow")), ...group("Processes", this.rows.filter(row => row.view.kind === "shell" || row.view.kind === "monitor"))].map(line => truncateToWidth(line, width, "…"));
         this.cachedList = { width, lines }; return lines;
@@ -414,7 +400,7 @@ export class TaskPanel implements Component, Focusable {
             footerLines = footerLines.map(line => this.theme.fg("dim", truncateToWidth(line, width, "…")));
         }
         const status = this.page === "detail" && this.model.selected && rows >= 3
-            ? { render: () => [taskStatusLine(this.model.selected!, width, this.theme, this.args.now?.(), this.animationTimer ? this.animationFrame : undefined)], invalidate() {} } : undefined;
+            ? { render: () => [taskStatusLine(this.model.selected!, width, this.theme, this.args.now?.())], invalidate() {} } : undefined;
         const fixedBudget = Math.max(0, rows - footerLines.length - header.length - (status ? 1 : 0) - 1);
         const metadata = this.page === "detail" && this.model.selected
             ? renderDetailHeader(this.model.selected, this.theme, width, this.args.now?.(), Math.min(8, Math.max(0, fixedBudget - 1))) : [];
@@ -467,7 +453,7 @@ export class TaskPanel implements Component, Focusable {
     close(): void { if (this.disposed) return; this.dispose(); this.args.done(); }
     dispose(): void {
         if (this.disposed) return;
-        this.disposed = true; clearInterval(this.timer); this.timer = undefined; clearInterval(this.animationTimer); this.animationTimer = undefined; this.unsubscribe();
+        this.disposed = true; clearInterval(this.timer); this.timer = undefined; this.unsubscribe();
         this.composer = undefined; this.model.dispose(); this.conversation.dispose(); this.history.clear(); this.expandedEntryIds.clear(); this.detailRanges = []; this.anchor = undefined; this.detail = undefined; this.rows = []; this.invalidate();
     }
 }

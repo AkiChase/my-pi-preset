@@ -3,7 +3,7 @@ import type { TaskCoordinator } from "./coordinator.ts";
 import type { TaskLifecycle } from "./lifecycle.ts";
 import type { TaskUIConfig } from "./config.ts";
 import { TaskPanel } from "./panel.ts";
-import { TaskOverviewModel, overviewLines, overviewRootCount } from "./overview.ts";
+import { TaskOverviewModel, overviewLines } from "./overview.ts";
 import { createWidgetClient } from "../shared/widget-display/client.ts";
 import { FINISHED_LINGER_MS, isTerminal, taskSummary, TaskPanelModel } from "./model.ts";
 import { layoutError, loadNativeLayout, type NativeLayout } from "../shared/scroll-panel/native-layout.ts";
@@ -52,22 +52,15 @@ export function createTaskUIOwner(pi: ExtensionAPI, coordinator: TaskCoordinator
                 try { origin.ui.setStatus("task-ui", status); } catch { statusKnown = false; /* independent optional footer */ }
             }
             if (!live()) return;
-            let visibleActivity = false;
             const published = widget.set(origin, roots.length ? (tui) => {
-                const rows = tui.terminal.rows || 24;
-                visibleActivity = tui.terminal.columns > 0 && roots.slice(0, overviewRootCount(roots.length, rows))
-                    .some(view => view.status === "starting" || view.status === "running");
                 return {
-                    render(width) { return live() ? overviewLines(roots, width, tui.terminal.rows || 24, origin.ui.theme, Date.now(),
-                        config.animations === false ? undefined : Math.floor(Date.now() / 250)) : []; },
+                    render(width) { return live() ? overviewLines(roots, width, tui.terminal.rows || 24, origin.ui.theme, Date.now()) : []; },
                     invalidate() {},
                 };
             } : undefined);
             if (!live()) return;
-            // One aligned clock for every visible root. Source updates do not reset the
-            // animation phase or postpone its next tick; failed sinks keep only expiry.
+            // Terminal expiry and duration clocks are the only overview refresh sources.
             const nextDelays = published ? delays : expiry;
-            if (published && visibleActivity && config.animations !== false) nextDelays.push(250 - now % 250);
             if (nextDelays.length) {
                 timer = setTimeout(() => { timer = undefined; if (live()) update(); }, Math.min(...nextDelays));
                 timer.unref();

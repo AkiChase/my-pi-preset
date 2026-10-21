@@ -55,21 +55,21 @@ function fixture(display = true, shortcutBackground = DEFAULTS.shortcutBackgroun
         dispose() { owner.dispose(); emit("session_shutdown"); coordinator.dispose(); },
     };
 }
-it("root metadata only, five rows plus hidden count, no child sums/input/detail, conservative small screens", () => {
+it("overview keeps nested Agent rows and reports bounded truncation", () => {
     const roots = Array.from({ length: 7 }, (_, i) => view(String(i)));
     const child = view("child", { parentKey: roots[0].key, stats: { tokens: 99999 } });
     const model = new TaskOverviewModel();
     const selected = model.refresh([roots[0], child, ...roots.slice(1), view("process", { kind: "shell" })], 100_000);
-    assert.equal(selected.length, 7);
+    assert.equal(selected.length, 8);
     for (const rows of [1, 12, 13, 14, 16, 17, 18, 24]) {
         const lines = overviewLines(selected, 100, rows, theme, 103_000);
         assert.ok(lines.length <= Math.min(6, Math.max(1, rows - 12)));
         assert.match(lines.at(-1)!, /hidden/);
-        assert.doesNotMatch(lines.join("\n"), /child|99/);
     }
     const lines = overviewLines(selected, 100, 24, theme, 103_000);
-    assert.equal(lines.length, 6); assert.equal(lines[5], "+2 hidden");
-    assert.match(lines[0], /^◌ alias-0 +\[running\] 3s · ↓ 12$/);
+    assert.equal(lines.length, 6); assert.equal(lines[5], "+3 hidden");
+    assert.match(lines[0], /^● alias-0 \(1\) +3s · ↓ 12/);
+    assert.match(lines[1], /^└─ ● alias-child/);
     const malicious = view("safe", { description: "中文🙂\u001b]0;BAD\u0007\n描述\u001b[31m", status: "paused" });
     for (const width of [0, 1, 2, 5, 20, 40, 80]) for (const line of overviewLines([malicious], width, 24, theme, 103_000)) {
         assert.ok(visibleWidth(line) <= width); assert.doesNotMatch(stripTerminalSequences(line), /BAD|[\u0000-\u001f]/);
@@ -78,13 +78,13 @@ it("root metadata only, five rows plus hidden count, no child sums/input/detail,
 });
 it("retention is unpinned whole-root four seconds, orphan/cycle safe and new run does not resurrect old metadata", () => {
     const model = new TaskOverviewModel(), root = view("parent"), child = view("child", { parentKey: root.key, status: "completed", endedAt: 0 });
-    assert.deepEqual(model.refresh([root, child], 100_000).map(v => v.taskId), ["parent"]);
+    assert.deepEqual(model.refresh([root, child], 100_000).map(v => v.taskId), ["parent", "child"]);
     const terminal = { ...root, status: "completed" as const, endedAt: 100_000 };
     model.refresh([terminal, child], 100_000);
-    assert.deepEqual(model.refresh([], 103_999), [terminal]);
+    assert.deepEqual(model.refresh([], 103_999).map(v => v.taskId), ["parent", "child"]);
     assert.deepEqual(model.refresh([], 104_000), []);
     const orphan = view("orphan", { parentKey: "missing" }), a = view("a"), b = view("b", { parentKey: a.key });
-    assert.deepEqual(model.refresh([orphan, { ...a, parentKey: b.key }, b], 104_000).map(v => v.taskId), ["orphan", "a"]);
+    assert.deepEqual(model.refresh([orphan, { ...a, parentKey: b.key }, b], 104_000).map(v => v.taskId), ["orphan", "a", "b"]);
     const resumed = view("parent", { runId: "2", key: taskKey({ sourceId: "overview", taskId: "parent", runId: "2" }),
         startedAt: 104_000, stats: { tokens: 3210, durationMs: 2000 } });
     assert.deepEqual(model.refresh([resumed], 106_000), [resumed]);
@@ -103,7 +103,7 @@ it("actual widget owner/client hide at expiry without source events; clocks and 
         t.mock.timers.tick(1000); assert.match(f.render().join("\n"), /1s/);
         const cached = [...f.widgets.values()][0];
         f.publish([view("root", { kind: "workflow", status: "completed", endedAt: 101_000 })]);
-        f.publish([]); t.mock.timers.tick(3999); assert.match(f.render().join("\n"), /completed/);
+        f.publish([]); t.mock.timers.tick(3999); assert.match(f.render().join("\n"), /✓/);
         t.mock.timers.tick(1); assert.equal(f.widgets.size, 0);
         const writes = f.writes(); t.mock.timers.tick(10000); assert.equal(f.writes(), writes);
         f.publish([view("next")]);
@@ -197,39 +197,28 @@ it("theme/resize use current presentation; synchronous session reset during publ
     } finally { f.dispose(); }
 });
 
-it("overview frames animate only real active states with static fallback and unchanged layout", () => {
+void it("overview lifecycle glyphs are static", () => {
     for (const status of ["starting", "running", "queued", "paused", "completed", "failed", "stopped", "interrupted"] as const) {
         const root = view(status, { status });
-        const first = overviewLines([root], 100, 24, theme, 100_000, 0)[0];
-        const next = overviewLines([root], 100, 24, theme, 100_000, 1)[0];
-        if (status === "starting" || status === "running") {
-            assert.match(first, /^⠋ /); assert.match(next, /^⠙ /);
-            assert.match(overviewLines([root], 100, 24, theme, 100_000)[0], /^◌ /);
-        } else assert.equal(first, next);
-        assert.equal(visibleWidth(first), 100);
+        const line = overviewLines([root], 100, 24, theme, 100_000)[0];
+        const dot = status === "starting" || status === "running" ? "●" : ({ queued: "○", paused: "Ⅱ", completed: "✓", failed: "✕", stopped: "■", interrupted: "!" }[status] ?? "");
+        assert.match(line, new RegExp(`^${dot} `));
+        assert.doesNotMatch(line, /\[/);
     }
 });
-it("visible active roots share one aligned clock across source events and stop at non-active states", t => {
+it("visible active tasks retain the duration clock without spinner refreshes", t => {
     t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 100_000 });
     const f = fixture();
     try {
         f.publish([view("a", { status: "starting" }), view("b")]);
-        assert.ok(f.render().every(line => line.startsWith("⠋ ")));
-        const reads = f.refreshes(), renders = f.renders(), writes = f.writes();
-        t.mock.timers.tick(100);
-        f.publish([view("a"), view("b")]);
-        t.mock.timers.tick(149); assert.ok(f.render().every(line => line.startsWith("⠋ ")));
-        t.mock.timers.tick(1); assert.ok(f.render().every(line => line.startsWith("⠙ ")));
-        assert.equal(f.refreshes(), reads + 2, "one source refresh plus one shared tick, not one timer per root");
-        assert.equal(f.renders(), renders + 2, "source update and animation tick request actual host redraws");
-        assert.equal(f.writes(), writes, "animation does not reinstall the shared Footer");
-        f.publish([view("a", { status: "completed", endedAt: 100_250 }), view("b")]);
-        assert.match(f.render()[0], /^✓ /);
-        t.mock.timers.tick(250); assert.match(f.render()[1], /^⠹ /);
-        f.publish([view("a", { status: "completed", endedAt: 100_250 }), view("b", { status: "paused" })]);
-        const pausedReads = f.refreshes();
-        t.mock.timers.tick(250); assert.equal(f.refreshes(), pausedReads);
-        assert.match(f.render()[1], /^Ⅱ /);
+        assert.ok(f.render().every(line => line.startsWith("● ")));
+        const reads = f.refreshes(), writes = f.writes();
+        t.mock.timers.tick(999); assert.equal(f.refreshes(), reads);
+        t.mock.timers.tick(1); assert.equal(f.refreshes(), reads + 1, "duration clock refreshes once per second");
+        assert.ok(f.render().every(line => line.startsWith("● ")));
+        assert.equal(f.writes(), writes, "clock does not reinstall the shared Footer");
+        f.publish([view("a", { status: "completed", endedAt: 101_000 }), view("b", { status: "paused" })]);
+        assert.match(f.render()[0], /^✓ /); assert.match(f.render()[1], /^Ⅱ /);
         f.publish([]); t.mock.timers.tick(4000);
         const emptyReads = f.refreshes(); t.mock.timers.tick(10000); assert.equal(f.refreshes(), emptyReads);
     } finally { f.dispose(); }
@@ -244,7 +233,7 @@ it("disabled, missing and failed displays never retain an animation clock", t =>
             const reads = f.refreshes();
             t.mock.timers.tick(999); assert.equal(f.refreshes(), reads);
             if (mode === "disabled") {
-                assert.match(f.render()[0], /^◌ /);
+                assert.match(f.render()[0], /^● /);
                 t.mock.timers.tick(1); assert.equal(f.refreshes(), reads + 1, "retain the existing duration clock");
             } else {
                 t.mock.timers.tick(10000); assert.equal(f.refreshes(), reads);
@@ -252,7 +241,7 @@ it("disabled, missing and failed displays never retain an animation clock", t =>
         } finally { f.dispose(); }
     }
 });
-it("hidden active roots do not animate while visible roots keep the existing duration clock", t => {
+it("hidden active rows do not create a spinner clock", t => {
     t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 100_000 });
     const f = fixture();
     try {
@@ -261,24 +250,13 @@ it("hidden active roots do not animate while visible roots keep the existing dur
         const reads = f.refreshes();
         assert.doesNotMatch(f.render().join("\n"), /alias-hidden/);
         t.mock.timers.tick(999); assert.equal(f.refreshes(), reads);
-        // A source transition makes an existing visible root active.
         f.publish([view("0"), ...roots.slice(1)]);
-        t.mock.timers.tick(1); assert.match(f.render()[0], /^⠼ /);
-        const visibleReads = f.refreshes(); t.mock.timers.tick(250); assert.equal(f.refreshes(), visibleReads + 1);
-        f.terminal.rows = 14;
-        f.publish([view("0", { status: "paused" }), ...roots.slice(1)]);
-        const narrowReads = f.refreshes(); t.mock.timers.tick(250); assert.equal(f.refreshes(), narrowReads);
-        f.terminal.rows = 24;
-        f.publish([view("0", { status: "starting", startedAt: undefined })]);
-        const startingReads = f.refreshes(); t.mock.timers.tick(250); assert.equal(f.refreshes(), startingReads + 1);
-        // Third-party Footer takeover retires the display lease; the next tick
-        // must stop without reinstalling our surface or retrying forever.
+        assert.match(f.render()[0], /^● /);
+        const activeReads = f.refreshes(); t.mock.timers.tick(250); assert.equal(f.refreshes(), activeReads);
         f.ctx.ui.setFooter(undefined);
-        t.mock.timers.tick(250);
+        t.mock.timers.tick(1000);
         const retiredReads = f.refreshes(), retiredWrites = f.writes();
         t.mock.timers.tick(10000);
         assert.equal(f.refreshes(), retiredReads); assert.equal(f.writes(), retiredWrites);
-        f.owner.dispose(); const disposedReads = f.refreshes();
-        t.mock.timers.tick(10000); assert.equal(f.refreshes(), disposedReads);
     } finally { f.dispose(); }
 });

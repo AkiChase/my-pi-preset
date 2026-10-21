@@ -8,6 +8,43 @@ export interface TaskRow {
     readonly prefix?: string; readonly descendantCount?: number;
 }
 
+/** Pure parent-key tree projection shared by the panel and compact overview. */
+export function taskTreeRows(views: readonly TaskView[], collapsed: ReadonlySet<string> = new Set()): TaskRow[] {
+    const byKey = new Map(views.map(view => [view.key, view]));
+    const children = new Map<string, TaskView[]>();
+    for (const view of views) if (view.parentKey && byKey.has(view.parentKey)) {
+        const group = children.get(view.parentKey) ?? []; group.push(view); children.set(view.parentKey, group);
+    }
+    const descendants = (key: string, visited = new Set<string>([key])): number => {
+        let count = 0;
+        for (const child of children.get(key) ?? []) if (!visited.has(child.key)) {
+            visited.add(child.key); count++; count += descendants(child.key, visited);
+        }
+        return count;
+    };
+    const rows: TaskRow[] = [], seen = new Set<string>();
+    const visit = (view: TaskView, depth: number, continuation: boolean[] = [], last = true) => {
+        if (seen.has(view.key)) return;
+        seen.add(view.key);
+        const nested = children.get(view.key) ?? [];
+        const prefix = depth ? continuation.map(more => more ? "│  " : "   ").join("") + (last ? "└─" : "├─") : "";
+        rows.push({ view, depth, group: nested.length > 0 || view.kind === "workflow", prefix, descendantCount: descendants(view.key) });
+        if (!collapsed.has(view.key)) nested.forEach((child, index) => visit(child, depth + 1, depth ? [...continuation, !last] : [], index === nested.length - 1));
+    };
+    for (const view of views) if (!view.parentKey || !byKey.has(view.parentKey)) visit(view, 0);
+    // Cyclic/invalid external hierarchy must not silently hide every row.
+    for (const view of views) if (!seen.has(view.key) && (!view.parentKey || !collapsed.has(view.parentKey))) {
+        let parent = view.parentKey; const ancestors = new Set<string>(); let cycle = false, hidden = false;
+        while (parent && byKey.has(parent)) {
+            if (collapsed.has(parent) && seen.has(parent)) { hidden = true; break; }
+            if (ancestors.has(parent)) { cycle = true; break; }
+            ancestors.add(parent); parent = byKey.get(parent)?.parentKey;
+        }
+        if (cycle && !hidden) visit(view, 0);
+    }
+    return rows;
+}
+
 /** Interaction-only metadata. Never retains backend records or consumes results. */
 export class TaskPanelModel {
     private readonly collapsed = new Set<string>();
@@ -56,42 +93,7 @@ export class TaskPanelModel {
         return rows;
     }
 
-    private rows(): TaskRow[] {
-        const byKey = new Map(this.current.map(view => [view.key, view]));
-        const children = new Map<string, TaskView[]>();
-        for (const view of this.current) if (view.parentKey && byKey.has(view.parentKey)) {
-            const group = children.get(view.parentKey) ?? []; group.push(view); children.set(view.parentKey, group);
-        }
-        const descendants = (key: string, visited = new Set<string>([key])): number => {
-            let count = 0;
-            for (const child of children.get(key) ?? []) if (!visited.has(child.key)) {
-                visited.add(child.key); count++; count += descendants(child.key, visited);
-            }
-            return count;
-        };
-        const rows: TaskRow[] = [], seen = new Set<string>();
-        const visit = (view: TaskView, depth: number, continuation: boolean[] = [], last = true) => {
-            if (seen.has(view.key)) return;
-            seen.add(view.key);
-            const nested = children.get(view.key) ?? [];
-            const prefix = depth ? continuation.map(more => more ? "│  " : "   ").join("") + (last ? "└─" : "├─") : "";
-            rows.push({ view, depth, group: nested.length > 0 || view.kind === "workflow", prefix, descendantCount: descendants(view.key) });
-            if (!this.collapsed.has(view.key)) nested.forEach((child, index) => visit(child, depth + 1, depth ? [...continuation, !last] : [], index === nested.length - 1));
-        };
-        for (const view of this.current) if (!view.parentKey || !byKey.has(view.parentKey)) visit(view, 0);
-        // Cyclic/invalid external hierarchy must not silently hide every row.
-        for (const view of this.current) if (!seen.has(view.key) && (!view.parentKey || !this.collapsed.has(view.parentKey))) {
-            // Only actual cycles need fallback; collapsed descendants stay hidden.
-            let parent = view.parentKey; const ancestors = new Set<string>(); let cycle = false, hidden = false;
-            while (parent && byKey.has(parent)) {
-                if (this.collapsed.has(parent) && seen.has(parent)) { hidden = true; break; }
-                if (ancestors.has(parent)) { cycle = true; break; }
-                ancestors.add(parent); parent = byKey.get(parent)?.parentKey;
-            }
-            if (cycle && !hidden) visit(view, 0);
-        }
-        return rows;
-    }
+    private rows(): TaskRow[] { return taskTreeRows(this.current, this.collapsed); }
     select(view: TaskView): void { this.selected = view; }
     expand(key: string): void { this.collapsed.delete(key); }
     collapse(key: string): void {

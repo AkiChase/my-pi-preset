@@ -235,7 +235,7 @@ void it("detail truncates fixed metadata and keeps body/status/actions visible w
         panel.handleInput("\r");
         const latest = panel.render(40).map(stripTerminalSequences);
         assert.match(latest.join("\n"), /log-59/);
-        assert.match(latest.join("\n"), /running/);
+        assert.match(latest.join("\n"), /●/);
         assert.doesNotMatch(latest.join("\n"), /TITLE_END|COMMAND_END|PHASE_END/);
         panel.handleInput("\u001b[H");
         assert.match(panel.render(40).join("\n"), /log-0/);
@@ -579,7 +579,7 @@ void it("native clipped mouse clicks expand only one stable entry, after scrolli
     } finally { panel.dispose(); f.coordinator.dispose(); }
 });
 
-void it("clock/spinner refresh perform zero detail IO and dispose clears active/static timers", t => {
+void it("clock refresh performs zero detail IO and dispose clears timers", t => {
     t.mock.timers.enable({ apis: ["setInterval"] });
     for (const animations of [true, false]) {
         const f = sourceFixture([view("clock", { startedAt: 0 })]);
@@ -589,7 +589,7 @@ void it("clock/spinner refresh perform zero detail IO and dispose clears active/
         try {
             panel.handleInput("\r"); const first = stripTerminalSequences(panel.render(80).join("\n")), reads = f.reads.length;
             t.mock.timers.tick(250); const second = stripTerminalSequences(panel.render(80).join("\n"));
-            if (animations) assert.notEqual(second, first); else assert.equal(second, first);
+            assert.equal(second, first);
             t.mock.timers.tick(2000); panel.render(80); assert.equal(f.reads.length, reads);
             panel.dispose(); const count = renders; t.mock.timers.tick(5000);
             assert.equal(renders, count); assert.equal(f.reads.length, reads);
@@ -630,7 +630,7 @@ void it("tiny detail terminals prioritize body, selected status and actions over
     try {
         panel.handleInput("\r");
         const frame = panel.render(40).map(stripTerminalSequences);
-        assert.equal(frame.length, 3); assert.match(frame[0], /BODY/); assert.match(frame[1], /running/); assert.match(frame[2], /x Stop · c Copy/); assert.match(frame[2], /ctrl\+shift\+b All waits/);
+        assert.equal(frame.length, 3); assert.match(frame[0], /BODY/); assert.match(frame[1], /●/); assert.match(frame[2], /x Stop · c Copy/); assert.match(frame[2], /ctrl\+shift\+b All waits/);
         assert.doesNotMatch(frame.join("\n"), /metadata/);
         terminal.rows = 8; assert.match(panel.render(40).join("\n"), /BODY/);
     } finally { panel.dispose(); f.coordinator.dispose(); }
@@ -696,7 +696,7 @@ void it("tight detail footer retains selected controls and global detach instead
         for (const rows of [3, 8]) {
             terminal.rows = rows;
             const frame = stripTerminalSequences(panel.render(40).join("\n"));
-            assert.match(frame, /BODY/); assert.match(frame, /running/);
+            assert.match(frame, /BODY/); assert.match(frame, /●/);
             for (const key of ["x", "c", "Enter", "p", "s", "r", "ctrl\\+shift\\+b"]) assert.match(frame, new RegExp(key));
             assert.match(frame, /Detach|All waits/);
         }

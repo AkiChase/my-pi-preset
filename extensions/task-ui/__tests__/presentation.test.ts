@@ -25,12 +25,12 @@ void it("agent titles preserve the stable public identity while other kinds use 
 void it("status dots are execution-state based and selected styling does not change them", () => {
     for (const status of ["starting", "queued", "running", "paused", "completed", "failed", "stopped"] as const) {
         const row = view(status, { status, waitCount: 2, stats: { tokens: 1234, durationMs: 61200 } });
-        const dot = { starting: "◌", queued: "○", running: "◌", paused: "Ⅱ", completed: "✓", failed: "✕", stopped: "■" }[status];
+        const dot = { starting: "●", queued: "○", running: "●", paused: "Ⅱ", completed: "✓", failed: "✕", stopped: "■" }[status];
         assert.equal(taskDot(row), dot);
         const selected = taskLine(row, 100, theme, { selected: true });
         assert.equal(stripTerminalSequences(selected), taskLine(row, 100, theme));
         assert.ok(selected.startsWith("\u001b[44m"));
-        assert.match(selected, /waiting 2/);
+        assert.doesNotMatch(selected, /\[(?:running|queued)\]/);
         assert.ok(selected.includes(dot));
         assert.match(selected, /1m1s · ↓ 1.2k/);
     }
@@ -41,7 +41,7 @@ void it("task lines bound Unicode/control input and retain state/statistics befo
         const line = taskLine(row, width, theme, { prefix: "│  ".repeat(100) + "└─", selected: true });
         assert.equal(visibleWidth(line), width);
         assert.doesNotMatch(cleanTaskText(line), /[\u0000-\u001f\u007f-\u009f]/);
-        if (width >= 20) assert.match(line, /running/);
+        if (width >= 20) assert.match(line, /●/);
         if (width >= 50) assert.match(line, /↓ 1.2M/);
     }
     assert.equal(taskDuration(view("x", { startedAt: 1000, endedAt: 4200 }), 99999), "3s");
@@ -121,15 +121,14 @@ void it("collapsed cyclic trees do not resurrect indirect hidden descendants as 
     } finally { model.dispose(); }
 });
 
-void it("all lifecycle symbols/colors remain readable without animation, only active states animate", () => {
+void it("all lifecycle symbols/colors remain readable without animation", () => {
     const seen: string[] = [];
     const themed = { fg: (color: string, text: string) => { seen.push(color); return text; } } as never;
     for (const status of ["queued", "starting", "running", "paused", "completed", "failed", "stopped"] as const) {
         const row = view(status, { status });
         const plain = taskLine(row, 80, themed);
-        assert.match(plain, new RegExp(status)); assert.doesNotMatch(plain, /waiting/);
-        if (status === "starting" || status === "running") assert.notEqual(taskDot(row, 0), taskDot(row, 1));
-        else assert.equal(taskDot(row, 0), taskDot(row, 1));
+        assert.doesNotMatch(plain, /\[(?:queued|starting|running|paused|completed|failed|stopped)\]|waiting/);
+        assert.equal(taskDot(row), status === "starting" || status === "running" ? "●" : ({ queued: "○", paused: "Ⅱ", completed: "✓", failed: "✕", stopped: "■" }[status] ?? ""));
     }
     assert.ok(seen.includes("muted")); assert.ok(seen.includes("warning")); assert.ok(seen.includes("accent"));
     assert.ok(seen.includes("success")); assert.ok(seen.includes("error")); assert.ok(seen.includes("dim"));
