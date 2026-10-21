@@ -1800,3 +1800,43 @@ Clarified latest-request and session cache metrics in the unified status bar, wi
 ### Next Steps
 
 - 未运行个人 Pi 同步、/reload 或真实 TUI 验收；按任务范围保留。
+
+
+## Session 54: 统一清理手工扩展并直连 Herdr
+<!-- trellis-session: v=2 fp=50cfb911c124c6c5 -->
+
+**Date**: 2026-10-21
+**Task**: 统一清理手工扩展并直连 Herdr
+**Branch**: `main`
+
+### Summary
+
+完成直接扩展 prune 域与 Herdr 直连状态上报，任务已归档；真实宿主迁移由用户后续执行。
+
+### Main Changes
+
+- 新增 extensions 同步域、preserve.extensions 与安全 prune 边界。
+- 以 Herdr State 替换旧事件桥接，并补充用户文档和开发合约。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `74327e1` | feat(sync): prune direct user extensions |
+| `98e9e61` | feat(herdr): report Pi state directly |
+| `bcff5c5` | docs(spec): capture extension sync and Herdr contracts |
+| `fe838c1` | chore(task): record final prune and Herdr review |
+| `a7a5643` | chore(task): record temporary output cleanup |
+| `8d4c862` | chore(task): archive 10-21-prune-direct-extensions-herdr |
+
+### Testing
+
+- [OK] pnpm check 通过（1,619 tests）；独立 review 通过。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 用户可在自己的 Herdr pane 预览并执行 extensions prune，随后 /reload 或重启 Pi。
