@@ -35,3 +35,7 @@
 {"file": "extensions/agent-tasks/__tests__/workflow-failures.test.ts", "reason": "Workflow failed-child and tolerant-branch semantics regression"}
 {"file": "extensions/agent-tasks/__tests__/workflow-failure-host.test.ts", "reason": "Workflow host failure/notification semantics regression"}
 {"file": "extensions/agent-tasks/__tests__/workflow.test.ts", "reason": "Workflow runtime and natural-exit regression"}
+{"file": "extensions/beautify/notification-card.ts", "reason": "S4 public notification shell and text-preview contract"}
+{"file": "extensions/beautify/__tests__/notification-card.test.ts", "reason": "Notification primitive width and rich-body regression"}
+{"file": "extensions/agent-tasks/src/parent-delivery.ts", "reason": "S4 parent reply/notice entry adapter without delivery changes"}
+{"file": "extensions/agent-tasks/__tests__/parent-delivery.test.ts", "reason": "Parent entry/wait/reply delivery and notification-card regression"}

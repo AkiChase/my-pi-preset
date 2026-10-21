@@ -14,8 +14,9 @@
  * A held message nobody takes is delivered normally once the wait is gone.
  */
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Text, stripTerminalSequences } from "@earendil-works/pi-tui";
+import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
+import { stripTerminalSequences, type Component } from "@earendil-works/pi-tui";
+import { createNotificationCard } from "../../beautify/notification-card.ts";
 import type { TaskCoordinator } from "../../task-ui/coordinator.ts";
 import type { TaskIdentity } from "../../task-ui/types.ts";
 import type { AgentManager } from "./agent-manager.ts";
@@ -56,24 +57,26 @@ export function formatHeldMessages(messages: readonly ChildMessage[]): string {
     `${message.requestId ? `[reply ${message.requestId}]` : "[notice]"} ${message.text}`).join("\n");
 }
 
-const COLLAPSED_LINES = 3;
-
 /** Card payload is persisted/external text; never let it supply terminal controls. */
 function cleanCardText(text: string): string {
   return stripTerminalSequences(text).replace(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/g, "");
 }
 
-export function renderSubagentMessageCard(data: SubagentMessageEntryData | undefined, expanded: boolean, theme: { fg(color: never, text: string): string; bold?(text: string): string }): Text | undefined {
+export function renderSubagentMessageCard(
+  data: SubagentMessageEntryData | undefined,
+  expanded: boolean,
+  theme: Theme,
+  outputPad = 0,
+): Component | undefined {
   if (!data || typeof data.text !== "string") return undefined;
-  const fg = (color: string, text: string) => theme.fg(color as never, text);
   const kind = data.requestId ? `reply ${cleanCardText(data.requestId)}` : "notice";
-  const label = cleanCardText(data.label);
-  const title = `${fg("accent", "↩")} ${theme.bold ? theme.bold(label) : label} ${fg("dim", "·")} ${fg("muted", kind)}`;
-  const lines = cleanCardText(data.text).split(/\r\n|\n|\r/);
-  const shown = expanded ? lines : lines.slice(0, COLLAPSED_LINES);
-  const body = shown.map(line => `  ${line}`);
-  if (!expanded && lines.length > COLLAPSED_LINES) body.push(fg("dim", `  … ${lines.length - COLLAPSED_LINES} more line${lines.length - COLLAPSED_LINES === 1 ? "" : "s"}`));
-  return new Text([title, ...body].join("\n"), 0, 0);
+  return createNotificationCard({
+    identity: "subagent_message",
+    summary: cleanCardText(data.label),
+    marker: { label: kind, tone: data.requestId ? "accent" : "muted" },
+    textBody: cleanCardText(data.text),
+    bodyTone: "muted",
+  }, { expanded, outputPad }, theme);
 }
 
 interface Pending { runId: string; messages: ChildMessage[]; timer?: ReturnType<typeof setTimeout> }

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { it } from "node:test";
 import { validateToolArguments } from "@earendil-works/pi-ai";
-import type { AgentSession, ExtensionAPI, ExtensionToolContext } from "@earendil-works/pi-coding-agent";
+import type { AgentSession, ExtensionAPI, ExtensionToolContext, Theme } from "@earendil-works/pi-coding-agent";
 import "./source-loader.mjs";
 import { completeToolCall } from "./tool-inputs.ts";
 import { TaskCoordinator } from "../../task-ui/coordinator.ts";
@@ -269,19 +269,21 @@ void it("detail omits whole older message entries rather than silently truncatin
 });
 
 void it("message card renders kind, label and a collapsed body", () => {
-  const theme = { fg: (_color: never, value: string) => value, bold: (value: string) => value };
+  const theme = { fg: (_color: never, value: string) => value, bg: (_color: never, value: string) => value, bold: (value: string) => value } as unknown as Theme;
   const data = { agentId: "a", label: "explore", requestId: null, text: "1\n2\n3\n4\n5", at: 0 };
-  const collapsed = renderSubagentMessageCard(data, false, theme)!.render(80).map(line => line.trimEnd());
-  assert.equal(collapsed[0], "↩ explore · notice");
-  assert.ok(collapsed.includes("  … 2 more lines"));
-  const expanded = renderSubagentMessageCard({ ...data, requestId: "req_1" }, true, theme)!.render(80).map(line => line.trimEnd());
-  assert.equal(expanded[0], "↩ explore · reply req_1");
-  assert.equal(expanded.length, 6);
+  const collapsed = renderSubagentMessageCard(data, false, theme)!.render(80).map(line => line.trimEnd()).filter(line => line.trim());
+  assert.match(collapsed[0]!, /subagent_message.*explore.*notice/);
+  assert.ok(collapsed.includes("… (2 more lines, expand)"));
+  const expanded = renderSubagentMessageCard({ ...data, requestId: "req_1" }, true, theme)!.render(80).map(line => line.trimEnd()).filter(line => line.trim());
+  assert.match(expanded[0]!, /subagent_message.*explore/);
+  assert.ok(expanded.some(line => /reply req_1/.test(line)));
+  assert.ok(expanded.length >= 6);
+  assert.deepEqual(expanded.filter(line => /^[1-5]$/.test(line)), ["1", "2", "3", "4", "5"]);
   assert.equal(renderSubagentMessageCard(undefined, false, theme), undefined);
 });
 
 void it("message card strips external terminal controls before styling", () => {
-  const theme = { fg: (_color: never, value: string) => value, bold: (value: string) => value };
+  const theme = { fg: (_color: never, value: string) => value, bg: (_color: never, value: string) => value, bold: (value: string) => value } as unknown as Theme;
   const rendered = renderSubagentMessageCard({
     agentId: "a", label: "\u001b[31mevil", requestId: "req_\u001b[2J1",
     text: "safe\u001b[2J\u0000 text", at: 0,

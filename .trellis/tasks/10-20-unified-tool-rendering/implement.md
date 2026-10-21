@@ -115,6 +115,8 @@
 
 **提交检查点**：agent delivery 与 process/Trellis 范围可以分别提交；每个提交都有对应 renderer 及 owner 边界测试。
 
+**S4a notification primitive + parent entry（已完成，待 scoped commit）**：新增无注册副作用的 `createNotificationCard()`，只拥有 `customMessageBg` shell、共享标题、`outputPad` 与 plain-text 的真实物理行预览；rich body 原样交由 producer。`renderSubagentMessageCard()` 改用该 adapter，标题为 `subagent_message` + label + reply/notice marker。未修改 `appendEntry`、hold/timer、`take`、`sendMessage`、wait 匹配或 `formatHeldMessages`；用户已接受 entry 与 held result 同时可见时的重复。`node --test extensions/beautify/__tests__/notification-card.test.ts extensions/agent-tasks/__tests__/parent-delivery.test.ts`（14/14 PASS，natural exit）、`pnpm typecheck`、`git diff --check` 通过；独立 check PASS。真实终端视觉 NOT_RUN。
+
 ### S5：集成、独立检查与收尾评估
 
 **目的**：审阅跨层一致性，执行全量检查，记录可覆盖/不可覆盖边界；不扩大到 CLI/history workflow snapshot、Task Panel 或外部 custom renderer 迁移。
