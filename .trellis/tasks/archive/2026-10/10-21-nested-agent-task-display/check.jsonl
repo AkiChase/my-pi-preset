@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/development/index.md", "reason": "Extension UI ownership, rendering, lifecycle, and Agent API constraints"}
+{"file": ".trellis/spec/development/widget-display.md", "reason": "Shared Footer ownership and block-widget rendering contract"}
+{"file": ".trellis/spec/testing/index.md", "reason": "Task UI verification and test isolation requirements"}
