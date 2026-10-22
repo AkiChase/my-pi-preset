@@ -13,6 +13,7 @@ Use `node:test` and `node:assert/strict`. Tests live in `extensions/<name>/__tes
 | `pnpm link-sdk` | Resolve the already installed SDK |
 | `pnpm typecheck` | Link SDK and run strict no-emit TypeScript |
 | `pnpm test` | Link SDK and run the full configured suite with file concurrency 8 |
+| `pnpm test:low-cpu` | Same SDK and full discovery/exit contract with file concurrency 4; trades wall-clock time for lower CPU pressure |
 | `pnpm check` | Typecheck and full suite |
 | `node --test <focused files>` | Focused regressions without forced exit |
 

@@ -66,6 +66,29 @@
 - 未解决 blocker：无。非阻塞限制：新 shape case 同时改变 user/key，未逐维覆盖 user-only/key-only/git-only；strict gate 原本同时篡改 diagnostics.py，不独立证明每个 gate 原因，未削弱现有断言。
 - 原始日志和快照在 `/tmp/pi-test-sdk-cpu-zJjatf/paired-*`、stage2-*；自包含结果如上。独立 reviewer 空临时目录由其保留，不自动清理。
 
+## Stage 3 验证结果与最终验收
+
+- 默认 test 8 workers unchanged；新增 `pnpm test:low-cpu` 4 workers，发现 globs / SDK 前置步骤 / forced-exit / 失败退出码与默认完全相同。只更新 testing spec 英文命令表，不新增用户测试教程。
+- `node --test scripts/test-modes.test.mjs` 初次 exit 1：子进程继承 NODE_TEST_CONTEXT，Node 拒绝 recursive runner 导致失败 fixture 返回 0。已删除该子环境变量，让子 runner 拥有独立上下文；rerun exit 0，1/1 PASS，实际验证两个模式各自的成功 0 / 失败 1。
+- 独立 agent_trellis_check_2_9a8e722a 只读审查无 blocker，node --check / diff --check exit 0；按主要求不并发全套测量。主会话执行结果如下面表格。
+- 固定 HEAD 328e236；六轮开始/结束 HEAD 一致，tracked binary diff cmp exit 0，新增 test-modes 文件期间未变化。每轮显式临时 agent + 现有 PI_SDK_DIR，Node 24.14.1 / SDK 1.4.0。首次默认 command 为 `/usr/bin/time -l pnpm check`（包括 typecheck 成本），后两次默认 `/usr/bin/time -l pnpm test`；low 三次 `/usr/bin/time -l pnpm test:low-cpu`，default/low 交替。每轮 exit 0，1659 tests / 1659 pass / 0 fail；第二对 named records 1735/1735 完全一致，命令 parity regression 锁定所有 glob。
+
+| mode | real 秒 | user 秒 | sys 秒 |
+| --- | --- | --- | --- |
+| default 1（含 typecheck） | 63.83 | 225.43 | 97.22 |
+| low 1 | 76.55 | 181.23 | 67.76 |
+| default 2 | 72.94 | 232.00 | 102.44 |
+| low 2 | 120.82 | 222.48 | 90.78 |
+| default 3 | 56.30 | 214.63 | 93.49 |
+| low 3 | 74.47 | 176.52 | 65.41 |
+
+real 中位数 default 63.83 / low 76.55；每轮 user+sys 的中位数 default 322.65 / low 248.99（约 -22.8%）。平均 CPU 核数代理 (user+sys)/real 的中位数 default 5.05 / low 3.25。系统负载存在明显噪声（low2 120.82 秒）；第一默认含 typecheck，非严格纯套件耗时对照，不承诺稳定百分比或将平均值称为峰值。默认仍速度优先，低负载由用户显式选择。
+
+- 全套 forced-exit 不证明 cleanup：Stage 1 191 个相关测试、Stage 2 focused 55 / broader 359 / Python38 均另有自然退出证据。
+- 三个阶段独立审查无未解决 blocker。无 SDK/依赖安装、产品初始化逻辑改动、跳过测试或削弱校验。无独立 lint script，未运行真实终端/provider（非本任务验收）。
+- 最终 `git diff --check` exit 0；只提交本任务 package/script/spec/materials，不纳入另一个 Beautify task。
+- 原始输出位于 owned `/tmp/pi-test-sdk-cpu-zJjatf/`，自包含记录如上。结束前确认无活跃进程后清理该 owned run；不清理旧 `/tmp/pi-testrun` 或 reviewer 目录。
+
 ## 最终记录要求
 
 逐条记录命令、环境/Node/SDK、代码快照、退出码、PASS/FAIL/NOT_RUN、失败原因与后续 rerun 关系。保留第一次失败事实。性能没有稳定收益时明确报告并调整 fixture 方案，不以减少覆盖换取通过。
