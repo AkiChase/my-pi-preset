@@ -5,7 +5,7 @@ import { harness, pause } from './harness.ts';
 void it('actual resetExtensionUI before shutdown preserves default editing and does not reinstall predecessor', async () => {
   const h = harness();
   try {
-    Object.assign(h.host, { clearExtensionTerminalInputListeners() {}, setExtensionFooter() {}, setExtensionHeader() {}, clearExtensionWidgets() {}, footerDataProvider: { clearExtensionStatuses() {} }, footer: { invalidate() {} }, updateTerminalTitle() {}, setWorkingIndicator() {}, setHiddenThinkingLabel() {} });
+    Object.assign(h.host, { extensionDialogs: [], showTopExtensionDialog() {}, clearExtensionTerminalInputListeners() {}, setExtensionFooter() {}, setExtensionHeader() {}, clearExtensionWidgets() {}, footerDataProvider: { clearExtensionStatuses() {} }, footer: { invalidate() {} }, updateTerminalTitle() {}, setWorkingIndicator() {}, setHiddenThinkingLabel() {} });
     h.install(); await h.start(); const editor = h.editor; editor.setText('@local'); editor.handleInput('/');
     InteractiveMode.prototype.resetExtensionUI.call(h.host);
     assert.equal(h.ctx.ui.getEditorComponent(), undefined); assert.equal(h.host.autocompleteProviderWrappers.length, 0);

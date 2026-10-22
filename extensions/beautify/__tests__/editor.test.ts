@@ -10,6 +10,35 @@ import { TaskLifecycle } from "../../task-ui/lifecycle.ts";
 import { TaskCoordinator } from "../../task-ui/coordinator.ts";
 import { cleanup, makeHost, loadUnified, inputHistory, sdk, themeSdk, tuiSdk, StatusIndicator } from "./harness.mjs";
 after(cleanup);
+test("actual reset disposes extension dialogs before clearing the stack and restores the editor", () => {
+  const h = makeHost("dialog-reset");
+  const events: string[] = [];
+  const blocked: unknown[] = [];
+  h.host.programStatus.setBlocked = (_name: string, value: unknown) => { blocked.push(value); };
+  const dialogs = ["first", "second"].map(name => ({ component: {
+    render: () => [], invalidate() {}, dispose() { events.push(name); },
+  } }));
+  const top = { component: { render: () => [], invalidate() {} }, blocked: { kind: "question", message: "Dialog" } };
+  Reflect.set(h.host, "extensionDialogs", [...dialogs, top]);
+  try {
+    h.editor.setText("draft");
+    h.host.showTopExtensionDialog();
+    assert.equal(h.tui.getFocusedComponent(), top.component);
+    assert.deepEqual(h.host.editorContainer.children, [top.component]);
+    assert.deepEqual(blocked, [top.blocked]);
+    h.resetExtensionUI();
+    assert.deepEqual(events, ["first", "second"]);
+    assert.deepEqual(h.host.extensionDialogs, []);
+    assert.deepEqual(blocked, [top.blocked, undefined]);
+    assert.equal(h.editor.getText(), "draft");
+    assert.equal(h.tui.getFocusedComponent(), h.editor);
+    assert.deepEqual(h.host.editorContainer.children, [h.editor]);
+    h.resetExtensionUI();
+    assert.deepEqual(events, ["first", "second"], "empty stack does not dispose dialogs again");
+    assert.deepEqual(blocked, [top.blocked, undefined], "empty reset does not redraw the dialog stack");
+  } finally { h.dispose(); }
+});
+
 const up = "\x1b[A", down = "\x1b[B";
 type FactoryArgs = Parameters<NonNullable<Parameters<ExtensionContext["ui"]["setEditorComponent"]>[0]>>;
 

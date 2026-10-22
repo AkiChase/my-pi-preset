@@ -79,6 +79,8 @@ export function makeHost(name) {
     workingMessage: undefined,
     defaultWorkingMessage: "Working...", idleStatus: { invalidate() {}, render() { return []; } },
     setCustomEditorComponent: interactive.InteractiveMode.prototype.setCustomEditorComponent,
+    extensionDialogs: [], programStatus: { setBlocked(_name, _value) {} },
+    showTopExtensionDialog: interactive.InteractiveMode.prototype.showTopExtensionDialog,
     clearExtensionTerminalInputListeners() {}, setExtensionFooter() {}, setExtensionHeader() {},
     clearExtensionWidgets() {}, footerDataProvider: { clearExtensionStatuses() {}, setExtensionStatus() {} }, footer: { invalidate() {} },
     autocompleteProviderWrappers: [],

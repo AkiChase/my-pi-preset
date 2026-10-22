@@ -1,0 +1,4 @@
+{"file":".trellis/spec/development/index.md","reason":"SDK public type boundaries, lifecycle ownership and test-only changes"}
+{"file":".trellis/spec/testing/index.md","reason":"Actual SDK regressions, isolated fixture copies, natural exit and performance evidence"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse existing fixture owners without changing semantics"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Preserve root identity and cleanup boundaries"}

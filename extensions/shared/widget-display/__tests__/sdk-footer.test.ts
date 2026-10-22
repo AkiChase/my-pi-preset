@@ -19,6 +19,7 @@ for (const ownerFirst of [true, false]) it(`installed SDK Footer setter/factory/
         footerContainer: new Container(), footer: { render: () => ["native"], invalidate() {} }, footerDataProvider: provider,
         ui: { requestRender() {}, hideOverlay() {} }, defaultEditor: {}, activeStatusIndicator: undefined,
         setExtensionFooter(factory: unknown) { factories++; InteractiveMode.prototype.setExtensionFooter.call(seam, factory); },
+        extensionDialogs: [], showTopExtensionDialog() {},
         clearExtensionTerminalInputListeners() {}, setExtensionHeader() {}, clearExtensionWidgets() {}, setCustomEditorComponent() {},
         setupAutocompleteProvider() {}, updateTerminalTitle() {}, setWorkingIndicator() {}, setHiddenThinkingLabel() {},
     };
