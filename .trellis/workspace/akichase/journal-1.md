@@ -1862,3 +1862,39 @@ Clarified latest-request and session cache metrics in the unified status bar, wi
 ### Status
 
 [OK] **Completed**
+
+
+## Session 56: 交互式预设安装器
+<!-- trellis-session: v=2 fp=93da2b78739dfedf -->
+
+**Date**: 2026-10-22
+**Task**: 交互式预设安装器
+**Branch**: `main`
+
+### Summary
+
+完成无边框键盘安装向导、默认全选同步/全不选清理、真实预览与 Enter 执行、本地 pnpm 依赖前置；用户验收后归档。
+
+### Main Changes
+
+- 保留 100ms Esc 延迟与指针对齐；curl 管道从终端读取输入；修复 macOS 临时路径与执行 stdin 交接。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d953f75` | fix: clarify sync state logging |
+| `34e9d30` | feat: add interactive preset installer |
+| `1b679a3` | feat: streamline installer apply and prepare local dependencies |
+
+### Testing
+
+- [OK] 集中 33/33、隔离 pnpm check 1626/1626 通过；独立审查修复后无剩余重要问题。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 未 push；远程 curl 入口需发布后更新。保留其他会话的 subagent-detail-parity 未跟踪任务。
