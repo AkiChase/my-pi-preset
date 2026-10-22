@@ -2,7 +2,7 @@ import type { Theme, ToolRenderers } from "@earendil-works/pi-coding-agent";
 import { Highlighter, language } from "../highlight.ts";
 import { clean, readNotice, splitView, wrap } from "../layout.ts";
 import { text, type RenderContext, type Result } from "../types.ts";
-import { fallback, genericMetadata, withSecondaryParameters, numbered, renderers, type TimingDisplay } from "./shared.ts";
+import { fallback, genericMetadata, numbered, renderers, type TimingDisplay } from "./shared.ts";
 
 function applyHighlight(weak: WeakRef<ReadDrawing>, revision: number, ansi: string | undefined): void {
   const drawing = weak.deref();
@@ -67,12 +67,12 @@ class ReadDrawing {
   }
 }
 export function readRenderers(highlighter: Highlighter, timing?: TimingDisplay): ToolRenderers {
-  const base = renderers("read", fallback, withSecondaryParameters("read", (result, ctx) => {
+  const base = renderers("read", fallback, (result, ctx) => {
     if (!result || ctx.isError) return genericMetadata(result, ctx);
     const raw = text(result), view = splitView(raw, readNotice);
     if (result.content.some(block => block.type === "image") || /^Read image file \[image\//.test(raw)) return { stats: "image" };
     return { stats: `${view.lines.length} lines${view.notice.length ? " · limited" : ""}` };
-  }), timing);
+  }, timing);
   return { ...base,
     renderResult(result, options, theme, context) {
       base.renderResult!(result, options, theme, context);

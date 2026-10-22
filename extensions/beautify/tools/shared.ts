@@ -1,44 +1,55 @@
 import type { Theme, ToolRenderers } from "@earendil-works/pi-coding-agent";
 import { visibleWidth, type Component } from "@earendil-works/pi-tui";
-import { argumentsText } from "../tool-card.ts";
 import { clean, clip, summary, toolHeading, wrap } from "../layout.ts";
 import { text, type Args, type RenderContext, type Result } from "../types.ts";
 export type Draw = (result: Result, theme: Theme, context: RenderContext, width: number) => string[];
 export interface Metadata { title?: string; suffix?: string; stats: string; secondary?: string; expandedRows?: readonly string[]; executionConfig?: import("../../runtime-tasks/execution-config.ts").ExecutionConfig }
 export type Describe = (result: Result | undefined, context: RenderContext) => Metadata;
 
-/** Add only arrived parameters not already represented by the title or suffix. */
-export function withSecondaryParameters(name: "bash" | "read" | "find" | "grep", describe: Describe): Describe {
-  return (result, ctx) => {
-    const meta = describe(result, ctx);
-    const args = ctx.args;
-    const keys = name === "bash" ? (typeof args.description === "string" && args.description.trim() ? ["command"] : [])
-      : name === "grep" ? ["glob", "ignoreCase", "literal", "context", "limit"] : ["limit"];
-    const fields = keys.flatMap(key => {
-      if (!Object.hasOwn(args, key)) return [];
-      const value = args[key];
-      if (typeof value === "boolean") return [value ? key : `${key} false`];
-      if (typeof value === "number") return [`${key} ${value}`];
-      if (typeof value === "string" && value.trim()) return [`${key} ${value}`];
-      return [];
-    });
-    return { ...meta, secondary: [meta.secondary, ...fields].filter(Boolean).join(" · ") };
-  };
-}
+type BuiltinName = "bash" | "read" | "find" | "grep";
+interface CallDescription { title: string; suffix: string; options: string; details: string[] }
 
-export function title(name: string, args: Args): string {
+/** Args-only call information: execution and result updates only add metadata/body. */
+export function describeCall(name: BuiltinName, args: Args): CallDescription {
+  const string = (key: string) => Object.hasOwn(args, key) && typeof args[key] === "string" ? clean(args[key]) : "";
+  const boolean = (key: string) => Object.hasOwn(args, key) && typeof args[key] === "boolean" ? args[key] : undefined;
+  const number = (key: string) => Object.hasOwn(args, key) && typeof args[key] === "number" && Number.isFinite(args[key]) ? args[key] : undefined;
+  const options: string[] = [], details: string[] = [];
   if (name === "bash") {
-    const mode = args.run_in_background === true ? "  background"
-      : args.background_after_seconds !== undefined ? `  background after ${args.background_after_seconds}s`
-      : args.timeout !== undefined ? `  timeout ${args.timeout}s` : "";
-    return clean(typeof args.description === "string" && args.description.trim() ? args.description.trim() : String(args.command ?? "")) + mode;
+    const description = string("description").trim(), command = string("command");
+    const after = number("background_after_seconds"), timeout = number("timeout");
+    const mode = boolean("run_in_background") === true ? "  background"
+      : after !== undefined ? `  background after ${after}s`
+      : timeout !== undefined ? `  timeout ${timeout}s` : "";
+    if (description && command) options.push(command.replace(/\n/g, "\\n"));
+    if (command) details.push(`Command: ${command}`);
+    return { title: (description || command) + mode, suffix: "", options: options.join(" · "), details };
   }
-  if (name === "read") return clean(String(args.path ?? ""));
-  return `${clean(String(args.pattern ?? ""))}${args.path ? ` in ${clean(String(args.path))}` : ""}`;
+  const path = string("path"), limit = number("limit");
+  if (name === "read") {
+    const offset = number("offset");
+    if (limit !== undefined) options.push(`up to ${limit} lines`);
+    if (offset !== undefined || limit !== undefined) {
+      const start = Math.max(1, offset ?? 1);
+      details.push(limit !== undefined && limit > 0 ? `Lines ${start}–${start + limit - 1}` : `From line ${start}`);
+    }
+    return { title: path, suffix: offset !== undefined ? `:${Math.max(1, offset)}` : "", options: options.join(" · "), details };
+  }
+  if (name === "grep") {
+    const glob = string("glob"), context = number("context");
+    if (glob.trim()) options.push(`files ${glob}`);
+    if (boolean("ignoreCase") === true) options.push("case-insensitive");
+    else if (boolean("ignoreCase") === false) options.push("case-sensitive");
+    if (boolean("literal") === true) options.push("literal");
+    else if (boolean("literal") === false) options.push("regex");
+    if (context !== undefined) options.push(`${context} context lines`);
+  }
+  if (limit !== undefined) options.push(`up to ${limit} ${name === "find" ? "files" : "matches"}`);
+  return { title: string("pattern") + (path ? ` in ${path}` : ""), suffix: "", options: options.join(" · "), details };
 }
 interface Cell { result?: Result; ctx: RenderContext; theme: Theme }
 export type TimingDisplay = (ctx: RenderContext) => string | undefined;
-export function renderers(name: string, draw: Draw, describe: Describe = genericMetadata, timing?: TimingDisplay): ToolRenderers {
+export function renderers(name: BuiltinName, draw: Draw, describe: Describe = genericMetadata, timing?: TimingDisplay): ToolRenderers {
   const key = `beautify.${name}.composition`;
   const cell = (theme: Theme, ctx: RenderContext): Cell => {
     const existing = ctx.state[key] as Cell | undefined;
@@ -54,11 +65,20 @@ export function renderers(name: string, draw: Draw, describe: Describe = generic
         const meta = describe(result, ctx);
         const display = timing?.(ctx);
         if (display) meta.stats = [meta.stats, display].filter(Boolean).join(" · ");
-        const label = meta.title ?? title(name, ctx.args);
-        const suffix = meta.suffix ?? (name === "read" && typeof ctx.args.offset === "number" ? `:${Math.max(1, ctx.args.offset)}` : "");
-        const heading = toolHeading(name, label, suffix, meta.stats, width, theme, ctx.expanded, meta.secondary);
-        const args = ctx.expanded ? argumentsText(ctx.args) : "";
-        return args ? [...heading, ...wrap(args, width).map(row => theme.fg("muted", row))] : heading;
+        const call = describeCall(name, ctx.args);
+        const label = meta.title ?? call.title;
+        const suffix = meta.suffix ?? call.suffix;
+        const secondary = [meta.secondary, call.options].filter(Boolean).join(" · ");
+        // Expanded calls keep the same semantic options in their heading. Only
+        // this family opts in; generic/management toolHeading semantics stay intact.
+        const heading = ctx.expanded
+          ? toolHeading(name, label + suffix + (secondary ? `  ${secondary}` : ""), "", "", width, theme, true)
+          : toolHeading(name, label, suffix, meta.stats, width, theme, false, secondary);
+        if (!ctx.expanded) return heading;
+        return [...heading,
+          ...wrap(meta.stats, width).filter(Boolean).map(row => theme.fg("muted", row)),
+          ...call.details.flatMap(detail => wrap(detail, width).map(row => theme.fg("muted", row))),
+        ];
       } };
     },
     renderResult: (result, _options, theme, context) => {

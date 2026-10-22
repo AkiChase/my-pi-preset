@@ -156,11 +156,11 @@ test("task headings preserve measurements on narrow terminals and bash descripti
   const args = { command: "printf first\\nsecond", description: "运行测试", background_after_seconds: -1 };
   const compact = plain(result(bashRenderers, "ok", args, { expanded: false }).render(120).join("\n"));
   assert.match(compact, /bash  运行测试/);
-  assert.match(compact, /command printf first\\nsecond/);
+  assert.match(compact, /printf first\\nsecond/);
   const expanded = plain(result(bashRenderers, "ok", args, { expanded: true }).render(100).join("\n"));
-  assert.match(expanded, /command: printf first/);
-  assert.equal((expanded.match(/command: /g) ?? []).length, 1);
-  assert.doesNotMatch(expanded, /Command:/);
+  assert.match(expanded, /Command: printf first/);
+  assert.equal((expanded.match(/Command: /g) ?? []).length, 1);
+  assert.doesNotMatch(expanded, /command:|description:|background_after_seconds:/);
   assert.match(expanded, /\nok$/);
   assert.equal(args.command, "printf first\\nsecond");
 });

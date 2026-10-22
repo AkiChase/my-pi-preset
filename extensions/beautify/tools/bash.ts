@@ -1,9 +1,9 @@
 import { isLaunchMetadata, launchText } from "../../runtime-tasks/launch.ts";
 import { text } from "../types.ts";
 import type { RenderContext } from "../types.ts";
-import { fallback, genericMetadata, withSecondaryParameters, renderers } from "./shared.ts";
+import { fallback, genericMetadata, renderers } from "./shared.ts";
 export function createBashRenderers(elapsed?: (ctx: RenderContext) => string | undefined) {
-return renderers("bash", fallback, withSecondaryParameters("bash", (result, ctx) => {
+return renderers("bash", fallback, (result, ctx) => {
   const handling = elapsed?.(ctx);
   const attachTime = <T extends { stats: string; secondary?: string }>(meta: T): T => {
     if (handling) meta.stats = [meta.stats, handling].filter(Boolean).join(" · ");
@@ -19,6 +19,6 @@ return renderers("bash", fallback, withSecondaryParameters("bash", (result, ctx)
   const meta = genericMetadata(valid ? { ...result, content: [{ type: "text", text: raw }] } : result, ctx);
   if (!handling && typeof ctx.durationMs === "number" && Number.isFinite(ctx.durationMs) && ctx.durationMs >= 0) meta.secondary = `${ctx.durationMs}ms call`;
   return attachTime(meta);
-}));
+});
 }
 export const bashRenderers = createBashRenderers();

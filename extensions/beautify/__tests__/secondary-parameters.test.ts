@@ -7,7 +7,7 @@ import { bashRenderers } from "../tools/bash.ts";
 import { findRenderers } from "../tools/find.ts";
 import { grepRenderers } from "../tools/grep.ts";
 import { readRenderers } from "../tools/read.ts";
-import { withSecondaryParameters } from "../tools/shared.ts";
+import { describeCall, renderers } from "../tools/shared.ts";
 import { Highlighter } from "../highlight.ts";
 import type { Args, RenderContext } from "../types.ts";
 import { ToolExecutionComponent, themeSdk } from "./renderer-host.mjs";
@@ -15,11 +15,11 @@ import { ToolExecutionComponent, themeSdk } from "./renderer-host.mjs";
 const screen = new TuiMainScreen({ columns: 400, rows: 40, kittyProtocolActive: false, start() {}, stop() {}, async drainInput() {}, write() {}, moveBy() {}, hideCursor() {}, showCursor() {}, clearLine() {}, clearFromCursor() {}, clearScreen() {}, setTitle() {}, setProgress() {}, setProgramStatus() {} });
 screen.requestRender = () => {};
 const highlighter = new Highlighter();
-const fixtures: Array<{ name: string; renderer: ToolRenderers; stages: Args[]; fields: string[] }> = [
-  { name: "bash", renderer: bashRenderers, stages: [{}, { description: "Check tests" }, { description: "Check tests", command: "npm test" }, { description: "Check tests", command: "npm test", background_after_seconds: 5 }], fields: ["command npm test"] },
-  { name: "read", renderer: readRenderers(highlighter), stages: [{}, { path: "a.ts" }, { path: "a.ts", offset: 65 }, { path: "a.ts", offset: 65, limit: 40 }], fields: ["limit 40"] },
-  { name: "find", renderer: findRenderers, stages: [{}, { pattern: "*.ts" }, { pattern: "*.ts", path: "src" }, { pattern: "*.ts", path: "src", limit: 50 }], fields: ["limit 50"] },
-  { name: "grep", renderer: grepRenderers, stages: [{}, { pattern: "needle", path: "src" }, { pattern: "needle", path: "src", glob: "*.ts" }, { pattern: "needle", path: "src", glob: "*.ts", ignoreCase: true }, { pattern: "needle", path: "src", glob: "*.ts", ignoreCase: true, literal: false }, { pattern: "needle", path: "src", glob: "*.ts", ignoreCase: true, literal: false, context: 0 }, { pattern: "needle", path: "src", glob: "*.ts", ignoreCase: true, literal: false, context: 0, limit: 60 }], fields: ["glob *.ts", "ignoreCase", "literal false", "context 0", "limit 60"] },
+const fixtures: Array<{ name: string; renderer: ToolRenderers; stages: Args[]; fields: Array<[string, string]> }> = [
+  { name: "bash", renderer: bashRenderers, stages: [{}, { description: "Check tests" }, { description: "Check tests", command: "npm test" }, { description: "Check tests", command: "npm test", background_after_seconds: 5 }], fields: [["command", "npm test"]] },
+  { name: "read", renderer: readRenderers(highlighter), stages: [{}, { path: "a.ts" }, { path: "a.ts", offset: 65 }, { path: "a.ts", offset: 65, limit: 40 }], fields: [["limit", "up to 40 lines"]] },
+  { name: "find", renderer: findRenderers, stages: [{}, { pattern: "*.ts" }, { pattern: "*.ts", path: "src" }, { pattern: "*.ts", path: "src", limit: 50 }], fields: [["limit", "up to 50 files"]] },
+  { name: "grep", renderer: grepRenderers, stages: [{}, { pattern: "needle", path: "src" }, { pattern: "needle", path: "src", glob: "*.ts" }, { pattern: "needle", path: "src", glob: "*.ts", ignoreCase: true }, { pattern: "needle", path: "src", glob: "*.ts", ignoreCase: true, literal: false }, { pattern: "needle", path: "src", glob: "*.ts", ignoreCase: true, literal: false, context: 0 }, { pattern: "needle", path: "src", glob: "*.ts", ignoreCase: true, literal: false, context: 0, limit: 60 }], fields: [["glob", "files *.ts"], ["ignoreCase", "case-insensitive"], ["literal", "regex"], ["context", "0 context lines"], ["limit", "up to 60 matches"]] },
 ];
 const visible = (component: InstanceType<typeof ToolExecutionComponent>, width = 400): string[] => component.render(width).map((row: string) => plain(row).trim()).filter(Boolean);
 
@@ -41,8 +41,8 @@ for (const fixture of fixtures) {
       assert.equal(ctx.durationMs, undefined);
       const rows = visible(component), output = rows.join("\n");
       assert.equal(rows.length, 1);
-      for (const field of fixture.fields) {
-        if (Object.hasOwn(args, field.split(" ")[0]!)) assert.ok(output.includes(field), output);
+      for (const [key, field] of fixture.fields) {
+        if (Object.hasOwn(args, key)) assert.ok(output.includes(field), output);
         else assert.ok(!output.includes(field), output);
       }
       assert.doesNotMatch(output, /undefined|elapsed|execution \d/);
@@ -52,7 +52,7 @@ for (const fixture of fixtures) {
     assert.equal(observed.at(-1)!.executionStarted, true);
     assert.equal(observed.at(-1)!.argsComplete, true);
     const running = visible(component).join("\n");
-    for (const field of fixture.fields) assert.ok(running.includes(field), running);
+    for (const [key, field] of fixture.fields) assert.ok(running.includes(field), running);
     assert.match(running, /expand/);
     if (fixture.name === "read") {
       assert.equal((running.match(/:65/g) ?? []).length, 1);
@@ -67,10 +67,17 @@ function context(args: Args): RenderContext {
 }
 
 test("secondary derivation preserves existing metadata, explicit false/zero, and skips absent/empty parameters", () => {
-  const describe = withSecondaryParameters("grep", () => ({ title: "kept", suffix: ":1", stats: "running", secondary: "125ms call", expandedRows: ["kept row"] }));
-  const meta = describe(undefined, context({ glob: "", ignoreCase: false, literal: true, context: 0, limit: undefined }));
-  assert.deepEqual(meta, { title: "kept", suffix: ":1", stats: "running", secondary: "125ms call · ignoreCase false · literal · context 0", expandedRows: ["kept row"] });
-  assert.equal(withSecondaryParameters("read", () => ({ stats: "" }))(undefined, context(Object.create({ limit: 40 }))).secondary, "");
+  assert.deepEqual(describeCall("grep", { glob: "", ignoreCase: false, literal: true, context: 0, limit: undefined }), {
+    title: "", suffix: "", options: "case-sensitive · literal · 0 context lines", details: [],
+  });
+  assert.equal(describeCall("read", Object.create({ limit: 40 })).options, "");
+  assert.equal(describeCall("grep", Object.create({ ignoreCase: true, literal: false })).options, "");
+  assert.deepEqual(describeCall("read", { path: " spaced path ", offset: 0, limit: 0 }), {
+    title: " spaced path ", suffix: ":1", options: "up to 0 lines", details: ["From line 1"],
+  });
+  assert.deepEqual(describeCall("bash", { command: "  printf x\n", run_in_background: false, background_after_seconds: 0 }), {
+    title: "  printf x\n  background after 0s", suffix: "", options: "", details: ["Command:   printf x\n"],
+  });
   for (const description of [undefined, "", "  "]) {
     const call = bashRenderers.renderCall!({ description, command: "npm test", run_in_background: false }, themeSdk.theme, context({ description, command: "npm test", run_in_background: false }));
     const output = plain(call.render(400).join("\n"));
@@ -80,7 +87,26 @@ test("secondary derivation preserves existing metadata, explicit false/zero, and
   const ctx = { ...context({ description: "Check", command: "npm test" }), isPartial: false, durationMs: 125 };
   const call = bashRenderers.renderCall!(ctx.args, themeSdk.theme, ctx);
   bashRenderers.renderResult!({ content: [{ type: "text", text: "done" }], details: undefined }, { expanded: false, isPartial: false }, themeSdk.theme, ctx);
-  assert.match(plain(call.render(400).join("\n")), /125ms call · command npm test/);
+  assert.match(plain(call.render(400).join("\n")), /125ms call · npm test/);
+});
+
+test("shared call composition preserves metadata title/suffix overrides and semantic options", () => {
+  const renderer = renderers("read", () => [], () => ({ title: "Selected file", suffix: ":9", stats: "running", secondary: "adapter detail" }));
+  const ctx = context({ path: "original.ts", offset: 2, limit: 3 });
+  const call = renderer.renderCall!(ctx.args, themeSdk.theme, ctx);
+  for (const expanded of [false, true]) {
+    ctx.expanded = expanded;
+    const output = plain(call.render(400).join("\n"));
+    assert.match(output, /read  Selected file:9/);
+    assert.match(output, /adapter detail · up to 3 lines/);
+    assert.match(output, /running/);
+    assert.doesNotMatch(output, /original\.ts|Selected file:2/);
+  }
+  const empty = renderers("read", () => [], () => ({ title: "", suffix: "", stats: "" }));
+  ctx.expanded = false;
+  const output = plain(empty.renderCall!(ctx.args, themeSdk.theme, { ...ctx, state: {} }).render(400).join("\n"));
+  assert.doesNotMatch(output, /original\.ts|:2/);
+  assert.match(output, /up to 3 lines/);
 });
 
 test("partial/running hostile secondary text is sanitized and width-safe without changing compact row contracts", () => {
