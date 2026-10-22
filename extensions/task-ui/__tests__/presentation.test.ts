@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
-import { visibleWidth, stripTerminalSequences } from "@earendil-works/pi-tui";
+import { visibleWidth, stripTerminalSequences, mixColors } from "@earendil-works/pi-tui";
 import { taskKey, type TaskView } from "../types.ts";
 import { TaskPanelModel } from "../model.ts";
 import { cleanTaskText, taskDot, taskDuration, taskLine, taskStatusColor, taskTokens, taskTitle } from "../presentation.ts";
@@ -133,4 +133,55 @@ void it("all lifecycle symbols/colors remain readable without animation", () => 
     }
     assert.ok(seen.includes("muted")); assert.ok(seen.includes("accent"));
     assert.ok(seen.includes("success")); assert.ok(seen.includes("error")); assert.ok(seen.includes("dim"));
+});
+
+void it("terminal detail headers use public theme colors as soft full-width backgrounds in light/dark themes", async () => {
+    // Test-only installed theme loader introspection; production uses the injected public Theme.
+    const { pathToFileURL } = await import("node:url");
+    const { dirname, join } = await import("node:path");
+    const { fileURLToPath } = await import("node:url");
+    const host = await import(pathToFileURL(join(dirname(fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"))), "modes/interactive/theme/theme.js")).href);
+    const getThemeByName = host.getThemeByName as (name: string) => import("@earendil-works/pi-coding-agent").Theme | undefined;
+    const { taskDetailTopLine } = await import("../presentation.ts");
+    for (const name of ["dark", "light"]) {
+        const actual = getThemeByName(name)!; assert.ok(actual);
+        const seen = new Set<string>();
+        const luminance = (color: typeof actual.colors.text) => {
+            assert.equal(color.kind, "rgb");
+            if (color.kind !== "rgb") throw new Error("Expected public RGB palette");
+            return [color.r, color.g, color.b].map(v => v / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+                .reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i]!, 0);
+        };
+        for (const status of ["completed", "failed", "stopped", "interrupted"] as const) {
+            const semantic = status === "completed" ? "success" : status === "failed" ? "error" : "warning";
+            const surface = mixColors(actual.colors.toolPendingBg, actual.colors[semantic], 0.22, "srgb");
+            const fg = luminance(actual.colors.text), bg = luminance(surface);
+            assert.ok((Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05) >= 4.5, `${name}/${status}: readable normal text`);
+            const line = taskDetailTopLine(view("Agent中文😀", { status }), 60, actual);
+            assert.ok(line.includes(actual.fg("text", `${taskDot(view(status, { status }))} ${status[0].toUpperCase() + status.slice(1)}`)), "status uses the contrasting text foreground");
+            assert.equal(visibleWidth(line), 60);
+            assert.match(stripTerminalSequences(line), new RegExp(status[0].toUpperCase() + status.slice(1)));
+            let active = false, columns = 0;
+            for (const part of line.match(/\u001b\[[0-9;]*m|[^\u001b]+/g) ?? []) {
+                if (part.startsWith("\u001b")) {
+                    const codes = part.slice(2, -1).split(";");
+                    if (codes.some(c => c === "" || c === "0" || c === "49")) active = false;
+                    if (codes.includes("48")) { active = true; seen.add(part); }
+                } else { assert.equal(active, true); columns += visibleWidth(part); }
+            }
+            assert.equal(columns, 60); assert.equal(active, false);
+        }
+        assert.ok(seen.size >= 3, "success/warning/error have distinct surfaces");
+        assert.doesNotMatch(taskDetailTopLine(view("live"), 60, actual), /\u001b\[48/);
+    }
+});
+
+void it("agent runtime keeps pending cleanup visible before counters and sanitizes synthetic activity", async () => {
+    const { taskStatusLine } = await import("../presentation.ts");
+    const pending = view("pending", { status: "stopped", stats: { settling: true, durationMs: 999999999 } });
+    assert.match(taskStatusLine(pending, 20, theme), /^cleanup pending/);
+    const running = view("live", { stats: { activity: "setup\u001b]0;unsafe\u0007\nactivity" } });
+    const out = taskStatusLine(running, 80, theme);
+    assert.doesNotMatch(out, /\u001b|\u0007|\n|unsafe/);
+    assert.match(out, /setup activity/);
 });

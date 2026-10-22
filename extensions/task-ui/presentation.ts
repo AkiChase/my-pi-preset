@@ -1,5 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { stripTerminalSequences, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { backgroundAnsi, mixColors, stripTerminalSequences, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { TaskView } from "./types.ts";
 
 /** Sanitize external text before applying host-owned styles. Preserve detail line breaks. */
@@ -52,7 +52,7 @@ export function taskTokens(tokens: number | undefined): string | undefined {
     return tokens >= 1_000_000 ? `${(tokens / 1_000_000).toFixed(1)}M` : tokens >= 1_000 ? `${(tokens / 1_000).toFixed(1)}k` : String(Math.floor(tokens));
 }
 
-export type TaskTheme = Pick<Theme, "fg"> & Partial<Pick<Theme, "bg" | "bold">>;
+export type TaskTheme = Pick<Theme, "fg"> & Partial<Pick<Theme, "bg" | "bold" | "style" | "colors" | "getColorMode">>;
 export interface TaskLineOptions { prefix?: string; children?: number; selected?: boolean; now?: number }
 
 /** One bounded task line. Protect state/wait first, then statistics, before title/indentation. */
@@ -87,6 +87,14 @@ export function taskLine(view: TaskView, width: number, theme: TaskTheme, option
 
 /** Fixed selected status: protect lifecycle/name/activity before secondary counters. */
 export function taskStatusLine(view: TaskView, width: number, theme: TaskTheme, now?: number): string {
+    if (view.kind === "agent") {
+        const parts = [view.stats.settling ? "cleanup pending" : undefined,
+            taskDuration(view, now) ? `Agent runtime ${taskDuration(view, now)}` : undefined,
+            view.status === "running" || view.status === "starting" ? taskOneLine(view.stats.activity ?? "") : undefined,
+            view.stats.turnCount === undefined ? undefined : `${view.stats.turnCount} turns`,
+            view.stats.toolUses === undefined ? undefined : `${view.stats.toolUses} tools`, taskTokens(view.stats.tokens)].filter(Boolean);
+        return truncateToWidth(theme.fg("dim", parts.join(" · ")), width, "…");
+    }
     const state = theme.fg(taskStatusColor(view), taskDot(view));
     const name = truncateToWidth(taskOneLine(view.title), Math.max(0, Math.floor(width / 3)), "…");
     const primary = `${state} ${name}`;
@@ -94,4 +102,25 @@ export function taskStatusLine(view: TaskView, width: number, theme: TaskTheme, 
     const secondary = [taskDuration(view, now), view.stats.turnCount === undefined ? undefined : `${view.stats.turnCount} turns`,
         view.stats.toolUses === undefined ? undefined : `${view.stats.toolUses} tools`, taskTokens(view.stats.tokens)].filter(Boolean).join(" · ");
     return truncateToWidth(primary + activity + (secondary ? ` · ${secondary}` : ""), width, "…");
+}
+
+/** Fixed one-row detail identity. Concrete public colors permit soft semantic surfaces. */
+export function taskDetailTopLine(view: TaskView, width: number, theme: TaskTheme): string {
+    const label = view.status[0].toUpperCase() + view.status.slice(1);
+    const status = `${taskDot(view)} ${label}`;
+    const terminal = view.status === "completed" || view.status === "failed" || view.status === "stopped" || view.status === "interrupted";
+    const color = view.status === "stopped" ? "warning" : taskStatusColor(view);
+    // The semantic surface carries terminal color. Normal text preserves contrast
+    // in both public light/dark palettes; semantic foreground on its own tint does not.
+    const suffix = theme.fg(terminal ? "text" : color, status);
+    const name = truncateToWidth(taskTitle(view), Math.max(0, width - visibleWidth(suffix) - 3), "…");
+    let line = truncateToWidth((name ? theme.fg("text", name) + " · " : "") + suffix, width, "…");
+    line += " ".repeat(Math.max(0, width - visibleWidth(line)));
+    if (!terminal || !theme.colors || !theme.style || !theme.getColorMode) return line;
+    const background = mixColors(theme.colors.toolPendingBg, theme.colors[color], 0.22, "srgb");
+    const open = backgroundAnsi(background, theme.getColorMode());
+    // Foreground and layout resets must not punch holes through the fixed surface.
+    line = line.replace(/\u001b\[([0-9;]*)m/g, (sgr, codes: string) =>
+        codes.split(";").some(code => code === "" || code === "0" || code === "49") ? sgr + open : sgr);
+    return theme.style(line, { bg: background });
 }

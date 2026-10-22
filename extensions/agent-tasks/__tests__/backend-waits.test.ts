@@ -755,3 +755,80 @@ void it("synthetic outcomes respect the page byte cap and retain real round-trip
     assert.deepEqual(newer.entries.filter(e => e.kind === "user").slice(0, latest.entries.filter(e => e.kind === "user").length).map(e => e.id), latest.entries.filter(e => e.kind === "user").map(e => e.id));
   } finally { await f.close(); }
 });
+
+void it("run-scoped call clocks isolate concurrent same-name IDs, freeze stop, and fence stale resume events", async t => {
+  let now = 100;
+  t.mock.method(performance, "now", () => now);
+  const f = fixture();
+  try {
+    const id = f.spawn(true); await tick();
+    const activity = f.calls[0]!.options.onToolActivity!;
+    activity({ type: "end", toolName: "extension-error:setup" });
+    assert.equal(f.manager.getRecord(id)!.toolUses, 0);
+    activity({ type: "start", toolName: "bash", toolCallId: "a" });
+    now = 200; activity({ type: "start", toolName: "bash", toolCallId: "b" });
+    now = 600;
+    assert.deepEqual(f.source.list()[0]!.stats.toolCalls?.map(c => [c.toolCallId, c.elapsedMs]), [["a", 500], ["b", 400]]);
+    activity({ type: "end", toolName: "bash", toolCallId: "a", durationMs: 37, isError: true });
+    assert.equal(f.manager.getToolCalls(id)[0]!.durationMs, 37);
+    assert.equal(f.manager.getToolCalls(id)[0]!.status, "failed");
+    const parent = new AbortController();
+    const run = f.manager.getRun(id)!;
+    parent.signal.addEventListener("abort", () => f.manager.stopRun(run.identity));
+    parent.abort();
+    now = 6000;
+    assert.deepEqual(f.manager.getToolCalls(id).map(c => [c.status, c.elapsedMs]), [["failed", 500], ["interrupted", 400]]);
+    activity({ type: "end", toolName: "bash", toolCallId: "b", durationMs: 9000 });
+    assert.equal(f.manager.getToolCalls(id)[1]!.status, "interrupted");
+    assert.equal(f.source.list()[0]!.stats.activity, undefined);
+    await f.manager.waitForAll();
+    f.manager.resumeRun(id, "continue", undefined, { isBackground: true });
+    activity({ type: "start", toolName: "bash", toolCallId: "stale" });
+    assert.deepEqual(f.manager.getToolCalls(id), []);
+    const resumed = f.resumes[0]!.options!.onToolActivity!;
+    resumed({ type: "end", toolName: "read", toolCallId: "unknown-start" });
+    assert.equal(f.manager.getToolCalls(id)[0]!.elapsedMs, undefined);
+    f.resumes[0]!.finish(); await f.manager.waitForAll();
+    assert.equal(f.manager.getToolCalls(id)[0]!.durationMs, undefined);
+  } finally { await f.close(); }
+});
+
+void it("source keeps cleanup pending while owned session cancellation outlives runner settlement", async () => {
+  const f = fixture(), abort = deferred<void>();
+  try {
+    const id = f.spawn(true); await tick();
+    f.calls[0]!.session.abort = async () => abort.promise;
+    assert.equal(f.manager.abort(id), true);
+    await tick();
+    assert.equal(f.manager.isRunActive(id), false, "terminal runner has settled independently");
+    assert.equal(f.source.list()[0]!.stats.settling, true, "owned abort has not returned yet");
+    abort.resolve(); await f.manager.drainExecution(); await tick();
+    assert.equal(f.source.list()[0]!.stats.settling, false);
+  } finally { abort.resolve(); await f.close(); }
+});
+
+void it("bounded call retention keeps snapshots immutable and terminal clocks stop before cleanup settles", async t => {
+  let now = 0; t.mock.method(performance, "now", () => now);
+  const cleanup = deferred<{ hasChanges: boolean }>();
+  const f = fixture({ worktreeEnabled: () => true,
+    createWorktree: async () => ({ path: tmpdir(), workPath: tmpdir(), branch: "fake", baseSha: "fake" }),
+    cleanupWorktree: async () => cleanup.promise });
+  try {
+    const id = f.spawn(true, { isolation: "worktree" }); await tick();
+    const activity = f.calls[0]!.options.onToolActivity!;
+    for (let i = 0; i < 150; i++) {
+      activity({ type: "start", toolName: "read", toolCallId: String(i) });
+      activity({ type: "end", toolName: "read", toolCallId: String(i), durationMs: i });
+    }
+    activity({ type: "start", toolName: "read", toolCallId: "unfinished" });
+    const snapshot = f.source.list()[0]!.stats.toolCalls!;
+    assert.equal(snapshot.length, 128); assert.ok(Object.isFrozen(snapshot) && Object.isFrozen(snapshot[0]));
+    now = 100; f.calls[0]!.finish(); await tick();
+    const row = f.source.list()[0]!;
+    assert.equal(row.status, "completed"); assert.equal(row.stats.settling, true);
+    now = 9000; assert.equal(f.manager.getToolCalls(id).at(-1)!.elapsedMs, 100);
+    assert.equal(snapshot.at(-1)!.status, "running");
+    cleanup.resolve({ hasChanges: false }); await f.manager.waitForAll();
+    assert.equal(f.source.list()[0]!.stats.settling, false);
+  } finally { cleanup.resolve({ hasChanges: false }); await f.close(); }
+});

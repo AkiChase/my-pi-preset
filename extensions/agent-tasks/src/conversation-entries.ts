@@ -102,8 +102,9 @@ export function entryFromMessage(message: unknown, structured = false): Conversa
       const { text, elided, sourceTruncated } = blocksText(message.content, MAX_RESULT);
       const name = str(message.toolName)?.slice(0, 128);
       if (!text && !message.isError && !sourceTruncated) return undefined;
+      const durationMs = structured && typeof message.durationMs === "number" && Number.isFinite(message.durationMs) && message.durationMs >= 0 ? message.durationMs : undefined;
       const toolCallId = structured ? str(message.toolCallId)?.slice(0, 200) : undefined;
-      return { kind: "toolResult", ...(name ? { name } : {}), text, elided, ...(sourceTruncated ? { sourceTruncated: true } : {}), ...(toolCallId ? { toolCallId } : {}), ...(message.isError === true ? { error: true } : {}) };
+      return { kind: "toolResult", ...(durationMs === undefined ? {} : { durationMs }), ...(name ? { name } : {}), text, elided, ...(sourceTruncated ? { sourceTruncated: true } : {}), ...(toolCallId ? { toolCallId } : {}), ...(message.isError === true ? { error: true } : {}) };
     }
     case "bashExecution": {
       const command = str(message.command);

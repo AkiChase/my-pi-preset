@@ -1,0 +1,3 @@
+{"file":".trellis/spec/development/index.md","reason":"Review execution and display ownership, lifecycle and themes"}
+{"file":".trellis/spec/testing/index.md","reason":"Review SDK regressions, natural exit and failure records"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Review run fencing and timing propagation"}

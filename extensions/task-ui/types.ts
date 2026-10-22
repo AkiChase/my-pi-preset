@@ -13,6 +13,15 @@ export type TaskKind = "shell" | "monitor" | "agent" | "workflow";
 export type TaskExecutionMode = "foreground" | "background" | "owned";
 export type TaskStatus = "starting" | "queued" | "running" | "paused" | "completed" | "failed" | "stopped" | "interrupted";
 
+/** Bounded actual execution facts; elapsed is sampled by the source, never inferred from history. */
+export interface ToolCallState {
+    readonly toolCallId: string;
+    readonly name: string;
+    readonly status: "running" | "completed" | "failed" | "interrupted";
+    readonly elapsedMs?: number;
+    readonly durationMs?: number;
+}
+
 export interface TaskView extends TaskIdentity {
     readonly key: string;
     readonly parentKey?: string;
@@ -33,6 +42,9 @@ export interface TaskView extends TaskIdentity {
         toolUses?: number; turnCount?: number; maxTurns?: number; activity?: string;
         /** One-line preview of the latest message the running task sent to its parent. */
         latestMessage?: string;
+        toolCalls?: readonly ToolCallState[];
+        /** Terminal metadata can precede actual runner/cleanup exit. */
+        settling?: boolean;
         model?: string; thinking?: string;
         doneCount?: number; totalCount?: number;
         phases?: readonly Readonly<{ index: number; title: string; detail?: string }>[];
@@ -90,7 +102,7 @@ export interface ToolCallSummary { readonly name: string; readonly detail?: stri
 export type ConversationEntry = Readonly<{ id?: string }> & (
     | Readonly<{ kind: "user"; text: string }>
     | Readonly<{ kind: "assistant"; text: string; tools: readonly ToolCallSummary[] }>
-    | Readonly<{ kind: "toolResult"; name?: string; text: string; elided: number; sourceTruncated?: boolean; error?: boolean; toolCallId?: string; summary?: ToolDataSummary; callDetail?: string }>
+    | Readonly<{ kind: "toolResult"; name?: string; text: string; elided: number; sourceTruncated?: boolean; error?: boolean; durationMs?: number; toolCallId?: string; summary?: ToolDataSummary; callDetail?: string }>
     | Readonly<{ kind: "bash"; command: string; output: string; elided: number; exitCode?: number }>
     | Readonly<{ kind: "notice"; text: string }>);
 

@@ -1,0 +1,4 @@
+{"file":".trellis/spec/development/index.md","reason":"Execution ownership, UI boundaries and lifecycle contracts"}
+{"file":".trellis/spec/testing/index.md","reason":"Isolated actual SDK tests and natural exit verification"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Run identity and source/UI propagation"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse only matching display semantics"}

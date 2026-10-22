@@ -62,3 +62,22 @@ void it("tool previews are bounded by visual lines, click state uses IDs, write 
         assert.ok(wrapped.lines.length <= 7);
     } finally { r.dispose(); }
 });
+
+void it("call titles reserve state/duration before paths and never invent historical durations", () => {
+    const r = new ConversationRenderer();
+    const rows: ConversationEntry[] = [
+        { kind: "assistant", text: "", tools: [{ toolCallId: "a", name: "read", detail: "中文😀/".repeat(100) }, { toolCallId: "b", name: "read", detail: "b.ts" }] },
+        { kind: "toolResult", toolCallId: "historical", name: "read", text: "ok", elided: 0 },
+    ];
+    try {
+        const calls = [{ toolCallId: "a", name: "read", status: "running" as const, elapsedMs: 1234 }, { toolCallId: "b", name: "read", status: "completed" as const, elapsedMs: 5000, durationMs: 37 }];
+        const out = r.render(rows, 55, theme, { toolCalls: calls }).map(stripTerminalSequences).join("\n");
+        assert.match(out, /Running · elapsed 1\.2s/); assert.match(out, /Completed · execution 0\.0s/);
+        assert.doesNotMatch(out, /execution 5\.0s|historical.*(?:elapsed|execution)/);
+        const interrupted = r.render(rows, 55, theme, { toolCalls: [{ ...calls[0]!, status: "interrupted" }] }).join("\n");
+        assert.match(interrupted, /Interrupted · elapsed 1\.2s/);
+        const known = r.render([{ kind: "toolResult", name: "bash", durationMs: 1200, text: "ok", elided: 0 }], 55, theme).join("\n");
+        assert.match(known, /Completed · execution 1\.2s/);
+        for (const width of [1, 12, 36, 80]) for (const line of r.render(rows, width, theme, { toolCalls: calls })) assert.ok(visibleWidth(line) <= width);
+    } finally { r.dispose(); }
+});

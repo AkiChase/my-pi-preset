@@ -381,6 +381,10 @@ export function resolveDefaultModel(
 export interface ToolActivity {
   type: "start" | "end";
   toolName: string;
+  /** Absent for synthetic setup diagnostics, which are not tool executions. */
+  toolCallId?: string;
+  durationMs?: number;
+  isError?: boolean;
 }
 
 /** Local offline seam; production still uses the host SDK and Pi loader. */
@@ -1191,10 +1195,10 @@ export async function runAgent(
         options.onTextDelta?.(event.assistantMessageEvent.delta, currentMessageText);
       }
       if (event.type === "tool_execution_start") {
-        options.onToolActivity?.({ type: "start", toolName: event.toolName });
+        options.onToolActivity?.({ type: "start", toolName: event.toolName, toolCallId: event.toolCallId });
       }
       if (event.type === "tool_execution_end") {
-        options.onToolActivity?.({ type: "end", toolName: event.toolName });
+        options.onToolActivity?.({ type: "end", toolName: event.toolName, toolCallId: event.toolCallId, durationMs: event.durationMs, isError: event.isError });
       }
       if (event.type === "message_end" && event.message.role === "assistant") {
         const u = (event.message as any).usage;
@@ -1320,8 +1324,8 @@ export async function resumeAgent(
               }
             }
           }
-          if (event.type === "tool_execution_start") options.onToolActivity?.({ type: "start", toolName: event.toolName });
-          if (event.type === "tool_execution_end") options.onToolActivity?.({ type: "end", toolName: event.toolName });
+          if (event.type === "tool_execution_start") options.onToolActivity?.({ type: "start", toolName: event.toolName, toolCallId: event.toolCallId });
+          if (event.type === "tool_execution_end") options.onToolActivity?.({ type: "end", toolName: event.toolName, toolCallId: event.toolCallId, durationMs: event.durationMs, isError: event.isError });
           if (event.type === "message_end" && event.message.role === "assistant") {
             const u = (event.message as any).usage;
             if (u) options.onAssistantUsage?.({

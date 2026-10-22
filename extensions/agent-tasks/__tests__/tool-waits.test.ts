@@ -259,7 +259,7 @@ void it("actual launch detach preserves same run and transcript, later Esc canno
     writeFileSync(path, "prior transcript\n");
     f.coordinator.detachAll(); await tool; parent.abort();
     assert.equal(f.calls[0]?.options.signal?.aborted, false);
-    f.calls[0]!.options.onToolActivity?.({ type: "start", toolName: "read" });
+    f.calls[0]!.options.onToolActivity?.({ type: "start", toolName: "read", toolCallId: "read-call" });
     f.calls[0]!.options.onAssistantUsage?.({ input: 3, output: 2, cacheWrite: 0, cost: 0 });
     assert.equal(f.coordinator.list()[0]?.stats.activity, "read");
     f.calls[0]!.finish("background output"); await tick();

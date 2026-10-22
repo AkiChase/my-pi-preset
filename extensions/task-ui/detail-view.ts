@@ -109,7 +109,7 @@ export function detailRange(detail: TaskDetail | undefined): string {
 /** Non-scrolling metadata summary. Values are single-line and height-bounded. */
 export function renderDetailHeader(view: TaskView, theme: TaskTheme, width: number, now?: number, maxLines = 8): string[] {
     width = Math.max(1, Math.floor(width));
-    const lines = [theme.fg("toolTitle", taskOneLine(view.title)),
+    const lines = [...(view.kind === "agent" ? [] : [theme.fg("toolTitle", taskOneLine(view.title))]),
         theme.fg("dim", `${view.kind} · ${view.executionMode}`)];
     if (view.description && taskOneLine(view.description) !== taskOneLine(view.title))
         lines.push(`${view.kind === "shell" || view.kind === "monitor" ? "$ " : ""}${taskOneLine(view.description)}`);

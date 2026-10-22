@@ -630,7 +630,7 @@ void it("tiny detail terminals prioritize body, selected status and actions over
     try {
         panel.handleInput("\r");
         const frame = panel.render(40).map(stripTerminalSequences);
-        assert.equal(frame.length, 3); assert.match(frame[0], /BODY/); assert.match(frame[1], /●/); assert.match(frame[2], /x Stop · c Copy/); assert.match(frame[2], /ctrl\+shift\+b All waits/);
+        assert.equal(frame.length, 3); assert.match(frame[0], /tiny · ● Running/); assert.match(frame[1], /BODY/); assert.match(frame[2], /x Stop · c Copy/); assert.match(frame[2], /ctrl\+shift\+b All waits/);
         assert.doesNotMatch(frame.join("\n"), /metadata/);
         terminal.rows = 8; assert.match(panel.render(40).join("\n"), /BODY/);
     } finally { panel.dispose(); f.coordinator.dispose(); }
@@ -701,4 +701,33 @@ void it("tight detail footer retains selected controls and global detach instead
             assert.match(frame, /Detach|All waits/);
         }
     } finally { panel.dispose(); f.coordinator.dispose(); }
+});
+
+void it("fixed agent header changes terminal state in place, keeps history and repaints clocks without detail reads", t => {
+    t.mock.timers.enable({ apis: ["setInterval"] });
+    let elapsedMs = 1000;
+    const row = view("timed", { startedAt: 0, stats: { toolCalls: [{ toolCallId: "t", name: "bash", status: "running", elapsedMs }] } });
+    const f = sourceFixture([row]);
+    f.details.set(row.key, { text: "", conversation: [{ id: "call", kind: "assistant", text: "", tools: [{ toolCallId: "t", name: "bash", detail: "sleep" }] },
+        ...Array.from({ length: 30 }, (_, i) => ({ id: String(i), kind: "user" as const, text: `history-${i}` }))] });
+    const list = f.source.list;
+    f.source.list = () => list().map(v => ({ ...v, stats: { ...v.stats, toolCalls: v.stats.toolCalls?.map(c => ({ ...c, elapsedMs })) } }));
+    const h = component(f);
+    try {
+        h.panel.handleInput("\r"); h.panel.handleInput("\u001b[H");
+        const before = h.panel.render(100).map(stripTerminalSequences), reads = f.reads.length;
+        assert.match(before[0]!, /timed · ● Running/); assert.match(before.join("\n"), /Running · elapsed 1\.0s/);
+        elapsedMs = 3000; t.mock.timers.tick(1000);
+        assert.match(h.panel.render(100).join("\n"), /Running · elapsed 3\.0s/); assert.equal(f.reads.length, reads);
+        const top = h.panel.getState().detailScrollTop;
+        for (const status of ["completed", "stopped", "interrupted", "failed"] as const) {
+            f.publish([{ ...row, status, endedAt: 4000, stats: { settling: true, toolCalls: [{ toolCallId: "t", name: "bash", status: "interrupted", elapsedMs: 3000 }] } }]);
+            const out = h.panel.render(100).map(stripTerminalSequences);
+            assert.match(out[0]!, new RegExp(status[0].toUpperCase() + status.slice(1)));
+            assert.doesNotMatch(out.join("\n"), /Task Panel · Detail|Running · elapsed/);
+            assert.match(out.join("\n"), /cleanup pending/);
+            assert.equal(h.panel.getState().detailScrollTop, top);
+            assert.equal(h.panel.getState().followingEnd, false);
+        }
+    } finally { h.panel.dispose(); f.coordinator.dispose(); }
 });

@@ -22,7 +22,7 @@ import { createAgentManagement } from "./management.ts";
 import { createAgentTaskSource } from "./source.ts";
 import { getAgentConversation } from "./agent-runner.ts";
 import { allocatePersistentAgent, loadSubagentRegistry, markRunningAgentsInterrupted, registryLocatorForRootSession, updatePersistentAgent, type PersistentAgentEntry, type RootRegistryLocator } from "./subagent-registry.ts";
-import type { TaskIdentity } from "../../task-ui/types.ts";
+import type { TaskIdentity, ToolCallState } from "../../task-ui/types.ts";
 import { existsSync, statSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import type { Model } from "@earendil-works/pi-ai";
@@ -49,6 +49,8 @@ interface AgentRun extends AgentRunHandle {
   settled: boolean;
   terminalResolved: boolean;
   sessions: Set<AgentSession>;
+  pendingStops: number;
+  toolCalls: Map<string, { state: ToolCallState; start?: number }>;
 }
 export interface AgentManagerDependencies {
   readonly runAgent?: typeof runAgent;
@@ -377,13 +379,22 @@ export class AgentManager {
     return run ? Object.freeze({ identity: run.identity, terminal: run.terminal }) : undefined;
   }
   isRunActive(id: string): boolean { return this.runs.get(id)?.settled === false; }
+  /** Display metadata includes owned cancellation cleanup, not just the runner gate. */
+  isRunSettling(id: string): boolean {
+    const run = this.runs.get(id);
+    return !!run && (!run.settled || run.pendingStops > 0);
+  }
   /** Stage 3's epoch owner must call this BEFORE stopping old execution. */
   freezeAdmission(): void {
     this.admissionClosed = true;
     clearInterval(this.cleanupInterval);
     this.cleanupController.abort();
     // Release reply waiters and refuse late child sends from the old activation.
-    for (const record of this.agents.values()) record.mailbox?.closeAll("shutdown");
+    for (const record of this.agents.values()) {
+      record.mailbox?.closeAll("shutdown");
+      const run = this.runs.get(record.id);
+      if (run) this.freezeToolCalls(record, run);
+    }
     this.parentMessageListeners.clear();
   }
 
@@ -407,14 +418,66 @@ export class AgentManager {
     return !this.admissionClosed && this.agents.get(record.id) === record && this.runs.get(record.id) === run;
   }
 
+  /** One bounded clock owner per run, shared by source sampling and lifecycle freezing. */
+  getToolCalls(id: string): readonly ToolCallState[] {
+    const now = performance.now();
+    return Object.freeze([...(this.runs.get(id)?.toolCalls.values() ?? [])].map(call => Object.freeze({
+      ...call.state,
+      ...(call.start === undefined ? {} : { elapsedMs: Math.max(0, now - call.start) }),
+    })));
+  }
+
+  private toolActivity(record: AgentRecord, run: AgentRun, activity: ToolActivity): void {
+    const id = activity.toolCallId;
+    if (!id || id.length > 200) return; // Setup diagnostics must not increment actual tool use or start clocks.
+    const prior = run.toolCalls.get(id);
+    if (activity.type === "start") {
+      if (prior) return;
+      // Prefer evicting old terminal calls; never replace a concurrent same-name call.
+      if (run.toolCalls.size >= 128) {
+        const old = [...run.toolCalls].find(([, call]) => call.state.status !== "running");
+        if (old) run.toolCalls.delete(old[0]); else return;
+      }
+      run.toolCalls.set(id, { state: { toolCallId: id, name: activity.toolName.slice(0, 128), status: "running" }, start: performance.now() });
+    } else {
+      if (prior && prior.state.status !== "running") return;
+      record.toolUses++;
+      const durationMs = activity.durationMs;
+      const valid = typeof durationMs === "number" && Number.isFinite(durationMs) && durationMs >= 0;
+      // Missing start is readable, but not an invented elapsed window.
+      if (!prior && run.toolCalls.size >= 128) return;
+      run.toolCalls.set(id, { state: Object.freeze({ toolCallId: id, name: activity.toolName.slice(0, 128),
+        status: activity.isError ? "failed" : "completed",
+        ...(valid ? { durationMs } : {}),
+        ...(prior?.start === undefined ? {} : { elapsedMs: Math.max(0, performance.now() - prior.start) }),
+      }) });
+    }
+    record.activity = [...run.toolCalls.values()].filter(call => call.state.status === "running").map(call => call.state.name).join(", ") || undefined;
+  }
+
+  private freezeToolCalls(record: AgentRecord, run: AgentRun): void {
+    const now = performance.now();
+    for (const [id, call] of run.toolCalls) if (call.state.status === "running") {
+      run.toolCalls.set(id, { state: Object.freeze({ ...call.state, status: "interrupted",
+        ...(call.start === undefined ? {} : { elapsedMs: Math.max(0, now - call.start) }),
+      }) });
+    }
+    record.activity = undefined;
+  }
+
   private ownSession(session: AgentSession, run: AgentRun): void {
     if (run.sessions.has(session)) return;
     run.sessions.add(session);
-    if (this.admissionClosed || run.terminalResolved) this.stopSession(session);
+    if (this.admissionClosed || run.terminalResolved) this.stopSession(session, run);
   }
 
-  private stopSession(session: AgentSession): void {
-    this.ownExecution(() => stopChildSession(session));
+  private stopSession(session: AgentSession, run?: AgentRun): void {
+    if (run) run.pendingStops++;
+    void this.ownExecution(() => stopChildSession(session)).then(() => {
+      if (!run) return;
+      run.pendingStops--;
+      if (this.runs.get(run.identity.taskId) === run) this.notifyChanged();
+    });
   }
 
   private closeSession(session: AgentSession): Promise<void> {
@@ -443,7 +506,7 @@ export class AgentManager {
     record.promise = new Promise<string>(done => { resolveText = done; });
     const run: AgentRun = {
       identity: Object.freeze({ sourceId: "agent", taskId: record.id, runId: record.runId }),
-      terminal, resolve, resolveText, charged: false, settled: false, terminalResolved: false, sessions: new Set(),
+      terminal, resolve, resolveText, charged: false, settled: false, terminalResolved: false, sessions: new Set(), pendingStops: 0, toolCalls: new Map(),
     };
     this.runs.set(record.id, run);
     record.mailbox?.startRun(record.runId);
@@ -458,6 +521,7 @@ export class AgentManager {
   private resolveTerminal(record: AgentRecord): void {
     const run = this.runs.get(record.id);
     if (!run || run.terminalResolved) return;
+    this.freezeToolCalls(record, run);
     run.terminalResolved = true;
     run.unlinkParent?.(); run.unlinkParent = undefined;
     // A stop resolves the terminal long before actual exit; the channel already
@@ -866,9 +930,8 @@ export class AgentManager {
       configCwd: options.configCwd ?? (customCwd !== undefined ? ctx.cwd : undefined),
       signal: record.abortController!.signal,
       onToolActivity: (activity) => {
-        if (!this.current(record, run) || record.status === "stopped") return;
-        if (activity.type === "end") record.toolUses++;
-        record.activity = activity.type === "start" ? activity.toolName : undefined;
+        if (!this.current(record, run) || record.status !== "running" || record.abortController?.signal.aborted || run.terminalResolved) return;
+        this.toolActivity(record, run, activity);
         this.notifyChanged();
         try { if (this.current(record, run) && !record.abortController?.signal.aborted) options.onToolActivity?.(activity); } catch { /* isolate optional observer */ }
       },
@@ -1009,7 +1072,8 @@ export class AgentManager {
         record.structuredRetried = structuredRetried;
         if (!isChildSessionClosed(session)) record.session = session;
         record.completedAt ??= Date.now();
-
+        this.freezeToolCalls(record, run);
+        this.notifyChanged();
 
         // Final flush of streaming output file
         if (record.outputCleanup) {
@@ -1056,6 +1120,8 @@ export class AgentManager {
         }
         record.error = err instanceof Error ? err.message : String(err);
         record.completedAt ??= Date.now();
+        this.freezeToolCalls(record, run);
+        this.notifyChanged();
         // The runner closes only failed pre-prompt startup sessions. Keep
         // genuine prompt failures live for resume; discard only a matching
         // closed reference, not arbitrary failed runs or their disk artifacts.
@@ -1102,6 +1168,7 @@ export class AgentManager {
   /** Release the CURRENT admission lease once, even after a foreground transfer. */
   private settleRun(record: AgentRecord, run = this.runs.get(record.id)): void {
     if (!run || run.settled) return;
+    this.freezeToolCalls(record, run);
     run.settled = true;
     record.starting = false;
     record.startGate = undefined;
@@ -1306,9 +1373,8 @@ export class AgentManager {
     this.ownExecution(async () => { await (this.dependencies.resumeAgent ?? resumeAgent)(session, prompt, {
       maxTurns: record.maxTurns ?? 0,
       onToolActivity: activity => {
-        if (!this.current(record, run) || record.status === "stopped") return;
-        if (activity.type === "end") record.toolUses++;
-        record.activity = activity.type === "start" ? activity.toolName : undefined;
+        if (!this.current(record, run) || record.status !== "running" || record.abortController?.signal.aborted || run.terminalResolved) return;
+        this.toolActivity(record, run, activity);
         this.notifyChanged(); try { if (this.current(record, run) && !record.abortController?.signal.aborted) options.onToolActivity?.(activity); } catch { /* isolate optional observer */ }
       },
       onTurnEnd: count => { if (!this.current(record, run) || record.status === "stopped") return; record.turnCount = count; this.notifyChanged(); try { if (this.current(record, run) && !record.abortController?.signal.aborted) options.onTurnEnd?.(count); } catch { /* isolate optional observer */ } },
@@ -1330,11 +1396,11 @@ export class AgentManager {
         record.status = aborted ? "aborted" : failure ? "error" : steered ? "steered" : "completed";
         record.error = failure;
       }
-      record.result = text; record.completedAt ??= Date.now(); await finish();
+      record.result = text; record.completedAt ??= Date.now(); this.freezeToolCalls(record, run); this.notifyChanged(); await finish();
     }, async error => {
       if (record.status !== "stopped") record.status = "error";
       record.error = error instanceof Error ? error.message : String(error);
-      record.completedAt ??= Date.now(); await finish();
+      record.completedAt ??= Date.now(); this.freezeToolCalls(record, run); this.notifyChanged(); await finish();
     }); });
   }
 
@@ -1525,6 +1591,8 @@ export class AgentManager {
     const record = this.agents.get(id);
     if (!record || (record.status !== "queued" && record.status !== "running")) return false;
     const queued = record.status === "queued";
+    const stoppingRun = this.runs.get(id);
+    if (stoppingRun) this.freezeToolCalls(record, stoppingRun);
     record.status = "stopped";
     record.completedAt ??= Date.now();
     record.pendingSteers = undefined;
@@ -1532,8 +1600,8 @@ export class AgentManager {
     record.outputCleanup = undefined;
     record.abortController?.abort();
     const run = this.runs.get(id);
-    for (const session of run?.sessions ?? []) this.stopSession(session);
-    if (record.session && !run?.sessions.has(record.session)) this.stopSession(record.session);
+    for (const session of run?.sessions ?? []) this.stopSession(session, run);
+    if (record.session && !run?.sessions.has(record.session)) this.stopSession(record.session, run);
     this.releaseSlot(record, run);
     this.abortOwnedChildren(id);
     this.resolveTerminal(record);

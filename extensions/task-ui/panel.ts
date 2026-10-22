@@ -6,7 +6,7 @@ import type { TaskCoordinator } from "./coordinator.ts";
 import type { TaskUIConfig } from "./config.ts";
 import type { TaskControl, TaskDetail, ConversationPageRequest } from "./types.ts";
 import { TaskPanelModel, type TaskRow } from "./model.ts";
-import { cleanTaskText, taskLine, taskOneLine, taskStatusLine, type TaskTheme } from "./presentation.ts";
+import { cleanTaskText, taskLine, taskOneLine, taskStatusLine, taskDetailTopLine, type TaskTheme } from "./presentation.ts";
 import { detailRange, renderDetailHeader, renderMessages, sectionTitle } from "./detail-view.ts";
 import { ConversationRenderer, type ConversationRange } from "./conversation.ts";
 import { ConversationWindow } from "./conversation-window.ts";
@@ -130,7 +130,7 @@ export class TaskPanel implements Component, Focusable {
         if (selected && (this.detailRevision < 0 || readDetail && this.detailRevision !== this.args.coordinator.revision)) {
             this.readDetail({ direction: "latest" }, this.detailScroll.isFollowingEnd);
         }
-        this.cachedList = undefined; this.frame = undefined;
+        this.cachedList = undefined; this.cachedDetail = undefined; this.frame = undefined;
     }
     private captureAnchor(): void {
         if (this.page !== "detail" || !this.frame) return;
@@ -307,7 +307,7 @@ export class TaskPanel implements Component, Focusable {
         let body: string[];
         if (conversation) {
             const rendered = this.conversation.renderModel(conversation, width, this.theme, { truncated: !this.detail?.conversationPage && this.detail?.conversationTruncated,
-                expanded: this.expandedEntryIds });
+                expanded: this.expandedEntryIds, toolCalls: selected.stats.toolCalls });
             body = rendered.lines;
             this.detailRanges = rendered.ranges;
         } else {
@@ -373,7 +373,10 @@ export class TaskPanel implements Component, Focusable {
         const clipped = truncateToWidth(text, width, "…"); return clipped + " ".repeat(Math.max(0, width - visibleWidth(clipped)));
     }
     private renderFrame(width: number, rows: number): string[] {
-        const header = rows > (this.page === "detail" ? 3 : 1) ? [this.theme.fg("accent", `Task Panel · ${this.page === "list" ? `Tasks (${this.rows.length})` : "Detail"}`)] : [];
+        const agentDetail = this.page === "detail" && this.model.selected?.kind === "agent";
+        const header = (agentDetail ? rows >= 3 : rows > (this.page === "detail" ? 3 : 1)) ? [agentDetail
+            ? taskDetailTopLine(this.model.selected!, width, this.theme)
+            : this.theme.fg("accent", `Task Panel · ${this.page === "list" ? `Tasks (${this.rows.length})` : "Detail"}`)] : [];
         const scroll = this.activeScroll;
         const footer = { render: () => footerLines, invalidate() {} };
         let footerLines = this.footerLines(width, rows, "");
@@ -399,7 +402,7 @@ export class TaskPanel implements Component, Focusable {
                 : [...(actionRows.length < budget ? [navigation] : []), ...actionRows];
             footerLines = footerLines.map(line => this.theme.fg("dim", truncateToWidth(line, width, "…")));
         }
-        const status = this.page === "detail" && this.model.selected && rows >= 3
+        const status = this.page === "detail" && this.model.selected && rows >= 3 && !(agentDetail && rows === 3)
             ? { render: () => [taskStatusLine(this.model.selected!, width, this.theme, this.args.now?.())], invalidate() {} } : undefined;
         const fixedBudget = Math.max(0, rows - footerLines.length - header.length - (status ? 1 : 0) - 1);
         const metadata = this.page === "detail" && this.model.selected
@@ -439,7 +442,9 @@ export class TaskPanel implements Component, Focusable {
         if (!compactFooter) footerLines = this.footerLines(width, rows, position).slice(0, footerLines.length);
         this.frame = this.args.layout.render(root, width, rows, request);
         this.args.layout.scrollBox(this.frame, scroll);
-        return this.frame.lines.map(line => this.cell(line, width));
+        const lines = this.frame.lines.map(line => this.cell(line, width));
+        if (agentDetail && header.length) lines[0] = taskDetailTopLine(this.model.selected!, width, this.theme);
+        return lines;
     }
     private refuse(cause: unknown): Error {
         const error = layoutError(cause, "Task Panel");

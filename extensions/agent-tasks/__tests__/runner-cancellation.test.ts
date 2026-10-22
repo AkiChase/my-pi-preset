@@ -594,3 +594,23 @@ void it("3B1 followup pending completed child hook retains owner after direct di
     assert.equal(manager.executionCount, 0); assert.equal(close, manager.dispose());
   } finally { gate.resolve(); resource.release(); await manager.drainExecution(); await manager.dispose(); await f.close(); }
 });
+
+void it("actual new/resume runner forwards IDs, host duration and failure without counting setup diagnostics as calls", async () => {
+  const f = fixture();
+  try {
+    const events: import("../src/agent-runner.ts").ToolActivity[] = [];
+    f.session.prompt = async () => {
+      for (const listener of f.listeners) {
+        listener({ type: "tool_execution_start", toolName: "read", toolCallId: "one", args: {} });
+        listener({ type: "tool_execution_end", toolName: "read", toolCallId: "one", result: { content: [], details: undefined }, isError: true, durationMs: 42 });
+      }
+    };
+    await runAgent(f.ctx, "general-purpose", "first", { ...f.options, onToolActivity: event => events.push(event) }, f.deps);
+    await resumeAgent(f.session, "again", { onToolActivity: event => events.push(event) });
+    assert.deepEqual(events, Array.from({ length: 2 }, () => [
+      { type: "start", toolName: "read", toolCallId: "one" },
+      { type: "end", toolName: "read", toolCallId: "one", durationMs: 42, isError: true },
+    ]).flat());
+    assert.equal(f.listeners.size, 0);
+  } finally { await f.close(); }
+});
