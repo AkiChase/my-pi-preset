@@ -1,6 +1,6 @@
 import { searchNotice, splitView, wrap } from "../layout.ts";
 import { text } from "../types.ts";
-import { fallback, genericMetadata, renderers, type TimingDisplay } from "./shared.ts";
+import { fallback, genericMetadata, withSecondaryParameters, renderers, type TimingDisplay } from "./shared.ts";
 
 export function createFindRenderers(timing?: TimingDisplay) {
   return renderers("find", (result, theme, ctx, width) => {
@@ -18,13 +18,13 @@ export function createFindRenderers(timing?: TimingDisplay) {
       rows.push(...wrap("  " + file, width));
     }
     return rows.concat(notices);
-  }, (result, ctx) => {
+  }, withSecondaryParameters("find", (result, ctx) => {
     if (!result || ctx.isError) return genericMetadata(result, ctx);
     const view = splitView(text(result), searchNotice);
     if (view.body === "No files found matching pattern") return { stats: "No files found" };
     if (!view.lines.length || view.lines.some(line => !line || line.startsWith("["))) return genericMetadata(result, ctx);
     return { stats: `${view.lines.length} files shown${view.notice.length ? " · limited" : ""}` };
-  }, timing);
+  }), timing);
 }
 
 export const findRenderers = createFindRenderers();

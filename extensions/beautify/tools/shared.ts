@@ -5,6 +5,26 @@ import { text, type Args, type RenderContext, type Result } from "../types.ts";
 export type Draw = (result: Result, theme: Theme, context: RenderContext, width: number) => string[];
 export interface Metadata { title?: string; suffix?: string; stats: string; secondary?: string; expandedRows?: readonly string[]; executionConfig?: import("../../runtime-tasks/execution-config.ts").ExecutionConfig }
 export type Describe = (result: Result | undefined, context: RenderContext) => Metadata;
+
+/** Add only arrived parameters not already represented by the title or suffix. */
+export function withSecondaryParameters(name: "bash" | "read" | "find" | "grep", describe: Describe): Describe {
+  return (result, ctx) => {
+    const meta = describe(result, ctx);
+    const args = ctx.args;
+    const keys = name === "bash" ? (typeof args.description === "string" && args.description.trim() ? ["command"] : [])
+      : name === "grep" ? ["glob", "ignoreCase", "literal", "context", "limit"] : ["limit"];
+    const fields = keys.flatMap(key => {
+      if (!Object.hasOwn(args, key)) return [];
+      const value = args[key];
+      if (typeof value === "boolean") return [value ? key : `${key} false`];
+      if (typeof value === "number") return [`${key} ${value}`];
+      if (typeof value === "string" && value.trim()) return [`${key} ${value}`];
+      return [];
+    });
+    return { ...meta, secondary: [meta.secondary, ...fields].filter(Boolean).join(" · ") };
+  };
+}
+
 export function title(name: string, args: Args): string {
   if (name === "bash") {
     const mode = args.run_in_background === true ? "  background"

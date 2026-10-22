@@ -1,7 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { clean, searchNotice, splitView, wrap } from "../layout.ts";
 import { text, type Args } from "../types.ts";
-import { fallback, genericMetadata, numbered, renderers, type TimingDisplay } from "./shared.ts";
+import { fallback, genericMetadata, withSecondaryParameters, numbered, renderers, type TimingDisplay } from "./shared.ts";
 
 export interface Match { path: string; number: number; body: string; match: boolean }
 
@@ -49,14 +49,14 @@ export function createGrepRenderers(timing?: TimingDisplay) {
       rows.push(numbered(record.match ? highlightMatch(clean(record.body), ctx.args, theme) : record.body, record.number, digits, width, theme, record.match));
     }
     return rows.concat(notice);
-  }, (result, ctx) => {
+  }, withSecondaryParameters("grep", (result, ctx) => {
     if (!result || ctx.isError) return genericMetadata(result, ctx);
     const view = splitView(text(result), searchNotice);
     if (view.body === "No matches found") return { stats: "No matches found" };
     const records = view.lines.map(parseMatch);
     if (!records.length || records.some(record => !record)) return genericMetadata(result, ctx);
     return { stats: `${records.filter(record => record?.match).length} matching lines shown${view.notice.length ? " · limited" : ""}` };
-  }, timing);
+  }), timing);
 }
 
 export const grepRenderers = createGrepRenderers();
