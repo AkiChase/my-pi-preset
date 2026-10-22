@@ -2,7 +2,7 @@
 
 ## 边界与所有权
 
-保留 runner → AgentManager → TaskSource → TaskPanel 的现有链路。主页面与详情页对齐信息语义，不直接复用需要完整工具定义/session 的宿主 ToolExecutionComponent。执行、queue 和结果消费仍由现有 owner 控制；UI 只读取有界不可变快照。
+保留 runner → AgentManager → TaskSource → TaskPanel 的现有链路。公共 ToolExecutionComponent 只需 ToolRenderers 而非执行定义，用户已批准阶段3复用它与已审计的 beautify factories；不向 UI 发布 child session、registry 或任意闭包 renderer。执行、queue 和结果消费仍由现有 owner 控制；UI 只读取有界不可变快照。
 
 预期涉及 agent-tasks 的 runner/types/manager/source/conversation 转换，task-ui 的 types/conversation/panel/presentation 及相应测试。必要时提取不依赖执行上下文的展示辅助函数到现有 shared/beautify 层，不能为复用而改变主页面执行行为。用户文档只更新已有 Agent 功能页。
 
@@ -29,6 +29,12 @@
 
 ## 工具摘要与展开
 
+- 复用公共 ToolExecutionComponent 和已审计 beautify read/grep/find/generic factories；bash/write/edit 使用薄展示 policy 保留已批准默认规则。主页面真实 bash 折叠0行、write 原生10行、edit 不限展开，不把“组件共享”错误宣称为所有行为完全照搬。
+- 原生 edit renderCall 在 argsComplete 后生成预执行 diff 并读文件，必须抑制该分支，仅用有界保留的 result.details.diff/firstChangedLine；缺失可读回退，不现场 I/O。
+- source 保留有界参数、文本结果和审计过的展示 metadata，标记 complete/truncated/unavailable；参数及配对缓存计入 page/global byte cap，不传残缺结构给 native renderer伪装完整。不会保证任意超大历史参数全量可见。
+- 用户确认：展开优先每工具原布局；独立紧凑“查看参数”入口可在运行中/完成后只读查看全部已加载参数，超限提示，Esc 返回，不新增固定 Arguments/Output 双栏目。
+- cache仅驻留工具卡，按 toolCallId 稳定配对；panel 负责 running 卡点击展开，避免 SDK 无 result 不 toggle 和双重 toggle。共享 renderer invalidate 清除 panel 缓存后 requestRender，淘汰/关闭撤销异步重绘与 highlighter。
+- SDK component 使用全局宿主主题，真实 TUI 路径与未初始化测试可读回退分别验证。
 - 按调用 ID 形成一个工具展示单元，合并调用与结果的标题、参数、状态和计时；无法配对的旧/外部记录保持独立可读。
 - read/grep/find 默认摘要；通用工具输出默认最多 3 个视觉行，写入成功保留摘要不泄露正文。
 - 展开显示当前 source 已加载的全部有界内容，取消独立的 40 行显示层上限。源截断提示保留，不触发自动无限分页或额外读取。

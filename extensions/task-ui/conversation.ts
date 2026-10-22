@@ -1,14 +1,16 @@
 import { getMarkdownTheme } from "@earendil-works/pi-coding-agent";
 import { Markdown, visibleWidth, truncateToWidth, wrapTextWithAnsi, type MarkdownOptions, type MarkdownTheme } from "@earendil-works/pi-tui";
+import { DetailToolCard, type DetailTool } from "./detail-tool-card.ts";
+import type { ToolParameters } from "./types.ts";
 import type { ConversationEntry, ToolCallState } from "./types.ts";
 import { cleanTaskText, taskOneLine, type TaskTheme } from "./presentation.ts";
 
 /** Keep source that only looks like Markdown (renumbered lists, escapes) intact. */
 const MARKDOWN_OPTIONS: MarkdownOptions = { preserveOrderedListMarkers: true, preserveBackslashEscapes: true };
 const CACHE_LIMIT = 128;
-const PREVIEW_LINES = 5;
-const EXPANDED_LINES = 40;
-export interface ConversationRange { id: string; start: number; end: number; collapsible: boolean }
+const PREVIEW_LINES = 3;
+const EXPANDED_LINES = Infinity;
+export interface ConversationRange { id: string; start: number; end: number; collapsible: boolean; parameters?: ToolParameters; parameterLine?: number; parameterWidth?: number }
 export interface ConversationRenderModel { lines: string[]; ranges: ConversationRange[] }
 
 const sgr = (on: number, off: number) => (text: string) => `\x1b[${on}m${text}\x1b[${off}m`;
@@ -32,6 +34,10 @@ function markdownTheme(theme: TaskTheme): MarkdownTheme {
 
 /** Renders structured conversation entries; owns a bounded Markdown cache for one panel. */
 export class ConversationRenderer {
+    private cards = new Map<string, DetailToolCard>();
+    private cardCosts = new Map<string, number>();
+    private readonly redraw: () => void;
+    constructor(redraw: () => void = () => {}) { this.redraw = redraw; }
     private cache = new Map<string, { md: Markdown; failed: boolean }>();
     private mdTheme?: MarkdownTheme;
     private themeRef?: TaskTheme;
@@ -42,7 +48,7 @@ export class ConversationRenderer {
 
     renderModel(entries: readonly ConversationEntry[], width: number, theme: TaskTheme, options: { activity?: string; truncated?: boolean; expanded?: ReadonlySet<string>; toolCalls?: readonly ToolCallState[] } = {}): ConversationRenderModel {
         width = Math.max(1, Math.floor(width));
-        if (theme !== this.themeRef) { this.themeRef = theme; this.mdTheme = undefined; this.cache.clear(); }
+        if (theme !== this.themeRef) { this.themeRef = theme; this.mdTheme = undefined; this.cache.clear(); for (const card of this.cards.values()) card.dispose(); this.cards.clear(); this.cardCosts.clear(); }
         const calls = new Map((options.toolCalls ?? []).map(call => [call.toolCallId, call]));
         for (const entry of entries) if (entry.kind === "toolResult" && entry.toolCallId && !calls.has(entry.toolCallId))
             calls.set(entry.toolCallId, { toolCallId: entry.toolCallId, name: entry.name ?? "result", status: entry.error ? "failed" : "completed",
@@ -50,17 +56,79 @@ export class ConversationRenderer {
         const lines: string[] = [], ranges: ConversationRange[] = [];
         if (options.truncated) lines.push(theme.fg("dim", "… older messages omitted"), "");
         if (!entries.length) lines.push(theme.fg("dim", "(waiting for first message…)"));
+        const tools = new Map<string, DetailTool>();
+        const idFor = (id: string) => `tool:${id}`;
+        entries.forEach((entry, index) => {
+            if (entry.kind === "assistant") entry.tools.forEach((call, n) => {
+                const id = call.toolCallId ? idFor(call.toolCallId) : `${entry.id ?? index}:tool:${n}`;
+                const previous = tools.get(id);
+                tools.set(id, { ...previous, id, call: { ...previous?.call, ...call,
+                    parameters: call.parameters ?? previous?.call.parameters, summary: call.summary ?? previous?.call.summary,
+                    detail: call.detail ?? previous?.call.detail }, state: call.toolCallId ? calls.get(call.toolCallId) : undefined });
+            });
+            if (entry.kind === "toolResult") {
+                const id = entry.toolCallId ? idFor(entry.toolCallId) : entry.id ?? `result:${index}`;
+                const existing = tools.get(id);
+                tools.set(id, { id, call: existing?.call ?? entry.call ?? { name: entry.name ?? entry.summary?.kind ?? "result", detail: entry.callDetail, summary: entry.summary }, result: entry,
+                    state: entry.toolCallId ? calls.get(entry.toolCallId) : { toolCallId: id, name: entry.name ?? "result", status: entry.error ? "failed" : "completed", durationMs: entry.durationMs } });
+            }
+        });
+        const emitted = new Set<string>();
+        const emit = (id: string) => {
+            if (emitted.has(id)) return;
+            emitted.add(id);
+            const tool = tools.get(id)!;
+            if (lines.length) lines.push("");
+            const start = lines.length, expanded = !!options.expanded?.has(id);
+            let card = this.cards.get(id);
+            if (!card) { card = new DetailToolCard(tool, this.redraw); this.cards.set(id, card); }
+            const renderedCard = card.render(tool, expanded, width, theme);
+            lines.push(...renderedCard);
+            // Logical retained payload budget: two serialized-input copies plus the
+            // final styled rows. SDK object overhead/engine heap is not byte-accounted;
+            // native caches derive only from bounded args/text/diff and <=128 cards.
+            this.cardCosts.set(id, Buffer.byteLength(JSON.stringify(tool)) * 2 + Buffer.byteLength(renderedCard.join("\n")));
+            while (this.cards.size > 128 || [...this.cardCosts.values()].reduce((a, b) => a + b, 0) > 256 * 1024) {
+                const oldest = this.cards.keys().next().value!;
+                this.cards.get(oldest)!.dispose(); this.cards.delete(oldest); this.cardCosts.delete(oldest);
+            }
+            const parameters = tool.call.parameters;
+            // One auxiliary row; legacy result-only cards do not repeat unavailable labels.
+            const parameterLine = parameters ? lines.length : undefined;
+            const entryText = parameters ? `View parameters · ${parameters.status}` : "";
+            const toggle = expanded ? "click to collapse" : "click to expand loaded content";
+            const hint = entryText ? entryText + (visibleWidth(entryText + " · " + toggle) <= width ? " · " + toggle : "") : toggle;
+            lines.push(theme.fg("muted", truncateToWidth(hint, width, "…")));
+            const result = tool.result;
+            if (result?.elided) lines.push(theme.fg("dim", `… source truncated · ${result.elided.toLocaleString("en-US")} more characters`));
+            if (result?.sourceTruncated) lines.push(theme.fg("dim", "… additional content omitted by source"));
+            if (result?.display?.diffTruncated) lines.push(theme.fg("dim", "… source diff truncated"));
+            if (result?.display?.status === "unavailable") lines.push(theme.fg("dim", "Result unavailable"));
+            ranges.push({ id, start, end: lines.length, collapsible: true, parameters, parameterLine, parameterWidth: Math.min(width, visibleWidth(entryText)) });
+        };
         entries.forEach((entry, i) => {
-            if (i) lines.push("");
+            if (entry.kind === "toolResult") { emit(entry.toolCallId ? idFor(entry.toolCallId) : entry.id ?? `result:${i}`); return; }
+            if (entry.kind === "assistant") {
+                if (entry.text) {
+                    if (lines.length) lines.push("");
+                    const start = lines.length;
+                    lines.push(...this.entry({ ...entry, tools: [] }, width, theme, false));
+                    if (entry.id) ranges.push({ id: entry.id, start, end: lines.length, collapsible: false });
+                }
+                entry.tools.forEach((call, n) => emit(call.toolCallId ? idFor(call.toolCallId) : `${entry.id ?? i}:tool:${n}`));
+                return;
+            }
+            if (lines.length) lines.push("");
             const start = lines.length;
             lines.push(...this.entry(entry, width, theme, !!entry.id && !!options.expanded?.has(entry.id), [...calls.values()]));
-            if (entry.id) ranges.push({ id: entry.id, start, end: lines.length, collapsible: entry.kind === "bash" || entry.kind === "toolResult" });
+            if (entry.id) ranges.push({ id: entry.id, start, end: lines.length, collapsible: entry.kind === "bash" });
         });
+        for (const [id, card] of this.cards) if (!emitted.has(id)) { card.dispose(); this.cards.delete(id); this.cardCosts.delete(id); }
         if (options.activity) lines.push("", theme.fg("accent", "▍ ") + theme.fg("dim", taskOneLine(options.activity)));
         return { lines: lines.map(line => truncateToWidth(line, width, "…")), ranges };
     }
 
-    dispose(): void { this.cache.clear(); this.mdTheme = undefined; this.themeRef = undefined; }
+    dispose(): void { for (const card of this.cards.values()) card.dispose(); this.cards.clear(); this.cardCosts.clear(); this.cache.clear(); this.mdTheme = undefined; this.themeRef = undefined; }
 
     private entry(entry: ConversationEntry, width: number, theme: TaskTheme, expanded: boolean, calls: readonly ToolCallState[] = []): string[] {
         const b = bold(theme);
@@ -79,24 +147,7 @@ export class ConversationRenderer {
             case "assistant":
                 return [b(theme.fg("success", "Assistant")), ...(entry.text ? this.markdown(cleanTaskText(entry.text), width, theme) : []),
                     ...entry.tools.map(tool => this.toolLine(tool.name, tool.detail, width, theme, calls.find(call => call.toolCallId === tool.toolCallId)))];
-            case "toolResult": {
-                const summary = entry.summary;
-                const facts = summary ? [summary.path, summary.command,
-                    summary.offset === undefined ? undefined : `from line ${summary.offset}`,
-                    summary.limit === undefined ? undefined : `limit ${summary.limit}`,
-                    summary.lines === undefined ? undefined : `${summary.lines} lines`,
-                    summary.bytes === undefined ? undefined : `${summary.bytes} bytes`,
-                    summary.addedLines === undefined ? undefined : `+${summary.addedLines} lines`,
-                    summary.removedLines === undefined ? undefined : `−${summary.removedLines} lines`].filter(Boolean).map(value => taskOneLine(String(value))).join(" · ") : entry.callDetail;
-                const successWrite = summary?.kind === "write" && !entry.error;
-                const call = calls.find(call => call.toolCallId === entry.toolCallId);
-                const timing = call ?? (entry.durationMs === undefined ? undefined : { toolCallId: entry.toolCallId ?? "", name: entry.name ?? "result", status: entry.error ? "failed" as const : "completed" as const, durationMs: entry.durationMs });
-                return [timing ? this.toolLine(entry.name ?? summary?.kind ?? "result", toggle.trim() || undefined, width, theme, timing)
-                    : truncateToWidth(theme.fg(entry.error ? "error" : "muted", `  ${entry.error ? "✗" : "↳"} ${taskOneLine(entry.name ?? summary?.kind ?? "result")}${entry.error ? " failed" : ""}${toggle}`), width, "…"),
-                    ...(facts ? [truncateToWidth("  " + theme.fg("muted", taskOneLine(facts)), width, "…")] : []),
-                    ...(!successWrite && entry.text ? preview(entry.text, "    ", summary?.kind === "bash") : []), ...elided(entry.elided),
-                    ...(entry.sourceTruncated ? [theme.fg("dim", "  … additional content omitted")] : [])];
-            }
+            case "toolResult": return []; // Paired cards are rendered above.
             case "bash":
                 return [truncateToWidth(theme.fg("bashMode", "$ ") + theme.fg("mdCode", taskOneLine(entry.command)) +
                     (entry.exitCode !== undefined ? theme.fg(entry.exitCode ? "error" : "dim", ` (exit ${entry.exitCode})`) : "") + theme.fg("dim", toggle), width, "…"),

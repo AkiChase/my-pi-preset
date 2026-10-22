@@ -101,7 +101,9 @@ export interface ToolDataSummary {
     readonly addedLines?: number;
     readonly removedLines?: number;
 }
-export interface ToolCallSummary { readonly name: string; readonly detail?: string; readonly toolCallId?: string; readonly summary?: ToolDataSummary }
+export interface ToolParameters { readonly status: "complete" | "truncated" | "unavailable"; readonly json?: string }
+export interface ToolResultDisplay { readonly status: "complete" | "truncated" | "unavailable"; readonly diff?: string; readonly firstChangedLine?: number; readonly diffTruncated?: boolean }
+export interface ToolCallSummary { readonly name: string; readonly detail?: string; readonly toolCallId?: string; readonly summary?: ToolDataSummary; readonly parameters?: ToolParameters }
 /** All text is external and unstyled; renderers sanitize before applying host styles.
  * toolResult.elided counts only inspected text; sourceTruncated means additional
  * blocks were not inspected and must be described without an invented count.
@@ -109,7 +111,7 @@ export interface ToolCallSummary { readonly name: string; readonly detail?: stri
 export type ConversationEntry = Readonly<{ id?: string }> & (
     | Readonly<{ kind: "user"; text: string }>
     | Readonly<{ kind: "assistant"; text: string; tools: readonly ToolCallSummary[] }>
-    | Readonly<{ kind: "toolResult"; name?: string; text: string; elided: number; sourceTruncated?: boolean; error?: boolean; durationMs?: number; toolCallId?: string; summary?: ToolDataSummary; callDetail?: string }>
+    | Readonly<{ kind: "toolResult"; name?: string; text: string; elided: number; sourceTruncated?: boolean; error?: boolean; durationMs?: number; toolCallId?: string; summary?: ToolDataSummary; callDetail?: string; call?: ToolCallSummary; display?: ToolResultDisplay }>
     | Readonly<{ kind: "bash"; command: string; output: string; elided: number; exitCode?: number }>
     | Readonly<{ kind: "notice"; text: string }>);
 

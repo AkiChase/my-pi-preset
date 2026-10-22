@@ -17,12 +17,24 @@ interface Row { message?: unknown; start: number; end: number; bytes: number }
 interface Scan { entries: ConversationEntry[]; start: number; end: number; scannedMessages: number; scannedBytes: number; budgetLimited: boolean }
 
 /** Conservative constant-time sizing for large strings; bounded traversal of external shapes. */
-function messageBytes(value: unknown, depth = 0): number {
-    if (typeof value === "string") return value.length * 3;
-    if (depth > 5) return 0;
-    if (Array.isArray(value)) return value.slice(0, 128).reduce<number>((n, v) => n + messageBytes(v, depth + 1), 0);
-    if (obj(value)) return Object.keys(value).slice(0, 64).reduce((n, k) => n + k.length * 3 + messageBytes(value[k], depth + 1), 0);
-    return 8;
+function messageBytes(value: unknown): number {
+    let nodes = 2048;
+    const size = (v: unknown, depth: number): number => {
+        if (--nodes < 0 || depth > 16) return MAX_SCAN_BYTES + 1;
+        if (typeof v === "string") return v.length * 3;
+        if (!v || typeof v !== "object") return 8;
+        if (Array.isArray(v) && v.length > nodes) return MAX_SCAN_BYTES + 1;
+        let total = 8;
+        for (const key in v) {
+            if (!Object.hasOwn(v, key)) continue;
+            const descriptor = Object.getOwnPropertyDescriptor(v, key);
+            if (!descriptor || !("value" in descriptor)) return MAX_SCAN_BYTES + 1;
+            total += key.length * 3 + size(descriptor.value, depth + 1);
+            if (nodes < 0 || total > MAX_SCAN_BYTES) return MAX_SCAN_BYTES + 1;
+        }
+        return total;
+    };
+    try { return size(value, 0); } catch { return MAX_SCAN_BYTES + 1; }
 }
 
 /** Activation-owned cursors contain no paths or caller-controlled authorization data. */
@@ -32,8 +44,9 @@ export class ConversationPager {
     private ids = new WeakMap<object, string>();
     private fileGenerations = new Map<string, { generation: string; fingerprint: string; size: number; mtime: number }>();
     private tools = new Map<string, ToolCallSummary>();
+    private toolBytes = 0;
 
-    dispose(): void { this.cursors.clear(); this.live.clear(); this.fileGenerations.clear(); this.tools.clear(); this.ids = new WeakMap(); }
+    dispose(): void { this.cursors.clear(); this.live.clear(); this.fileGenerations.clear(); this.tools.clear(); this.toolBytes = 0; this.ids = new WeakMap(); }
     private token(cursor: Cursor): string {
         const token = randomUUID();
         if (this.cursors.size >= 2048) this.cursors.delete(this.cursors.keys().next().value!);
@@ -59,12 +72,20 @@ export class ConversationPager {
         const entry = entryFromMessage(message, true);
         if (!entry) return undefined;
         if (entry.kind === "assistant") for (const tool of entry.tools) if (tool.toolCallId) {
-            if (this.tools.size >= 1024) this.tools.delete(this.tools.keys().next().value!);
-            this.tools.set(`${scope}:${tool.toolCallId}`, tool);
+            const key = `${scope}:${tool.toolCallId}`;
+            const previous = this.tools.get(key);
+            if (previous) this.toolBytes -= Buffer.byteLength(JSON.stringify(previous));
+            this.tools.delete(key); this.tools.set(key, tool);
+            this.toolBytes += Buffer.byteLength(JSON.stringify(tool));
+            while (this.tools.size > 128 || this.toolBytes > MAX_PAGE_BYTES) {
+                const oldest = this.tools.keys().next().value!;
+                this.toolBytes -= Buffer.byteLength(JSON.stringify(this.tools.get(oldest)));
+                this.tools.delete(oldest);
+            }
         }
         if (entry.kind === "toolResult" && entry.toolCallId) {
             const tool = this.tools.get(`${scope}:${entry.toolCallId}`);
-            return Object.freeze({ ...entry, id, ...(tool?.summary ? { summary: tool.summary } : {}), ...(tool?.detail ? { callDetail: tool.detail } : {}) });
+            return Object.freeze({ ...entry, id, ...(tool ? { call: tool } : {}), ...(tool?.summary ? { summary: tool.summary } : {}), ...(tool?.detail ? { callDetail: tool.detail } : {}) });
         }
         return Object.freeze({ ...entry, id });
     }

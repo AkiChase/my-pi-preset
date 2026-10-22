@@ -24,6 +24,8 @@
 
 ## 阶段 3：紧凑卡片与展开
 
+- [ ] 优先复用公共 ToolExecutionComponent、已审计 beautify factories，薄适配 bash/write/edit 紧凑默认；禁用原生 edit 渲染时读文件的预执行分支。
+- [ ] 有界保留参数/结果/安全 metadata，独立参数查看入口可在运行中使用；结果和参数分别准确标注 truncated/unavailable，缓存预算计入全局。
 - [ ] 合并可关联调用与结果，read/grep/find 默认摘要，通用结果默认 3 个视觉行。
 - [ ] 展开当前已加载有界内容，不保留 40 行额外限制；准确展示源截断和折叠隐藏。
 - [ ] 测试分页边界/缺失配对/稳定 ID/鼠标命中/锚点/中文 emoji/窄宽尺寸/主题。
@@ -50,6 +52,18 @@ git diff --check
 
 ## 结果记录
 
+### 阶段 3：已实施并独立审查
+
+- 复用公共 ToolExecutionComponent、审计过的 beautify/native 展示 factory，薄适配紧凑摘要、3行预览与稳定调用/结果配对；独立 View parameters 入口运行中可用，Esc 返回，取消额外40行展开上限。
+- reviewer 修复：双提示行/多余空白、write native 固定切两行丢首行/长路径错误、malformed参数JSON未捕获、结果消失仍保留旧SDK状态、贫化调用覆盖丰富metadata、重复路径摘要、有界扫描与非JSON数组键。新增真实共享组件、主题、窄屏命中/配对/参数/恢复回归。
+- 最终预算：参数16KiB序列化包络/2048遍历token/深度16；结果2000 UTF16单位/diff8000；配对128项/256KiB序列化；驻留卡128项/256KiB逻辑输入副本+styled rows；页256KiB、历史3页/256项/768KiB。不是JS引擎堆或任意object enumeration硬CPU上限。
+- 详情read复用现有inactive Highlighter seam，保留native编号布局但不启动异步高亮或保留ANSI highlighter缓存（job/cache0），不改主页面Beautify。native缓存只来自有界输入和有限卡片，淘汰/关闭释放组件。
+- 初次实施失败为strip-only语法/类型、旧privacy/5-40行断言和鼠标位置fixture；reviewer depth5 guard拒绝普通nested edit后改depth16；新增测试误用dynamic-import值作类型导致typecheck exit2，改type-only import。失败链保留，重跑后通过。
+- 最终 isolated SDK1.4 `node --test` 相关task-ui/agent/process/runtime自然878/878 exit0，focused25/25 exit0、pnpm typecheck exit0、git diff --check exit0。
+- full pnpm check 最终大范围run为1637/1652 exit1：已知SDK resetExtensionUI fixture14失败＋group notification timing1失败（单独重跑1/1 exit0，未范围外修复）；移除详情异步highlight的最后小改后未重复full suite，不能称全套通过。
+- 日志 `/tmp/subagent-detail-parity.9eqCCh/stage3`、`review3/budget-*`；真实终端外观/physical IME/online provider NOT_RUN。
+- 本阶段提交待记录；三阶段代码已完成，最终用户视觉验收尚待完成，不自动归档。
+
 ### 阶段 2：已实施并独立审查
 
 - 完成固定高度 Pending 独立滚动区、Tab/鼠标区域切换、只读全文查看、Failed 原文恢复和手动重发，以及准备前/SDK 队列 handoff。
@@ -60,7 +74,7 @@ git diff --check
 - 最终现有 SDK 解析到 1.4.0（非本任务安装）；隔离配置自然 task-ui/agent-tasks/process-tasks/runtime-tasks 868/868 exit0，最后 stale guard 顺序调整后 affected focused6/6 exit0、pnpm typecheck exit0、git diff --check exit0。
 - `pnpm check` 本轮 exit1：1641 中1627通过/14失败，为 at-path-completion/beautify/widget-display fixture 调用 SDK resetExtensionUI 时 interactive-mode.js:1899 读取 undefined.length。未在范围外修复，final full suite 未重跑，不引用较早 full PASS 作为当前最终结果。
 - 日志 `/tmp/subagent-detail-parity.9eqCCh/stage2-recovery`、`review2`；真实终端/IME/在线 provider NOT_RUN。
-- 本阶段提交待记录。阶段3共享组件复用与完整参数展示正进行只读评估，未实施。
+- 本阶段提交：`5d0ebd7 feat(task-ui): show scrollable subagent pending messages`。阶段3公共组件复用研究已完成，用户批准紧凑独立参数入口与复用方案，开始实施。
 
 ### 阶段 1：已实施并独立审查
 

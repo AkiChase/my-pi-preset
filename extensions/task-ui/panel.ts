@@ -59,7 +59,9 @@ export class TaskPanel implements Component, Focusable {
     private refreshQueued = false;
     private cachedList?: { width: number; lines: string[] };
     private cachedDetail?: { width: number; lines: string[] };
-    private readonly conversation = new ConversationRenderer();
+    private readonly conversation = new ConversationRenderer(() => {
+        if (!this.disposed) { this.cachedDetail = undefined; this.frame = undefined; this.args.tui.requestRender(); }
+    });
     /** Steering composer for the selected running agent; owns all input while open. */
     private composer?: { input: Input };
     private focusedState = false;
@@ -130,7 +132,7 @@ export class TaskPanel implements Component, Focusable {
         if (selected?.key !== this.detailKey) {
             this.detailKey = selected?.key; this.detail = undefined; this.composer = undefined; this.reader = undefined;
             this.pending = new PendingRegion(() => this.theme, () => this.invalidate());
-            this.history.clear(); this.expandedEntryIds.clear(); this.detailRanges = []; this.anchor = undefined; this.detailRevision = -1;
+            this.conversation.dispose(); this.history.clear(); this.expandedEntryIds.clear(); this.detailRanges = []; this.anchor = undefined; this.detailRevision = -1;
             this.detailScroll = this.scrollView(width => this.detailBody(width), "end");
         }
         this.pending.accept(selected?.stats.pendingMessages);
@@ -219,6 +221,19 @@ export class TaskPanel implements Component, Focusable {
             const line = event.y - box.rect.y + this.detailScroll.scrollTop;
             const range = this.detailRanges.find(range => range.collapsible && line >= range.start && line < range.end);
             if (!range) return undefined;
+            if (range.parameterLine === line && event.x - box.rect.x < (range.parameterWidth ?? 0)) {
+                const parameters = range.parameters;
+                let text = parameters?.json ?? "Parameters were not retained within the source budget. Inspect the transcript artifact.";
+                let status = parameters?.status ?? "unavailable";
+                if (status === "complete" && parameters?.json) {
+                    try {
+                        if (parameters.json.length > 16 * 1024) { status = "truncated"; text = "Parameters exceed the display budget. Inspect the transcript artifact."; }
+                        else text = JSON.stringify(JSON.parse(parameters.json), null, 2);
+                    } catch { status = "unavailable"; text = "Parameters could not be decoded. Inspect the transcript artifact."; }
+                }
+                this.reader = new PendingReader({ id: range.id, state: "pending", text }, () => this.theme, () => this.invalidate(), `Parameters · ${status}`);
+                this.invalidate(); this.args.tui.requestRender(); return { handled: true };
+            }
             this.captureAnchor();
             if (this.expandedEntryIds.has(range.id)) this.expandedEntryIds.delete(range.id); else {
                 if (this.expandedEntryIds.size >= 256) this.expandedEntryIds.delete(this.expandedEntryIds.values().next().value!);
@@ -365,7 +380,7 @@ export class TaskPanel implements Component, Focusable {
                 ...(messageEntries.length ? renderMessages(messageEntries, this.theme, width) : [this.theme.fg("dim", "Message content omitted by detail budget.")])]
             : [];
         const hints = this.history.hint ? [this.theme.fg("warning", this.history.hint)] : [];
-        if (conversation) this.detailRanges = this.detailRanges.map(range => ({ ...range, start: range.start + messages.length + hints.length, end: range.end + messages.length + hints.length }));
+        if (conversation) this.detailRanges = this.detailRanges.map(range => ({ ...range, start: range.start + messages.length + hints.length, end: range.end + messages.length + hints.length, parameterLine: range.parameterLine === undefined ? undefined : range.parameterLine + messages.length + hints.length }));
         else this.detailRanges = [];
         const lines = [...messages, ...hints, ...body];
         this.cachedDetail = { width, lines }; return lines;

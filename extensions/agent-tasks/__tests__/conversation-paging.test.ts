@@ -39,7 +39,7 @@ void it("duplicate texts have distinct stable IDs across append and normal proje
     assert.equal(pager.livePage("a", owner, messages.slice(-50), 1, { direction: "before", cursor: latest.before }).status, "reset");
 });
 
-void it("tool association carries bounded read/write/edit/bash summaries, never raw arguments/details", () => {
+void it("tool association carries bounded read/write/edit/bash summaries, retains bounded parameters but excludes unaudited details", () => {
     const pager = new ConversationPager(), owner = {};
     const names = ["read", "write", "edit", "bash"];
     const call = { role: "assistant", content: names.map((name, i) => ({ type: "toolCall", id: `t${i}`, name, arguments: {
@@ -50,7 +50,8 @@ void it("tool association carries bounded read/write/edit/bash summaries, never 
     const calls = pager.livePage("a", owner, messages.slice(0, 1), 0);
     const page = pager.livePage("a", owner, messages, 0, { direction: "after", cursor: calls.after });
     assert.deepEqual(page.entries.map(e => e.kind === "toolResult" ? e.summary?.kind : undefined), names);
-    assert.doesNotMatch(JSON.stringify(page), /SECRET_ARGS|SECRET_DETAILS|oldText|newText/);
+    assert.match(JSON.stringify(page), /SECRET_ARGS|oldText|newText/);
+    assert.doesNotMatch(JSON.stringify(page), /SECRET_DETAILS/);
     const write = page.entries[1]; assert.ok(write?.kind === "toolResult");
     assert.equal(write.summary?.lines, 2); assert.equal(write.summary?.bytes, 8);
     const edit = page.entries[2]; assert.ok(edit?.kind === "toolResult");
@@ -97,7 +98,7 @@ void it("oversize and partial JSONL lines make bounded progress in both directio
     } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-void it("disk tool results associate across separately loaded pages without exposing write content", () => {
+void it("disk tool results associate across separately loaded pages with bounded parameters for the separate reader", () => {
     const dir = mkdtempSync(join(tmpdir(), "paging-tools-"));
     try {
         const path = join(dir, "a.output"), pager = new ConversationPager();
@@ -113,7 +114,7 @@ void it("disk tool results associate across separately loaded pages without expo
         const refreshed = pager.transcriptPage("a", path);
         const result = refreshed.entries.at(-1); assert.ok(result?.kind === "toolResult");
         assert.equal(result.summary?.path, "a.ts"); assert.equal(result.summary?.bytes, 12);
-        assert.doesNotMatch(JSON.stringify(refreshed), /PRIVATE_BODY/);
+        assert.match(JSON.stringify(refreshed), /PRIVATE_BODY/);
     } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -176,4 +177,40 @@ void it("conversion marks uninspected blocks without reading them or inventing a
     assert.ok(bigTail?.kind === "toolResult"); assert.equal(bigTail.elided, 0); assert.equal(bigTail.sourceTruncated, true);
     const tool = entryFromMessage({ role: "assistant", content: [{ type: "toolCall", name: "bash", arguments: { command: " ".repeat(1001) + "PRIVATE_TAIL" } }] }, true);
     assert.ok(tool?.kind === "assistant"); assert.equal(tool.tools[0]?.detail, undefined);
+});
+
+it("parameters are complete immutable JSON or explicit bounded/unavailable, pair cache bytes stay capped", async () => {
+    const { toolParameters } = await import("../src/conversation-entries.ts");
+    const original = { path: "中文😀", nested: [null, false, { text: "  exact\nbody  " }] };
+    const retained = toolParameters(original);
+    assert.equal(retained.status, "complete");
+    assert.deepEqual(JSON.parse(retained.json!), original);
+    original.path = "changed"; assert.doesNotMatch(retained.json!, /changed/);
+    assert.equal(toolParameters({ content: "x".repeat(100_000) }).status, "truncated");
+    assert.equal(toolParameters({ get path() { throw new Error("no getter access"); } }).status, "unavailable");
+    const circular: Record<string, unknown> = {}; circular.self = circular;
+    assert.equal(toolParameters(circular).status, "unavailable");
+    const pager = new ConversationPager(), owner = {};
+    const messages = Array.from({ length: 200 }, (_, n) => ({ role: "assistant", content: [{ type: "toolCall", id: `t${n}`, name: "write", arguments: { content: "x".repeat(1000) } }] }));
+    pager.livePage("bounded", owner, messages, 0);
+    const cache = pager as unknown as { tools: Map<string, unknown>; toolBytes: number };
+    assert.ok(cache.tools.size <= 128); assert.ok(cache.toolBytes <= 256 * 1024);
+    pager.dispose(); assert.equal(cache.toolBytes, 0);
+});
+
+it("parameter arrays never reorder arbitrary keys and huge summary strings are not traversed", async () => {
+    const { toolParameters, entryFromMessage } = await import("../src/conversation-entries.ts");
+    const array = Object.assign(["zero"], { extra: "not JSON array data" });
+    assert.equal(toolParameters({ array }).status, "unavailable");
+    const huge = "x".repeat(1_000_000);
+    const entry = entryFromMessage({ role: "assistant", content: [{ type: "toolCall", id: "huge", name: "write", arguments: { content: huge } }] }, true);
+    assert.ok(entry?.kind === "assistant");
+    assert.equal(entry.tools[0]?.parameters?.status, "truncated");
+    assert.equal(entry.tools[0]?.summary?.lines, undefined);
+    const pager = new ConversationPager();
+    const broad = Array.from({ length: 3000 }, () => 0);
+    const page = pager.livePage("huge", {}, [{ role: "assistant", content: [{ type: "toolCall", name: "foreign", arguments: { broad } }] }], 0);
+    assert.equal(page.budgetLimited, true);
+    assert.equal(page.entries.length, 0);
+    pager.dispose();
 });

@@ -61,3 +61,27 @@ it("pending region has independent focus/anchors, overlay containment, readonly 
         entries = []; publish(); terminal.columns = 80; assert.doesNotMatch(plain().join("\n"), /Pending [0-9]/); assert.equal(panel.getState().pendingFocus, false);
     } finally { panel.dispose(); coordinator.dispose(); }
 });
+
+it("running tool parameter hit target opens independent readonly native reader and Esc preserves queue focus", () => {
+    const identity = { sourceId: "parameters", taskId: "agent", runId: "1" };
+    const row: TaskView = { ...identity, key: taskKey(identity), title: "agent", kind: "agent", status: "running", executionMode: "background", waitCount: 0, artifacts: [],
+        stats: { pendingMessages: { entries: [{ id: "pending", text: "keep queued", state: "pending" }], omitted: 0 }, toolCalls: [{ name: "write", toolCallId: "w", status: "running", elapsedMs: 1000 }] }, capabilities: { stop: true, details: true, steer: true } };
+    let sends = 0;
+    const source: TaskSource = { sourceId: identity.sourceId, revision: 0, list: () => [row], detail: () => ({ text: "", conversation: [{ id: "a", kind: "assistant", text: "", tools: [{ name: "write", toolCallId: "w", parameters: { status: "complete", json: JSON.stringify({ path: "file", content: "EXACT\n" + "中文😀".repeat(100) + "\nPARAM_END" }) } }] }] }),
+        stop: () => true, steer: () => { sends++; return true; }, subscribe: () => () => {}, dispose() {} };
+    const coordinator = new TaskCoordinator(); coordinator.registerSource(source);
+    const panel = new TaskPanel({ coordinator, layout, config: DEFAULTS, ctx: { ui: { notify() {} } } as unknown as ExtensionContext,
+        theme: { fg: (_color, text) => text }, keys: { matches: () => false }, tui: { terminal: { columns: 80, rows: 24 }, requestRender() {} } as never, done() {} });
+    try {
+        panel.handleInput("\r"); panel.handleInput("\t");
+        const before = panel.getState();
+        const lines = panel.render(80).map(stripTerminalSequences);
+        const y = lines.findIndex(line => /View parameters/.test(line)); assert.ok(y >= 0);
+        assert.deepEqual(panel.handleMouse({ type: "click", button: "left", x: 1, y } as never), { handled: true });
+        assert.match(panel.render(80).join("\n"), /Parameters · complete · Esc Back/);
+        panel.handleInput("x"); panel.handleInput("\r"); panel.handleInput("\t"); panel.handleInput("\u001b[F");
+        assert.match(panel.render(80).join("\n"), /PARAM_END/); assert.equal(sends, 0);
+        panel.handleInput("\u001b"); assert.equal(panel.getState().page, "detail"); assert.equal(panel.getState().pendingFocus, before.pendingFocus);
+        assert.equal(panel.getState().pendingScrollTop, before.pendingScrollTop);
+    } finally { panel.dispose(); coordinator.dispose(); }
+});

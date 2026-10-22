@@ -16,7 +16,7 @@ const entries: ConversationEntry[] = [
 void it("renders role labels, Markdown, tool lines, dimmed results and activity within width", () => {
     const r = new ConversationRenderer();
     const plain = r.render(entries, 60, theme, { activity: "reading a.ts", truncated: true }).map(stripTerminalSequences).join("\n");
-    for (const pattern of [/older messages omitted/, /^User$/m, /^Assistant$/m, /Plan/, /3\) keep/, /⏺ bash {2}npm test/, /✗ bash failed/, /FAIL/, /40 more characters/,
+    for (const pattern of [/older messages omitted/, /^User$/m, /^Assistant$/m, /Plan/, /3\) keep/, /bash {2}npm test/, /Failed/, /FAIL/, /40 more characters/,
         /\$ ls -la \(exit 1\)/, /Error: boom/, /▍ reading a\.ts/]) assert.match(plain, pattern);
     assert.doesNotMatch(plain, /# Plan|evil|\u0007/);
     for (const width of [1, 5, 20, 80]) for (const line of r.render(entries, width, theme)) assert.ok(visibleWidth(line) <= width, `${width}`);
@@ -45,21 +45,21 @@ void it("tool previews are bounded by visual lines, click state uses IDs, write 
     try {
         const compact = r.renderModel(tools, 80, theme);
         const text = stripTerminalSequences(compact.lines.join("\n"));
-        assert.match(text, /output-4/); assert.doesNotMatch(text, /output-5\b/);
-        assert.match(text, /output-99/); assert.doesNotMatch(text, /output-94\b/);
-        assert.match(text, /95 more visual lines/); assert.match(text, /30 more characters/);
+        assert.doesNotMatch(text, /output-0\b/);
+        assert.match(text, /output-99/); assert.doesNotMatch(text, /output-96\b/);
+        assert.match(text, /97 more visual lines/); assert.match(text, /30 more characters/);
         assert.match(text, /additional content omitted/); assert.doesNotMatch(text, /SECRET WRITE CONTENT/);
         assert.match(text, /from line 2 · limit 20/); assert.match(text, /10 lines · 100 bytes/); assert.match(text, /\+3 lines · −2 lines/);
         assert.equal(compact.ranges.length, 4); assert.ok(compact.ranges.every(range => range.collapsible));
         const expanded = new Set(["read", "write"]);
         const model = r.renderModel([{ id: "older", kind: "user", text: "before" }, ...tools], 80, theme, { expanded });
         const open = stripTerminalSequences(model.lines.join("\n"));
-        assert.match(open, /output-39/); assert.doesNotMatch(open, /output-40\b/);
-        assert.doesNotMatch(open, /SECRET WRITE CONTENT/); assert.match(open, /60 more visual lines/);
+        assert.match(open, /output-99/); assert.match(open, /output-40\b/);
+        assert.match(open, /SECRET WRITE CONTENT/); assert.doesNotMatch(open, /60 more visual lines/);
         assert.ok(model.ranges.find(range => range.id === "read")!.start > compact.ranges[0].start);
         // A long single line must not bypass visual-line preview budgets at narrow widths.
         const wrapped = r.renderModel([{ id: "wide", kind: "toolResult", text: "中文😀".repeat(1000), elided: 0 }], 10, theme);
-        assert.ok(wrapped.lines.length <= 7);
+        assert.ok(wrapped.lines.length <= 8);
     } finally { r.dispose(); }
 });
 

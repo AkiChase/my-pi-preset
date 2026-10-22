@@ -414,7 +414,7 @@ void it("structured conversation replaces the raw output body, with running acti
     try {
         h.panel.handleInput("\r");
         const frame = stripTerminalSequences(h.panel.render(100).join("\n"));
-        for (const pattern of [/── Conversation · 2 messages \(latest\)/, /older messages omitted/, /User/, /do it/, /Assistant/, /done/, /⏺ read {2}a\.ts/, /reading a\.ts/]) assert.match(frame, pattern);
+        for (const pattern of [/── Conversation · 2 messages \(latest\)/, /older messages omitted/, /User/, /do it/, /Assistant/, /done/, /read {2}a\.ts/, /reading a\.ts/]) assert.match(frame, pattern);
         assert.doesNotMatch(frame, /"type":"user"|── Output|\*\*done\*\*/);
     } finally { h.panel.dispose(); f.coordinator.dispose(); }
 });
@@ -560,13 +560,13 @@ void it("native clipped mouse clicks expand only one stable entry, after scrolli
     const click = (x: number, y: number, button = "left") => panel.handleMouse({ type: "click", button, x, y } as never);
     try {
         panel.handleInput("\r"); panel.render(80);
-        panel.handleMouse({ type: "wheel", x: 1, y: 11, wheelDelta: -5 } as never);
+        panel.handleMouse({ type: "wheel", x: 1, y: 11, wheelDelta: -1 } as never);
         const before = panel.render(80).map(stripTerminalSequences);
-        const hit = before.findIndex(line => /TOOL-4-LINE/.test(line)); assert.ok(hit >= 0);
+        const hit = before.findLastIndex(line => /^read\s/.test(line)); assert.ok(hit >= 0);
         assert.equal(click(1, hit, "right"), undefined); assert.equal(click(1, 0), undefined); assert.equal(click(79, hit), undefined);
         assert.deepEqual(click(1, hit), { handled: true });
         let after = panel.render(80).map(stripTerminalSequences);
-        assert.ok(after.some(line => /click to collapse/.test(line)), "scrollTop/native clip must map to the clicked tool ID");
+        assert.ok((panel as unknown as { expandedEntryIds: Set<string> }).expandedEntryIds.has("tool-4"), "scrollTop/native clip must map to the clicked tool ID");
         panel.handleInput("\u001b[F"); after = panel.render(80).map(stripTerminalSequences);
         // End re-reads same-task raw source without losing per-entry expansion.
         assert.ok(after.some(line => /TOOL-4-LINE-19/.test(line)));

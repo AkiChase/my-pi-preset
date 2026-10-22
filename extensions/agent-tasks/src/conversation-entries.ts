@@ -4,7 +4,7 @@
  * as untrusted: unknown shapes are skipped, never thrown on.
  */
 import { closeSync, fstatSync, openSync, readSync } from "node:fs";
-import type { ConversationEntry, ToolCallSummary, ToolDataSummary } from "../../task-ui/types.ts";
+import type { ConversationEntry, ToolCallSummary, ToolDataSummary, ToolParameters } from "../../task-ui/types.ts";
 
 export const MAX_ENTRIES = 64;
 export const MAX_TEXT = 8_000;
@@ -18,11 +18,13 @@ const isObj = (value: unknown): value is Obj => value !== null && typeof value =
 const str = (value: unknown): string | undefined => typeof value === "string" ? value : undefined;
 
 function cap(text: string, max: number): { text: string; elided: number } {
-  return text.length <= max ? { text, elided: 0 } : { text: text.slice(0, max), elided: text.length - max };
+  if (text.length <= max) return { text, elided: 0 };
+  const end = /[\uD800-\uDBFF]/.test(text[max - 1] ?? "") ? max - 1 : max;
+  return { text: text.slice(0, end), elided: text.length - end };
 }
 
 /** Keep only a prefix and count inspected text blocks without joining large strings. */
-function blocksText(content: unknown, budget: number): { text: string; elided: number; sourceTruncated?: boolean } {
+function blocksText(content: unknown, budget: number, preserve = false): { text: string; elided: number; sourceTruncated?: boolean } {
   const parts = typeof content === "string" ? [content] : Array.isArray(content) ? content : [];
   let text = "", total = 0, count = 0;
   for (const part of parts.slice(0, 64)) {
@@ -34,7 +36,9 @@ function blocksText(content: unknown, budget: number): { text: string; elided: n
   }
   // Preserve trim semantics for normal output; elision counts the original text
   // beyond the retained prefix, not an artificial budget+1 sentinel.
-  return { text: text.trim(), elided: Math.max(0, total - budget), ...(parts.length > 64 ? { sourceTruncated: true } : {}) };
+  const retained = cap(text, budget);
+  if (/[\uD800-\uDBFF]$/.test(retained.text)) retained.text = retained.text.slice(0, -1);
+  return { text: preserve ? retained.text : retained.text.trim(), elided: Math.max(0, total - retained.text.length), ...(parts.length > 64 ? { sourceTruncated: true } : {}) };
 }
 
 function lineCount(text: string): number {
@@ -50,15 +54,48 @@ function dataSummary(name: string, args: Obj): ToolDataSummary | undefined {
   const summary: { kind: "read" | "write" | "edit" | "bash"; command?: string; path?: string; offset?: number; limit?: number; lines?: number; bytes?: number; addedLines?: number; removedLines?: number } = { kind: name, ...(path ? { path } : {}) };
   if (name === "bash") summary.command = str(args.command)?.slice(0, MAX_TOOL_DETAIL * 5);
   if (name === "read") { summary.offset = number(args.offset); summary.limit = number(args.limit); }
-  if (name === "write" && typeof args.content === "string") { summary.lines = lineCount(args.content); summary.bytes = Buffer.byteLength(args.content); }
+  if (name === "write" && typeof args.content === "string" && args.content.length <= 16 * 1024) { summary.lines = lineCount(args.content); summary.bytes = Buffer.byteLength(args.content); }
   if (name === "edit") {
     const edits = Array.isArray(args.edits) ? args.edits.slice(0, 64) : [args];
+    if (edits.some(edit => isObj(edit) && ((str(edit.newText)?.length ?? 0) > 16 * 1024 || (str(edit.oldText)?.length ?? 0) > 16 * 1024))) return Object.freeze(summary);
     summary.addedLines = 0; summary.removedLines = 0;
     for (const edit of edits) if (isObj(edit)) {
       summary.addedLines += lineCount(str(edit.newText) ?? ""); summary.removedLines += lineCount(str(edit.oldText) ?? "");
     }
   }
   return Object.freeze(summary);
+}
+
+/** Serialize JSON only, with bounded traversal and no getters/toJSON execution. */
+export function toolParameters(value: unknown): ToolParameters {
+  if (!isObj(value)) return Object.freeze({ status: "unavailable" });
+  let remaining = 16 * 1024, nodes = 2048;
+  const seen = new Set<object>();
+  const copy = (v: unknown, depth: number): unknown => {
+    if (--nodes < 0 || depth > 16) throw new Error("budget");
+    if (typeof v === "string") { remaining -= v.length * 6 + 2; if (remaining < 0) throw new Error("budget"); return v; }
+    if (v === null || typeof v === "boolean" || typeof v === "number" && Number.isFinite(v)) { remaining -= 24; if (remaining < 0) throw new Error("budget"); return v; }
+    if (!v || typeof v !== "object" || seen.has(v)) throw new Error("not JSON");
+    if (!Array.isArray(v) && Object.getPrototypeOf(v) !== Object.prototype && Object.getPrototypeOf(v) !== null) throw new Error("not JSON");
+    if (Array.isArray(v) && v.length > nodes) throw new Error("budget");
+    seen.add(v);
+    const out: unknown[] | Record<string, unknown> = Array.isArray(v) ? [] : Object.create(null);
+    let count = 0;
+    for (const key in v) {
+      if (!Object.hasOwn(v, key)) continue;
+      if (Array.isArray(v) && key !== String(count)) throw new Error("not JSON");
+      count++;
+      if (--nodes < 0 || (remaining -= key.length * 6 + 4) < 0) throw new Error("budget");
+      const prop = Object.getOwnPropertyDescriptor(v, key);
+      if (!prop || !("value" in prop)) throw new Error("not JSON");
+      if (Array.isArray(out)) out.push(copy(prop.value, depth + 1));
+      else out[key] = copy(prop.value, depth + 1);
+    }
+    if (Array.isArray(v) && count !== v.length) throw new Error("not JSON");
+    seen.delete(v); return out;
+  };
+  try { return Object.freeze({ status: "complete", json: JSON.stringify(copy(value, 0)) }); }
+  catch (error) { return Object.freeze({ status: error instanceof Error && error.message === "budget" ? "truncated" : "unavailable" }); }
 }
 
 const PRIMARY_ARGS = ["command", "path", "file_path", "pattern", "query", "url", "description", "action", "prompt"];
@@ -73,7 +110,7 @@ function toolSummary(block: Obj, structured = false): ToolCallSummary | undefine
   }
   const toolCallId = structured ? str(block.id)?.slice(0, 200) : undefined;
   const summary = structured && args ? dataSummary(name, args) : undefined;
-  return Object.freeze({ name: name.slice(0, 128), ...(detail ? { detail } : {}), ...(toolCallId ? { toolCallId } : {}), ...(summary ? { summary } : {}) });
+  return Object.freeze({ name: name.slice(0, 128), ...(detail ? { detail } : {}), ...(toolCallId ? { toolCallId } : {}), ...(summary ? { summary } : {}), ...(structured ? { parameters: toolParameters(args) } : {}) });
 }
 
 /** One message → at most one entry; unknown roles and empty content yield none. */
@@ -99,12 +136,17 @@ export function entryFromMessage(message: unknown, structured = false): Conversa
       return { kind: "assistant", text, tools };
     }
     case "toolResult": {
-      const { text, elided, sourceTruncated } = blocksText(message.content, MAX_RESULT);
+      const { text, elided, sourceTruncated } = blocksText(message.content, MAX_RESULT, structured);
       const name = str(message.toolName)?.slice(0, 128);
-      if (!text && !message.isError && !sourceTruncated) return undefined;
+      if (!text && !message.isError && !sourceTruncated && !(structured && str(message.toolCallId))) return undefined;
       const durationMs = structured && typeof message.durationMs === "number" && Number.isFinite(message.durationMs) && message.durationMs >= 0 ? message.durationMs : undefined;
       const toolCallId = structured ? str(message.toolCallId)?.slice(0, 200) : undefined;
-      return { kind: "toolResult", ...(durationMs === undefined ? {} : { durationMs }), ...(name ? { name } : {}), text, elided, ...(sourceTruncated ? { sourceTruncated: true } : {}), ...(toolCallId ? { toolCallId } : {}), ...(message.isError === true ? { error: true } : {}) };
+      const details = structured && isObj(message.details) ? message.details : undefined;
+      const diff = details && str(details.diff);
+      const display = structured ? Object.freeze({ status: elided || sourceTruncated ? "truncated" as const : !text && Array.isArray(message.content) && message.content.slice(0, 64).some(part => !isObj(part) || part.type !== "text") ? "unavailable" as const : "complete" as const,
+        ...(diff === undefined ? {} : { diff: cap(diff, MAX_RESULT * 4).text, diffTruncated: diff.length > MAX_RESULT * 4 }),
+        ...(number(details?.firstChangedLine) === undefined ? {} : { firstChangedLine: number(details?.firstChangedLine) }) }) : undefined;
+      return { kind: "toolResult", ...(display ? { display } : {}), ...(durationMs === undefined ? {} : { durationMs }), ...(name ? { name } : {}), text, elided, ...(sourceTruncated ? { sourceTruncated: true } : {}), ...(toolCallId ? { toolCallId } : {}), ...(message.isError === true ? { error: true } : {}) };
     }
     case "bashExecution": {
       const command = str(message.command);
