@@ -1935,3 +1935,41 @@ Clarified latest-request and session cache metrics in the unified status bar, wi
 ### Next Steps
 
 - 已披露read无语法高亮、generic计时独立行、未知customrenderer不重建；另两项并行任务保持原状。
+
+
+## Session 58: 修复 SDK 测试兼容并优化 CPU 开销
+<!-- trellis-session: v=2 fp=6676cda1568c2205 -->
+
+**Date**: 2026-10-22
+**Task**: 修复 SDK 测试兼容并优化 CPU 开销
+**Branch**: `main`
+
+### Summary
+
+修复 14 个 SDK reset 测试失败，复用独立 runtime fixture，默认保留 8 workers 并新增 4 worker 低负载模式。任务已验收归档，无推送。
+
+### Main Changes
+
+- 真实 SDK dialog 清理、编辑器焦点和重复 reset 回归；三个阶段均独立审查通过。
+- 固定源码热点配对：耗时中位数降低约 25%，CPU 总时间降低约 28%；低负载入口保持发现和退出码一致。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `665c415` | fix(tests): align reset fixtures with SDK dialog lifecycle |
+| `328e236` | perf(tests): reuse isolated runtime fixtures for diagnostics |
+| `8068f9a` | test: add low-CPU mode with identical suite discovery |
+
+### Testing
+
+- [OK] pnpm check 通过；默认和低负载各三轮，每轮 1659/1659 PASS。
+- [OK] 自然退出：SDK相关191、Trellis359；Python38通过。性能有系统负载噪声，首轮default包含typecheck，不承诺稳定百分比。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 无本任务阻塞；其他 Beautify 任务未修改。
