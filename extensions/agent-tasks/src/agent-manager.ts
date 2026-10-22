@@ -743,6 +743,9 @@ export class AgentManager {
       workflowId: options.workflowId,
       maxSubagentDepth: options.maxSubagentDepth,
       registryLocator,
+      // The persistent registry index is the user-facing runtime label
+      // (`resumeKey`); without it the task panel falls back to the raw agent id.
+      registryIndex: persistent.index,
       rootSessionId: options.rootSessionId,
       recoveredFromInterruption: persistent.status === "interrupted",
       // Workflow children answer to a script, not a conversation: no channel.
