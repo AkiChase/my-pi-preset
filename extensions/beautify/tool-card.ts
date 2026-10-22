@@ -51,7 +51,7 @@ function displayValue(value: unknown): string {
   catch { return "[unserializable argument]"; }
 }
 
-function argumentsText(args: Args): string {
+export function argumentsText(args: Args): string {
   if (!args || typeof args !== "object" || Array.isArray(args)) return `args: ${displayValue(args)}`;
   const entries = Object.entries(args);
   if (!entries.length) return "";

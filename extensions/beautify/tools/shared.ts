@@ -1,5 +1,6 @@
 import type { Theme, ToolRenderers } from "@earendil-works/pi-coding-agent";
 import { visibleWidth, type Component } from "@earendil-works/pi-tui";
+import { argumentsText } from "../tool-card.ts";
 import { clean, clip, summary, toolHeading, wrap } from "../layout.ts";
 import { text, type Args, type RenderContext, type Result } from "../types.ts";
 export type Draw = (result: Result, theme: Theme, context: RenderContext, width: number) => string[];
@@ -55,7 +56,9 @@ export function renderers(name: string, draw: Draw, describe: Describe = generic
         if (display) meta.stats = [meta.stats, display].filter(Boolean).join(" · ");
         const label = meta.title ?? title(name, ctx.args);
         const suffix = meta.suffix ?? (name === "read" && typeof ctx.args.offset === "number" ? `:${Math.max(1, ctx.args.offset)}` : "");
-        return toolHeading(name, label, suffix, meta.stats, width, theme, ctx.expanded, meta.secondary);
+        const heading = toolHeading(name, label, suffix, meta.stats, width, theme, ctx.expanded, meta.secondary);
+        const args = ctx.expanded ? argumentsText(ctx.args) : "";
+        return args ? [...heading, ...wrap(args, width).map(row => theme.fg("muted", row))] : heading;
       } };
     },
     renderResult: (result, _options, theme, context) => {

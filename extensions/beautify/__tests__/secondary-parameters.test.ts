@@ -59,9 +59,6 @@ for (const fixture of fixtures) {
       assert.doesNotMatch(running, /offset/);
     }
     if (fixture.name === "bash") assert.equal((running.match(/background after 5s/g) ?? []).length, 1);
-    // S1 keeps the existing expanded heading; a complete argument body belongs to S2.
-    component.setExpanded(true);
-    assert.doesNotMatch(visible(component).join("\n"), /command:|limit:|glob:/);
   });
 }
 
