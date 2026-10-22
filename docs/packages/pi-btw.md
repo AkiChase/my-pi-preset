@@ -7,10 +7,10 @@
 本预设已在 `pi-preset.json` 声明该包。运行本仓库的同步命令后，现有同步器会将它安装到用户级 Pi 环境：
 
 ```sh
-./install.sh --sync packages
+./install.sh
 ```
 
-也可以运行默认的 `./install.sh`。本仓库只维护所需包清单；不会通过项目 `.pi/settings.json` 自动加载该包，也不会在拉取代码时立即安装它。
+在同步范围中选中 `Packages`，审阅计划并输入 `APPLY` 确认。本仓库只维护所需包清单；不会通过项目 `.pi/settings.json` 自动加载该包，也不会在拉取代码时立即安装它。
 
 同步完成后重启 Pi，或按同步输出执行 `/reload`。
 

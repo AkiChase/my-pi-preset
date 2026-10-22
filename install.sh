@@ -1,53 +1,26 @@
 #!/bin/sh
-# Set up my pi preset on a machine. Safe to re-run.
-#
-# Everything is declared in pi-preset.json; this script only bootstraps and then
-# hands over to scripts/sync.mjs, which reconciles the machine with the manifest:
-# packages through `pi install` / `pi update` / `pi remove`, and the declared
-# settings, keybindings and extension config files by writing the agent
-# directory's JSON files.
-#
-# Usage:
-#   curl -fsSL https://raw.githubusercontent.com/AkiChase/my-pi-preset/main/install.sh | sh
-#   ./install.sh --dry-run
-#   ./install.sh --dev
-#   ./install.sh --sync settings
-#   ./install.sh --prune packages
-#
-# Options are passed through to sync.mjs: --dev, --sync, --prune, --dry-run.
+# Bootstrap the interactive Node installer. Reconciliation belongs to sync.mjs.
+# Usage: curl -fsSL https://raw.githubusercontent.com/AkiChase/my-pi-preset/main/install.sh | sh
 set -eu
 
-REPO="AkiChase/my-pi-preset"
-RAW="https://raw.githubusercontent.com/${REPO}/main"
+RAW="https://raw.githubusercontent.com/AkiChase/my-pi-preset/main"
+log() { printf '[install] %s\n' "$*"; }
+die() { printf '[install] %s\n' "$*" >&2; exit 1; }
 
-log() {
-  printf '\033[2m[install]\033[0m %s\n' "$*"
-}
-
-die() {
-  printf '\033[31m[install]\033[0m %s\n' "$*" >&2
-  exit 1
-}
-
-# Dev needs the package checkout, not just a downloaded installer. Reject before
-# fetching anything so `curl | sh -s -- --dev` cannot install a temporary path.
-script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P) || script_dir=""
-local_checkout=false
-if [ -f "$0" ] && [ -n "$script_dir" ] && [ -f "$script_dir/scripts/sync.mjs" ] && [ -f "$script_dir/pi-preset.json" ]; then
-  local_checkout=true
+[ "$#" -eq 0 ] || die "This installer is interactive and takes no arguments. Run ./install.sh or curl | sh."
+# Never consume the shell source pipe as keyboard input.
+if ! ( : < /dev/tty > /dev/tty ) 2>/dev/null; then
+  die "Interactive installation needs a terminal. Run this command in an interactive shell."
 fi
-for arg in "$@"; do
-  if [ "$arg" = "--dev" ] && [ "$local_checkout" = false ]; then
-    die "--dev requires a local my-pi-preset checkout; run ./install.sh --dev there."
-  fi
-done
-
-log "checking required commands"
-command -v node >/dev/null 2>&1 || die "'node' is not on PATH; it is required to run the sync script."
+command -v node >/dev/null 2>&1 || die "'node' is not on PATH."
 command -v curl >/dev/null 2>&1 || die "'curl' is not on PATH."
 
-# A terminal app's launcher can shadow pi on PATH. Prefer the managed install so
-# this script drives the real pi, and pass the choice down to sync.mjs.
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P) || script_dir=""
+local_checkout=false
+if [ -f "$0" ] && [ -n "$script_dir" ] && [ -f "$script_dir/scripts/install.mjs" ] && [ -f "$script_dir/scripts/sync.mjs" ] && [ -f "$script_dir/pi-preset.json" ]; then
+  local_checkout=true
+fi
+
 PI_BIN="${PI_BIN:-}"
 if [ -z "$PI_BIN" ]; then
   agent_dir="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
@@ -56,37 +29,32 @@ if [ -z "$PI_BIN" ]; then
   elif command -v pi >/dev/null 2>&1; then
     PI_BIN=$(command -v pi)
   else
-    die "'pi' is not on PATH. Install pi first: https://pi.dev"
+    die "'pi' is not on PATH. Install Pi first: https://pi.dev"
   fi
 fi
 PI_BIN_DIR=$(dirname -- "$PI_BIN")
 PATH="$PI_BIN_DIR:$PATH"
 export PATH PI_BIN
 log "using pi at $PI_BIN"
-log "pi $("$PI_BIN" --version 2>/dev/null || echo '?'), node $(node --version)"
 
-# Work from the local checkout when this script sits in one, otherwise fetch
-# the two files it needs (the piped `curl | sh` case).
+cleanup=""
+cleanup_run() { if [ -n "$cleanup" ]; then rm -rf "$cleanup"; fi; }
+trap cleanup_run EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 if [ "$local_checkout" = true ]; then
-  log "using local checkout at $script_dir"
   manifest="$script_dir/pi-preset.json"
-  sync_script="$script_dir/scripts/sync.mjs"
-  cleanup=""
+  installer="$script_dir/scripts/install.mjs"
 else
-  tmp_dir=$(mktemp -d)
-  cleanup="$tmp_dir"
-  manifest="$tmp_dir/pi-preset.json"
-  sync_script="$tmp_dir/sync.mjs"
-  log "downloading pi-preset.json and scripts/sync.mjs from $RAW"
+  cleanup=$(mktemp -d)
+  # macOS temporary roots can be symlinked; Node resolves module URLs physically.
+  cleanup=$(CDPATH= cd -- "$cleanup" && pwd -P)
+  manifest="$cleanup/pi-preset.json"
+  installer="$cleanup/install.mjs"
+  log "downloading installer and preset"
   curl -fsSL "$RAW/pi-preset.json" -o "$manifest" || die "could not download pi-preset.json"
-  curl -fsSL "$RAW/scripts/sync.mjs" -o "$sync_script" || die "could not download scripts/sync.mjs"
-  log "downloaded to $tmp_dir"
+  curl -fsSL "$RAW/scripts/sync.mjs" -o "$cleanup/sync.mjs" || die "could not download scripts/sync.mjs"
+  curl -fsSL "$RAW/scripts/install.mjs" -o "$installer" || die "could not download scripts/install.mjs"
 fi
 
-if [ -n "$cleanup" ]; then
-  trap 'rm -rf "$cleanup"' EXIT INT TERM
-fi
-
-log "handing over to sync.mjs (it prints its own progress from here)"
-echo
-node "$sync_script" --manifest "$manifest" "$@"
+node "$installer" --manifest "$manifest" < /dev/tty > /dev/tty 2>&1

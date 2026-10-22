@@ -1,0 +1,4 @@
+{"file":".trellis/spec/development/index.md","reason":"Installer entry, dependency and synchronization safety contracts"}
+{"file":".trellis/spec/testing/index.md","reason":"Offline isolation, real subprocess exit and regression verification"}
+{"file":".trellis/spec/development/direct-user-extensions.md","reason":"Destructive direct extension pruning boundaries"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace shell to UI to preview and execution"}

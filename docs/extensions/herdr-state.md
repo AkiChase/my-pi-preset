@@ -26,11 +26,12 @@ socket 通信失败不会阻塞 Pi 的会话、工具调用或 UI 生命周期�
 本预设将 Herdr 状态功能作为自身扩展加载。更新前若需要清理用户 agent 目录里的手工直接扩展，先预览再执行：
 
 ```sh
-./install.sh --sync extensions --prune extensions --dry-run
-./install.sh --sync extensions --prune extensions
+./install.sh
 ```
 
-完成后执行 `/reload` 或重启 Pi，使扩展发现结果重新生效。`--prune` 会删除未列入 `preserve.extensions` 的直接扩展入口；先确认 dry-run 输出符合预期。
+在同步范围和清理范围中都选中 `Extensions`，审阅真实 dry-run 计划，确认后输入 `APPLY` 执行。清理会删除未列入 `preserve.extensions` 的直接扩展入口。
+
+完成后执行 `/reload` 或重启 Pi，使扩展发现结果重新生效。
 
 ## 配置与限制
 

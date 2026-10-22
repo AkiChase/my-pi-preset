@@ -16,9 +16,12 @@ curl -fsSL https://raw.githubusercontent.com/AkiChase/my-pi-preset/main/install.
 已有本地检出时：
 
 ```sh
-./install.sh --dry-run  # 先看计划，不改本机
 ./install.sh
 ```
+
+安装器是无边框的交互式终端界面，不接受命令行选项。使用方向键移动、空格勾选、`A` 全选/全不选、`Enter` 前进、`Esc` 返回、`Q` 退出。同步范围默认全选，清理范围默认全不选；清理选中的域使用 prune，其余同步域使用 merge。Esc 的按键判定等待为 100ms。
+
+执行前会生成真实 dry-run 计划，显示全部域的 Merge / Prune / Skip 状态；方向键或 PageUp/PageDown 可滚动计划。输入大写 `APPLY` 并按 Enter 才执行，退出则不应用更改。没有可交互终端时拒绝运行，不支持无人值守安装。
 
 完成后在 Pi 中 `/reload`，或重启 Pi。脚本只管理用户级包、agent 目录内的受管配置和直接扩展入口，不修改项目 `.pi/`。
 
@@ -28,13 +31,12 @@ curl -fsSL https://raw.githubusercontent.com/AkiChase/my-pi-preset/main/install.
 
 ```sh
 pnpm install
-./install.sh --dev --dry-run
-./install.sh --dev
+./install.sh
 ```
 
-随后 `/reload`，可用 `/process-tasks-version` 查看加载路径。`--dev` 只切换本仓库，第三方包仍按清单安装；不修改清单。切回远程版，在同一个检出运行普通 `./install.sh` 后再 `/reload`。
+在来源页选择 `Local checkout`，然后审阅计划并确认。第三方包仍按清单安装，本地源码直接加载，不修改清单，也不会由向导安装本地依赖。随后 `/reload`，可用 `/process-tasks-version` 查看加载路径。切回远程版，在同一个检出再次运行向导并选择 `Remote preset`。
 
-必须在本仓库完整独立检出中使用 `--dev`，不能在 Pi 管理的克隆、下载的单文件或 `curl | sh` 中使用。来源切换的移除失败会中止后续安装和配置写入，避免重复注册。只选择配置域或使用 dry-run 时不会切换来源。
+本地来源要求完整独立检出，不能使用 Pi 管理的克隆或 curl 下载的临时文件。来源切换的移除失败会中止后续安装和配置写入，避免重复注册。未选择 Packages 或未确认执行时不会切换来源。
 
 脚本优先使用 agent 目录中的 `bin/pi`，并打印实际路径；需要指定时：
 
@@ -90,20 +92,20 @@ Monitor 属于 Task Composition，不是额外顶层入口；Agent、进程和�
 ```sh
 pi update --extensions
 ./install.sh
-./install.sh --sync settings
-./install.sh --sync packages,settings --dry-run
-./install.sh --sync extensions --prune extensions --dry-run
-./install.sh --prune
 ```
 
-| 选项 | 用途 |
-| --- | --- |
-| `--sync <域>` | 选择 `packages`、`settings`、`keybindings`、`files`、`extensions`，逗号分隔；支持 `all` / `none`，默认全部。 |
-| `--prune [<域>]` | 在选定域删除未声明内容；默认不删除，裸写表示清理全部已选域。 |
-| `--dev` | 只把本仓库切为执行同步脚本所在的本地检出。 |
-| `--dry-run` | 读取并打印计划，不执行安装、更新、移除、扩展删除或配置写入。 |
+向导会依次显示来源、同步范围和清理范围。所有选择均在审阅页回显，包括跳过项；取消后重新运行可重新选择。
 
-默认 **merge**：对齐清单声明的内容，保留未声明值；**prune**：删除选定域中未声明且未受保护的内容。不能 prune 未被 sync 选中的域。`conflicts` 中的包即使在 merge 模式也会移除。`extensions` 域只处理用户 agent 目录下的直接 Pi 扩展入口，使用 `--prune` 前应先看 dry-run。
+| 界面选择 | 用途 |
+| --- | --- |
+| 同步范围 | 选择 Packages、Settings、Keybindings、Config files、Extensions；默认全选。 |
+| 清理范围 | 仅列出已选同步域，默认全不选；勾选后使用 prune。 |
+| 来源 | 默认远程预设；完整本地检出可选择本地源码。 |
+| 计划审阅 | 读取当前状态并展示 dry-run 结果，不执行更改；输入 `APPLY` 后才执行。 |
+
+默认 **merge**：对齐清单声明的内容，保留未声明值；**prune**：删除选定域中未声明且未受保护的内容。`conflicts` 中的包即使在 merge 模式也会移除，清单声明的 `null` 也会删除对应配置。`extensions` 域只处理用户 agent 目录下的直接 Pi 扩展入口。
+
+计划预览与执行使用相同选择，但不会锁定其间的外部配置修改；同步器在执行时重新读取状态。
 
 ### 受管理的配置
 
