@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 56
+- **Total Sessions**: 57
 - **Last Active**: 2026-10-22
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1900 | Active |
+| `journal-1.md` | ~1937 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 57 | 2026-10-22 | 子 Agent 详情对齐与真实终端验收收尾 | `1363940`, `5d0ebd7`, `20c39e4`, `70078ca` | `main` |
 | 56 | 2026-10-22 | 交互式预设安装器 | `d953f75`, `34e9d30`, `1b679a3` | `main` |
 | 55 | 2026-10-22 | 统一嵌套 Agent 展示 | `58ee882` | `main` |
 | 54 | 2026-10-21 | 统一清理手工扩展并直连 Herdr | `74327e1`, `98e9e61`, `bcff5c5`, `fe838c1`, `a7a5643`, `8d4c862` | `main` |

@@ -1898,3 +1898,40 @@ Clarified latest-request and session cache metrics in the unified status bar, wi
 ### Next Steps
 
 - 未 push；远程 curl 入口需发布后更新。保留其他会话的 subagent-detail-parity 未跟踪任务。
+
+
+## Session 57: 子 Agent 详情对齐与真实终端验收收尾
+<!-- trellis-session: v=2 fp=ecc7036757f790be -->
+
+**Date**: 2026-10-22
+**Task**: 子 Agent 详情对齐与真实终端验收收尾
+**Branch**: `main`
+
+### Summary
+
+完成调用计时、终态背景、独立消息队列；真实验收后移除独立参数入口，按主页面工具renderer与统一展开修正，用户查看后授权收尾。
+
+### Main Changes
+
+- 已停止本次验收tmux；归档subagent-detail-parity，保留用户可回看的外部HTML/ANSI导出。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1363940` | feat(task-ui): show subagent tool timing and terminal surfaces |
+| `5d0ebd7` | feat(task-ui): show scrollable subagent pending messages |
+| `20c39e4` | feat(task-ui): reuse tool cards and expose bounded parameters |
+| `70078ca` | fix(task-ui): align detail tools with main agent renderers |
+
+### Testing
+
+- [OK] 最终相关自然882/882通过，typecheck通过；完整check14项已知SDK1.4 resetExtensionUI fixtures失败，未范围外修复。完整Pi同数据60对捕获验证通过。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 已披露read无语法高亮、generic计时独立行、未知customrenderer不重建；另两项并行任务保持原状。
