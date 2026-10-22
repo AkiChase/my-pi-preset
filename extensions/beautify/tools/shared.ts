@@ -1,4 +1,4 @@
-import type { Theme, ToolRenderers } from "@earendil-works/pi-coding-agent";
+import { keyHint, type Theme, type ToolRenderers } from "@earendil-works/pi-coding-agent";
 import { visibleWidth, type Component } from "@earendil-works/pi-tui";
 import { clean, clip, summary, toolHeading, wrap } from "../layout.ts";
 import { text, type Args, type RenderContext, type Result } from "../types.ts";
@@ -69,14 +69,21 @@ export function renderers(name: BuiltinName, draw: Draw, describe: Describe = ge
         const label = meta.title ?? call.title;
         const suffix = meta.suffix ?? call.suffix;
         const secondary = [meta.secondary, call.options].filter(Boolean).join(" · ");
-        // Expanded calls keep the same semantic options in their heading. Only
-        // this family opts in; generic/management toolHeading semantics stay intact.
-        const heading = ctx.expanded
-          ? toolHeading(name, label + suffix + (secondary ? `  ${secondary}` : ""), "", "", width, theme, true)
-          : toolHeading(name, label, suffix, meta.stats, width, theme, false, secondary);
+        // Keep the compact composition (and its metadata priority) in both
+        // states when it fits. Expanded overflow restores full call information
+        // in separately styled rows, without changing other tool families.
+        const metadata = [meta.stats, secondary, keyHint("app.tools.expand", "expand")]
+          .filter(Boolean).map(value => clean(value).replace(/\n/g, "\\n")).join(" · ");
+        const fullTitle = clean(name + (label || suffix ? `  ${label}${suffix}` : "")).replace(/\n/g, "\\n");
+        // summary() retains its own two-cell metadata separator even when
+        // no title has arrived; toolHeading adds the identity separator too.
+        const metadataGap = label || suffix ? 2 : 4;
+        const heading = !ctx.expanded || visibleWidth(fullTitle) + (metadata ? metadataGap + visibleWidth(metadata) : 0) <= width
+          ? toolHeading(name, label, suffix, meta.stats, width, theme, false, secondary)
+          : [...toolHeading(name, label, suffix, "", width, theme, true),
+            ...wrap(metadata, width).filter(Boolean).map(row => theme.fg("muted", row))];
         if (!ctx.expanded) return heading;
         return [...heading,
-          ...wrap(meta.stats, width).filter(Boolean).map(row => theme.fg("muted", row)),
           ...call.details.flatMap(detail => wrap(detail, width).map(row => theme.fg("muted", row))),
         ];
       } };

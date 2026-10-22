@@ -37,7 +37,7 @@ for (const fixture of fixtures) {
     } };
     const component = new ToolExecutionComponent(fixture.name, `args-${fixture.name}`, {}, { outputPad: 2 }, renderer, screen, "/fixture");
     component.setExpanded(true);
-    assert.deepEqual(rows(component).map(row => row.trim()), [fixture.name]);
+    assert.match(rows(component)[0]!.trim(), new RegExp(`^${fixture.name}\\s+ctrl\\+o expand$`));
     const arrived: Args = {};
     const assertCall = () => {
       const output = rows(component).join("\n"), heading = rows(component)[0]!;
@@ -67,7 +67,8 @@ for (const fixture of fixtures) {
       assert.equal(observed!.isPartial, partial); assertCall();
       // Only measurements/results are added; call detail retains its style and order.
       const rendered = rows(component);
-      assert.equal(rendered[0]!.replace(/10ms call · /, ""), callRows[0]);
+      const stats = fixture.name === "bash" ? `2 output lines${partial ? "" : " · 10ms call"}` : fixture.name === "read" ? "2 lines" : fixture.name === "find" ? "2 files shown" : "1 matching lines shown";
+      assert.equal(rendered[0]!.replace(`${stats} · `, ""), callRows[0]);
       for (const row of callRows.slice(1)) assert.ok(rendered.includes(row), rendered.join("\n"));
       assert.ok(rendered.slice(callRows.length).join("\n").includes(fixture.body));
       assert.deepEqual(result, copy);
@@ -92,11 +93,12 @@ test("registered boundary preserves shared call information and controls at ever
     for (const fixture of fixtures) {
       const component = new ToolExecutionComponent(fixture.name, "registered-call", fixture.args, { outputPad: 2 }, runner.resolveToolRenderers(fixture.name, () => undefined), screen, dir);
       component.setExpanded(true);
-      const heading = rows(component)[0];
+      const heading = rows(component)[0]!;
+      const stats = fixture.name === "bash" ? "2 output lines" : fixture.name === "read" ? "2 lines" : fixture.name === "find" ? "2 files shown" : "1 matching lines shown";
       for (const phase of ["streaming", "running", "completed"] as const) {
         if (phase === "running") { component.setArgsComplete(); component.markExecutionStarted(); }
         if (phase === "completed") component.updateResult({ content: [{ type: "text", text: fixture.output }], isError: false, durationMs: 0 });
-        assert.equal(rows(component)[0], heading);
+        assert.equal(rows(component)[0]!.replace(`${stats} · execution 0.0s · `, ""), heading);
         assert.doesNotMatch(rows(component).join("\n"), rawDump);
         if (fixture.name === "bash") assert.equal((rows(component).join("\n").match(/Command:/g) ?? []).length, 1);
         for (const expanded of [true, false]) {
