@@ -10,17 +10,17 @@ import test from 'node:test';
 import trellis, { __internals } from '../index.ts';
 import {assembleDispatchPrompt} from '../lib/task-context.ts';
 import {queryWorktree,requireMaterials} from '../lib/worktree-query.ts';
-import { installRuntimeFixture } from './runtime-fixture.mjs';
+import { copyRuntimeFixture } from './runtime-fixture.mjs';
 
 
 // Trellis resource root; tests never depend on the process cwd.
 const pkg=fileURLToPath(new URL('..',import.meta.url));
 
 const python = execFileSync('which', [process.env.TRELLIS_PYTHON || 'python3'], {encoding:'utf8'}).trim();
-function fixture(t) {
- const root=realpathSync(mkdtempSync(join(tmpdir(),'pi-real-runtime-'))); t.after(()=>rmSync(root,{recursive:true,force:true}));
+function fixture(t, { supported = false } = {}) {
+ const root=supported?copyRuntimeFixture(t,{git:true}):realpathSync(mkdtempSync(join(tmpdir(),'pi-real-runtime-'))); if(!supported)t.after(()=>rmSync(root,{recursive:true,force:true}));
  const put=(path,data)=>{mkdirSync(join(root,path,'..'),{recursive:true});writeFileSync(join(root,path),typeof data==='string'?data:JSON.stringify(data));};
- cpSync(resolve(pkg,'runtime'),join(root,'.trellis/scripts'),{recursive:true});
+ if(!supported)cpSync(resolve(pkg,'runtime'),join(root,'.trellis/scripts'),{recursive:true});
  const env={...process.env,PYTHONDONTWRITEBYTECODE:'1',TRELLIS_CONTEXT_ID:'own'};
  for(const key of Object.keys(env))if(key.startsWith('GIT_') || /SESSION_ID|THREAD_ID|CONVERSATION_ID|TRANSCRIPT_PATH|TRELLIS_DEVELOPER/.test(key))delete env[key];
  const run=(entry,args=[],extra={})=>spawnSync(python,[join(root,'.trellis/scripts',entry),...args],{cwd:root,env:{...env,...extra},encoding:'utf8'});
@@ -187,7 +187,7 @@ test('supported entrypoints run without trellis and suppress all bytecode/update
 });
 
 test('real runtime child binding/deactivate cannot resurrect from repeated dispatch header; failed binding never borrows parent',async t=>{
- const f=fixture(t);rmSync(join(f.root,'.trellis'),{recursive:true});installRuntimeFixture(f.root);const path=f.task('own',{status:'in_progress'});f.put(path+'/implement.jsonl','{"file":"'+path+'/prd.md"}');const handlers=new Map(),messages=[];
+ const f=fixture(t,{supported:true});const path=f.task('own',{status:'in_progress'});f.put(path+'/implement.jsonl','{"file":"'+path+'/prd.md"}');const handlers=new Map(),messages=[];
  trellis({registerMessageRenderer:()=>{},events:{on:()=>()=>{},emit:()=>{}},registerCommand: () => {}, registerTool:()=>{},on:(name,fn)=>handlers.set(name,fn),sendMessage:m=>messages.push(m),getAllTools:()=>[]});
  const ctx=name=>({cwd:f.root,hasUI:false,sessionManager:{getSessionId:()=>name,getSessionFile:()=>undefined},ui:{}});
  const parent=ctx('runtime-parent'),child=ctx('runtime-child'),parentKey=__internals.contextKey(f.root,parent);f.pointer(parentKey,path);

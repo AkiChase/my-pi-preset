@@ -46,6 +46,26 @@
 - [ ] affected suites 自然退出复核、`git diff --check`、实际 staged/unstaged/untracked 最终审查。
 - [ ] 独立审查通过后提交入口与必要规范更新阶段。
 
+## Stage 2 验证结果
+
+- 实际改动仅 diagnostic-runtime 支持态 fixture 与 runtime-contracts 一个 supported child-binding case；其余 script-only/fresh/恶意状态保留。agent-context-integration 与 dispatch 已有模板缓存，未重复重构。
+- 新 runtime-fixture.test.mjs 验证独立根、operation plan.root、真实 inspect ready、tamper 拒绝、模板及后续副本不污染、shape/user 区分。
+- focused `node --test --test-concurrency=1 runtime-fixture.test.mjs diagnostic-runtime.test.mjs runtime-contracts.test.mjs`（完整路径为 extensions/trellis/__tests__/）exit 0，55/55 PASS，自然退出。
+- broader `node --test extensions/trellis/__tests__/*.test.mjs` exit 0，359/359 PASS，自然退出。
+- `python3 -B -m unittest discover -s extensions/trellis/__tests__/python -p 'test_*.py'` exit 0，38 tests OK。输出的 argparse invalid-choice 是拒绝 removed action 的预期断言，非检查失败。
+- 独立 agent_trellis_check_1_8407a2f0 完整代码审查无 blocker；node --check / diff --check exit 0，核查 focused 55/55；按主要求未并发执行 CPU-heavy tests，避免干扰测量。
+- 固定源码快照：`git archive 665c415` 在 owned temp before/after 目录展开（非 Git worktree、非托管执行/派发），同一外链已有 node_modules、Node 24.14.1 / SDK 1.4.0；after 只替换两处 fixture test 文件，原 74 个热点测试发现一致。使用 `/usr/bin/time -l node --test --test-concurrency=1` + 四个热点路径，before/after 交替 3 对，全部 exit 0、74/74 PASS。
+
+| variant | real 秒（3 次） | user 秒（3 次） | sys 秒（3 次） |
+| --- | --- | --- | --- |
+| before | 80.87 / 77.62 / 77.10 | 47.74 / 46.82 / 46.63 | 20.32 / 19.08 / 19.21 |
+| after | 57.94 / 57.32 / 59.47 | 32.97 / 32.88 / 33.74 | 14.57 / 14.42 / 15.19 |
+
+中位数 real 77.62 → 57.94（-25.4%）；user+sys 中位数组合 66.03 → 47.54（-28.0%）。这是热点固定输入结果，不推断整个套件同等降幅；测试路径不同目录但相同源码与依赖，系统外部负载仍是噪声因素。新增 isolation regression 未加入配对集合，避免改变测试数。
+
+- 未解决 blocker：无。非阻塞限制：新 shape case 同时改变 user/key，未逐维覆盖 user-only/key-only/git-only；strict gate 原本同时篡改 diagnostics.py，不独立证明每个 gate 原因，未削弱现有断言。
+- 原始日志和快照在 `/tmp/pi-test-sdk-cpu-zJjatf/paired-*`、stage2-*；自包含结果如上。独立 reviewer 空临时目录由其保留，不自动清理。
+
 ## 最终记录要求
 
 逐条记录命令、环境/Node/SDK、代码快照、退出码、PASS/FAIL/NOT_RUN、失败原因与后续 rerun 关系。保留第一次失败事实。性能没有稳定收益时明确报告并调整 fixture 方案，不以减少覆盖换取通过。
