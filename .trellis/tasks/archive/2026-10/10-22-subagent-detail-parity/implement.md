@@ -6,7 +6,7 @@
 
 手动完整Pi复验启动首个脚本因只打开任务列表却等待Conversation超时（exit1），实际宿主正常；补发Enter进入真实详情后capture成功exit0。用户查看后执行driver stop成功，私有tmux list-sessions返回no server，已停止。既有882/882相关自然tests/typecheck/同数据60对捕获结果不变；已知14SDKfixture失败、read无语法高亮、generic计时单独行及unknown自定义renderer限制继续保留，不宣称完全视觉一致或全套测试通过。
 
-导出 `/tmp/pi-full-parity-KClJtr` 与此前owned日志暂保留供用户回看，不写入仓库，不广泛清理tmp。归档仅本任务并记录本会话；不push，不触碰另外两项并行任务。
+导出 `/tmp/pi-full-parity-KClJtr`、此前 rejected 验收目录与 owned 阶段日志已在用户明确要求下清理：先确认私有 tmux server 均已停止、无相关活动进程，再仅删除这三个本次拥有的目录，未触碰其他会话或系统临时文件。清理前结果已全部记录在本文件中（命令、exit code、配对校验与剩余限制），不依赖临时链接；`index.html` 等导出不再保留，需要复现时按上文命令在新建独占目录重跑。归档仅本任务并记录本会话；不push，不触碰另外两项并行任务。
 
 ## 阶段4：真实验收后对齐修正（已交付，用户授权收尾）
 
