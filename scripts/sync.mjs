@@ -468,7 +468,6 @@ function isPinned(source) {
 // Parse `pi list`, which prints two-space indented sources with an optional
 // four-space indented install path underneath.
 function readInstalled() {
-  step("reading installed packages (pi list)");
   const result = spawnSync(PI, ["list"], { encoding: "utf8", timeout: COMMAND_TIMEOUT_MS });
   if (result.error) {
     const detail = result.error.code === "ETIMEDOUT" ? `timed out after ${COMMAND_TIMEOUT_MS / 1000}s` : result.error.message;
@@ -959,6 +958,13 @@ const keybindingsFile = join(agentDir, "keybindings.json");
 
 const manifest = readManifest(manifestPath);
 const selfMode = selfPackageMode(manifest, values.dev);
+
+const hasConfigurationDomain = ["settings", "keybindings", "files", "extensions"].some((domain) => syncDomains.has(domain));
+if (syncDomains.has("packages")) {
+  step(hasConfigurationDomain ? "reading Pi packages and configuration" : "reading Pi packages");
+} else if (hasConfigurationDomain) {
+  step("reading Pi configuration");
+}
 
 const installed = syncDomains.has("packages") ? readInstalled() : [];
 const currentSettings = syncDomains.has("settings") ? readJsonFile(settingsFile, "settings") : {};

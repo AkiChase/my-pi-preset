@@ -169,6 +169,7 @@ test("unselected extensions do not inspect an extension package at the shared ro
 test("CLI smoke applies package/config plan through the configured pi binary", t => {
  const result = cli(t, { manifest: { packages: { "npm:one": "latest" }, settings: { retry: { maxRetries: 5 } } }, list: "User packages:\n  npm:one\n    /installed", files: { "settings.json": JSON.stringify({ retry: { maxRetries: 1 }, theme: "dark" }) } });
  assert.equal(result.status, 0, result.stderr); assert.deepEqual(result.calls, ["list", "update npm:one"]);
+ assert.match(result.stderr, /reading Pi packages and configuration/);
  assert.deepEqual(JSON.parse(readFileSync(join(result.agent, "settings.json"), "utf8")), { retry: { maxRetries: 5 }, theme: "dark" });
 });
 
