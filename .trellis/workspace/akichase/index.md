@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 54
-- **Last Active**: 2026-10-21
+- **Total Sessions**: 55
+- **Last Active**: 2026-10-22
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1842 | Active |
+| `journal-1.md` | ~1864 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 55 | 2026-10-22 | 统一嵌套 Agent 展示 | `58ee882` | `main` |
 | 54 | 2026-10-21 | 统一清理手工扩展并直连 Herdr | `74327e1`, `98e9e61`, `bcff5c5`, `fe838c1`, `a7a5643`, `8d4c862` | `main` |
 | 53 | 2026-10-21 | 同步 pi-btw 并收尾任务概览动画 | `a9d5030`, `ef07f54`, `9076ea8`, `60274ee` | `main` |
 | 52 | 2026-10-21 | 精简 Agent 运行时标签 | `7a3ee61` | `main` |

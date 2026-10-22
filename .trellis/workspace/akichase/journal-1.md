@@ -1840,3 +1840,25 @@ Clarified latest-request and session cache metrics in the unified status bar, wi
 ### Next Steps
 
 - 用户可在自己的 Herdr pane 预览并执行 extensions prune，随后 /reload 或重启 Pi。
+
+
+## Session 55: 统一嵌套 Agent 展示
+<!-- trellis-session: v=2 fp=ffa0d4a72f3c0d2d -->
+
+**Date**: 2026-10-22
+**Task**: 统一嵌套 Agent 展示
+**Branch**: `main`
+
+### Summary
+
+完成 Footer 与任务面板的嵌套 Agent 静态树展示：统一 ● 活跃状态、移除 spinner、复用 parentKey 树投影，并通过聚焦测试、typecheck、pnpm check 和独立审查修复闭环。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `58ee882` | chore(task): archive nested agent display |
+
+### Status
+
+[OK] **Completed**
