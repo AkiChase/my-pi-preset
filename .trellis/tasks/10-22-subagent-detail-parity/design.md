@@ -1,5 +1,12 @@
 # 技术设计
 
+## 真实验收修正（覆盖旧工具默认/参数入口设计）
+
+问题owner为task-ui/detail-tool-card.ts的通用self-shell describe与conversation.ts附加提示/参数命中，而非公共SDK不可复用。修正只替换展示适配、面板统一展开和相关tests/docs：优先直接调用beautify工具factories原renderCall/renderResult，宿主shell、padding、背景、标题保持；write/edit安全native展示，不允许edit预执行读取文件。禁止再次复制一套card heading/layout；工具时间与Interrupted采用最小兼容metadata适配。删除独立参数reader/点击分区和常驻标签，Ctrl+O复用公共key匹配并按主页面全工具语义作用于已加载工具及新到达工具。保持稳定配对与展开锚点、queue独立focus、输入独占和关闭清理。source有界参数/结果保留供renderer使用，不改变投递/结果消费。
+
+完整Pi CLI/InteractiveMode隔离加载当前仓库renderer/详情extension，用相同离线SDK事件与临时工具文件生成折叠/展开/窄屏/主题对照；真实capture原始输出在owned tmp，main验收后记录命令结果与不足，不先声称视觉通过。并行 `.trellis/tasks/10-22-beautify-tool-args-visibility` 与 `.probe-count.mjs` 不属本任务，不读取或修改其私有产物来推断授权。
+
+
 ## 边界与所有权
 
 保留 runner → AgentManager → TaskSource → TaskPanel 的现有链路。公共 ToolExecutionComponent 只需 ToolRenderers 而非执行定义，用户已批准阶段3复用它与已审计的 beautify factories；不向 UI 发布 child session、registry 或任意闭包 renderer。执行、queue 和结果消费仍由现有 owner 控制；UI 只读取有界不可变快照。

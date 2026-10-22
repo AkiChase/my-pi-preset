@@ -99,7 +99,10 @@ void it("actual installed SDK runner/manager/source/panel carries independent re
         assert.deepEqual(row.stats.toolCalls?.map(c => [c.toolCallId, c.status]), [["one", "running"], ["two", "running"]]);
         panel = new TaskPanel({ coordinator, config: DEFAULTS, layout: await loadNativeLayout(), ctx: { ui: { notify() {} } } as unknown as ExtensionContext,
             theme: { fg: (_color, text) => text }, keys: { matches: () => false }, tui: { terminal: { columns: 120, rows: 30 }, requestRender() {} } as never, done() {} });
-        panel.handleInput("\r"); assert.match(stripTerminalSequences(panel.render(120).join("\n")), /Running · elapsed/);
+        panel.handleInput("\r");
+        const running = stripTerminalSequences(panel.render(120).join("\n"));
+        assert.match(running.split("\n")[0]!, /Running/); assert.match(running, /elapsed \d+\.\ds/);
+        assert.doesNotMatch(running, /Completed|execution \d+\.\ds/);
         first.resolve();
         // Await the actual SDK event, not a wall-clock guess or copy of the runner algorithm.
         await new Promise<void>(resolve => {
@@ -123,8 +126,8 @@ void it("actual installed SDK runner/manager/source/panel carries independent re
         panel.handleInput("\u001b[H"); panel.render(120);
         panel.handleInput("\u001b[H");
         const out = stripTerminalSequences(panel.render(120).join("\n"));
-        assert.match(out.split("\n")[0]!, /Completed/); assert.match(out, /Completed · execution/); assert.match(out, /Agent runtime/);
-        assert.doesNotMatch(out, /Running · elapsed/);
+        assert.match(out.split("\n")[0]!, /Completed/); assert.match(out, /execution \d+\.\ds/); assert.match(out, /Agent runtime/);
+        assert.doesNotMatch(out, /Running|elapsed \d+\.\ds/);
         manager.resumeRun(id, "resume"); await manager.waitForAll();
         assert.deepEqual(source.list()[0]!.stats.toolCalls, []);
         assert.ok(session.messages.some(m => m.role === "toolResult" && m.durationMs !== undefined), "history retains evidenced host duration");

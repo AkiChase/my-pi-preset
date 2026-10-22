@@ -102,7 +102,10 @@ export interface ToolDataSummary {
     readonly removedLines?: number;
 }
 export interface ToolParameters { readonly status: "complete" | "truncated" | "unavailable"; readonly json?: string }
-export interface ToolResultDisplay { readonly status: "complete" | "truncated" | "unavailable"; readonly diff?: string; readonly firstChangedLine?: number; readonly diffTruncated?: boolean }
+export interface ToolResultDisplay { readonly status: "complete" | "truncated" | "unavailable"; readonly diff?: string; readonly firstChangedLine?: number; readonly diffTruncated?: boolean;
+    /** Audited process launch identity only; never arbitrary execution details. */
+    readonly runtimeLaunch?: Extract<import("../runtime-tasks/launch.ts").RuntimeLaunchMetadata, { task_type: "bash" | "monitor" }>;
+}
 export interface ToolCallSummary { readonly name: string; readonly detail?: string; readonly toolCallId?: string; readonly summary?: ToolDataSummary; readonly parameters?: ToolParameters }
 /** All text is external and unstyled; renderers sanitize before applying host styles.
  * toolResult.elided counts only inspected text; sourceTruncated means additional

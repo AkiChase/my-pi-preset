@@ -46,10 +46,10 @@ export class PendingRegion {
 export class PendingReader {
     readonly scroll: ScrollView;
     readonly item: PendingMessage;
-    constructor(item: PendingMessage, theme: () => TaskTheme, invalidate: () => void, title?: string) {
+    constructor(item: PendingMessage, theme: () => TaskTheme, invalidate: () => void) {
         this.item = item;
         this.scroll = new ScrollView({ render: width => [
-            theme().fg(item.state === "failed" ? "error" : "muted", `${title ?? (item.state === "submitting" ? "Submitting" : item.state === "handled" ? "Handled by input extension · not queued" : item.state === "failed" ? "Failed" : item.state === "notDelivered" ? "Not delivered" : "Pending")} · Esc Back${item.truncated ? " · source text truncated" : ""}`),
+            theme().fg(item.state === "failed" ? "error" : "muted", `${(item.state === "submitting" ? "Submitting" : item.state === "handled" ? "Handled by input extension · not queued" : item.state === "failed" ? "Failed" : item.state === "notDelivered" ? "Not delivered" : "Pending")} · Esc Back${item.truncated ? " · source text truncated" : ""}`),
             ...cleanTaskText(item.text).split(/\r\n|\n|\r/).flatMap(line => wrapTextWithAnsi(line, Math.max(1, width))),
             ...(item.error ? wrapTextWithAnsi(cleanTaskText(item.error), Math.max(1, width)).map(line => theme().fg("muted", line)) : []),
         ], invalidate }, { follow: "none", overscroll: "contain", scrollbar: "always",

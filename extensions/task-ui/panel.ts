@@ -43,6 +43,7 @@ export class TaskPanel implements Component, Focusable {
     private timer: NodeJS.Timeout | undefined;
     private readonly history = new ConversationWindow();
     private readonly expandedEntryIds = new Set<string>();
+    private toolsExpanded = false;
     private detailRanges: ConversationRange[] = [];
     private anchor?: { id: string; offset: number; top: number };
     private detailRevision = -1;
@@ -132,7 +133,7 @@ export class TaskPanel implements Component, Focusable {
         if (selected?.key !== this.detailKey) {
             this.detailKey = selected?.key; this.detail = undefined; this.composer = undefined; this.reader = undefined;
             this.pending = new PendingRegion(() => this.theme, () => this.invalidate());
-            this.conversation.dispose(); this.history.clear(); this.expandedEntryIds.clear(); this.detailRanges = []; this.anchor = undefined; this.detailRevision = -1;
+            this.conversation.dispose(); this.history.clear(); this.expandedEntryIds.clear(); this.toolsExpanded = false; this.detailRanges = []; this.anchor = undefined; this.detailRevision = -1;
             this.detailScroll = this.scrollView(width => this.detailBody(width), "end");
         }
         this.pending.accept(selected?.stats.pendingMessages);
@@ -221,19 +222,6 @@ export class TaskPanel implements Component, Focusable {
             const line = event.y - box.rect.y + this.detailScroll.scrollTop;
             const range = this.detailRanges.find(range => range.collapsible && line >= range.start && line < range.end);
             if (!range) return undefined;
-            if (range.parameterLine === line && event.x - box.rect.x < (range.parameterWidth ?? 0)) {
-                const parameters = range.parameters;
-                let text = parameters?.json ?? "Parameters were not retained within the source budget. Inspect the transcript artifact.";
-                let status = parameters?.status ?? "unavailable";
-                if (status === "complete" && parameters?.json) {
-                    try {
-                        if (parameters.json.length > 16 * 1024) { status = "truncated"; text = "Parameters exceed the display budget. Inspect the transcript artifact."; }
-                        else text = JSON.stringify(JSON.parse(parameters.json), null, 2);
-                    } catch { status = "unavailable"; text = "Parameters could not be decoded. Inspect the transcript artifact."; }
-                }
-                this.reader = new PendingReader({ id: range.id, state: "pending", text }, () => this.theme, () => this.invalidate(), `Parameters · ${status}`);
-                this.invalidate(); this.args.tui.requestRender(); return { handled: true };
-            }
             this.captureAnchor();
             if (this.expandedEntryIds.has(range.id)) this.expandedEntryIds.delete(range.id); else {
                 if (this.expandedEntryIds.size >= 256) this.expandedEntryIds.delete(this.expandedEntryIds.values().next().value!);
@@ -258,6 +246,12 @@ export class TaskPanel implements Component, Focusable {
             // A steer can publish synchronously and close the panel.
             if (!this.disposed) { this.invalidate(); this.args.tui.requestRender(); }
             return;
+        }
+        if (this.page === "detail" && this.args.keys.matches(data, "app.tools.expand")) {
+            this.captureAnchor();
+            this.toolsExpanded = !this.toolsExpanded;
+            this.expandedEntryIds.clear();
+            this.invalidate(); this.args.tui.requestRender(); return;
         }
         if (matchesKey(data, "tab") && this.page === "detail" && this.pending.entries.length) {
             this.pending.focused = !this.pending.focused; this.invalidate(); this.args.tui.requestRender(); return;
@@ -365,7 +359,7 @@ export class TaskPanel implements Component, Focusable {
         let body: string[];
         if (conversation) {
             const rendered = this.conversation.renderModel(conversation, width, this.theme, { truncated: !this.detail?.conversationPage && this.detail?.conversationTruncated,
-                expanded: this.expandedEntryIds, toolCalls: selected.stats.toolCalls });
+                expanded: this.expandedEntryIds, toolsExpanded: this.toolsExpanded, toolCalls: selected.stats.toolCalls });
             body = rendered.lines;
             this.detailRanges = rendered.ranges;
         } else {
@@ -380,7 +374,7 @@ export class TaskPanel implements Component, Focusable {
                 ...(messageEntries.length ? renderMessages(messageEntries, this.theme, width) : [this.theme.fg("dim", "Message content omitted by detail budget.")])]
             : [];
         const hints = this.history.hint ? [this.theme.fg("warning", this.history.hint)] : [];
-        if (conversation) this.detailRanges = this.detailRanges.map(range => ({ ...range, start: range.start + messages.length + hints.length, end: range.end + messages.length + hints.length, parameterLine: range.parameterLine === undefined ? undefined : range.parameterLine + messages.length + hints.length }));
+        if (conversation) this.detailRanges = this.detailRanges.map(range => ({ ...range, start: range.start + messages.length + hints.length, end: range.end + messages.length + hints.length }));
         else this.detailRanges = [];
         const lines = [...messages, ...hints, ...body];
         this.cachedDetail = { width, lines }; return lines;
@@ -527,6 +521,6 @@ export class TaskPanel implements Component, Focusable {
     dispose(): void {
         if (this.disposed) return;
         this.disposed = true; clearInterval(this.timer); this.timer = undefined; this.unsubscribe();
-        this.composer = undefined; this.reader = undefined; this.pending.accept(); this.model.dispose(); this.conversation.dispose(); this.history.clear(); this.expandedEntryIds.clear(); this.detailRanges = []; this.anchor = undefined; this.detail = undefined; this.rows = []; this.invalidate();
+        this.composer = undefined; this.reader = undefined; this.pending.accept(); this.model.dispose(); this.conversation.dispose(); this.history.clear(); this.expandedEntryIds.clear(); this.toolsExpanded = false; this.detailRanges = []; this.anchor = undefined; this.detail = undefined; this.rows = []; this.invalidate();
     }
 }

@@ -4,6 +4,7 @@
  * as untrusted: unknown shapes are skipped, never thrown on.
  */
 import { closeSync, fstatSync, openSync, readSync } from "node:fs";
+import { isLaunchMetadata, type RuntimeLaunchMetadata } from "../../runtime-tasks/launch.ts";
 import type { ConversationEntry, ToolCallSummary, ToolDataSummary, ToolParameters } from "../../task-ui/types.ts";
 
 export const MAX_ENTRIES = 64;
@@ -98,6 +99,26 @@ export function toolParameters(value: unknown): ToolParameters {
   catch (error) { return Object.freeze({ status: error instanceof Error && error.message === "budget" ? "truncated" : "unavailable" }); }
 }
 
+/** Copy only the bounded plain bash identity used by the main renderer. No getters or extra details. */
+function bashLaunch(details: Obj | undefined): Extract<RuntimeLaunchMetadata, { task_type: "bash" | "monitor" }> | undefined {
+  const property = details && Object.getOwnPropertyDescriptor(details, "runtimeLaunch");
+  const value: unknown = property && "value" in property ? property.value : undefined;
+  if (!isObj(value) || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) return undefined;
+  const copy: Obj = {};
+  let count = 0;
+  for (const key in value) {
+    if (!Object.hasOwn(value, key)) continue;
+    if (++count > 4 || !["version", "task_type", "task_id", "mode"].includes(key)) return undefined;
+    const field = Object.getOwnPropertyDescriptor(value, key);
+    if (!field || !("value" in field)) return undefined;
+    copy[key] = field.value;
+  }
+  if (copy.version !== 2 || copy.task_type !== "bash" || (copy.mode !== "foreground" && copy.mode !== "background") ||
+      typeof copy.task_id !== "string" || copy.task_id.length > 200 || /[\x00-\x1f\x7f-\x9f]/.test(copy.task_id) ||
+      !isLaunchMetadata(copy) || !("task_type" in copy)) return undefined;
+  return Object.freeze(copy);
+}
+
 const PRIMARY_ARGS = ["command", "path", "file_path", "pattern", "query", "url", "description", "action", "prompt"];
 function toolSummary(block: Obj, structured = false): ToolCallSummary | undefined {
   const name = str(block.name);
@@ -143,7 +164,9 @@ export function entryFromMessage(message: unknown, structured = false): Conversa
       const toolCallId = structured ? str(message.toolCallId)?.slice(0, 200) : undefined;
       const details = structured && isObj(message.details) ? message.details : undefined;
       const diff = details && str(details.diff);
+      const runtimeLaunch = name === "bash" ? bashLaunch(details) : undefined;
       const display = structured ? Object.freeze({ status: elided || sourceTruncated ? "truncated" as const : !text && Array.isArray(message.content) && message.content.slice(0, 64).some(part => !isObj(part) || part.type !== "text") ? "unavailable" as const : "complete" as const,
+        ...(runtimeLaunch ? { runtimeLaunch } : {}),
         ...(diff === undefined ? {} : { diff: cap(diff, MAX_RESULT * 4).text, diffTruncated: diff.length > MAX_RESULT * 4 }),
         ...(number(details?.firstChangedLine) === undefined ? {} : { firstChangedLine: number(details?.firstChangedLine) }) }) : undefined;
       return { kind: "toolResult", ...(display ? { display } : {}), ...(durationMs === undefined ? {} : { durationMs }), ...(name ? { name } : {}), text, elided, ...(sourceTruncated ? { sourceTruncated: true } : {}), ...(toolCallId ? { toolCallId } : {}), ...(message.isError === true ? { error: true } : {}) };

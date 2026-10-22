@@ -53,3 +53,19 @@ void it("reads only a bounded transcript tail and tolerates missing files", () =
         assert.equal(readTranscriptTail(dir), undefined);
     } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+it("retains only bounded immutable bash launch metadata without getters or arbitrary details", () => {
+    const launch = { version: 2, task_type: "bash", task_id: "bash_1", mode: "foreground" };
+    const result = (runtimeLaunch: unknown, toolName = "bash") => entryFromMessage({ role: "toolResult", toolName, content: "ok", details: { runtimeLaunch, private: "SECRET" } }, true);
+    const retained = result(launch); assert.ok(retained?.kind === "toolResult");
+    assert.deepEqual(retained.display?.runtimeLaunch, launch); assert.ok(Object.isFrozen(retained.display?.runtimeLaunch));
+    launch.task_id = "changed"; assert.equal(retained.display?.runtimeLaunch?.task_id, "bash_1");
+    for (const bad of [{ ...launch, extra: "SECRET" }, { ...launch, task_id: "x".repeat(201) }, { ...launch, task_id: "a\x1b" },
+        { ...launch, get task_id() { throw new Error("must not invoke getter"); } },
+        { ...launch, mode: { toString() { throw new Error("must not stringify metadata objects"); } } },
+        { version: 2, kind: "subagent", agent_id: "a", mode: "foreground" }]) {
+        const entry = result(bad); assert.ok(entry?.kind === "toolResult"); assert.equal(entry.display?.runtimeLaunch, undefined);
+    }
+    const other = result(launch, "foreign"); assert.ok(other?.kind === "toolResult"); assert.equal(other.display?.runtimeLaunch, undefined);
+    assert.doesNotMatch(JSON.stringify(retained), /SECRET/);
+});

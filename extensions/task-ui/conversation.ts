@@ -1,7 +1,6 @@
 import { getMarkdownTheme } from "@earendil-works/pi-coding-agent";
 import { Markdown, visibleWidth, truncateToWidth, wrapTextWithAnsi, type MarkdownOptions, type MarkdownTheme } from "@earendil-works/pi-tui";
 import { DetailToolCard, type DetailTool } from "./detail-tool-card.ts";
-import type { ToolParameters } from "./types.ts";
 import type { ConversationEntry, ToolCallState } from "./types.ts";
 import { cleanTaskText, taskOneLine, type TaskTheme } from "./presentation.ts";
 
@@ -10,7 +9,7 @@ const MARKDOWN_OPTIONS: MarkdownOptions = { preserveOrderedListMarkers: true, pr
 const CACHE_LIMIT = 128;
 const PREVIEW_LINES = 3;
 const EXPANDED_LINES = Infinity;
-export interface ConversationRange { id: string; start: number; end: number; collapsible: boolean; parameters?: ToolParameters; parameterLine?: number; parameterWidth?: number }
+export interface ConversationRange { id: string; start: number; end: number; collapsible: boolean }
 export interface ConversationRenderModel { lines: string[]; ranges: ConversationRange[] }
 
 const sgr = (on: number, off: number) => (text: string) => `\x1b[${on}m${text}\x1b[${off}m`;
@@ -42,11 +41,11 @@ export class ConversationRenderer {
     private mdTheme?: MarkdownTheme;
     private themeRef?: TaskTheme;
 
-    render(entries: readonly ConversationEntry[], width: number, theme: TaskTheme, options: { activity?: string; truncated?: boolean; expanded?: ReadonlySet<string>; toolCalls?: readonly ToolCallState[] } = {}): string[] {
+    render(entries: readonly ConversationEntry[], width: number, theme: TaskTheme, options: { activity?: string; truncated?: boolean; expanded?: ReadonlySet<string>; toolsExpanded?: boolean; toolCalls?: readonly ToolCallState[] } = {}): string[] {
         return this.renderModel(entries, width, theme, options).lines;
     }
 
-    renderModel(entries: readonly ConversationEntry[], width: number, theme: TaskTheme, options: { activity?: string; truncated?: boolean; expanded?: ReadonlySet<string>; toolCalls?: readonly ToolCallState[] } = {}): ConversationRenderModel {
+    renderModel(entries: readonly ConversationEntry[], width: number, theme: TaskTheme, options: { activity?: string; truncated?: boolean; expanded?: ReadonlySet<string>; toolsExpanded?: boolean; toolCalls?: readonly ToolCallState[] } = {}): ConversationRenderModel {
         width = Math.max(1, Math.floor(width));
         if (theme !== this.themeRef) { this.themeRef = theme; this.mdTheme = undefined; this.cache.clear(); for (const card of this.cards.values()) card.dispose(); this.cards.clear(); this.cardCosts.clear(); }
         const calls = new Map((options.toolCalls ?? []).map(call => [call.toolCallId, call]));
@@ -78,8 +77,7 @@ export class ConversationRenderer {
             if (emitted.has(id)) return;
             emitted.add(id);
             const tool = tools.get(id)!;
-            if (lines.length) lines.push("");
-            const start = lines.length, expanded = !!options.expanded?.has(id);
+            const start = lines.length, expanded = options.toolsExpanded ? !options.expanded?.has(id) : !!options.expanded?.has(id);
             let card = this.cards.get(id);
             if (!card) { card = new DetailToolCard(tool, this.redraw); this.cards.set(id, card); }
             const renderedCard = card.render(tool, expanded, width, theme);
@@ -92,19 +90,14 @@ export class ConversationRenderer {
                 const oldest = this.cards.keys().next().value!;
                 this.cards.get(oldest)!.dispose(); this.cards.delete(oldest); this.cardCosts.delete(oldest);
             }
-            const parameters = tool.call.parameters;
-            // One auxiliary row; legacy result-only cards do not repeat unavailable labels.
-            const parameterLine = parameters ? lines.length : undefined;
-            const entryText = parameters ? `View parameters · ${parameters.status}` : "";
-            const toggle = expanded ? "click to collapse" : "click to expand loaded content";
-            const hint = entryText ? entryText + (visibleWidth(entryText + " · " + toggle) <= width ? " · " + toggle : "") : toggle;
-            lines.push(theme.fg("muted", truncateToWidth(hint, width, "…")));
+            if (tool.call.parameters?.status === "truncated") lines.push(theme.fg("dim", "… source parameters truncated"));
+            if (tool.call.parameters?.status === "unavailable") lines.push(theme.fg("dim", "Parameters unavailable"));
             const result = tool.result;
             if (result?.elided) lines.push(theme.fg("dim", `… source truncated · ${result.elided.toLocaleString("en-US")} more characters`));
             if (result?.sourceTruncated) lines.push(theme.fg("dim", "… additional content omitted by source"));
             if (result?.display?.diffTruncated) lines.push(theme.fg("dim", "… source diff truncated"));
             if (result?.display?.status === "unavailable") lines.push(theme.fg("dim", "Result unavailable"));
-            ranges.push({ id, start, end: lines.length, collapsible: true, parameters, parameterLine, parameterWidth: Math.min(width, visibleWidth(entryText)) });
+            ranges.push({ id, start, end: lines.length, collapsible: true });
         };
         entries.forEach((entry, i) => {
             if (entry.kind === "toolResult") { emit(entry.toolCallId ? idFor(entry.toolCallId) : entry.id ?? `result:${i}`); return; }
@@ -120,7 +113,7 @@ export class ConversationRenderer {
             }
             if (lines.length) lines.push("");
             const start = lines.length;
-            lines.push(...this.entry(entry, width, theme, !!entry.id && !!options.expanded?.has(entry.id), [...calls.values()]));
+            lines.push(...this.entry(entry, width, theme, !!entry.id && (options.toolsExpanded ? !options.expanded?.has(entry.id) : !!options.expanded?.has(entry.id)), [...calls.values()]));
             if (entry.id) ranges.push({ id: entry.id, start, end: lines.length, collapsible: entry.kind === "bash" });
         });
         for (const [id, card] of this.cards) if (!emitted.has(id)) { card.dispose(); this.cards.delete(id); this.cardCosts.delete(id); }

@@ -571,7 +571,7 @@ void it("native clipped mouse clicks expand only one stable entry, after scrolli
         // End re-reads same-task raw source without losing per-entry expansion.
         assert.ok(after.some(line => /TOOL-4-LINE-19/.test(line)));
         panel.handleInput("\u001b[H"); const first = panel.render(80).map(stripTerminalSequences);
-        assert.ok(first.some(line => /click to expand/.test(line)), "other entries remain collapsed");
+        assert.ok(!first.some(line => /TOOL-0-LINE-0/.test(line)), "other entries remain collapsed");
         f.publish([row]); panel.handleInput("\u001b[F"); assert.match(panel.render(80).join("\n"), /TOOL-4-LINE-19/);
         f.details.set(row.key, { text: "", conversation: [{ id: "text", kind: "user", text: "NORMAL TEXT" }] }); f.publish([row]); panel.handleInput("\u001b[F");
         const normal = panel.render(80).map(stripTerminalSequences).findIndex(line => /NORMAL TEXT/.test(line));
@@ -716,9 +716,9 @@ void it("fixed agent header changes terminal state in place, keeps history and r
     try {
         h.panel.handleInput("\r"); h.panel.handleInput("\u001b[H");
         const before = h.panel.render(100).map(stripTerminalSequences), reads = f.reads.length;
-        assert.match(before[0]!, /timed · ● Running/); assert.match(before.join("\n"), /Running · elapsed 1\.0s/);
+        assert.match(before[0]!, /timed · ● Running/); assert.match(before.join("\n"), /elapsed 1\.0s/);
         elapsedMs = 3000; t.mock.timers.tick(1000);
-        assert.match(h.panel.render(100).join("\n"), /Running · elapsed 3\.0s/); assert.equal(f.reads.length, reads);
+        assert.match(h.panel.render(100).join("\n"), /elapsed 3\.0s/); assert.equal(f.reads.length, reads);
         const top = h.panel.getState().detailScrollTop;
         for (const status of ["completed", "stopped", "interrupted", "failed"] as const) {
             f.publish([{ ...row, status, endedAt: 4000, stats: { settling: true, toolCalls: [{ toolCallId: "t", name: "bash", status: "interrupted", elapsedMs: 3000 }] } }]);

@@ -1,29 +1,24 @@
-import { ToolExecutionComponent, createEditToolDefinition, createWriteToolDefinition, getMarkdownTheme, type ToolRenderers } from "@earendil-works/pi-coding-agent";
-import { Text, type TUI, type Component } from "@earendil-works/pi-tui";
+import { ToolExecutionComponent, createEditToolDefinition, createWriteToolDefinition, getMarkdownTheme, type ToolRenderers, type Theme } from "@earendil-works/pi-coding-agent";
+import { type TUI } from "@earendil-works/pi-tui";
 import { Highlighter } from "../beautify/highlight.ts";
 import { readRenderers } from "../beautify/tools/read.ts";
+import { createBashRenderers } from "../beautify/tools/bash.ts";
 import { createGrepRenderers } from "../beautify/tools/grep.ts";
 import { createFindRenderers } from "../beautify/tools/find.ts";
-import { createToolCardRenderers } from "../beautify/tool-card.ts";
 import { clean, wrap } from "../beautify/layout.ts";
-import type { RenderContext } from "../beautify/types.ts";
+import type { ToolTiming } from "../beautify/tool-clock.ts";
 import type { ToolCallState, ToolCallSummary, ConversationEntry } from "./types.ts";
 import type { TaskTheme } from "./presentation.ts";
 
 type ResultEntry = Extract<ConversationEntry, { kind: "toolResult" }>;
 export interface DetailTool { id: string; call: ToolCallSummary; result?: ResultEntry; state?: ToolCallState }
-// Only presentation methods cross this boundary. Never publish definitions or execution closures.
-const editResult = (createEditToolDefinition("") as ToolRenderers).renderResult!;
-const writeCall = (createWriteToolDefinition("") as ToolRenderers).renderCall!;
-// Strip the audited native logical heading before terminal wrapping, not guessed visual rows.
-class WriteBody extends Text {
-    override setText(text: string): void {
-        const separator = text.indexOf("\n\n");
-        super.setText(separator < 0 ? "" : text.slice(separator + 2));
-    }
-}
+// Only presentation methods are retained, never child execution closures.
+const { renderShell: editShell, renderCall: editCall, renderResult: editResult } = createEditToolDefinition("") as ToolRenderers;
+const { renderShell: writeShell, renderCall: writeCall, renderResult: writeResult } = createWriteToolDefinition("") as ToolRenderers;
+const nativeEdit: ToolRenderers = { renderShell: editShell, renderCall: editCall, renderResult: editResult };
+const nativeWrite: ToolRenderers = { renderShell: writeShell, renderCall: writeCall, renderResult: writeResult };
 
-/** One resident card owns its SDK component; detail read highlighting retains no async cache. */
+/** One resident SDK card. The panel owns input and the bounded source owns data. */
 export class DetailToolCard {
     private component?: ToolExecutionComponent;
     private highlighter = new Highlighter();
@@ -31,23 +26,74 @@ export class DetailToolCard {
     private input: DetailTool;
     private expanded = false;
     private signature = "";
-    private nativeState: Record<string, unknown> = {};
-    private nativeBody?: Component;
-    private writeBody?: WriteBody;
     private hadResult = false;
     private readonly redraw: () => void;
     constructor(input: DetailTool, redraw: () => void) {
         this.input = input; this.redraw = redraw;
-        // Reuse ReadDrawing's audited inactive seam: numbered native output without
-        // per-card async jobs/ANSI caches. Main-page highlighting is unchanged.
+        // Retain native numbered read output without per-card async jobs/caches.
+        // The main page's active highlighter is unaffected.
         this.highlighter.dispose();
     }
-    dispose(): void { this.active = false; this.highlighter.dispose(); this.component = undefined; this.nativeBody = undefined; this.writeBody = undefined; this.nativeState = {}; }
+    dispose(): void { this.active = false; this.highlighter.dispose(); this.component = undefined; }
+    private timing(): ToolTiming | undefined {
+        const state = this.input.state;
+        const duration = state?.durationMs ?? this.input.result?.durationMs;
+        if (state?.status !== "running" && state?.status !== "interrupted" && duration !== undefined)
+            return { kind: "execution", durationMs: duration };
+        return state?.elapsedMs === undefined ? undefined : { kind: "elapsed", durationMs: state.elapsedMs };
+    }
+    private timingText(): string | undefined {
+        const timing = this.timing();
+        const clock = timing ? `${timing.kind} ${(Math.max(0, timing.durationMs) / 1000).toFixed(1)}s` : undefined;
+        return this.input.state?.status === "interrupted" ? ["Interrupted", clock].filter(Boolean).join(" · ") : clock;
+    }
+    /** Native edit may rebuild its call header from the result slot. */
+    private nativeTitleTheme(theme: Theme): Theme {
+        const display = this.timingText();
+        const tone = this.input.state?.status === "interrupted" ? "warning" : "muted";
+        // Project only the SDK's title token, never body text or shell ownership.
+        return display ? new Proxy(theme, { get(target, key) {
+            if (key === "fg") return (color: Parameters<Theme["fg"]>[0], text: string) => target.fg(color, text) +
+                (color === "toolTitle" ? target.fg(tone, ` · ${display}`) : "");
+            return Reflect.get(target, key);
+        } }) : theme;
+    }
+    private renderers(): ToolRenderers {
+        const timing = () => this.timingText();
+        const withInterruption = (renderers: ToolRenderers): ToolRenderers => ({ ...renderers, renderCall: (args, theme, context) => {
+            const call = renderers.renderCall!(args, theme, context);
+            // The actual main expanded heading intentionally omits statistics.
+            // Cancellation with no result must still be identifiable, without
+            // changing its normal running/completed title or result layout.
+            if (!context.expanded || this.input.state?.status !== "interrupted") return call;
+            return { invalidate: () => call.invalidate(), render: width => [
+                ...call.render(width), ...wrap(this.timingText() ?? "Interrupted", width).map(row => theme.fg("warning", row)),
+            ] };
+        } });
+        switch (this.input.call.name) {
+            case "read": return withInterruption(readRenderers(this.highlighter, timing));
+            case "bash": return withInterruption(createBashRenderers(timing));
+            case "grep": return withInterruption(createGrepRenderers(timing));
+            case "find": return withInterruption(createFindRenderers(timing));
+            case "write": case "edit": {
+                const native = this.input.call.name === "edit" ? nativeEdit : nativeWrite;
+                return { ...native, renderCall: (args, theme, context) => {
+                    // Native edit's argsComplete branch reads the filesystem to compute
+                    // a preview. Result rendering still installs the returned diff in
+                    // native shared state, preserving its exact layout at both sizes.
+                    const safeContext = this.input.call.name === "edit" ? { ...context, argsComplete: false } : context;
+                    return native.renderCall!(args, this.nativeTitleTheme(theme), safeContext);
+                }, renderResult: (result, options, theme, context) => native.renderResult!(result, options, this.nativeTitleTheme(theme), context) };
+            }
+            // A registered unknown tool with no custom renderer reaches the SDK's
+            // default call/result fallbacks through a non-empty definition slot.
+            // Do not invent a shared descriptor or retain opaque child closures.
+            default: return {};
+        }
+    }
     render(input: DetailTool, expanded: boolean, width: number, injected: TaskTheme): string[] {
-        // A public source may omit or replace an earlier result. SDK has no clearResult.
-        if (this.hadResult && !input.result || this.input.call.name !== input.call.name) {
-            this.component = undefined;
-            this.nativeBody = undefined; this.writeBody = undefined; this.nativeState = {}; this.signature = "";
+        if (this.hadResult && !input.result || this.input.call.name !== input.call.name || this.input.state?.status === "interrupted" && input.state?.status === "running") {
+            this.component = undefined; this.signature = "";
         }
         this.hadResult = !!input.result;
         this.input = input; this.expanded = expanded;
@@ -55,75 +101,51 @@ export class DetailToolCard {
         try {
             const json = input.call.parameters?.status === "complete" ? input.call.parameters.json : undefined;
             if (json && json.length <= 16 * 1024) {
-                const parsed: unknown = JSON.parse(json);
+                const parsed: unknown = JSON.parse(json, (_key, value: unknown) => typeof value === "string" ? clean(value) : value);
                 if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) args = parsed as Record<string, unknown>;
             }
-        } catch { /* Malformed external parameter snapshots remain readable, never native args. */ }
-        const signature = JSON.stringify([args, input.result, expanded]);
-        // SDK shell uses the initialized host theme. Injected fallback never changes that global.
+        } catch { /* Malformed snapshots are never passed as complete native arguments. */ }
         let ready = false;
-        try { getMarkdownTheme().heading("probe"); ready = !!injected.bg && !!injected.bold; } catch { /* standalone tests / pre-init */ }
+        try { getMarkdownTheme().heading("probe"); ready = !!injected.bg && !!injected.bold; } catch { /* pre-init fallback */ }
         if (!ready) return this.fallback(width, injected);
         try {
             if (!this.component) {
-                const special = input.call.name === "read" ? readRenderers(this.highlighter) : input.call.name === "grep" ? createGrepRenderers() : input.call.name === "find" ? createFindRenderers() : undefined;
-                const policy: ToolRenderers = createToolCardRenderers(input.call.name, () => {
-                    const state = this.input.state;
-                    const execution = state && state.status !== "running" && state.status !== "interrupted" && state.durationMs !== undefined;
-                    const ms = execution ? state?.durationMs : state?.elapsedMs;
-                    return ms === undefined ? undefined : { kind: execution ? "execution" : "elapsed", durationMs: ms };
-                }, (_args, _result, context, theme) => {
-                    const current = this.input, result = current.result, summary = current.call.summary;
-                    const state = current.state?.status;
-                    const marker = state ? { label: { running: "Running", completed: "Completed", failed: "Failed", interrupted: "Interrupted" }[state], tone: state === "running" ? "accent" as const : state === "completed" ? "success" as const : state === "failed" ? "error" as const : "warning" as const } : undefined;
-                    let body: Component | undefined;
-                    if (result) {
-                        const hostResult = { content: [{ type: "text" as const, text: clean(result.text) }], details: result.display?.diff === undefined ? undefined : { diff: clean(result.display.diff), firstChangedLine: result.display.firstChangedLine } };
-                        const nativeContext = { ...context, argsComplete: false, expanded: true, state: this.nativeState, lastComponent: this.nativeBody } as RenderContext;
-                        if (this.expanded && special?.renderResult) body = special.renderResult(hostResult, { expanded: true, isPartial: false }, theme, nativeContext);
-                        else if (this.expanded && !result.error && current.call.name === "edit" && hostResult.details) body = editResult({ ...hostResult, details: { ...hostResult.details, patch: "" } }, { expanded: true, isPartial: false }, theme, nativeContext);
-                        else if (this.expanded && !result.error && current.call.name === "write" && current.call.parameters?.status === "complete") {
-                            this.writeBody ??= new WriteBody("", 0, 0);
-                            body = writeCall({ path: typeof context.args.path === "string" ? clean(context.args.path) : "", content: typeof context.args.content === "string" ? clean(context.args.content) : "" }, theme, { ...nativeContext, lastComponent: this.writeBody });
-                        }
-                    }
-                    if (body) this.nativeBody = body;
-                    const summaryOnly = ["read", "grep", "find", "write", "edit"].includes(current.call.name) && !result?.error;
-                    const stats = [result && ["read", "grep", "find"].includes(current.call.name) ? `${result.text.split("\n").length} output lines shown` : undefined, summary?.lines === undefined ? undefined : `${summary.lines} lines`, summary?.bytes === undefined ? undefined : `${summary.bytes} bytes`, summary?.addedLines === undefined ? undefined : `+${summary.addedLines} lines`, summary?.removedLines === undefined ? undefined : `−${summary.removedLines} lines`].filter(Boolean).join(" · ");
-                    return { identity: current.call.name, summary: current.call.detail ?? summary?.path ?? summary?.command,
-                        marker, statistics: stats ? [{ label: stats, tone: "muted" }] : [], body,
-                        bodyText: body || !result || summaryOnly && !this.expanded ? "" : clean(result.text) };
-                });
                 const ui = { requestRender: () => { if (this.active) this.redraw(); } } as TUI;
-                this.component = new ToolExecutionComponent(input.call.name, input.id, args, { showImages: false, outputPad: 1 }, policy, ui, "");
+                this.component = new ToolExecutionComponent(input.call.name, input.id, args, { showImages: false }, this.renderers(), ui, "");
             }
+            const signature = JSON.stringify([args, input.result, input.state]);
             if (signature !== this.signature) {
                 this.signature = signature;
                 this.component.updateArgs(args);
-                if (input.result) this.component.updateResult({ content: [{ type: "text", text: clean(input.result.text) }], isError: !!input.result.error, details: input.result.display, durationMs: input.result.durationMs });
+                if (input.state) this.component.markExecutionStarted();
+                if (input.call.parameters?.status === "complete") this.component.setArgsComplete();
+                if (input.result) this.component.updateResult({ content: [{ type: "text", text: clean(input.result.text) }], isError: !!input.result.error,
+                    details: input.result.display ? {
+                        ...(input.result.display.runtimeLaunch ? { runtimeLaunch: input.result.display.runtimeLaunch } : {}),
+                        ...(input.result.display.diff === undefined ? {} : { diff: clean(input.result.display.diff), firstChangedLine: input.result.display.firstChangedLine }),
+                    } : undefined,
+                    durationMs: input.result.durationMs ?? input.state?.durationMs });
+                else if (input.state?.status === "interrupted") this.component.updateResult({ content: [], isError: true });
             }
             this.component.setExpanded(expanded);
-            // The cooperating self-shell owns one outer spacer and one vertical pad.
-            // Drop those empty rows for this compact surface, preserving body layout.
-            return this.component.render(width).slice(2, -1);
+            const rows = this.component.render(width);
+            if (!["read", "bash", "grep", "find", "write", "edit"].includes(input.call.name)) {
+                const timing = this.timingText();
+                if (timing) rows.push(...wrap(timing, width).map(row => injected.fg(input.state?.status === "interrupted" ? "warning" : "muted", row)));
+            }
+            return rows;
         } catch { return this.fallback(width, injected); }
     }
     private fallback(width: number, theme: TaskTheme): string[] {
-        const { call, result, state } = this.input;
-        const execution = state && state.status !== "running" && state.status !== "interrupted" && state.durationMs !== undefined;
-        const ms = execution ? state?.durationMs : state?.elapsedMs;
-        const timing = ms === undefined ? "" : ` · ${execution ? "execution" : "elapsed"} ${(ms / 1000).toFixed(1)}s`;
-        const label = state ? { running: "Running", completed: "Completed", failed: "Failed", interrupted: "Interrupted" }[state.status] : result ? result.error ? "Failed" : "Completed" : "";
-        const path = call.detail ?? call.summary?.path ?? call.summary?.command;
-        const rows = wrap(`${call.name}${path ? "  " + path : ""}`, width).slice(0, 1).map(s => theme.fg("toolTitle", s));
-        if (label) rows.push(...wrap(label + timing, width).map(s => theme.fg(state?.status === "interrupted" ? "warning" : result?.error ? "error" : "muted", s)));
-        const summary = call.summary;
-        const stats = [summary?.offset === undefined ? undefined : `from line ${summary.offset}`, summary?.limit === undefined ? undefined : `limit ${summary.limit}`, summary?.lines === undefined ? undefined : `${summary.lines} lines`, summary?.bytes === undefined ? undefined : `${summary.bytes} bytes`, summary?.addedLines === undefined ? undefined : `+${summary.addedLines} lines`, summary?.removedLines === undefined ? undefined : `−${summary.removedLines} lines`].filter(Boolean).join(" · ");
-        if (stats) rows.push(...wrap(stats, width).map(s => theme.fg("muted", s)));
-        if (result && (this.expanded || result.error || !["read", "grep", "find", "write", "edit"].includes(call.name))) {
+        const { call, result } = this.input;
+        const detail = call.detail ?? call.summary?.path ?? call.summary?.command;
+        const rows = wrap(`${call.name}${detail ? "  " + detail : ""}`, width).map(s => theme.fg("toolTitle", s));
+        const timing = this.timingText();
+        if (timing) rows.push(...wrap(timing, width).map(s => theme.fg(this.input.state?.status === "interrupted" ? "warning" : "muted", s)));
+        if (result?.error) rows.push(theme.fg("error", "Failed"));
+        if (result && (this.expanded || result.error || !["read", "grep", "find", "bash"].includes(call.name))) {
             const body = wrap(call.name === "edit" && result.display?.diff ? result.display.diff : result.text, width);
-            rows.push(...(this.expanded ? body : body.slice(0, 3)).map(s => theme.fg(result.error ? "error" : "toolOutput", s)));
-            if (!this.expanded && body.length > 3) rows.push(theme.fg("dim", `… ${body.length - 3} more visual lines · click to expand`));
+            rows.push(...(this.expanded || call.name === "edit" ? body : body.slice(0, call.name === "write" ? 10 : 3)).map(s => theme.fg(result.error ? "error" : "toolOutput", s)));
         }
         return rows;
     }

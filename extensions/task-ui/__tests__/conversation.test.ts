@@ -33,7 +33,7 @@ void it("falls back to literal text when Markdown rendering throws and remembers
     r.dispose();
 });
 
-void it("tool previews are bounded by visual lines, click state uses IDs, write success is summary-only", () => {
+void it("pre-init fallback uses bounded output and stable IDs without parameter click hints", () => {
     const r = new ConversationRenderer();
     const long = Array.from({ length: 100 }, (_, i) => `output-${i}`).join("\n");
     const tools: ConversationEntry[] = [
@@ -48,8 +48,8 @@ void it("tool previews are bounded by visual lines, click state uses IDs, write 
         assert.doesNotMatch(text, /output-0\b/);
         assert.match(text, /output-99/); assert.doesNotMatch(text, /output-96\b/);
         assert.match(text, /97 more visual lines/); assert.match(text, /30 more characters/);
-        assert.match(text, /additional content omitted/); assert.doesNotMatch(text, /SECRET WRITE CONTENT/);
-        assert.match(text, /from line 2 · limit 20/); assert.match(text, /10 lines · 100 bytes/); assert.match(text, /\+3 lines · −2 lines/);
+        assert.match(text, /additional content omitted/); assert.match(text, /SECRET WRITE CONTENT/);
+        assert.doesNotMatch(text, /View parameters|click to expand loaded content/);
         assert.equal(compact.ranges.length, 4); assert.ok(compact.ranges.every(range => range.collapsible));
         const expanded = new Set(["read", "write"]);
         const model = r.renderModel([{ id: "older", kind: "user", text: "before" }, ...tools], 80, theme, { expanded });
@@ -72,12 +72,12 @@ void it("call titles reserve state/duration before paths and never invent histor
     try {
         const calls = [{ toolCallId: "a", name: "read", status: "running" as const, elapsedMs: 1234 }, { toolCallId: "b", name: "read", status: "completed" as const, elapsedMs: 5000, durationMs: 37 }];
         const out = r.render(rows, 55, theme, { toolCalls: calls }).map(stripTerminalSequences).join("\n");
-        assert.match(out, /Running · elapsed 1\.2s/); assert.match(out, /Completed · execution 0\.0s/);
+        assert.match(out, /elapsed 1\.2s/); assert.match(out, /execution 0\.0s/);
         assert.doesNotMatch(out, /execution 5\.0s|historical.*(?:elapsed|execution)/);
         const interrupted = r.render(rows, 55, theme, { toolCalls: [{ ...calls[0]!, status: "interrupted" }] }).join("\n");
         assert.match(interrupted, /Interrupted · elapsed 1\.2s/);
         const known = r.render([{ kind: "toolResult", name: "bash", durationMs: 1200, text: "ok", elided: 0 }], 55, theme).join("\n");
-        assert.match(known, /Completed · execution 1\.2s/);
+        assert.match(known, /execution 1\.2s/);
         for (const width of [1, 12, 36, 80]) for (const line of r.render(rows, width, theme, { toolCalls: calls })) assert.ok(visibleWidth(line) <= width);
     } finally { r.dispose(); }
 });

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { it } from "node:test";
 import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { KeybindingsManager } from "../../beautify/__tests__/renderer-host.mjs";
 import { TaskPanel } from "../panel.ts";
 import { TaskCoordinator } from "../coordinator.ts";
 import { DEFAULTS } from "../config.ts";
@@ -62,26 +63,44 @@ it("pending region has independent focus/anchors, overlay containment, readonly 
     } finally { panel.dispose(); coordinator.dispose(); }
 });
 
-it("running tool parameter hit target opens independent readonly native reader and Esc preserves queue focus", () => {
-    const identity = { sourceId: "parameters", taskId: "agent", runId: "1" };
+it("card clicks and global tools key preserve queue focus, arrivals and exclusive input ownership", () => {
+    const identity = { sourceId: "expansion", taskId: "agent", runId: "1" };
     const row: TaskView = { ...identity, key: taskKey(identity), title: "agent", kind: "agent", status: "running", executionMode: "background", waitCount: 0, artifacts: [],
-        stats: { pendingMessages: { entries: [{ id: "pending", text: "keep queued", state: "pending" }], omitted: 0 }, toolCalls: [{ name: "write", toolCallId: "w", status: "running", elapsedMs: 1000 }] }, capabilities: { stop: true, details: true, steer: true } };
-    let sends = 0;
-    const source: TaskSource = { sourceId: identity.sourceId, revision: 0, list: () => [row], detail: () => ({ text: "", conversation: [{ id: "a", kind: "assistant", text: "", tools: [{ name: "write", toolCallId: "w", parameters: { status: "complete", json: JSON.stringify({ path: "file", content: "EXACT\n" + "中文😀".repeat(100) + "\nPARAM_END" }) } }] }] }),
-        stop: () => true, steer: () => { sends++; return true; }, subscribe: () => () => {}, dispose() {} };
+        stats: { pendingMessages: { entries: [{ id: "pending", text: "keep queued", state: "pending" }], omitted: 0 } }, capabilities: { stop: true, details: true, steer: true } };
+    const makeTool = (id: string): import("../types.ts").ConversationEntry => ({ id, kind: "toolResult", name: "read", text: `BODY-${id}`, elided: 0 });
+    let entries = [makeTool("first"), makeTool("second")];
+    const listeners = new Set<() => void>();
+    let revision = 0, sends = 0;
+    const source: TaskSource = { sourceId: identity.sourceId, get revision() { return revision; }, list: () => [row], detail: () => ({ text: "", conversation: entries }),
+        stop: () => true, steer: () => { sends++; return true; }, subscribe: listener => { listeners.add(listener); return () => listeners.delete(listener); }, dispose() {} };
     const coordinator = new TaskCoordinator(); coordinator.registerSource(source);
+    const terminal = { columns: 80, rows: 24 };
     const panel = new TaskPanel({ coordinator, layout, config: DEFAULTS, ctx: { ui: { notify() {} } } as unknown as ExtensionContext,
-        theme: { fg: (_color, text) => text }, keys: { matches: () => false }, tui: { terminal: { columns: 80, rows: 24 }, requestRender() {} } as never, done() {} });
+        theme: { fg: (_color, text) => text }, keys: new KeybindingsManager(), tui: { terminal, requestRender() {} } as never, done() {} });
+    const text = () => stripTerminalSequences(panel.render(terminal.columns).join("\n"));
+    const expandState = () => (panel as unknown as { toolsExpanded: boolean }).toolsExpanded;
     try {
         panel.handleInput("\r"); panel.handleInput("\t");
         const before = panel.getState();
+        assert.doesNotMatch(text(), /BODY-first|View parameters|click to/);
+        panel.handleInput("\x0f"); assert.match(text(), /BODY-first/); assert.match(text(), /BODY-second/);
+        assert.equal(panel.getState().pendingFocus, before.pendingFocus); assert.equal(panel.getState().pendingScrollTop, before.pendingScrollTop);
+        entries.push(makeTool("arrival")); revision++; for (const listener of listeners) listener();
+        assert.match(text(), /BODY-arrival/);
         const lines = panel.render(80).map(stripTerminalSequences);
-        const y = lines.findIndex(line => /View parameters/.test(line)); assert.ok(y >= 0);
+        const y = lines.findIndex(line => /BODY-second/.test(line)); assert.ok(y >= 0);
         assert.deepEqual(panel.handleMouse({ type: "click", button: "left", x: 1, y } as never), { handled: true });
-        assert.match(panel.render(80).join("\n"), /Parameters · complete · Esc Back/);
-        panel.handleInput("x"); panel.handleInput("\r"); panel.handleInput("\t"); panel.handleInput("\u001b[F");
-        assert.match(panel.render(80).join("\n"), /PARAM_END/); assert.equal(sends, 0);
-        panel.handleInput("\u001b"); assert.equal(panel.getState().page, "detail"); assert.equal(panel.getState().pendingFocus, before.pendingFocus);
-        assert.equal(panel.getState().pendingScrollTop, before.pendingScrollTop);
+        assert.doesNotMatch(text(), /BODY-second/); assert.match(text(), /BODY-first/);
+        panel.handleInput("\x0f"); assert.equal(expandState(), false); assert.doesNotMatch(text(), /BODY-/);
+        const pendingY = panel.render(80).map(stripTerminalSequences).findIndex(line => /keep queued/.test(line));
+        panel.handleMouse({ type: "click", button: "left", x: 1, y: pendingY } as never);
+        assert.match(text(), /Pending · Esc Back/);
+        panel.handleInput("\x0f"); assert.equal(expandState(), false); assert.equal(sends, 0);
+        panel.handleInput("\x1b"); panel.handleInput("\r");
+        panel.handleInput("\x0f"); assert.equal(expandState(), false); assert.equal(sends, 0);
+        panel.handleInput("\x1b"); panel.handleInput("\x0f"); assert.equal(expandState(), true);
+        for (const width of [1, 12, 40, 80]) { terminal.columns = width; assert.ok(panel.render(width).every(line => visibleWidth(line) === width)); }
+        terminal.columns = 80;
+        panel.handleInput("\x1b"); panel.handleInput("\r"); assert.equal(expandState(), true, "same detail retains global mode");
     } finally { panel.dispose(); coordinator.dispose(); }
 });

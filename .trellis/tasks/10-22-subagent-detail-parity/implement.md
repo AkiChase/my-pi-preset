@@ -1,5 +1,22 @@
 # 实施计划
 
+## 阶段4：真实验收后对齐修正（已实施/独立review，用户视觉验收待定）
+
+- 删除独立参数点击/reader及View parameters/附加click行，Ctrl+O统一展开含后续工具，mouse单卡统一展开。read/bash/grep/find直接原factory，write/edit原native布局；取消混合默认规则。
+- reviewer修正native title metadata颜色与旧SDK时序断言；真实完整Pi捕获发现bash9vs10，修复丢失的审计有界runtimeLaunch metadata；unknown无renderer工具改SDK `{}`fallback匹配主页面，shared beautify最终无变更。
+- 最终相关自然tests882/882 exit0，focused source/paging/SDK28/28 exit0，typecheck/diffcheck exit0。fullcheck1642/1656 exit1仅已知SDK1.4 resetExtensionUI fixtures14；最后hostilemetadata scalar guard之后未重复fullcheck，但natural/tc已重跑通过。中途TS7022测试类型推断失败改explicitSDK type后重跑，未抹失败。
+- main执行最终完整Pi `node /tmp/pi-full-parity-KClJtr/final-capture.mjs` → verify-pairs → export 串联exit0：60对相同真实messages/result/id/duration/theme，142实际viewport文本/ANSI/HTML。主核对bash dark120标题9vs9与主相同description/background/keyhint，generic参数及4行匹配，无旧独立参数行。原失败事实README、最终结论FINAL-README；无需安装/network/personal改动。
+- 私有tmux已停止，list-sessions exit1 no server；输出保留 `/tmp/pi-full-parity-KClJtr/index.html`。本轮完整CLI但offlineprovider与TaskSource投影为夹具，不验证真实spawn恢复。
+- 明确剩余差异：read无主页面异步语法色；fixed任务metadata缩小viewport；nativewrite/edit附加计时；generic fallback计时仍单独一行（无安全标题seam）；unknown自定义renderer不重建。不能称全工具像素一致，用户视觉验收未完成。
+- 本阶段提交待记录。证据 `/tmp/subagent-detail-parity.9eqCCh/stage4`、`review4` 与上述ownedfullCLI目录。
+
+
+- 阶段3提交20c39e4真实tmux验收被用户拒绝：独立参数/展开点击区域复杂，附加提示及通用卡片与主页面不一致，不能算视觉验收通过。
+- 已按要求停止唯一验收tmux pi-detail-accept-dRzEwd（has-session exit1、对应pid不存在），输出保留 `/tmp/pi-detail-accept-dRzEwd`。
+- 实施范围：移除独立参数入口/reader、采用主页面每工具renderer默认及统一展开/Ctrl+O；不动队列/终态/执行或并行任务。独立review＋完整Pi宿主并排验收后提交单阶段。
+- 验证：自然task-ui/agent/process/runtime相关tests、typecheck、diffcheck；fullcheck记录已知SDKfixture失败；真实完整Pi隔离主/详情同数据dark/light与窄屏captures。raw输出仅owned tmp。
+
+
 ## 授权与执行策略
 
 - 用户已批准最终整页方案并指示开工，授权以下分阶段实施、验证和主会话本地提交。
