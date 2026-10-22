@@ -29,7 +29,7 @@ socket 通信失败不会阻塞 Pi 的会话、工具调用或 UI 生命周期�
 ./install.sh
 ```
 
-在同步范围和清理范围中都选中 `Extensions`，审阅真实 dry-run 计划，确认后输入 `APPLY` 执行。清理会删除未列入 `preserve.extensions` 的直接扩展入口。
+在同步范围和清理范围中都选中 `Extensions`，审阅真实 dry-run 计划，确认后按 Enter 执行。清理会删除未列入 `preserve.extensions` 的直接扩展入口。
 
 完成后执行 `/reload` 或重启 Pi，使扩展发现结果重新生效。
 

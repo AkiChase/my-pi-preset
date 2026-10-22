@@ -16,7 +16,9 @@ with tempfile.TemporaryDirectory(prefix='installer-pty-') as temporary:
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 32, 90, 0, 0))
         def setup():
             os.setsid(); fcntl.ioctl(0, termios.TIOCSCTTY, 0)
-        proc = subprocess.Popen(cmd, stdin=slave, stdout=slave, stderr=slave, env={**env, **(extra or {})}, preexec_fn=setup)
+        proc_env = {**env, **(extra or {})}
+        proc_env.pop('EXPECTED_EXIT', None)
+        proc = subprocess.Popen(cmd, stdin=slave, stdout=slave, stderr=slave, env=proc_env, preexec_fn=setup)
         os.close(slave); output = bytearray(); pos = 0
         def expect(text):
             nonlocal pos
@@ -32,7 +34,7 @@ with tempfile.TemporaryDirectory(prefix='installer-pty-') as temporary:
         def send(data): os.write(master, data)
         try:
             steps(expect, send)
-            assert proc.wait(timeout=10) == 0
+            assert proc.wait(timeout=10) == (extra or {}).get('EXPECTED_EXIT', 0)
         finally:
             if proc.poll() is None:
                 os.killpg(proc.pid, signal.SIGKILL); proc.wait(timeout=4)
@@ -44,8 +46,7 @@ with tempfile.TemporaryDirectory(prefix='installer-pty-') as temporary:
         expect('1 of 5 selected'); send(b'\r')
         expect('Choose what to clean up'); send(b'\r')
         expect('Actual dry-run plan'); assert not (agent/'settings.json').exists()
-        send(b'\r'); expect('Type APPLY')
-        send(b'APPLY\r'); expect('Setup complete')
+        send(b'\r'); expect('Setup complete')
     session(['node', str(ROOT/'scripts/install.mjs'), '--manifest', str(manifest)], apply)
     assert json.loads((agent/'settings.json').read_text()) == {'retry': {'maxRetries': 5}}
     (agent/'settings.json').unlink()
@@ -105,8 +106,54 @@ else {
         expect('Choose your preset source'); send(b'\r')
         expect('Choose what to sync'); send(b'\r')
         expect('Choose what to clean up'); send(b'\r')
-        expect('Actual dry-run plan'); send(b'\r'); expect('Type APPLY')
-        send(b'APPLY\r'); expect('Child answer: ')
+        expect('Actual dry-run plan'); send(b'\r'); expect('Child answer: ')
         send(b'q\r'); expect('Received: q'); expect('Setup complete')
     session(['node', str(prompt_scripts/'install.mjs'), '--manifest', str(manifest)], child_input)
     print('PASS: applying child exclusively receives terminal input')
+
+    checkout = (box/'checkout').resolve(); checkout.mkdir()
+    (checkout/'.git').mkdir(); (checkout/'extensions').mkdir(); (checkout/'scripts').mkdir()
+    (checkout/'package.json').write_text(json.dumps({'name': 'my-pi-preset', 'pi': {'extensions': ['extensions/*.ts']}}))
+    (checkout/'install.sh').write_text('fixture')
+    local_manifest = checkout/'pi-preset.json'
+    local_manifest.write_text(json.dumps({'packages': {'git:github.com/AkiChase/my-pi-preset': 'latest'}}))
+    for filename in ['install.mjs', 'sync.mjs']:
+        (checkout/'scripts'/filename).write_text((ROOT/'scripts'/filename).read_text())
+    pnpm = bin_dir/'pnpm'
+    pnpm.write_text('#!/bin/sh\nprintf "pnpm %s cwd=%s\\n" "$*" "$PWD" >> "$CALLS"\nexit "${PNPM_EXIT:-0}"\n')
+    pnpm.chmod(0o755)
+    calls = box/'calls'
+    def local_apply(expect, send):
+        expect('Choose your preset source'); send(b'\x1b[B\r')
+        expect('Choose what to sync'); send(b'\r')
+        expect('Choose what to clean up'); send(b'\r')
+        expect('First: pnpm install'); expect('Actual dry-run plan')
+        assert 'pnpm' not in calls.read_text()
+        send(b'\r')
+        expect('Setup complete')
+    calls.write_text('')
+    local_env = {'PATH': str(bin_dir)+':'+env['PATH']}
+    session(['node', str(checkout/'scripts/install.mjs'), '--manifest', str(local_manifest)], local_apply, local_env)
+    recorded = calls.read_text()
+    assert f'pnpm install cwd={checkout}' in recorded
+    assert recorded.index('pnpm install') < recorded.index('install '+str(checkout))
+    calls.write_text('')
+    def local_failure(expect, send):
+        expect('Choose your preset source'); send(b'\x1b[B\r')
+        expect('Choose what to sync'); send(b'\r')
+        expect('Choose what to clean up'); send(b'\r')
+        expect('Actual dry-run plan'); send(b'\r')
+        expect('Pi synchronization was not started')
+    session(['node', str(checkout/'scripts/install.mjs'), '--manifest', str(local_manifest)], local_failure, {**local_env, 'PNPM_EXIT': '7', 'EXPECTED_EXIT': 7})
+    assert '\ninstall ' not in calls.read_text()
+    print('PASS: local pnpm prerequisite is previewed, ordered, and aborts sync on failure')
+    calls.write_text('')
+    def local_config(expect, send):
+        expect('Choose your preset source'); send(b'\x1b[B\r')
+        expect('Choose what to sync'); send(b'a\x1b[B ')
+        expect('1 of 5 selected'); send(b'\r')
+        expect('Choose what to clean up'); send(b'\r')
+        expect('Actual dry-run plan'); send(b'\r'); expect('Setup complete')
+    session(['node', str(checkout/'scripts/install.mjs'), '--manifest', str(local_manifest)], local_config, local_env)
+    assert 'pnpm' not in calls.read_text()
+    print('PASS: local config-only selection skips dependency installation')

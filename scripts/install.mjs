@@ -31,7 +31,7 @@ export function localCheckout(scriptPath) {
 export function createState(checkout) {
   return {
     page: "source", cursor: 0, selected: new Set(DOMAINS.map(({ id }) => id)), cleanup: new Set(),
-    dev: false, checkout, notice: "", confirmation: "", plan: [], scroll: 0,
+    dev: false, checkout, notice: "", plan: [], scroll: 0,
   };
 }
 
@@ -50,18 +50,9 @@ function listFor(state) {
 // Returns an effect to the terminal/process owner; no I/O happens in this reducer.
 export function handleKey(state, text, key = {}) {
   if (key.ctrl && key.name === "c") return "quit";
-  if (state.page !== "confirm" && key.name === "q") return "quit";
+  if (key.name === "q") return "quit";
   state.notice = "";
   if (state.page === "loading") return key.name === "escape" ? "cancel-preview" : undefined;
-  if (state.page === "confirm") {
-    if (key.name === "escape") { state.page = "review"; state.confirmation = ""; }
-    else if (key.name === "return") {
-      if (state.confirmation === "APPLY") return "apply";
-      state.notice = "Enter APPLY exactly, or Esc to return.";
-    } else if (key.name === "backspace") state.confirmation = state.confirmation.slice(0, -1);
-    else if (text && !key.ctrl && !key.meta && /^[a-zA-Z]+$/.test(text)) state.confirmation = (state.confirmation + text).slice(0, 20);
-    return;
-  }
   if (state.page === "review" || state.page === "error") {
     if (key.name === "escape") { state.page = "cleanup"; state.cursor = 0; state.plan = []; }
     else if (key.name === "up") state.scroll = Math.max(0, state.scroll - 1);
@@ -70,7 +61,7 @@ export function handleKey(state, text, key = {}) {
     else if (key.name === "pagedown") state.scroll += 10;
     else if (key.name === "home") state.scroll = 0;
     else if (key.name === "end") state.scroll = Number.MAX_SAFE_INTEGER;
-    else if (key.name === "return" && state.page === "review") { state.page = "confirm"; state.confirmation = ""; }
+    else if (key.name === "return" && state.page === "review") return "apply";
     return;
   }
   if (state.page === "source") {
@@ -136,7 +127,7 @@ export function renderFrame(state, { columns = 80, rows = 24, color = false, uni
   const symbols = unicode ? { focus: "›", on: "◉", off: "○" } : { focus: ">", on: "[x]", off: "[ ]" };
   const lines = [];
   const add = (text = "", kind) => { for (const line of wrap(text, width)) lines.push(`  ${paint(line, kind)}`); };
-  const steps = { source: "SOURCE", sync: "01 / 03", cleanup: "02 / 03", loading: "03 / 03", review: "03 / 03", confirm: "03 / 03", error: "PREVIEW FAILED" };
+  const steps = { source: "SOURCE", sync: "01 / 03", cleanup: "02 / 03", loading: "03 / 03", review: "03 / 03", error: "PREVIEW FAILED" };
   const footer = [];
   add();
   add(`pi preset    ${steps[state.page]}`, "accent");
@@ -150,7 +141,7 @@ export function renderFrame(state, { columns = 80, rows = 24, color = false, uni
     });
     add();
     add(state.checkout ? `Local: ${state.checkout}` : "Local source requires running ./install.sh from a checkout.", "muted");
-    add("No dependency installation is performed for a local checkout.", "muted");
+    add("Local Packages: pnpm install runs before Pi synchronization.", "muted");
     footer.push("Up/Down Move   Enter Next   Q Quit");
   } else if (state.page === "sync" || state.page === "cleanup") {
     const pruning = state.page === "cleanup";
@@ -177,6 +168,7 @@ export function renderFrame(state, { columns = 80, rows = 24, color = false, uni
   } else {
     add(state.page === "error" ? "Unable to preview changes" : "Review your setup", "title");
     add(`Source: ${state.dev ? "local checkout" : "remote preset"}`, "muted");
+    if (state.dev && state.selected.has("packages")) add("First: pnpm install in the local checkout.", "danger");
     for (const domain of DOMAINS) {
       const mode = !state.selected.has(domain.id) ? "Skip" : state.cleanup.has(domain.id) ? "Prune" : "Merge";
       add(`${domain.name.padEnd(17)} ${mode}`, mode === "Prune" ? "danger" : mode === "Skip" ? "muted" : "good");
@@ -184,20 +176,14 @@ export function renderFrame(state, { columns = 80, rows = 24, color = false, uni
     add();
     add("Actual dry-run plan", "title");
     const planLines = state.plan.flatMap((line) => wrap(line, width));
-    const confirming = state.page === "confirm";
-    const bottom = confirming ? ["Type APPLY to execute these choices.", `> ${state.confirmation}_`] : [];
-    const footerText = confirming ? ["Enter Confirm   Esc Back   Ctrl+C Quit"] : ["Up/Down/PgUp/PgDn Scroll", `${state.page === "review" ? "Enter Continue   " : ""}Esc Back   Q Quit`];
-    const reserve = 1 + bottom.reduce((count, text) => count + wrap(text, width).length, 0) +
-      footerText.reduce((count, text) => count + wrap(text, width).length, 0) +
+    const footerText = ["Up/Down/PgUp/PgDn Scroll", `${state.page === "review" ? "Enter Apply   " : ""}Esc Back   Q Quit`];
+    const reserve = 1 + footerText.reduce((count, text) => count + wrap(text, width).length, 0) +
       (state.notice ? wrap(state.notice, width).length : 0) + 1;
     const count = Math.max(0, rows - 1 - lines.length - reserve);
     state.scroll = Math.max(0, Math.min(state.scroll, Math.max(0, planLines.length - count)));
     for (const line of planLines.slice(state.scroll, state.scroll + count)) add(line);
     add(`${planLines.length && count ? state.scroll + 1 : 0}-${Math.min(planLines.length, state.scroll + count)} of ${planLines.length} lines`, "muted");
-    if (confirming) {
-      // Confirmation controls stay in the footer even when the plan needs scrolling.
-      footer.push(...bottom, ...footerText);
-    } else footer.push(...footerText);
+    footer.push(...footerText);
   }
   if (state.notice) footer.unshift(state.notice);
   const footLines = footer.flatMap((line) => wrap(line, width).map((part) => `  ${paint(part, "muted")}`));
@@ -208,10 +194,10 @@ export function renderFrame(state, { columns = 80, rows = 24, color = false, uni
 
 // Each sync child owns a process group on POSIX: cancellation covers pi and its
 // descendants, not just the Node sync wrapper (which uses spawnSync internally).
-export function runSync(script, args, { preview = false, onStart, maxBytes = 1024 * 1024, timeoutMs = 12 * 60 * 1000, env = process.env } = {}) {
+export function runSync(script, args, { preview = false, onStart, maxBytes = 1024 * 1024, timeoutMs = 12 * 60 * 1000, env = process.env, command, cwd } = {}) {
   const grouped = process.platform !== "win32";
-  const child = spawn(process.execPath, [script, ...args, ...(preview ? ["--dry-run"] : [])], {
-    env, detached: grouped, stdio: preview ? ["ignore", "pipe", "pipe"] : "inherit",
+  const child = spawn(command ?? process.execPath, command ? args : [script, ...args, ...(preview ? ["--dry-run"] : [])], {
+    env, cwd, detached: grouped, stdio: preview ? ["ignore", "pipe", "pipe"] : "inherit",
   });
   let reason;
   let bytes = 0;
@@ -311,6 +297,19 @@ export async function runInstaller({ manifest, script, input = process.stdin, ou
       input.off("keypress", safeKey);
       input.pause();
     } else render();
+    if (applying && state.dev && state.selected.has("packages")) {
+      output.write(`Installing local dependencies in ${state.checkout}: pnpm install\n`);
+      const dependencies = await runSync(undefined, ["install"], {
+        command: "pnpm", cwd: state.checkout, onStart: (job) => { active = job; },
+      });
+      active = undefined;
+      if (quitting) { resolveFinished(130); return; }
+      if (dependencies.error || dependencies.code !== 0) {
+        output.write(`\nLocal dependency installation failed: ${dependencies.error ?? `pnpm exited with ${dependencies.code}`}. Pi synchronization was not started.\n`);
+        resolveFinished(dependencies.error ? 1 : dependencies.code);
+        return;
+      }
+    }
     const result = await runSync(script, args, { preview: !applying, onStart: (job) => { active = job; } });
     active = undefined;
     busy = false;

@@ -23,13 +23,12 @@ test("default selections, keyboard toggles and cleanup intersection", () => {
   key(state, "return"); assert.equal(state.page, "sync"); assert.match(state.notice, /at least one/);
 });
 
-test("source and exact confirmation gates; failure cannot apply", () => {
+test("source and review execution gates; failure cannot apply", () => {
   const state = createState();
   key(state, "down"); key(state, "return"); assert.equal(state.page, "source"); assert.equal(state.dev, false);
   state.page = "error"; assert.equal(key(state, "return"), undefined); assert.equal(state.page, "error");
-  state.page = "review"; key(state, "return"); assert.equal(state.page, "confirm");
-  handleKey(state, "apply", { name: "a" }); assert.equal(key(state, "return"), undefined);
-  state.confirmation = "APPLY"; assert.equal(key(state, "return"), "apply");
+  state.page = "loading"; assert.equal(key(state, "return"), undefined);
+  state.page = "review"; assert.equal(key(state, "return"), "apply");
   assert.equal(handleKey(state, "", { ctrl: true, name: "c" }), "quit");
   const local = createState("/checkout"); key(local, "down"); key(local, "return");
   assert.ok(syncArgs(local, "/preset").includes("--dev"));
@@ -42,10 +41,10 @@ test("pointer column, no borders, sanitized output and narrow layouts", () => {
   assert.equal(lines[0].indexOf("Packages"), lines[1].indexOf("Settings"));
   assert.doesNotMatch(text, /[│╭╮╯╰]/);
   assert.equal(cleanText("\x1b[31mred\x1b[0m\x07"), "red");
-  state.page = "confirm"; state.confirmation = "APPLY";
-  assert.match(renderFrame(state, { columns: 35, rows: 20 }), /> APPLY_/);
+  state.page = "review";
+  assert.match(renderFrame(state, { columns: 35, rows: 20 }), /Enter Apply/);
   assert.match(renderFrame(state, { columns: 20, rows: 10 }), /Terminal too small/);
-  for (const page of ["source", "sync", "cleanup", "loading", "review", "confirm", "error"]) {
+  for (const page of ["source", "sync", "cleanup", "loading", "review", "error"]) {
     state.page = page; state.plan = ["x".repeat(1000)];
     const narrow = renderFrame(state, { columns: 35, rows: 20, unicode: false });
     assert.ok(narrow.split("\n").every(line => line.length <= 35));

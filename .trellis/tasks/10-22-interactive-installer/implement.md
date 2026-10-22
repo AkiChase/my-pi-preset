@@ -38,3 +38,14 @@
 - 变更用户文档本地链接存在性检查 PASS。
 - `node --check scripts/install.mjs`、`sh -n install.sh`、`git diff --check` PASS。spec discovery 为 single-repo development/testing；用户 docs 已无 install.sh 旧参数调用。
 - 不运行真实安装、联网依赖下载、个人配置同步、reload。全套采用已有 SDK 与临时 agent/config；PTY fake Pi 不访问个人状态。
+
+## 后续阶段：简化确认及本地依赖
+
+用户追加授权：审阅页 Enter 直接执行，移除 APPLY 页；本地来源且选中 Packages 时先执行 pnpm install。来源/审阅页明确展示依赖步骤，只在执行确认后启动，不自动安装 pnpm，失败/取消阻断 Pi 同步。配置域/远程来源不安装依赖。
+
+- 实现与 docs/spec 同步；保留原独占 stdin 和进程组取消逻辑。
+- 新增 fake pnpm PTY 验证：预览无依赖安装、正确 cwd、先 pnpm 后 Pi、本地安装失败 exit 7 不开始同步、local config-only 不运行 pnpm。
+- 首次 fixture cwd 断言 FAIL：macOS /var 临时目录别名与物理 cwd 不同；仅修正 fixture 使用 resolve 后复跑 PASS，不修改产品逻辑。
+- 最终集中 suite 33/33 PASS；隔离 pnpm check 类型检查和 1626/1626 tests PASS（exit 0）。之后补充 config-only fixture，重跑集中 suite PASS。
+- 独立 general-purpose reviewer 窄范围读取代码：无发现；main 核对实际测试结果。node syntax 与 git diff --check PASS。
+- 本阶段作为独立验证点提交；不 push、归档或实际安装。原始日志使用本轮拥有的 `/tmp/pi-installer-followup.pe4q2w`，核验后清理。
