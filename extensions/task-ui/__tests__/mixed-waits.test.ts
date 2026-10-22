@@ -80,7 +80,8 @@ void it("one shared /task-detach releases mixed shell/agent launch and retrieval
         const viewing = new TaskPanel(panelArgs);
         try {
             const rendered = viewing.render(180).join("\n");
-            assert.match(rendered, /shell/); assert.match(rendered, /agent/);
+            assert.match(rendered, /shell/);
+            assert.ok(rendered.includes(before.find(task => task.kind === "agent")!.title), "the actual selected Agent title is visible");
             assert.equal(viewing.model.refresh(coordinator.list()).length, 2);
             viewing.handleInput("\u001b");
             assert.equal(coordinator.waitCount, 4, "viewing/closing real mixed tasks cannot detach");

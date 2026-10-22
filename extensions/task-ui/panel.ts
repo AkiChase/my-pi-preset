@@ -1,3 +1,4 @@
+import { PendingRegion, PendingReader } from "./pending.ts";
 import { copyToClipboard, type ExtensionContext, type KeybindingsManager } from "@earendil-works/pi-coding-agent";
 import { Input, ScrollView, VStack, isKeyRelease, matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi, type Component, type Focusable, type TUI, type TuiMouseEvent, type TuiMouseEventResult } from "@earendil-works/pi-tui";
 import { layoutError, type NativeFrame, type NativeLayout } from "../shared/scroll-panel/native-layout.ts";
@@ -35,6 +36,9 @@ export class TaskPanel implements Component, Focusable {
     readonly model = new TaskPanelModel();
     private listScroll: ScrollView;
     private detailScroll: ScrollView;
+    private pending: PendingRegion;
+    private reader?: PendingReader;
+    private pendingVisible = false;
     private unsubscribe: () => void = () => {};
     private timer: NodeJS.Timeout | undefined;
     private readonly history = new ConversationWindow();
@@ -68,6 +72,7 @@ export class TaskPanel implements Component, Focusable {
         this.copy = args.copy ?? copyToClipboard;
         this.listScroll = this.scrollView(width => this.listBody(width));
         this.detailScroll = this.scrollView(width => this.detailBody(width), "end");
+        this.pending = new PendingRegion(() => this.theme, () => this.invalidate());
         this.refresh();
         const off = args.coordinator.subscribe(() => this.update());
         if (this.disposed) { off(); return; }
@@ -84,7 +89,7 @@ export class TaskPanel implements Component, Focusable {
         });
     }
     private get activeScroll(): ScrollView { return this.page === "list" ? this.listScroll : this.detailScroll; }
-    getState() { return { page: this.page, selectedKey: this.model.selected?.key, listScrollTop: this.listScroll.scrollTop, detailScrollTop: this.detailScroll.scrollTop, followingEnd: this.detailScroll.isFollowingEnd, historyPages: this.history.pageCount, historyEntries: this.history.entries.length }; }
+    getState() { return { page: this.page, selectedKey: this.model.selected?.key, listScrollTop: this.listScroll.scrollTop, detailScrollTop: this.detailScroll.scrollTop, followingEnd: this.detailScroll.isFollowingEnd, pendingScrollTop: this.pending.scroll.scrollTop, pendingFocus: this.pending.focused, pendingFollowingEnd: this.pending.scroll.isFollowingEnd, historyPages: this.history.pageCount, historyEntries: this.history.entries.length }; }
     private selectedLine(): number {
         const agents = this.rows.filter(row => row.view.kind === "agent" || row.view.kind === "workflow");
         const processes = this.rows.filter(row => row.view.kind === "shell" || row.view.kind === "monitor");
@@ -123,10 +128,12 @@ export class TaskPanel implements Component, Focusable {
         if (visible && previous !== this.selectedLine()) this.ensureSelected = true;
         const selected = this.model.selected;
         if (selected?.key !== this.detailKey) {
-            this.detailKey = selected?.key; this.detail = undefined; this.composer = undefined;
+            this.detailKey = selected?.key; this.detail = undefined; this.composer = undefined; this.reader = undefined;
+            this.pending = new PendingRegion(() => this.theme, () => this.invalidate());
             this.history.clear(); this.expandedEntryIds.clear(); this.detailRanges = []; this.anchor = undefined; this.detailRevision = -1;
             this.detailScroll = this.scrollView(width => this.detailBody(width), "end");
         }
+        this.pending.accept(selected?.stats.pendingMessages);
         if (selected && (this.detailRevision < 0 || readDetail && this.detailRevision !== this.args.coordinator.revision)) {
             this.readDetail({ direction: "latest" }, this.detailScroll.isFollowingEnd);
         }
@@ -183,7 +190,26 @@ export class TaskPanel implements Component, Focusable {
     handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
         if (this.disposed || event.type !== "wheel" && (event.type !== "click" || event.button !== "left" || event.shift || event.ctrl || event.alt)) return undefined;
         try {
-            const box = this.args.layout.scrollBox(this.ensureInputFrame(), this.activeScroll);
+            const frame = this.ensureInputFrame();
+            if (this.composer) return event.type === "wheel" ? { handled: true } : undefined;
+            if (this.reader) {
+                const readerBox = this.args.layout.scrollBox(frame, this.reader.scroll);
+                return event.type === "wheel" ? consumeWheel(event, readerBox.clip, this.reader.scroll) : undefined;
+            }
+            if (this.page === "detail" && this.pendingVisible) {
+                const pendingBox = this.args.layout.scrollBox(frame, this.pending.scroll);
+                if (contains(pendingBox.clip, event.x, event.y)) {
+                    if (event.type === "wheel") return consumeWheel(event, pendingBox.clip, this.pending.scroll);
+                    if (event.x >= pendingBox.rect.x + pendingBox.children[0].rect.width) return undefined;
+                    const item = this.pending.entries[event.y - pendingBox.rect.y + this.pending.scroll.scrollTop];
+                    const target = this.model.selected;
+                    if (!item || !target) return undefined;
+                    if (item.restorable && target.capabilities.steer) this.openComposer(target, item.text, item.id);
+                    else this.reader = new PendingReader(item, () => this.theme, () => this.invalidate());
+                    this.invalidate(); this.args.tui.requestRender(); return { handled: true };
+                }
+            }
+            const box = this.args.layout.scrollBox(frame, this.activeScroll);
             if (event.type === "wheel") {
                 const result = consumeWheel(event, box.clip, this.activeScroll);
                 if (contains(box.clip, event.x, event.y)) this.historyEdge(event.wheelDelta ?? 0);
@@ -207,11 +233,19 @@ export class TaskPanel implements Component, Focusable {
         try { this.applyInput(data); } catch (cause) { this.refuse(cause); }
     }
     private applyInput(data: string): void {
+        if (this.reader) {
+            if (matchesKey(data, "escape")) this.reader = undefined;
+            else this.reader.input(data);
+            this.invalidate(); this.args.tui.requestRender(); return;
+        }
         if (this.composer) {
             this.composer.input.handleInput(data);
             // A steer can publish synchronously and close the panel.
             if (!this.disposed) { this.invalidate(); this.args.tui.requestRender(); }
             return;
+        }
+        if (matchesKey(data, "tab") && this.page === "detail" && this.pending.entries.length) {
+            this.pending.focused = !this.pending.focused; this.invalidate(); this.args.tui.requestRender(); return;
         }
         if (matchesKey(data, "escape") || this.args.keys.matches(data, "tui.select.cancel")) {
             if (this.page === "detail") { this.page = "list"; this.frame = undefined; this.args.tui.requestRender(); }
@@ -246,6 +280,13 @@ export class TaskPanel implements Component, Focusable {
                 matchesKey(data, "down") || matchesKey(data, "j") || this.args.keys.matches(data, "tui.select.down") ? 1 : 0;
             if (this.page === "detail") {
                 this.ensureInputFrame();
+                if (this.pending.focused) {
+                    if (matchesKey(data, "home")) this.pending.scroll.scrollToStart();
+                    else if (matchesKey(data, "end")) this.pending.scroll.scrollToEnd();
+                    else if (delta) this.pending.scroll.scrollBy(delta);
+                    else return;
+                    this.invalidate(); this.args.tui.requestRender(); return;
+                }
                 if (matchesKey(data, "home")) { this.detailScroll.scrollToStart(); this.historyEdge(-1); }
                 else if (matchesKey(data, "end")) {
                     this.readDetail({ direction: "latest" }, true); this.detailScroll.scrollToEnd();
@@ -275,18 +316,20 @@ export class TaskPanel implements Component, Focusable {
         }
         if (!this.disposed) { this.invalidate(); this.args.tui.requestRender(); }
     }
-    private openComposer(target: NonNullable<TaskPanelModel["selected"]>): void {
+    private openComposer(target: NonNullable<TaskPanelModel["selected"]>, original = "", replaceId?: string): void {
         const input = new Input({ prompt: "› ", placeholder: "Message the agent · Enter send · Esc cancel",
             placeholderStyle: text => this.theme.fg("dim", text) });
+        input.setValue(original);
         input.focused = this.focusedState;
         const close = () => { if (this.composer?.input === input) this.composer = undefined; };
         input.onEscape = close;
         input.onSubmit = value => {
-            close();
-            const message = value.trim();
-            if (!message || this.disposed) return;
+            const message = value;
+            if (!message.trim() || this.disposed) return;
             // Identity is the one the composer was opened for, never a later selection.
-            if (!this.args.coordinator.steer(target, message) && !this.disposed) this.args.ctx.ui.notify("Message not delivered: the agent is no longer running.", "warning");
+            if (!this.args.coordinator.steer(target, message, replaceId)) {
+                if (!this.disposed) this.args.ctx.ui.notify("Message not delivered: the agent changed state or the pending message budget is full (128 originals / 512 KiB).", "warning");
+            } else close();
         };
         this.composer = { input };
     }
@@ -330,12 +373,13 @@ export class TaskPanel implements Component, Focusable {
     private detailTitle(width: number): string[] {
         const entries = this.detail?.conversation;
         const suffix = entries ? `${entries.length} messages${this.history.first?.hasOlder ? " · ↑ earlier" : ""}${this.history.last?.hasNewer ? " · ↓ newer" : ""}${!this.detail?.conversationPage && this.detail?.conversationTruncated ? " (latest)" : ""}` : detailRange(this.detail);
-        return [truncateToWidth(sectionTitle(entries ? "Conversation" : "Output", this.theme, width, suffix).join(" "), width, "…")];
+        const titleTheme: TaskTheme = { ...this.theme, fg: (color, text) => this.theme.fg(color === "accent" && this.pending.focused ? "muted" : color, text) };
+        return [truncateToWidth(sectionTitle(entries ? "Conversation" : "Output", titleTheme, width, suffix).join(" "), width, "…")];
     }
     private hints(width: number): string {
         const row = this.rows.find(row => row.view.key === this.model.selected?.key);
         const tree = row?.group ? this.model.isCollapsed(row.view.key) ? " · → Expand" : " · ← Collapse" : row?.view.parentKey ? " · ← Parent" : "";
-        const navigation = this.page === "detail" ? "Esc Back · ↑↓/jk Scroll" : "Esc Close · Enter Detail · ↑↓/jk Select";
+        const navigation = this.page === "detail" ? `Esc Back · ↑↓/jk Scroll${this.pending.entries.length ? " · Tab Area" : ""}` : "Esc Close · Enter Detail · ↑↓/jk Select";
         return `${navigation}${width >= 70 ? " · Home/End" : ""}${this.page === "list" ? tree : ""}`;
     }
     private footerLines(width: number, rows: number, position: string): string[] {
@@ -404,7 +448,11 @@ export class TaskPanel implements Component, Focusable {
         }
         const status = this.page === "detail" && this.model.selected && rows >= 3 && !(agentDetail && rows === 3)
             ? { render: () => [taskStatusLine(this.model.selected!, width, this.theme, this.args.now?.())], invalidate() {} } : undefined;
-        const fixedBudget = Math.max(0, rows - footerLines.length - header.length - (status ? 1 : 0) - 1);
+        const pendingHeight = this.page === "detail" && this.pending.entries.length && rows >= 6
+            ? Math.min(this.pending.entries.length, rows < 12 ? 1 : 3, Math.max(1, rows - footerLines.length - header.length - (status ? 1 : 0) - 3)) : 0;
+        this.pendingVisible = pendingHeight > 0;
+        const readerHeight = this.reader ? Math.max(1, Math.min(6, rows - header.length - (status ? 1 : 0) - pendingHeight - 3)) : 0;
+        const fixedBudget = Math.max(0, rows - (pendingHeight ? pendingHeight + 1 : 0) - readerHeight - footerLines.length - header.length - (status ? 1 : 0) - 1);
         const metadata = this.page === "detail" && this.model.selected
             ? renderDetailHeader(this.model.selected, this.theme, width, this.args.now?.(), Math.min(8, Math.max(0, fixedBudget - 1))) : [];
         const title = this.page === "detail" && fixedBudget > 0 ? this.detailTitle(width) : [];
@@ -414,7 +462,12 @@ export class TaskPanel implements Component, Focusable {
             { component: { render: () => header.map(line => truncateToWidth(line, width, "…")), invalidate() {} }, basis: header.length, shrink: 0 },
             { component: { render: () => [...metadata, ...title], invalidate() {} }, basis: metadata.length + title.length, shrink: 0 },
             { component: scroll, basis: 0, grow: 1, minSize: 0 },
+            ...(pendingHeight ? [
+                { component: { render: () => [this.pending.title(width)], invalidate() {} }, basis: 1, shrink: 0 },
+                { component: this.pending.scroll, basis: pendingHeight, shrink: 0 },
+            ] : []),
             ...(status ? [{ component: status, basis: 1, shrink: 0 }] : []),
+            ...(this.reader ? [{ component: this.reader.scroll, basis: readerHeight, shrink: 0 }] : []),
             { component: footer, basis: footerLines.length, shrink: 0 },
         ]);
         if (this.page === "list") {
@@ -459,6 +512,6 @@ export class TaskPanel implements Component, Focusable {
     dispose(): void {
         if (this.disposed) return;
         this.disposed = true; clearInterval(this.timer); this.timer = undefined; this.unsubscribe();
-        this.composer = undefined; this.model.dispose(); this.conversation.dispose(); this.history.clear(); this.expandedEntryIds.clear(); this.detailRanges = []; this.anchor = undefined; this.detail = undefined; this.rows = []; this.invalidate();
+        this.composer = undefined; this.reader = undefined; this.pending.accept(); this.model.dispose(); this.conversation.dispose(); this.history.clear(); this.expandedEntryIds.clear(); this.detailRanges = []; this.anchor = undefined; this.detail = undefined; this.rows = []; this.invalidate();
     }
 }

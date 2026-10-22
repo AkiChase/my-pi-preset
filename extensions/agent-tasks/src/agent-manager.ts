@@ -1,3 +1,4 @@
+import { PendingQueue } from "./pending-queue.ts";
 import { resolvedExecutionConfig, sessionExecutionConfig } from "./execution-config.ts";
 import { copyAgentExecutionConfig } from "../../runtime-tasks/execution-config.ts";
 /**
@@ -50,6 +51,8 @@ interface AgentRun extends AgentRunHandle {
   terminalResolved: boolean;
   sessions: Set<AgentSession>;
   pendingStops: number;
+  pending: PendingQueue;
+  steerChain: Promise<void>;
   toolCalls: Map<string, { state: ToolCallState; start?: number }>;
 }
 export interface AgentManagerDependencies {
@@ -393,7 +396,7 @@ export class AgentManager {
     for (const record of this.agents.values()) {
       record.mailbox?.closeAll("shutdown");
       const run = this.runs.get(record.id);
-      if (run) this.freezeToolCalls(record, run);
+      if (run) { this.freezeToolCalls(record, run); run.pending.prepare(record.pendingSteers ?? []); run.pending.freeze("Session shutting down before delivery"); }
     }
     this.parentMessageListeners.clear();
   }
@@ -416,6 +419,13 @@ export class AgentManager {
 
   private current(record: AgentRecord, run: AgentRun): boolean {
     return !this.admissionClosed && this.agents.get(record.id) === record && this.runs.get(record.id) === run;
+  }
+
+  getPendingMessages(id: string) {
+    const record = this.agents.get(id), run = this.runs.get(id);
+    if (!run) return undefined;
+    if (!run.terminalResolved && !record?.session) run.pending.prepare(record?.pendingSteers ?? []);
+    return run.pending.snapshot();
   }
 
   /** One bounded clock owner per run, shared by source sampling and lifecycle freezing. */
@@ -495,6 +505,8 @@ export class AgentManager {
   }
 
   private beginRun(record: AgentRecord, signal?: AbortSignal): AgentRun {
+    this.runs.get(record.id)?.pending.freeze();
+    record.pendingSteers = undefined;
     record.runId = String(Number(record.runId ?? "0") + 1);
     record.resultConsumed = false;
     record.notificationDelivered = false;
@@ -506,7 +518,7 @@ export class AgentManager {
     record.promise = new Promise<string>(done => { resolveText = done; });
     const run: AgentRun = {
       identity: Object.freeze({ sourceId: "agent", taskId: record.id, runId: record.runId }),
-      terminal, resolve, resolveText, charged: false, settled: false, terminalResolved: false, sessions: new Set(), pendingStops: 0, toolCalls: new Map(),
+      terminal, resolve, resolveText, charged: false, settled: false, terminalResolved: false, sessions: new Set(), pendingStops: 0, toolCalls: new Map(), pending: new PendingQueue(() => { if (this.current(record, run)) this.notifyChanged(); }), steerChain: Promise.resolve(),
     };
     this.runs.set(record.id, run);
     record.mailbox?.startRun(record.runId);
@@ -522,6 +534,9 @@ export class AgentManager {
     const run = this.runs.get(record.id);
     if (!run || run.terminalResolved) return;
     this.freezeToolCalls(record, run);
+    run.pending.prepare(record.pendingSteers ?? []);
+    run.pending.freeze(record.status === "stopped" ? "Stopped before delivery" : "Execution ended before delivery");
+    record.pendingSteers = undefined;
     run.terminalResolved = true;
     run.unlinkParent?.(); run.unlinkParent = undefined;
     // A stop resolves the terminal long before actual exit; the channel already
@@ -1038,15 +1053,13 @@ export class AgentManager {
           thinking: record.invocation?.sessionRequestedThinking ?? (options.invocation ? undefined : options.thinkingLevel),
           model: record.invocation?.sessionRequestedModel ?? (!options.invocation && options.model ? `${options.model.provider}/${options.model.id}` : undefined),
         });
-        // Flush any steers that arrived before the session was ready
-        if (record.pendingSteers?.length) {
-          const steers = record.pendingSteers;
-          record.pendingSteers = undefined;
-          for (const msg of steers) {
-            if (!this.current(record, run) || record.abortController?.signal.aborted) break;
-            try { void session.steer(msg).catch(() => {}); } catch { /* isolate steering sink */ }
-          }
-        }
+        // Observe the public SDK before handoff. Preparing entries stay visible while
+        // asynchronous input handlers run; public question/marker order stays unchanged.
+        run.pending.prepare(record.pendingSteers ?? []);
+        run.pending.bind(session);
+        const steers = record.pendingSteers ?? [];
+        record.pendingSteers = undefined;
+        for (const msg of steers) this.deliverSteer(record, run, msg);
         this.notifyChanged();
         if (this.current(record, run) && !record.abortController?.signal.aborted) options.onSessionCreated?.(session);
       },
@@ -1296,7 +1309,7 @@ export class AgentManager {
   /** Synchronous preparation lets the subagent_run tool register its launch lease before awaits. */
   resumeRun(id: string, prompt: string, signal?: AbortSignal, options: ResumeOptions = {}): AgentRecord | undefined {
     const record = this.agents.get(id);
-    if (this.admissionClosed || !record?.session || this.isRunActive(id)) return undefined;
+    if (this.admissionClosed || !record?.session || this.isRunActive(id) || (this.runs.get(id)?.pending.inFlight ?? 0) > 0) return undefined;
     record.isBackground = !!options.isBackground;
     if (record.invocation) {
       const { requestedModel: _model, requestedThinking: _thinking, requestedRunInBackground: _mode,
@@ -1348,6 +1361,8 @@ export class AgentManager {
     const run = this.runs.get(id)!;
     if (!this.current(record, run) || record.abortController?.signal.aborted) return;
     this.ownSession(session, run);
+    // A stopped run must never leave old steering in the retained session.
+    session.clearQueue?.();
     this.acquireSlot(record);
     record.status = "running"; record.starting = false; record.startedAt = Date.now();
     updatePersistentAgent(record.registryLocator!, record.id, { status: "running" });
@@ -1366,6 +1381,13 @@ export class AgentManager {
       this.ownExecution(async () => { await this.closeRunSessions(record, run); this.settleRun(record, run); });
       return;
     }
+    // Existing startup wiring owns its rollback contract. Subscribe only after
+    // it succeeds, but still before any resumed prompt or queue handoff.
+    run.pending.prepare(record.pendingSteers ?? []);
+    run.pending.bind(session);
+    const steers = record.pendingSteers ?? [];
+    record.pendingSteers = undefined;
+    for (const message of steers) this.deliverSteer(record, run, message);
     const finish = async () => {
       try { record.outputCleanup?.(); } catch { /* isolate transcript teardown */ }
       record.outputCleanup = undefined;
@@ -1415,16 +1437,25 @@ export class AgentManager {
    * session is created. Returns false if the agent can't accept steering
    * (unknown id, or no longer running/queued).
    */
-  steer(id: string, message: string): boolean {
-    const record = this.agents.get(id);
-    if (this.admissionClosed || !record) return false;
+  private deliverSteer(record: AgentRecord, run: AgentRun, message: string, item?: ReturnType<PendingQueue["admit"]>): void {
+    run.steerChain = run.steerChain.then(async () => {
+      if (!this.current(record, run) || run.terminalResolved) return;
+      await this.ownExecution(() => run.pending.deliver(message, () => this.current(record, run) && !run.terminalResolved && !record.abortController?.signal.aborted, item));
+    });
+  }
+
+  steer(id: string, message: string, replaceId?: string): boolean {
+    const record = this.agents.get(id), run = this.runs.get(id);
+    if (this.admissionClosed || !record || !run || run.terminalResolved) return false;
     if (record.status !== "running" && record.status !== "queued") return false;
-    if (record.session) {
-      record.session.steer(message).catch(() => {});
-    } else {
-      if (!record.pendingSteers) record.pendingSteers = [];
-      record.pendingSteers.push(message);
+    const item = run.pending.admit(message, replaceId);
+    if (!item) return false;
+    if (record.session && !record.starting) this.deliverSteer(record, run, message, item);
+    else {
+      (record.pendingSteers ??= []).push(message);
+      run.pending.prepare(record.pendingSteers);
     }
+    this.notifyChanged();
     return true;
   }
 
@@ -1598,6 +1629,7 @@ export class AgentManager {
     if (stoppingRun) this.freezeToolCalls(record, stoppingRun);
     record.status = "stopped";
     record.completedAt ??= Date.now();
+    if (stoppingRun) { stoppingRun.pending.prepare(record.pendingSteers ?? []); stoppingRun.pending.freeze("Stopped before delivery"); }
     record.pendingSteers = undefined;
     try { record.outputCleanup?.(); } catch { /* stop output before late events */ }
     record.outputCleanup = undefined;
@@ -1621,6 +1653,7 @@ export class AgentManager {
     record.session = undefined;
     record.mailbox?.closeAll("shutdown");
     this.agents.delete(id);
+    this.runs.get(id)?.pending.freeze();
     this.runs.delete(id);
     this.notifyChanged();
     // A failed startup keeps its (rejected) entry so a late awaitStartup still

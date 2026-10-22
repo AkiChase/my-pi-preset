@@ -160,6 +160,7 @@ export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCo
             outputTokens: record.lifetimeUsage.output, cost: record.lifetimeUsage.cost, toolUses: record.toolUses,
             turnCount: record.turnCount, maxTurns: record.maxTurns, activity: status === "running" || status === "starting" ? record.activity : undefined,
             toolCalls: manager.getToolCalls?.(record.id),
+            pendingMessages: manager.getPendingMessages?.(record.id),
             settling: status !== "running" && status !== "starting" && status !== "queued" && manager.isRunSettling?.(record.id) === true,
             latestMessage: latestMessage(record),
             model: record.executionConfig ? record.executionConfig.model : record.invocation?.modelId ?? record.invocation?.modelName,
@@ -251,11 +252,11 @@ export function createAgentTaskSource(manager: AgentManager, coordinator: TaskCo
       const record = manager.getRecord(identity.taskId);
       return record !== undefined && (!options.filter || options.filter(record)) && manager.stopRun(identity);
     },
-    steer(identity, message) {
+    steer(identity, message, replaceId) {
       if (disposed || identity.sourceId !== "agent" || !message.trim()) return false;
       const record = manager.getRecord(identity.taskId);
       if (!record || record.runId !== identity.runId || !steerable(record) || (options.filter && !options.filter(record))) return false;
-      return manager.steer(record.id, message);
+      return manager.steer(record.id, message, replaceId);
     },
     control(identity, action) {
       if (disposed || identity.sourceId !== "agent") return false;

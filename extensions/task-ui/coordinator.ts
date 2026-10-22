@@ -164,9 +164,9 @@ export class TaskCoordinator {
         return source?.list().some(view => view.key === taskKey(identity) && view.capabilities[capability] === true) ? source : undefined;
     }
 
-    steer(identity: TaskIdentity, message: string): boolean {
+    steer(identity: TaskIdentity, message: string, replaceId?: string): boolean {
         if (!message.trim()) return false;
-        return this.capable(identity, "steer")?.steer?.(identity, message) ?? false;
+        return this.capable(identity, "steer")?.steer?.(identity, message, replaceId) ?? false;
     }
 
     control(identity: TaskIdentity, action: TaskControl): boolean {

@@ -50,6 +50,18 @@ git diff --check
 
 ## 结果记录
 
+### 阶段 2：已实施并独立审查
+
+- 完成固定高度 Pending 独立滚动区、Tab/鼠标区域切换、只读全文查看、Failed 原文恢复和手动重发，以及准备前/SDK 队列 handoff。
+- 重启中断原代理，原 transcript 无法恢复；新执行者接续实际未提交代码和日志，不重做。原 stage2/natural-final.log 无最终汇总，NOT_PASS。
+- 恢复第一轮自然检查暴露 2 个 resume rollback 回归及 minimal subscribe fixture 挂起，取消该失败运行保留日志，修复 observation 安装顺序/optional subscribe 后复跑；该取消还造成 worktree case cancellation，不抹去。第一次 full check 1636/1637 因旧标签断言失败，改为实际 view.title；并行标签工作随后由其他会话提交 `9cb4505`，本任务保留且不纳入其提交范围。
+- reviewer 修复 omission 丢失、reentrant unsubscribe ownership、bounded duplicate identity/FIFO、原文 whitespace 被 trim、Failed reader 错误标题。
+- reviewer 复现外部 queue 增长被误认成异步 UI 原文，消费后 Failed 记录丢失（correlation-before exit1）。采用公共队列真实文本，等待期间 Submitting 原文独立保留，只有 steer Promise 明确 queued 才移除原文/替换旧失败项；handled 中性提示，拒绝 Failed，不猜 transformed 归属。回归复现修复后 exit0；短暂 Submitting 与真实 Pending 并存如实区分，不隐藏外部入队事件。
+- 最终现有 SDK 解析到 1.4.0（非本任务安装）；隔离配置自然 task-ui/agent-tasks/process-tasks/runtime-tasks 868/868 exit0，最后 stale guard 顺序调整后 affected focused6/6 exit0、pnpm typecheck exit0、git diff --check exit0。
+- `pnpm check` 本轮 exit1：1641 中1627通过/14失败，为 at-path-completion/beautify/widget-display fixture 调用 SDK resetExtensionUI 时 interactive-mode.js:1899 读取 undefined.length。未在范围外修复，final full suite 未重跑，不引用较早 full PASS 作为当前最终结果。
+- 日志 `/tmp/subagent-detail-parity.9eqCCh/stage2-recovery`、`review2`；真实终端/IME/在线 provider NOT_RUN。
+- 本阶段提交待记录。阶段3共享组件复用与完整参数展示正进行只读评估，未实施。
+
 ### 阶段 1：已实施并独立审查
 
 - 完成调用 ID/状态/计时跨层传播、128 项 run-scoped 有界工具快照、并行同名调用与 stop/resume/迟到事件隔离；未知历史时长不推算。
@@ -59,5 +71,6 @@ git diff --check
 - 隔离环境：临时 PI_CODING_AGENT_DIR、现有已安装 SDK，无安装或个人配置读写。实施聚焦自然退出 180/180、Agent 全套自然退出 296/296、pnpm typecheck 均 exit 0；实施 pnpm check 1633/1633 exit 0。
 - reviewer 最终 `node --test` task-ui/agent-tasks/process-tasks/runtime-tasks 自然退出 861/861 exit 0；`pnpm check`（含 strict typecheck）1635/1635 exit 0；`git diff --check` exit 0。主会话复核实际 diff、SDK 测试和结果日志，补齐本阶段用户文档。
 - 日志暂存于本次拥有的 `/tmp/subagent-detail-parity.9eqCCh/stage1` 与 `review1`；真实终端外观与在线 provider NOT_RUN，组件/调色板测量不冒充视觉验收。
-- 本阶段提交待记录。阶段 2/3 尚未实施。
+- 阶段 2 开始前确认内部预算：仅 UI 原文保留/恢复 admission 128 项、合计 512KiB UTF-8，上限前可见拒绝，不改变公开消息工具 delivery；外部队列有界投影如实标注省略，不伪称原文完整。SDK input handler 的 handled 结果不是失败，采用 muted 的 Handled by input extension · not queued，真实异步拒绝才为 Failed，不自动重试。初次 stage2 探索因这两项解释暂停，未改产品或跑测试；主会话澄清后继续。
+- 本阶段提交：`1363940 feat(task-ui): show subagent tool timing and terminal surfaces`。阶段 2 开始；阶段 3 尚未实施。
 

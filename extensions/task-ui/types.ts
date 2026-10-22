@@ -22,6 +22,12 @@ export interface ToolCallState {
     readonly durationMs?: number;
 }
 
+export interface PendingMessage {
+    readonly id: string; readonly text: string; readonly state: "pending" | "submitting" | "failed" | "handled" | "notDelivered";
+    readonly error?: string; readonly truncated?: boolean; readonly restorable?: boolean;
+}
+export interface PendingMessages { readonly entries: readonly PendingMessage[]; readonly omitted: number }
+
 export interface TaskView extends TaskIdentity {
     readonly key: string;
     readonly parentKey?: string;
@@ -43,6 +49,7 @@ export interface TaskView extends TaskIdentity {
         /** One-line preview of the latest message the running task sent to its parent. */
         latestMessage?: string;
         toolCalls?: readonly ToolCallState[];
+        pendingMessages?: PendingMessages;
         /** Terminal metadata can precede actual runner/cleanup exit. */
         settling?: boolean;
         model?: string; thinking?: string;
@@ -140,7 +147,7 @@ export interface TaskSource {
     detail(identity: TaskIdentity, request?: TaskDetailRequest): TaskDetail | undefined;
     stop(identity: TaskIdentity): boolean;
     /** Deliver a user message to a running task; false when no longer accepted. */
-    steer?(identity: TaskIdentity, message: string): boolean;
+    steer?(identity: TaskIdentity, message: string, replaceId?: string): boolean;
     control?(identity: TaskIdentity, action: TaskControl): boolean;
     subscribe(listener: () => void): () => void;
     dispose(): void;
