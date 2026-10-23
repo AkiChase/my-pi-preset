@@ -34,13 +34,15 @@
 
 ## 验收标准
 
-- [ ] 交互代码位于 `extensions/shared/interaction/`，不配置或发布为独立依赖。
-- [ ] 使用方可以运行 TUI 浮层，并取得 `completed`、`cancelled`、`stale`、`unsupported` 或 `error` 类型结果。
-- [ ] `onHandle` 前的关闭请求不会提前调用 `done()`。
-- [ ] 所有权或会话失效时，中止受控工作，阻止过期界面更新与副作用。
-- [ ] Memory 和 Task UI 保持现有全屏浮层行为，包括安装前关闭与同步重入安全性。
-- [ ] Widget Display 和 scroll-panel 的既有契约保持不变。
-- [ ] 迁移行为有对应回归测试，相关既有检查通过。
+- [x] 交互代码位于 `extensions/shared/interaction/`，不配置或发布为独立依赖。
+- [x] 使用方可以运行 TUI 浮层，并取得 `completed`、`cancelled`、`stale`、`unsupported` 或 `error` 类型结果。
+- [x] `onHandle` 前的关闭请求不会提前调用 `done()`。
+- [x] 所有权或会话失效时，中止受控工作，阻止过期界面更新与副作用。
+- [x] Memory 和 Task UI 保持现有全屏浮层行为，包括安装前关闭与同步重入安全性。
+- [x] Widget Display 和 scroll-panel 的既有契约保持不变。
+- [x] 迁移行为有对应回归测试，相关既有检查通过。
+
+用户已确认本期工作无问题并授权收尾。验收依据为实施记录中的自动化与安装 SDK 边界测试；未声称已完成额外真实终端、IME 或第三方组合验证。
 
 ## 已确定的设计决策
 
