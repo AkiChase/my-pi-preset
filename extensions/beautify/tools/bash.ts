@@ -1,14 +1,9 @@
 import { isLaunchMetadata, launchText } from "../../runtime-tasks/launch.ts";
 import { text } from "../types.ts";
-import { clean, wrap } from "../layout.ts";
 import type { RenderContext } from "../types.ts";
 import { fallback, genericMetadata, renderers } from "./shared.ts";
 export function createBashRenderers(elapsed?: (ctx: RenderContext) => string | undefined) {
-return renderers("bash", (result, theme, ctx, width) => [
-  ...(typeof ctx.args.description === "string" && ctx.args.description.trim()
-    ? wrap(`Command: ${clean(String(ctx.args.command ?? ""))}`, width).map(row => theme.fg("muted", row)) : []),
-  ...fallback(result, theme, ctx, width),
-], (result, ctx) => {
+return renderers("bash", fallback, (result, ctx) => {
   const handling = elapsed?.(ctx);
   const attachTime = <T extends { stats: string; secondary?: string }>(meta: T): T => {
     if (handling) meta.stats = [meta.stats, handling].filter(Boolean).join(" · ");
