@@ -1,3 +1,4 @@
+import { createDialogOwner } from "../../shared/interaction/dialog.ts";
 import { createWidgetClient } from "../../shared/widget-display/client.ts";
 import { performance } from "node:perf_hooks";
 import { getAgentDir, type ExtensionAPI, type ExtensionCommandContext, type ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -41,7 +42,7 @@ export default function registerRecap(pi: ExtensionAPI, dependencies: RecapDepen
     let windowToken = 0;
     let timer: unknown;
     let request: AbortController | undefined;
-    let dialog: AbortController | undefined;
+    const configuration = createDialogOwner();
     let commandVersion = 0;
     let manualPending: number | undefined;
     let manualWait: AbortController | undefined;
@@ -67,7 +68,7 @@ export default function registerRecap(pi: ExtensionAPI, dependencies: RecapDepen
     function closeDialog(): void {
         commandVersion++; manualPending = undefined;
         const waiting = manualWait; manualWait = undefined; waiting?.abort();
-        const old = dialog; dialog = undefined; old?.abort();
+        configuration.cancel();
     }
     async function waitForIdle(ctx: ExtensionCommandContext, controller: AbortController): Promise<boolean> {
         if (controller.signal.aborted) return false;
@@ -261,18 +262,22 @@ export default function registerRecap(pi: ExtensionAPI, dependencies: RecapDepen
         closeDialog();
         const token = commandVersion;
         const version = epoch;
-        const controller = new AbortController(); dialog = controller;
-        const admitted = () => owns(ctx) && commandVersion === token && epoch === version && dialog === controller && !controller.signal.aborted;
         clearTimer();
-        try {
+        await configuration.run(ctx, {
+            isCurrent: () => owns(ctx) && commandVersion === token && epoch === version,
+            onSettled(result) {
+                if (owns(ctx)) schedule(ctx);
+                // Notification can synchronously start a new configuration; do no old-flow work after it.
+                if (result.kind === "error") notify(ctx, `Could not save Recap configuration: ${failureDetail(result.error)}; file unchanged.`, "error");
+            },
+        }, async flow => {
             let fresh: ConfigState;
             try { fresh = loadConfig(directory()); } catch (error) { notify(ctx, `Cannot edit recap.json: ${failureDetail(error)}; file unchanged.`, "error"); return; }
             let issues = [...fresh.issues];
             if (!issues.length) try { resolveModel(fresh, ctx.modelRegistry); } catch (error) { issues = [failureDetail(error)]; }
             const c = fresh.config;
-            const choice = await ctx.ui.select(display(`Recap (model ${display(c.model ?? "missing")}, thinking ${display(c.thinking ?? "missing")}, automatic ${display(c.automatic)}, idle ${display(c.idleMinutes)}m, budget ${display(c.maxContextChars)})${issues.length ? ` — ${issues.map(issue => display(issue)).join("; ")}` : ""}`, 800),
-                ["Set model", "Set thinking", "Toggle automatic", "Set idle minutes", "Set context budget"], { signal: controller.signal });
-            if (!choice || !admitted()) return;
+            const choice = await flow.select(display(`Recap (model ${display(c.model ?? "missing")}, thinking ${display(c.thinking ?? "missing")}, automatic ${display(c.automatic)}, idle ${display(c.idleMinutes)}m, budget ${display(c.maxContextChars)})${issues.length ? ` — ${issues.map(issue => display(issue)).join("; ")}` : ""}`, 800),
+                ["Set model", "Set thinking", "Toggle automatic", "Set idle minutes", "Set context budget"]);
             if (!["Set model", "Set thinking", "Toggle automatic", "Set idle minutes", "Set context budget"].includes(choice)) throw new Error("Unknown Recap configuration choice");
             const patch: Partial<RecapConfig> = {};
             if (choice === "Toggle automatic") patch.automatic = !c.automatic;
@@ -285,8 +290,7 @@ export default function registerRecap(pi: ExtensionAPI, dependencies: RecapDepen
                     if (!models.length) { notify(ctx, "No authenticated text models available for Recap; configure a provider first. File unchanged.", "warning"); return; }
                     // Numbered, bounded labels remain unique even when long identifiers are truncated.
                     const labels = models.map((model, index) => `${index + 1}. ${display(`${model.provider}/${model.id}`, 760)}`);
-                    const raw = await ctx.ui.select("Recap model (authenticated text models)", labels, { signal: controller.signal });
-                    if (raw === undefined || !admitted()) return;
+                    const raw = await flow.select("Recap model (authenticated text models)", labels);
                     const index = labels.indexOf(raw);
                     if (index < 0) throw new Error("Unknown Recap model selection");
                     selected = models[index];
@@ -295,8 +299,7 @@ export default function registerRecap(pi: ExtensionAPI, dependencies: RecapDepen
                 if (!selected) { notify(ctx, "Select an available Recap model with Set model before choosing thinking. File unchanged.", "warning"); return; }
                 const levels = getSupportedThinkingLevels(selected);
                 if (choice === "Set thinking" || c.thinking === undefined || !levels.includes(c.thinking)) {
-                    const raw = await ctx.ui.select(display(`Recap thinking for ${selected.provider}/${selected.id}`, 800), levels, { signal: controller.signal });
-                    if (raw === undefined || !admitted()) return;
+                    const raw = await flow.select(display(`Recap thinking for ${selected.provider}/${selected.id}`, 800), levels);
                     const level = levels.find(level => level === raw);
                     if (level === undefined) throw new Error("Unsupported Recap thinking selection");
                     patch.thinking = level;
@@ -306,17 +309,15 @@ export default function registerRecap(pi: ExtensionAPI, dependencies: RecapDepen
                 if (!resolved.model.input.includes("text")) throw new Error("Recap model no longer supports text input");
             } else {
                 const key = choice === "Set idle minutes" ? "idleMinutes" : "maxContextChars";
-                const raw = await ctx.ui.input(key === "idleMinutes" ? "Idle minutes (0.01–1440)" : "Context characters (256–1000000)", display(c[key]), { signal: controller.signal });
-                if (raw === undefined || !admitted()) return;
+                const raw = await flow.input(key === "idleMinutes" ? "Idle minutes (0.01–1440)" : "Context characters (256–1000000)", display(c[key]));
                 if (!raw.trim()) throw new Error(`${key} cannot be empty`);
                 patch[key] = Number(raw);
             }
-            if (!admitted()) return;
-            config = saveConfig(patch, directory(), admitted);
-            if (!admitted()) return;
+            flow.checkpoint();
+            config = saveConfig(patch, directory(), flow.isCurrent);
+            flow.checkpoint();
             notify(ctx, "Recap configuration saved; active requests keep their captured parameters.", "info");
-        } catch (error) { if (admitted()) notify(ctx, `Could not save Recap configuration: ${failureDetail(error)}; file unchanged.`, "error"); }
-        finally { if (dialog === controller) { dialog = undefined; if (owns(ctx)) schedule(ctx); } }
+        });
     }
 
     pi.on("session_start", (_event, ctx) => restore(ctx));

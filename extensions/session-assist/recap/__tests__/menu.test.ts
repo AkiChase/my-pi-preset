@@ -4,6 +4,80 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { deferred, flush, harness } from "./harness.ts";
 
+it("cancel releases pending selection/input before host settlement and observes late failures", async t => {
+    for (const step of ["select", "input"]) {
+        const h = harness(t); await h.start();
+        const path = join(h.directory, "recap.json"), before = readFileSync(path, "utf8");
+        const gate = deferred<string | undefined>();
+        if (step === "select") h.selections.push(gate.promise);
+        else { h.selections.push("Set idle minutes"); h.inputs.push(gate.promise); }
+        let completed = false; const command = h.command("config").then(() => { completed = true; });
+        await flush(); await h.emit("session_before_switch"); await flush();
+        assert.equal(completed, true);
+        assert.equal((step === "select" ? h.menus.at(-1) : h.inputDialogs.at(-1))!.signal?.aborted, true);
+        gate.reject(new Error("late dialog failure")); await command; await flush();
+        assert.equal(readFileSync(path, "utf8"), before); assert.deepEqual(h.notices, []);
+    }
+});
+it("retired configuration cannot restore the timer while a replacement menu remains open", async t => {
+    const h = harness(t); await h.start(); await h.user(); await h.settled();
+    const oldGate = deferred<string | undefined>(), newGate = deferred<string | undefined>();
+    h.selections.push(oldGate.promise, newGate.promise);
+    const old = h.command("config"); await flush();
+    const current = h.command("config"); await old; await flush();
+    assert.equal(h.menus[0].signal?.aborted, true); assert.equal(h.menus[1].signal?.aborted, false);
+    assert.equal(h.clock.timers.size, 0);
+    oldGate.resolve("Toggle automatic"); await flush(); assert.equal(h.clock.timers.size, 0);
+    newGate.resolve(undefined); await current; assert.equal(h.clock.timers.size, 1);
+});
+it("current dialog failure reports once and restores scheduling", async t => {
+    const h = harness(t); await h.start(); await h.user(); await h.settled();
+    const gate = deferred<string | undefined>(); h.selections.push(gate.promise);
+    const command = h.command("config"); await flush(); gate.reject(new Error("host unavailable")); await command;
+    assert.match(h.notices.at(-1)!, /Could not save Recap configuration: host unavailable/);
+    assert.equal(h.notices.length, 1); assert.equal(h.clock.timers.size, 1);
+});
+
+it("error notification reentry cannot restore scheduling for a replacement configuration", async t => {
+    const h = harness(t); await h.start(); await h.user(); await h.settled();
+    const oldGate = deferred<string | undefined>(), newGate = deferred<string | undefined>();
+    h.selections.push(oldGate.promise, newGate.promise);
+    let replacement: Promise<void> | undefined;
+    h.setOnNotify(() => { h.setOnNotify(undefined); replacement = h.command("config"); });
+    const old = h.command("config"); await flush(); oldGate.reject(new Error("host unavailable")); await old; await flush();
+    assert.equal(h.menus.length, 2); assert.equal(h.menus[1].signal?.aborted, false);
+    assert.equal(h.notices.length, 1); assert.equal(h.clock.timers.size, 0);
+    newGate.resolve(undefined); await replacement; assert.equal(h.clock.timers.size, 1);
+});
+
+it("save notification reentry leaves replacement ownership and persisted patch intact", async t => {
+    const h = harness(t); await h.start(); await h.user(); await h.settled();
+    const gate = deferred<string | undefined>(); h.selections.push("Set idle minutes", gate.promise); h.inputs.push("10");
+    let replacement: Promise<void> | undefined;
+    h.setOnNotify(() => { h.setOnNotify(undefined); replacement = h.command("config"); });
+    await h.command("config"); await flush();
+    assert.equal(JSON.parse(readFileSync(join(h.directory, "recap.json"), "utf8")).idleMinutes, 10);
+    assert.equal(h.menus[1].signal?.aborted, false); assert.equal(h.clock.timers.size, 0); assert.equal(h.notices.length, 1);
+    gate.resolve(undefined); await replacement; assert.equal(h.clock.timers.size, 1);
+});
+it("host resolution followed synchronously by cancellation cannot admit save or another dialog", async t => {
+    for (const choice of ["Toggle automatic", "Set idle minutes"]) {
+        const h = harness(t); await h.start(); const path = join(h.directory, "recap.json"), before = readFileSync(path, "utf8");
+        const gate = deferred<string | undefined>(); h.selections.push(gate.promise);
+        const command = h.command("config"); await flush();
+        gate.resolve(choice); await h.emit("session_before_fork"); await command;
+        assert.equal(readFileSync(path, "utf8"), before); assert.equal(h.inputDialogs.length, 0); assert.deepEqual(h.notices, []);
+    }
+});
+it("error notification shutdown reentry cannot leave a timer or reopen configuration", async t => {
+    const h = harness(t); await h.start(); await h.user(); await h.settled();
+    const gate = deferred<string | undefined>(); h.selections.push(gate.promise);
+    h.setOnNotify(() => { h.setOnNotify(undefined); void h.emit("session_shutdown"); });
+    const command = h.command("config"); await flush(); gate.reject(new Error("host unavailable")); await command;
+    assert.equal(h.clock.timers.size, 0); assert.equal(h.notices.length, 1);
+    await h.command("config"); assert.equal(h.menus.length, 1);
+});
+
 it("model menu lists authenticated text models; compatible thinking is preserved without input", async t => {
     const h = harness(t); await h.start();
     h.models.push({ ...h.model, provider: "other", id: "model", reasoning: false }, { ...h.model, id: "image-only", input: ["image"] });

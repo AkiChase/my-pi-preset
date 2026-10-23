@@ -39,13 +39,14 @@ export function harness(t: TestContext, options: { initial?: boolean; config?: R
     const clock = new FakeClock();
     const notices: string[] = [];
     const widgets: (unknown | undefined)[] = [];
-    const menus: { title: string; options: string[] }[] = [];
+    const menus: { title: string; options: string[]; signal?: AbortSignal }[] = [];
+    const inputDialogs: { signal?: AbortSignal }[] = [];
     const selections: (string | undefined | Promise<string | undefined>)[] = [];
     const inputs: (string | undefined | Promise<string | undefined>)[] = [];
     const requests: { context: { systemPrompt?: string; messages: UserMessage[] }; options: { reasoning?: string; signal?: AbortSignal; timeoutMs?: number }; resolve: (value: AssistantMessage) => void; reject: (error: Error) => void }[] = [];
     let idle = true; let pending = false; let auth = true; let available = true;
     let wait = Promise.resolve();
-    let onAppend: (() => void) | undefined; let onWidget: (() => void) | undefined;
+    let onAppend: (() => void) | undefined; let onWidget: (() => void) | undefined; let onNotify: (() => void) | undefined;
     const model: Model<"openai-responses"> = { provider: "fixture", id: "model", api: "openai-responses", name: "Fixture", baseUrl: "http://offline.invalid", reasoning: true,
         input: ["text"], contextWindow: 100000, maxTokens: 8192, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, thinkingLevelMap: { minimal: null, max: null, xhigh: null } };
     const bus = new EventEmitter();
@@ -66,19 +67,20 @@ export function harness(t: TestContext, options: { initial?: boolean; config?: R
     } as unknown as ExtensionContext["modelRegistry"];
     const ctx = { sessionManager: manager, model, modelRegistry: registry, mode: options.mode ?? "tui", hasUI: options.hasUI ?? true,
         isIdle: () => idle, hasPendingMessages: () => pending, waitForIdle: () => wait,
-        ui: { notify(text: string) { notices.push(text); }, setWidget(_key: string, content: unknown) { widgets.push(content); if (typeof content === "function") content({ requestRender() {} } as unknown as TUI, { fg: (_color: string, text: string) => text } as Theme); onWidget?.(); },
-            select: async (title: string, options: string[]) => { menus.push({ title, options }); return await selections.shift(); }, input: async () => await inputs.shift() },
+        ui: { notify(text: string) { notices.push(text); onNotify?.(); }, setWidget(_key: string, content: unknown) { widgets.push(content); if (typeof content === "function") content({ requestRender() {} } as unknown as TUI, { fg: (_color: string, text: string) => text } as Theme); onWidget?.(); },
+            select: async (title: string, options: string[], opts?: { signal?: AbortSignal }) => { menus.push({ title, options, signal: opts?.signal }); return await selections.shift(); }, input: async (_title: string, _hint?: string, opts?: { signal?: AbortSignal }) => { inputDialogs.push({ signal: opts?.signal }); return await inputs.shift(); } },
     } as unknown as ExtensionCommandContext;
     registerWidgetDisplay(pi);
     register(pi, { clock, directory: () => directory });
     const emit = async (name: string, event: Record<string, unknown> = {}) => { for (const handler of [...(handlers.get(name) ?? [])]) await handler({ type: name, ...event } as ExtensionEvent, ctx); };
     t.after(async () => { await emit("session_shutdown"); await flush(); rmSync(directory, { recursive: true, force: true }); });
-    return { directory, manager, clock, requests, notices, widgets, selections, inputs, menus, models, ctx, emit, model,
+    return { directory, manager, clock, requests, notices, widgets, selections, inputs, inputDialogs, menus, models, ctx, emit, model,
         start: () => emit("session_start"), command: (args = "") => commands.get("recap")!.handler(args, ctx),
         async user(text = "修复目标") { await emit("input", { text, source: "interactive" }); manager.appendMessage({ role: "user", content: text, timestamp: 1 }); },
         async run() { idle = false; await emit("before_agent_start"); await emit("agent_start"); },
         async settled(aborted = false) { idle = true; await emit("agent_settled", { aborted }); },
         setIdle(value: boolean) { idle = value; }, setPending(value: boolean) { pending = value; }, setAuth(value: boolean) { auth = value; }, setAvailable(value: boolean) { available = value; },
         setWait(value: Promise<void>) { wait = value; }, setOnAppend(value: (() => void) | undefined) { onAppend = value; }, setOnWidget(value: (() => void) | undefined) { onWidget = value; },
+        setOnNotify(value: (() => void) | undefined) { onNotify = value; },
     };
 }
