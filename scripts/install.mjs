@@ -194,14 +194,16 @@ export function renderFrame(state, { columns = 80, rows = 24, color = false, uni
 
 // Each sync child owns a process group on POSIX: cancellation covers pi and its
 // descendants, not just the Node sync wrapper (which uses spawnSync internally).
-export function runSync(script, args, { preview = false, onStart, maxBytes = 1024 * 1024, timeoutMs = 12 * 60 * 1000, env = process.env, command, cwd } = {}) {
+export function runSync(script, args, { preview = false, onStart, onOutput, input, maxBytes = 1024 * 1024, timeoutMs = 12 * 60 * 1000, env = process.env, command, cwd } = {}) {
   const grouped = process.platform !== "win32";
   const child = spawn(command ?? process.execPath, command ? args : [script, ...args, ...(preview ? ["--dry-run"] : [])], {
-    env, cwd, detached: grouped, stdio: preview ? ["ignore", "pipe", "pipe"] : "inherit",
+    env, cwd, detached: grouped, stdio: [preview ? "ignore" : input ? "pipe" : "inherit", "pipe", "pipe"],
   });
+  const forwardedInput = !preview && input && child.stdin ? input.pipe(child.stdin) : undefined;
   let reason;
   let bytes = 0;
   const chunks = [];
+  const forward = onOutput ?? (preview ? undefined : (chunk, stream) => (stream === "stderr" ? process.stderr : process.stdout).write(chunk));
   let killTimer;
   let deadline;
   const signal = (name) => {
@@ -216,21 +218,23 @@ export function runSync(script, args, { preview = false, onStart, maxBytes = 102
   };
   const done = new Promise((resolveDone) => {
     child.on("error", (error) => { reason ??= error.message; });
-    if (preview) {
-      const collect = (chunk) => {
+    const collect = (stream) => (chunk) => {
+      forward?.(chunk, stream);
+      if (preview) {
         bytes += chunk.length;
         if (bytes > maxBytes) { cancel("Preview exceeds the 1 MiB display limit. Narrow the sync selection."); return; }
         chunks.push(chunk);
-      };
-      child.stdout.on("data", collect);
-      child.stderr.on("data", collect);
-      deadline = setTimeout(() => cancel("Preview timed out."), timeoutMs);
-    }
+      }
+    };
+    child.stdout.on("data", collect("stdout"));
+    child.stderr.on("data", collect("stderr"));
+    if (preview) deadline = setTimeout(() => cancel("Preview timed out."), timeoutMs);
     child.on("close", (code, exitSignal) => {
       clearTimeout(deadline);
       // Still kill a non-cooperative descendant if the group leader exited first.
       if (reason && grouped) signal("SIGKILL");
       clearTimeout(killTimer);
+      if (forwardedInput && child.stdin) input.unpipe(child.stdin);
       resolveDone({ code: code ?? 1, signal: exitSignal, error: reason, output: cleanText(Buffer.concat(chunks).toString("utf8")) });
     });
   });
@@ -300,7 +304,7 @@ export async function runInstaller({ manifest, script, input = process.stdin, ou
     if (applying && state.dev && state.selected.has("packages")) {
       output.write(`Installing local dependencies in ${state.checkout}: pnpm install\n`);
       const dependencies = await runSync(undefined, ["install"], {
-        command: "pnpm", cwd: state.checkout, onStart: (job) => { active = job; },
+        command: "pnpm", cwd: state.checkout, input, onStart: (job) => { active = job; },
       });
       active = undefined;
       if (quitting) { resolveFinished(130); return; }
@@ -310,13 +314,18 @@ export async function runInstaller({ manifest, script, input = process.stdin, ou
         return;
       }
     }
-    const result = await runSync(script, args, { preview: !applying, onStart: (job) => { active = job; } });
+    const result = await runSync(script, args, {
+      preview: !applying,
+      onStart: (job) => { active = job; },
+      ...(applying ? { input, onOutput: (chunk) => output.write(chunk) } : {}),
+    });
     active = undefined;
     busy = false;
     if (quitting) { resolveFinished(130); return; }
     if (applying) {
-      if (result.error || result.code !== 0) output.write(`\nInstallation failed: ${result.error ?? `sync exited with ${result.code}${result.signal ? ` (${result.signal})` : ""}`}.\n`);
-      else output.write("\nSetup complete. Run /reload in Pi, or restart it.\n");
+      if (result.error || result.code !== 0) {
+        output.write(`\nInstallation failed: ${result.error ?? `sync exited with ${result.code}${result.signal ? ` (${result.signal})` : ""}`}.\n`);
+      } else output.write("\nSetup complete. Run /reload in Pi, or restart it.\n");
       resolveFinished(result.error ? 1 : result.code);
       return;
     }

@@ -80,6 +80,14 @@ test("real child argv, preview failure, cancellation, limits and natural exit", 
   const result = await runSync(script, ["--sync", "settings"], { preview: true });
   assert.equal(result.code, 0); assert.deepEqual(JSON.parse(result.output), ["--sync", "settings", "--dry-run"]);
   assert.equal((await runSync(script, ["fail"], { preview: true })).code, 2);
+  const applied = [];
+  writeFileSync(script, 'process.stdout.write("apply output"); process.stderr.write(" apply error");');
+  const appliedResult = await runSync(script, [], { onOutput: (chunk, stream) => applied.push([stream, chunk.toString()]) });
+  assert.equal(appliedResult.code, 0);
+  assert.deepEqual(new Set(applied.map(([stream, text]) => `${stream}:${text}`)), new Set(["stdout:apply output", "stderr: apply error"]));
+  writeFileSync(script, 'console.error("before signal"); setTimeout(() => process.kill(process.pid, "SIGTERM"), 10);');
+  const signalled = await runSync(script, [], { onOutput() {} });
+  assert.equal(signalled.signal, "SIGTERM");
   writeFileSync(script, 'process.stdout.write("x".repeat(10000)); setInterval(() => {}, 1000);');
   const limited = await runSync(script, [], { preview: true, maxBytes: 100 });
   assert.match(limited.error, /display limit/);
