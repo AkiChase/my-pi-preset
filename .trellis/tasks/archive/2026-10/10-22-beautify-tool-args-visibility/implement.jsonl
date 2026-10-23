@@ -1,0 +1,5 @@
+{"file":".trellis/spec/development/index.md","reason":"Rendering contracts: no file I/O in renderers, injected themes, width-safe output, sanitize external controls before styling"}
+{"file":".trellis/spec/development/widget-display.md","reason":"Shared widget/block composition rules: preserve component wrapping and width-safe output, no global truncation of block rows"}
+{"file":".trellis/spec/testing/index.md","reason":"Beautify focused checks, actual SDK loader/resolver/ToolExecutionComponent, width and expansion assertions, isolation and NOT_RUN reporting"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse existing argumentsText/textPreview formatting instead of a second parameter formatter"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Renderer reads host context only; no backend access, result consumption or execution side effects"}

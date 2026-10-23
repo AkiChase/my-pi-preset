@@ -1,0 +1,5 @@
+{"file":".trellis/spec/development/index.md","reason":"Rendering ownership, width safety and control sanitization for the beautify tool card layer"}
+{"file":".trellis/spec/development/widget-display.md","reason":"Block composition and width-safe output constraints shared by preset widgets"}
+{"file":".trellis/spec/testing/index.md","reason":"Beautify focused suite entry, actual host component assertions, narrow/wide widths, folded/expanded states and reporting gates"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Verify reuse of existing argument formatting and preview helpers rather than duplicated logic"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Confirm renderer stays presentation-only with no backend or execution side effects"}
