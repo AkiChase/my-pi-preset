@@ -78,6 +78,16 @@ git diff --check
 
 新增英文 `development/dialog-scopes.md` 与索引链接，记录已验证共享契约、重入风险和取消/保存边界；无用户文档或 SDK 变更。真实终端/IME、第三方组合与在线 provider 质量 NOT_RUN。未执行安装/push/历史重写/归档。
 
+### 用户授权的 tmux 真实 CLI 验收
+
+用户随后明确要求开 tmux 验收。使用已有 tmux 3.6a、Pi 1.4.0，唯一 server `pi-dialog-TQ0laU`，owned run `/tmp/pi-dialog-tmux-TQ0laU`；env -i、临时 HOME/agent/cwd、offline/no-session、关闭自动扩展/技能/提示/上下文/MCP/主题发现，显式加载仓库 recap.ts/session-name.ts。fullscreen、dark，120×36 动态改为 80×30，无模型或网络请求。
+
+PASS：Session Name interval=3 写入、第二步 Esc 不写入；Recap idleMinutes=2 写入、非法数值提示且不覆盖、菜单 Esc；取消后另一命令可打开（编辑器焦点恢复）；80 列菜单/输入可操作；/new 实际显示 New session started，随后重新进入配置保留全局 N=3。正常 Ctrl+D 退出，launch exit-code=0，stderr 空；初始 pane shell PID 65973 已不存在，唯一 tmux server 随最后 pane 退出，不再运行。
+
+驱动失败与修复：初次/第二次 command 后等待超时，capture 显示命令仍留编辑器；补充观测命令与第二次 Enter 后实际打开，不认作产品失败。第三次 Esc 后未等待输入对话移除，后续文字落入旧 input；补充基于对话 footer 消失的条件等待后 PASS。/new 等待文字写错为 Started a new session，实屏为 New session started，修正后 PASS。原始失败、pane text、driver 与报告仅留 owned run；没有改产品代码或弱化字段保存断言。
+
+本次为真实 CLI 的键盘/配置验收，不是图像截图。未验证 pending 对话时外部会话切换、同 owner 并发替换、regular/light/40 列、物理 IME/鼠标、第三方组合或在线模型质量；这些不得从 /new 成功推断。自动化生命周期回归仍是相应边界的证据。
+
 ## 环境、记录与边界
 
 所有测试仅使用已有安装 SDK；执行前创建仓库外 owned run 目录，PI_CODING_AGENT_DIR 指向其中隔离目录，PI_SDK_DIR 从现有链接解析并检查成功，不读取个人配置。原始日志、驱动和重复中间输出只存 owned run 目录。最终记录命令、退出码、失败及修复重跑关系、测试数量和未运行项于本文件；诊断未完成时保留所需材料。没有实际执行就不记 PASS。
