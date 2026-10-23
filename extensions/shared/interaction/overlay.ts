@@ -1,12 +1,8 @@
 import type { ExtensionContext, ExtensionUIContext, Theme, KeybindingsManager } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
 
-export type InteractionResult<T> =
-    | { kind: "completed"; value: T }
-    | { kind: "cancelled" }
-    | { kind: "stale" }
-    | { kind: "unsupported"; mode: ExtensionContext["mode"] }
-    | { kind: "error"; error: unknown };
+import type { InteractionResult } from "./result.ts";
+export type { InteractionResult } from "./result.ts";
 
 export interface OverlayInteraction<T> {
     readonly signal: AbortSignal;
