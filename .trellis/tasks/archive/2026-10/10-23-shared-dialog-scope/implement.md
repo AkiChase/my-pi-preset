@@ -88,6 +88,12 @@ PASS：Session Name interval=3 写入、第二步 Esc 不写入；Recap idleMinu
 
 本次为真实 CLI 的键盘/配置验收，不是图像截图。未验证 pending 对话时外部会话切换、同 owner 并发替换、regular/light/40 列、物理 IME/鼠标、第三方组合或在线模型质量；这些不得从 /new 成功推断。自动化生命周期回归仍是相应边界的证据。
 
+## 用户验收与收尾
+
+用户在真实 tmux 验收后明确要求“收尾吧”，确认接受当前实现并授权归档、清除绑定、日志记录及其配置的本地提交。任务直接在 main 实施、未创建 PR，因此归档使用官方 `--skip-branch-validation` 处理 branch/base_branch 同名，不虚构独立分支或重写历史。任务仅保留 PRD、设计、实施证据、角色 manifest 和 task.json；无需长期原始日志或额外 evidence 报告。
+
+主会话已核实测试结果、失败修复关系和 tmux 正常退出，确认无使用这两次 owned run 路径的活动进程；收尾清理 `/tmp/pi-dialog-nOVJuE` 与 `/tmp/pi-dialog-tmux-TQ0laU`。长期结果均已在本文件自包含记录，不依赖被清理的临时链接。
+
 ## 环境、记录与边界
 
 所有测试仅使用已有安装 SDK；执行前创建仓库外 owned run 目录，PI_CODING_AGENT_DIR 指向其中隔离目录，PI_SDK_DIR 从现有链接解析并检查成功，不读取个人配置。原始日志、驱动和重复中间输出只存 owned run 目录。最终记录命令、退出码、失败及修复重跑关系、测试数量和未运行项于本文件；诊断未完成时保留所需材料。没有实际执行就不记 PASS。
