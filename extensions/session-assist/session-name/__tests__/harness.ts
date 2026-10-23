@@ -23,8 +23,10 @@ export function harness(t: TestContext, options: { existing?: string; synchronou
     const commands = new Map<string, RegisteredCommand>();
     const notices: string[] = [];
     const requests: { text: string; systemPrompt: string; signal: AbortSignal | undefined; resolve: (value: AssistantMessage) => void; reject: (value: Error) => void }[] = [];
-    let selection: string | undefined;
-    let input: string | undefined;
+    let selection: string | undefined | Promise<string | undefined>;
+    let input: string | undefined | Promise<string | undefined>;
+    const menus: { signal?: AbortSignal }[] = [];
+    const inputDialogs: { signal?: AbortSignal }[] = [];
     const emit = async (name: string, event: unknown = {}) => {
         for (const handler of handlers.get(name) ?? []) await handler(event, ctx);
     };
@@ -54,12 +56,12 @@ export function harness(t: TestContext, options: { existing?: string; synchronou
             return { result: () => promise };
         } },
         hasUI: true, mode: "tui", isIdle: () => true,
-        ui: { notify(text: string) { notices.push(text); }, select: async () => selection, input: async () => input },
+        ui: { notify(text: string) { notices.push(text); }, select: async (_title: string, _items: string[], opts?: { signal?: AbortSignal }) => { menus.push({ signal: opts?.signal }); return selection; }, input: async (_title: string, _hint?: string, opts?: { signal?: AbortSignal }) => { inputDialogs.push({ signal: opts?.signal }); return input; } },
         waitForIdle: async () => {},
     } as unknown as ExtensionCommandContext;
     register(pi);
     t.after(async () => { await emit("session_shutdown"); await flush(); });
-    return { manager, requests, notices, emit, ctx, pi, directory,
+    return { manager, requests, notices, menus, inputDialogs, emit, ctx, pi, directory,
         start: () => emit("session_start"),
         async user(text: string, source = "interactive", deliver = true) {
             await emit("input", { text, source });
@@ -67,7 +69,7 @@ export function harness(t: TestContext, options: { existing?: string; synchronou
         },
         settled: (aborted = false) => emit("agent_settled", { aborted }),
         command: (args = "") => commands.get("session-name")!.handler(args, ctx),
-        choose(value: string | undefined, raw?: string) { selection = value; input = raw; },
+        choose(value: string | undefined | Promise<string | undefined>, raw?: string | Promise<string | undefined>) { selection = value; input = raw; },
         async externalName(name: string) { manager.appendSessionInfo(name); await emit("session_info_changed", { name }); },
         /** Count delivered genuine inputs, each followed by a normal settled boundary. */
         async inputs(total: number, prefix = "input") { for (let n = 0; n < total; n++) { await this.user(`${prefix} ${n}`); await this.settled(); } },

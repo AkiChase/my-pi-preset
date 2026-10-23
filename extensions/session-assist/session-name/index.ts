@@ -1,3 +1,4 @@
+import { createDialogOwner } from "../../shared/interaction/dialog.ts";
 import type { ExtensionAPI, ExtensionContext, SessionEntry } from "@earendil-works/pi-coding-agent";
 import { branchIdentity } from "../shared/context.ts";
 import { failureDetail } from "../shared/errors.ts";
@@ -73,6 +74,8 @@ function restoreOwnership(entries: SessionEntry[]): Ownership | undefined {
 }
 
 export default function registerSessionName(pi: ExtensionAPI): void {
+    const configuration = createDialogOwner();
+    let configurationManager: ExtensionContext["sessionManager"] | undefined;
     let active = false;
     let config: NameConfig = { ...DEFAULTS };
     let configWarning = false;
@@ -107,6 +110,8 @@ export default function registerSessionName(pi: ExtensionAPI): void {
         return Math.max(1 + config.interval, (quota.anchor ?? quota.count) + 1) - quota.count;
     }
     function restore(ctx: ExtensionContext): void {
+        configuration.cancel();
+        configurationManager = ctx.sessionManager;
         cancel();
         manualGeneration++;
         manualPending = undefined;
@@ -222,9 +227,10 @@ export default function registerSessionName(pi: ExtensionAPI): void {
 
     pi.on("session_start", (_event, ctx) => restore(ctx));
     pi.on("session_tree", (_event, ctx) => restore(ctx));
-    pi.on("session_before_tree", () => { cancel(); manualGeneration++; manualPending = undefined; candidates = []; });
-    pi.on("session_before_switch", () => { cancel(); manualGeneration++; manualPending = undefined; candidates = []; });
-    pi.on("session_shutdown", () => { cancel(); manualGeneration++; manualPending = undefined; active = false; sessionId = undefined; candidates = []; });
+    pi.on("session_before_tree", () => { configuration.cancel(); cancel(); manualGeneration++; manualPending = undefined; candidates = []; });
+    pi.on("session_before_fork", () => configuration.cancel());
+    pi.on("session_before_switch", () => { configuration.cancel(); cancel(); manualGeneration++; manualPending = undefined; candidates = []; });
+    pi.on("session_shutdown", () => { configuration.cancel(); configurationManager = undefined; cancel(); manualGeneration++; manualPending = undefined; active = false; sessionId = undefined; candidates = []; });
     pi.on("session_info_changed", (_event, ctx) => {
         // Deferral only resolves synchronous host reentry; ownership is always checked by entry identity.
         if (writingTitle) queueMicrotask(() => { if (active) checkOwnership(ctx); });
@@ -259,25 +265,34 @@ export default function registerSessionName(pi: ExtensionAPI): void {
             if (!active) restore(ctx);
             if (args.trim() === "config") {
                 if (!ctx.hasUI) { notify(ctx, "Session-name configuration requires an interactive UI.", "warning"); return; }
-                const choice = await ctx.ui.select(`Session naming (automatic ${config.automatic ? "on" : "off"}, N=${config.interval}, ${remaining()} in this session)`,
-                    ["Enable automatic naming", "Disable automatic naming", "Set interval"]);
-                if (!choice || !active) return;
-                let next = { ...config };
-                if (choice === "Set interval") {
-                    const raw = await ctx.ui.input("User inputs before the second automatic naming (1–10000)", String(config.interval));
-                    if (raw === undefined || !active) return;
-                    const interval = Number(raw);
-                    if (!raw.trim() || !Number.isSafeInteger(interval) || interval < 1 || interval > 10_000) {
-                        notify(ctx, "Interval must be an integer between 1 and 10000.", "error"); return;
-                    }
-                    next.interval = interval;
-                } else next.automatic = choice === "Enable automatic naming";
-                try {
-                    saveConfig(next); config = next;
+                const originId = ctx.sessionManager.getSessionId();
+                await configuration.run(ctx, {
+                    isCurrent: () => active && configurationManager === ctx.sessionManager && sessionId === originId && ctx.sessionManager.getSessionId() === originId,
+                    onSettled(result) {
+                        if (result.kind === "error") notify(ctx, "Could not save session-name configuration; nothing changed.", "error");
+                    },
+                }, async flow => {
+                    const choice = await flow.select(`Session naming (automatic ${config.automatic ? "on" : "off"}, N=${config.interval}, ${remaining()} in this session)`,
+                        ["Enable automatic naming", "Disable automatic naming", "Set interval"]);
+                    const patch: Partial<NameConfig> = {};
+                    if (choice === "Set interval") {
+                        const raw = await flow.input("User inputs before the second automatic naming (1–10000)", String(config.interval));
+                        const interval = Number(raw);
+                        if (!raw.trim() || !Number.isSafeInteger(interval) || interval < 1 || interval > 10_000) {
+                            notify(ctx, "Interval must be an integer between 1 and 10000.", "error"); return;
+                        }
+                        patch.interval = interval;
+                    } else if (choice === "Enable automatic naming" || choice === "Disable automatic naming") {
+                        patch.automatic = choice === "Enable automatic naming";
+                    } else throw new Error("Unknown session-name configuration choice");
+                    flow.checkpoint();
+                    config = saveConfig(patch, undefined, flow.isCurrent);
+                    flow.checkpoint();
                     // Configuration never grants or returns chances; only disabling stops an automatic request.
                     if (!config.automatic) cancel();
+                    flow.checkpoint();
                     notify(ctx, "Session-name configuration saved.", "info");
-                } catch { notify(ctx, "Could not save session-name configuration; nothing changed.", "error"); }
+                });
                 return;
             }
             if (args.trim()) { notify(ctx, "Usage: /session-name [config]", "warning"); return; }

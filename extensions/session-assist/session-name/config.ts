@@ -31,16 +31,23 @@ export function loadConfig(directory = getAgentDir()): NameConfig {
 }
 
 /** Synchronous reread/rename preserves unrelated fields and refuses malformed configuration. */
-export function saveConfig(config: NameConfig, directory = getAgentDir()): void {
-    parseConfig({ ...config });
+export function saveConfig(patch: Partial<NameConfig>, directory = getAgentDir(), admitted: () => boolean = () => true): NameConfig {
+    if (!admitted()) throw new Error("Configuration operation cancelled");
+    if (Object.keys(patch).some(key => !["automatic", "interval"].includes(key))) throw new Error("Unknown session-name configuration field");
     mkdirSync(directory, { recursive: true });
     const path = join(directory, CONFIG_FILENAME);
     const fresh = readObject(path);
+    // Refuse invalid stored known fields even when the patch would overwrite them.
+    parseConfig(fresh);
+    const config = parseConfig({ ...fresh, ...patch });
     const temporary = `${path}.${randomUUID()}.tmp`;
     try {
-        writeFileSync(temporary, `${JSON.stringify({ ...fresh, ...config }, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+        if (!admitted()) throw new Error("Configuration operation cancelled");
+        writeFileSync(temporary, `${JSON.stringify({ ...fresh, ...patch }, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+        if (!admitted()) throw new Error("Configuration operation cancelled");
         renameSync(temporary, path);
     } finally {
         rmSync(temporary, { force: true });
     }
+    return config;
 }

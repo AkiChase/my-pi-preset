@@ -71,6 +71,8 @@ Cancel owned execution and verify actual exit. Bound shutdown waits and report n
 
 Built-in persistent editor-region and Footer content must follow [Shared Widget and Footer Display](widget-display.md): declare central region/group/item membership and publish through its client. Only the shared owner calls host `setWidget` or `setFooter`; group-local composition controls block/inline layout, separators and overflow. Keep business calculations with consumers; other UI surfaces and unintegrated third-party widgets retain their existing owners.
 
+For owned multi-step native dialogs, follow [Owned Dialog Scopes](dialog-scopes.md): share the complete flow, preserve consumer cancellation policy and save admission, and keep current-only settlement safe under synchronous reentry.
+
 Prefer public `ctx.ui` dialogs and host components; terminal-only screens require TUI mode, not merely dialog-capable RPC. Bind each custom instance to one interaction and finish through its completion callback; do not nest replacement dialogs or manually hide SDK-owned interactions.
 
 Preserve the live editor receiver, history, undo, paste, cursor and focus. Do not recreate it by copying text or reading private editing state. Preflight capabilities, roll back partial installation and restore only still-owned properties. Later wrappers remain usable; retired delegates must not retain session resources. Respect application keybindings, delegate unowned keys, use local component input handling, and propagate focus/cursor markers for IME.
