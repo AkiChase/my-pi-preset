@@ -69,3 +69,36 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 61: 共享对话作用域与真实终端验收
+<!-- trellis-session: v=2 fp=5f704cceeb484d74 -->
+
+**Date**: 2026-10-23
+**Task**: 共享对话作用域与真实终端验收
+**Branch**: `main`
+
+### Summary
+
+完成内部 dialog owner/scope，迁移 Recap 与 Session Name 配置；保留业务取消、调度、配额与标题所有权，增加新鲜单字段配置保存。三阶段独立审查，相关自然退出 144/144、pnpm check 1724/1724；真实隔离 tmux 验证保存、取消、错误、焦点、120→80 缩放与新会话重入，正常退出。用户确认验收后归档，清理两次 owned 临时目录。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d799d5a` | feat(interaction): add owned dialog scopes |
+| `126a0d0` | refactor(recap): use shared dialog scopes |
+| `cf02ed7` | refactor(session-name): use shared dialog scopes |
+
+### Testing
+
+- [OK] 自然退出 144/144；pnpm check 类型与1724/1724通过
+- [OK] Pi 1.4.0/tmux 3.6a隔离离线真实CLI验收通过；未测物理IME/鼠标、第三方组合、在线模型质量
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 无待实施项；后续范围另行 Request Triage
