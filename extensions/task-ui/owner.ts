@@ -1,3 +1,4 @@
+import { runOverlay } from "../shared/interaction/overlay.ts";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { TaskCoordinator } from "./coordinator.ts";
 import type { TaskLifecycle } from "./lifecycle.ts";
@@ -86,6 +87,8 @@ export function createTaskUIOwner(pi: ExtensionAPI, coordinator: TaskCoordinator
         if (!active()) return;
         epoch++; clearTimeout(timer); timer = undefined; overview.clear();
         ctx = fresh;
+        // Invalidate installed and installing panels before publishing the new session.
+        interaction?.close();
         lastStatus = undefined; statusKnown = false;
         // Capture subscription ownership before calling external setters.
         if (!offSource) offSource = coordinator.subscribe(update);
@@ -101,42 +104,35 @@ export function createTaskUIOwner(pi: ExtensionAPI, coordinator: TaskCoordinator
         },
         async openPanel(origin: ExtensionContext): Promise<void> {
             if (!active() || interaction) return;
-            if (origin.mode !== "tui" || !origin.ui.custom) {
+            if (origin.mode !== "tui" || !origin.hasUI || typeof origin.ui.custom !== "function") {
                 origin.ui.notify("Task Panel requires interactive TUI mode; use process_manage or agent_manage for details.", "info"); return;
             }
-            let installed = false, closeRequested = false, completed = false;
-            let done: (() => void) | undefined;
-            const finish = () => {
-                if (!installed || !done || completed) return;
-                completed = true;
-                current.panel?.dispose();
-                done();
-            };
-            const current: Interaction = { close() { closeRequested = true; finish(); } };
+            const controller = new AbortController();
+            let completed = false;
+            const current: Interaction = { close() { controller.abort(); } };
             interaction = current; // Publish BEFORE layout/custom can reenter shutdown.
-            const live = () => active() && interaction === current && !closeRequested && !completed;
+            const stamp = epoch;
+            const live = () => active() && interaction === current && stamp === epoch && !controller.signal.aborted && !completed;
             try {
                 let layout: NativeLayout;
                 try { layout = await (options.loadLayout ?? loadNativeLayout)(); }
                 catch (cause) { if (live()) origin.ui.notify(layoutError(cause, "Task Panel").message, "error"); return; }
                 if (!live()) return;
-                await origin.ui.custom<void>((tui, _theme, keys, complete) => {
-                    done = () => complete();
-                    const panel = new TaskPanel({ coordinator, config, layout, ctx: origin, tui, theme: () => origin.ui.theme, keys, done: current.close });
-                    current.panel = panel;
-                    if (!live()) { panel.dispose(); current.close(); }
-                    return panel;
-                }, { overlay: true, overlayOptions: { anchor: "top-left", width: "100%", maxHeight: "100%", margin: 0 }, onHandle: () => {
-                    // Wait for our handle: setup cancellation must not close an
-                    // unrelated overlay on hosts with pre-install completion semantics.
-                    installed = true;
-                    if (!live()) closeRequested = true;
-                    if (closeRequested) finish();
-                } });
+                const result = await runOverlay<void>(origin, {
+                    signal: controller.signal,
+                    isCurrent: live,
+                    overlayOptions: { anchor: "top-left", width: "100%", maxHeight: "100%", margin: 0 },
+                    create(tui, _theme, keys, runtime) {
+                        const panel = new TaskPanel({ coordinator, config, layout, ctx: origin, tui, theme: () => origin.ui.theme, keys, done: runtime.cancel });
+                        current.panel = panel;
+                        return panel;
+                    },
+                });
+                if (result.kind === "error" && live()) throw result.error;
             } finally {
                 completed = true;
-                current.panel?.dispose();
-                if (interaction === current) interaction = undefined;
+                try { current.panel?.dispose(); }
+                finally { if (interaction === current) interaction = undefined; }
             }
         },
         dispose() { dispose(); offStart?.(); offClose(); },

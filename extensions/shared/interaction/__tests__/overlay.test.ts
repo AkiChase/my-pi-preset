@@ -82,6 +82,20 @@ it("mode preflight and factory failures do not install UI or notify", async () =
     h.owner.abort(); assert.deepEqual(await h.start(), { kind: "stale" });
 });
 
+it("ownership predicate exceptions return typed errors before and during installation", async () => {
+    const error = new Error("ownership failed"), h = harness();
+    assert.deepEqual(await runOverlay(h.ctx, { isCurrent() { throw error; }, create() { throw new Error("must not create"); } }), { kind: "error", error });
+    let throws = false;
+    const pending = runOverlay(h.ctx, {
+        isCurrent() { if (throws) throw error; return true; },
+        create() { return { render: () => [], invalidate() {} }; },
+    });
+    throws = true;
+    assert.doesNotThrow(() => h.install());
+    assert.deepEqual(await pending, { kind: "error", error });
+    assert.equal(h.doneCount(), 1);
+});
+
 function synchronousHost(config: { doneError?: Error; afterInstallError?: Error } = {}) {
     let doneCount = 0;
     const ctx = { mode: "tui", hasUI: true, ui: {

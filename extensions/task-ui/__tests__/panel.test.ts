@@ -146,7 +146,7 @@ void it("footer counts only independent real work, including foreground-only and
     assert.equal(taskSummary([view("done", { status: "completed" })]), undefined);
 });
 
-function uiFixture(f: ReturnType<typeof sourceFixture>, reenter: "status" | "custom" | "factory" | undefined = undefined) {
+function uiFixture(f: ReturnType<typeof sourceFixture>, reenter: "status" | "custom" | "factory" | undefined = undefined, loadLayout: () => Promise<typeof layout> = async () => layout) {
     const lifecycle = new TaskLifecycle(f.coordinator), handlers = new Map<string, Set<(event: unknown, ctx: ExtensionContext) => unknown>>();
     let opens = 0, panel: TaskPanel | undefined, completes = 0;
     const statuses: (string | undefined)[] = [];
@@ -163,7 +163,7 @@ function uiFixture(f: ReturnType<typeof sourceFixture>, reenter: "status" | "cus
         },
     } } as unknown as ExtensionContext;
     const pi = { events: createEventBus(), on(event: string, handler: (event: unknown, ctx: ExtensionContext) => unknown) { const set = handlers.get(event) ?? new Set(); set.add(handler); handlers.set(event, set); return () => { set.delete(handler); }; } } as unknown as ExtensionAPI;
-    const owner = createTaskUIOwner(pi, f.coordinator, lifecycle, DEFAULTS, { loadLayout: async () => layout });
+    const owner = createTaskUIOwner(pi, f.coordinator, lifecycle, DEFAULTS, { loadLayout });
     return { lifecycle, owner, ctx, statuses, start() { for (const handler of [...handlers.get("session_start") ?? []]) handler({}, ctx); }, opens: () => opens, panel: () => panel, handlers: () => [...handlers.values()].reduce((n, set) => n + set.size, 0), completes: () => completes };
 }
 void it("one shared owner/explicit controls/overlay, lifecycle closes before wait disposal and unsubscribes", async () => {
@@ -253,13 +253,13 @@ void it("owner fences pending native load and never calls done until its own onH
     const f = sourceFixture([view("row")]), lifecycle = new TaskLifecycle(f.coordinator);
     let resolveLayout!: (native: typeof layout) => void, opens = 0;
     const pi = { on() { return () => {}; } } as unknown as ExtensionAPI;
-    const ctx = { mode: "tui", ui: { custom() { opens++; }, notify() {} } } as unknown as ExtensionContext;
+    const ctx = { mode: "tui", hasUI: true, ui: { custom() { opens++; }, notify() {} } } as unknown as ExtensionContext;
     const pending = createTaskUIOwner(pi, f.coordinator, lifecycle, DEFAULTS, { loadLayout: () => new Promise(resolve => { resolveLayout = resolve; }) });
     const opening = pending.openPanel(ctx); await lifecycle.shutdown(); resolveLayout(layout); await opening; assert.equal(opens, 0); pending.dispose();
 
     const next = sourceFixture([view("row")]), life = new TaskLifecycle(next.coordinator);
     let onHandle!: () => void, doneCount = 0, panel!: TaskPanel;
-    const delayedCtx = { mode: "tui", ui: { theme: { fg: (_: string, text: string) => text }, notify() {},
+    const delayedCtx = { mode: "tui", hasUI: true, ui: { theme: { fg: (_: string, text: string) => text }, notify() {},
         custom(factory: Parameters<ExtensionContext["ui"]["custom"]>[0], options: Parameters<ExtensionContext["ui"]["custom"]>[1]) {
             return new Promise<void>(resolve => {
                 panel = factory({ terminal: { rows: 10, columns: 60 }, requestRender() {} } as never, {} as never, { matches: () => false } as never, () => { doneCount++; resolve(); }) as TaskPanel;
@@ -272,6 +272,75 @@ void it("owner fences pending native load and never calls done until its own onH
     const installed = owner.openPanel(delayedCtx); await Promise.resolve();
     await life.shutdown(); assert.equal(doneCount, 0, "a different topmost interaction cannot be popped during setup"); assert.deepEqual(panel.render(60), []);
     onHandle(); onHandle(); await installed; assert.equal(doneCount, 1); owner.dispose();
+});
+
+void it("owner session epochs close installed panels and fence pending layout without changing status", async () => {
+    const f = sourceFixture([view("row")]), h = uiFixture(f);
+    try {
+        h.start();
+        const opening = h.owner.openPanel(h.ctx); await Promise.resolve();
+        const oldPanel = h.panel()!;
+        assert.ok(oldPanel.render(80).length > 0);
+        const statuses = [...h.statuses];
+        h.start(); await opening;
+        assert.deepEqual(oldPanel.render(80), []);
+        oldPanel.handleInput("x"); assert.equal(f.stops.length, 0);
+        assert.equal(h.completes(), 1);
+        assert.deepEqual(h.statuses, [...statuses, statuses.at(-1)]);
+        assert.equal(h.owner.canOpen(), true);
+        const reopened = h.owner.openPanel(h.ctx); await Promise.resolve();
+        h.panel()!.close(); await reopened; assert.equal(h.opens(), 2);
+    } finally { h.owner.dispose(); await h.lifecycle.shutdown(); }
+
+    let release!: (native: typeof layout) => void;
+    const next = sourceFixture([view("row")]), pending = uiFixture(next, undefined, () => new Promise(resolve => { release = resolve; }));
+    try {
+        pending.start();
+        const opening = pending.owner.openPanel(pending.ctx);
+        pending.start(); release(layout); await opening;
+        assert.equal(pending.opens(), 0); assert.equal(pending.owner.canOpen(), true);
+    } finally { pending.owner.dispose(); await pending.lifecycle.shutdown(); }
+});
+
+void it("owner missing UI capability refuses before native loading and preserves command admission", async () => {
+    const f = sourceFixture([view("row")]); let loads = 0;
+    const h = uiFixture(f, undefined, async () => { loads++; return layout; });
+    const notices: string[] = [];
+    h.ctx.hasUI = false;
+    h.ctx.ui.notify = message => { notices.push(message); };
+    try {
+        await h.owner.openPanel(h.ctx);
+        assert.equal(loads, 0); assert.equal(h.opens(), 0);
+        assert.match(notices[0]!, /requires interactive TUI mode/);
+        assert.equal(h.owner.canOpen(), true);
+    } finally { h.owner.dispose(); await h.lifecycle.shutdown(); }
+});
+
+void it("owner propagates current host failures and releases admission after custom or done throws", async () => {
+    for (const phase of ["custom", "done"] as const) {
+        const f = sourceFixture([view("row")]), h = uiFixture(f), error = new Error(`${phase} failed`);
+        const original = h.ctx.ui.custom;
+        let panel!: TaskPanel, doneCount = 0;
+        h.ctx.ui.custom = ((factory, options) => {
+            if (phase === "custom") throw error;
+            return new Promise(() => {
+                panel = factory({ terminal: { rows: 10, columns: 60 }, requestRender() {} } as never, {} as never, { matches: () => false } as never,
+                    () => { doneCount++; throw error; }) as TaskPanel;
+                options?.onHandle?.({} as never);
+            });
+        }) as ExtensionContext["ui"]["custom"];
+        try {
+            const opening = h.owner.openPanel(h.ctx);
+            const rejected = assert.rejects(opening, cause => cause === error);
+            await Promise.resolve();
+            if (phase === "done") { panel.close(); assert.deepEqual(panel.render(80), []); }
+            await rejected;
+            assert.equal(doneCount, phase === "done" ? 1 : 0);
+            assert.equal(h.owner.canOpen(), true);
+            h.ctx.ui.custom = original;
+            const reopened = h.owner.openPanel(h.ctx); await Promise.resolve(); h.panel()!.close(); await reopened;
+        } finally { h.owner.dispose(); await h.lifecycle.shutdown(); }
+    }
 });
 
 void it("Agents precede Processes with one tree selection; detail return preserves collapse and source reparent reconciles", () => {
@@ -293,7 +362,7 @@ void it("native incompatibility refuses open/frame without manual fallback and r
     const f = sourceFixture([view("row")]), lifecycle = new TaskLifecycle(f.coordinator);
     const notices: string[] = []; let opens = 0;
     const pi = { on() { return () => {}; } } as unknown as ExtensionAPI;
-    const ctx = { mode: "tui", ui: { notify(message: string) { notices.push(message); }, custom() { opens++; } } } as unknown as ExtensionContext;
+    const ctx = { mode: "tui", hasUI: true, ui: { notify(message: string) { notices.push(message); }, custom() { opens++; } } } as unknown as ExtensionContext;
     const owner = createTaskUIOwner(pi, f.coordinator, lifecycle, DEFAULTS, { loadLayout: async () => { throw new Error("incompatible"); } });
     await owner.openPanel(ctx); assert.equal(opens, 0); assert.match(notices[0], /Task Panel unavailable/); assert.equal(owner.canOpen(), true);
     let done = 0;
