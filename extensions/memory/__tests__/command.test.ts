@@ -193,6 +193,58 @@ it("shutdown before installation waits for onHandle; done is idempotent and late
   }
 });
 
+it("queued detail and refresh reads are fenced immediately by user close or host disposal", async t => {
+  for (const action of ["detail", "refresh"] as const) {
+    for (const close of ["user", "host"] as const) {
+      const h = harness(t); await h.store.write(input());
+      const read = t.mock.method(h.store, "read");
+      const scan = t.mock.method(h.store, "scan");
+      h.scripts.push(panel => {
+        const scans = scan.mock.callCount();
+        panel.handleInput(action === "detail" ? keys.enter : "r");
+        if (close === "user") panel.handleInput(keys.escape); else panel.dispose();
+        // No queued task has run yet; neither may read after the interaction ends.
+        assert.equal(scan.mock.callCount(), scans);
+      });
+      await h.run(); await flush();
+      assert.equal(read.mock.callCount(), 0, `${action}/${close}: late detail read`);
+      assert.equal(scan.mock.callCount(), 1, `${action}/${close}: late metadata scan`);
+      assert.equal(h.overlay, false); assert.deepEqual(h.violations, []); assert.deepEqual(h.notifications, []);
+    }
+  }
+});
+
+it("layout completion after cwd or activation invalidation cannot install or notify", async t => {
+  for (const stale of ["cwd", "activation"] as const) {
+    let release!: (layout: NativeLayout) => void;
+    const h = harness(t, { loadLayout: () => new Promise(resolve => { release = resolve; }) });
+    const pending = h.run();
+    if (stale === "cwd") h.ctx.cwd = join(h.root, "elsewhere"); else h.retire();
+    release(fakeLayout()); await pending;
+    assert.equal(h.panels, 0); assert.deepEqual(h.notifications, []);
+  }
+});
+
+it("host failures notify once, release admission, and suppress stale failures", async t => {
+  for (const stale of ["none", "cwd", "activation"] as const) {
+    const h = harness(t);
+    const original = h.ctx.ui.custom;
+    h.ctx.ui.custom = (() => {
+      if (stale === "cwd") h.ctx.cwd = join(h.root, "elsewhere");
+      if (stale === "activation") h.retire();
+      throw new Error("RAW_HOST_SECRET");
+    }) as Custom;
+    await h.run();
+    assert.equal(h.notifications.length, stale === "none" ? 1 : 0);
+    assert.doesNotMatch(h.notifications.join("\n"), /RAW_HOST_SECRET/);
+    if (stale === "none") {
+      h.ctx.ui.custom = original;
+      await h.run(); // A failed open must not leave command admission occupied.
+      assert.equal(h.panels, 1); assert.deepEqual(h.violations, []);
+    }
+  }
+});
+
 it("busy command rejects concurrent admission; an old completion cannot clear a newer interaction", async t => {
   const h = harness(t); await h.store.write(input());
   h.scripts.push(() => {});

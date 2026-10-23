@@ -1,3 +1,4 @@
+import { runOverlay } from "../shared/interaction/overlay.ts";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { layoutError, loadNativeLayout } from "../shared/scroll-panel/native-layout.ts";
 import type { NativeLayout } from "../shared/scroll-panel/native-layout.ts";
@@ -61,25 +62,18 @@ export function registerMemoryCommand(pi: ExtensionAPI, getOrigin: (cwd: string)
         const owner = origin;
         const snapshot = loadSnapshot(owner, check);
         let panel: MemoryPanel | undefined;
-        let finish: (() => void) | undefined;
-        let installed = false;
-        let closeRequested = false;
         let ended = false;
         let detailSeq = 0;
         let refreshSeq = 0;
-        const finalize = () => {
-          if (ended || !installed || !finish) return;
-          ended = true; panel?.dispose();
-          finish();
-        };
-        // Pi's done hides the topmost overlay even before installation. Wait for
-        // public onHandle so setup cancellation cannot pop another interaction.
-        const closeInteraction = () => { closeRequested = true; finalize(); };
-        const live = () => { if (ended || closeRequested) return false; try { check(); return true; } catch { return false; } };
+        const controller = new AbortController();
+        const closeInteraction = () => controller.abort();
+        const current = () => { try { check(); return true; } catch { return false; } };
+        let interactionSignal: AbortSignal | undefined;
+        const live = () => !ended && !controller.signal.aborted && !interactionSignal?.aborted && current();
         // Reads run after the input callback returns: render/handleInput never perform I/O.
         const later = (task: () => void) => { void Promise.resolve().then(() => { if (live()) task(); }).catch(() => {}); };
         const onAction = (action: PanelAction) => {
-          if (action.kind === "close") { closeInteraction(); return; }
+          if (action.kind === "close") { cancelPanel?.(); return; }
           if (!live()) return;
           if (action.kind === "back") { detailSeq++; return; }
           if (action.kind === "detail") {
@@ -95,18 +89,21 @@ export function registerMemoryCommand(pi: ExtensionAPI, getOrigin: (cwd: string)
             if (seq === refreshSeq && live()) panel?.update(next, result, "Reloaded from disk (read-only).");
           });
         };
-        await ctx.ui.custom<void>((tui, theme, _keys, done) => {
-          finish = () => done();
-          panel = new MemoryPanel({ snapshot, theme, tui, layout, onAction, unavailable: error => { if (live()) { try { ctx.ui.notify(error.message, "error"); } catch { /* host may be closing */ } } } });
-          if (operation === token) closePanel = closeInteraction;
-          try { check(); } catch { closeInteraction(); }
-          return panel;
-        }, { overlay: true, overlayOptions: { width: "100%", maxHeight: "100%", anchor: "top-left", margin: 0 }, onHandle: () => {
-          installed = true;
-          try { check(); } catch { closeRequested = true; }
-          if (closeRequested) finalize();
-        } });
+        let cancelPanel: (() => void) | undefined;
+        if (operation === token) closePanel = closeInteraction;
+        const result = await runOverlay<void>(ctx, {
+          signal: controller.signal,
+          isCurrent: current,
+          overlayOptions: { width: "100%", maxHeight: "100%", anchor: "top-left", margin: 0 },
+          create(tui, theme, _keys, interaction) {
+            interactionSignal = interaction.signal;
+            cancelPanel = interaction.cancel;
+            panel = new MemoryPanel({ snapshot, theme, tui, layout, onAction, unavailable: error => { if (live()) { try { ctx.ui.notify(error.message, "error"); } catch { /* host may be closing */ } } } });
+            return panel;
+          },
+        });
         ended = true;
+        if (result.kind === "error") throw result.error;
         if (operation === token) closePanel = undefined;
       } catch (error) {
         if (operation === token) {
