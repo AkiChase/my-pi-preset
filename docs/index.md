@@ -1,14 +1,20 @@
-# 插件使用文档
+# 使用文档
 
-本目录覆盖当前预设的全部插件，说明功能、用法、命令、快捷键、配置和使用限制。安装、更新及清单同步见 [README](../README.md)。详细说明只维护在对应页面，不在 README 重复。
+本目录包含预设同步说明及全部插件的用法、命令、配置和限制。安装与更新见 [README](../README.md)。详细说明只维护在对应页面，不在 README 重复。
+
+## 预设
+
+- [同步范围与受管理配置](preset.md)
 
 ## 本仓库自带
 
 - [Session Name](extensions/session-name.md)
-- [Widget Display：内置信息统一展示](extensions/widget-display.md)
 - [Recap](extensions/recap.md)
 - [Task Composition：任务管理与共享面板](extensions/task-composition.md)
-- [Monitor](extensions/monitor.md)
+  - [命令进程](extensions/task-composition.md#命令进程)
+  - [Monitor：持续监听命令或 WebSocket](extensions/monitor.md)
+  - [子 Agent 与 workflow](extensions/task-composition.md#子-agent-与-workflow)
+  - [后台任务提醒](extensions/task-composition.md#后台任务提醒)
 - [Beautify](extensions/beautify.md)
 - [At Path Completion](extensions/at-path-completion.md)
 - [Status Bar](extensions/status-bar.md)

@@ -80,9 +80,3 @@ Pi 全屏模式下可用鼠标滚轮滚动正文，在标题栏或底栏滚动�
 ```
 
 `/memory on` 和 `/memory off` 会写这个文件，也可以手工修改，下一轮对话即生效。如果写入后无法确认落盘，命令会如实说明磁盘上的实际状态。
-
-## 从 pi-memory 迁移
-
-本预设以前安装外部的 `pi-memory` 包。现在 Memory 是内置的，预设的 `conflicts` 里列出了 `npm:pi-memory`，同步时会把它移除。
-
-内置 Memory 与旧插件的文件格式不同，但共用 `~/.pi/agent/memory/` 这个目录：内置实现只用自己的 `projects/` 子目录，旧插件的 `MEMORY.md`、`SCRATCHPAD.md`、`daily/`、`recovery/` 不会被转换，也不会被自动删除，两者互不干扰。需要保留的内容请自行复制，然后按 [README](../../README.md) 的同步与更新一节执行同步并重启。

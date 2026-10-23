@@ -1,10 +1,8 @@
 # Task Composition：任务管理与共享面板
 
-Task composition 把命令进程、Monitor、子 Agent 和 workflow 放进同一个任务面板。底栏按 `shell`、`monitor`、`agent`、`workflow` 显示活动和排队数量，前台任务也会计入；父任务及其子任务不会重复算作独立工作。底栏还显示实际等待数量及配置的全局解除等待入口；未绑定快捷键时显示 `/task-detach`。等待与后台运行独立，所属子任务不等于主会话正在等待。没有活动、排队或等待任务时，摘要隐藏。
+Task Composition 把命令进程、Monitor、子 Agent 和 workflow 放进同一个任务面板。你可以在这里查看正在运行的工作、阅读日志和结果、解除等待或停止任务；对运行中的子 Agent 还可以发送消息。
 
-底部 Footer 的用量行之后通过 [Widget Display](widget-display.md) 紧接显示只读 Agent／workflow 根任务概览，不显示 Shell／Monitor，不展开子任务，也不接管输入或导航。每行优先显示任务描述，使用与面板一致的状态图标（starting／running 默认播放低频 spinner，关闭动画时使用静态 `◌`）；耗时与 `↓ tokens` 靠右排列。最多五个根任务，小终端减少行数并提示隐藏数量；极端拥挤时 Pi 仍可能裁剪概览或底栏，隐藏数量不保证始终可见。空态隐藏，终态短暂保留四秒。
-
-概览使用根任务自身统计，不累加子任务。Agent tokens 包含 input、output、cacheWrite，不含 cacheRead；继续会话时 tokens 为累计值，耗时为本轮运行。Workflow 的统计可能稍有延迟。请保持 Widget Display 启用；没有共享展示入口时概览不显示，但底栏和 Task Panel 仍可使用。命令等待只由共享底栏／面板说明，没有独立命令提示。
+有活动、排队或等待中的任务时，底栏会显示简要状态；运行 `/tasks` 或按 `Shift+Down` 可打开完整面板。没有任务时，摘要自动隐藏。
 
 ## 常用入口
 
@@ -65,6 +63,12 @@ Pending 表示仍在排队，不代表 Agent 已读或处理；`Submitting` 表�
 命令输出是有长度限制的预览，最多 16K 字符，文件通常读取尾部；面板会标明范围和省略量。滚动只覆盖这段预览，更多内容请复制路径查看，或让模型用结果工具读取。终态任务通常在整体完成四秒后隐藏，正在查看的最终预览保留到换选项或关闭面板。小终端会压缩固定信息和正文，可放大终端以查看更多内容。
 
 面板只在交互终端中可用；非交互模式没有面板预览。
+
+## 任务概览与统计
+
+底栏会显示命令、Monitor、Agent 和 workflow 的活动与排队数量，以及当前等待次数。Agent 和 workflow 的根任务概览紧接用量行显示；命令和 Monitor 不在这里逐项展开。概览最多显示五个根任务，终态保留四秒；空间不足时 Pi 可能裁剪内容。
+
+Agent 的 tokens 包含 input、output 和 cacheWrite，不含 cacheRead；继续会话时显示累计 tokens，耗时只计算当前一轮。Workflow 的统计可能稍有延迟。`/task-detach` 只解除当前等待，不会停止仍在运行的任务。
 
 ## 命令进程
 
