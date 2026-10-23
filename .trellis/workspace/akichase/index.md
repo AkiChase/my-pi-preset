@@ -7,9 +7,9 @@
 ## Current Status
 
 <!-- @@@auto:current-status -->
-- **Active File**: `journal-1.md`
-- **Total Sessions**: 58
-- **Last Active**: 2026-10-22
+- **Active File**: `journal-2.md`
+- **Total Sessions**: 59
+- **Last Active**: 2026-10-23
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,8 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1975 | Active |
+| `journal-2.md` | ~47 | Active |
+| `journal-1.md` | ~1975 | Archived |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 59 | 2026-10-23 | 完成 beautify 工具参数可见性 | `9983df4`, `ef9360e`, `2937db4`, `d626ae2`, `2c815c2`, `28b6772` | `main` |
 | 58 | 2026-10-22 | 修复 SDK 测试兼容并优化 CPU 开销 | `665c415`, `328e236`, `8068f9a` | `main` |
 | 57 | 2026-10-22 | 子 Agent 详情对齐与真实终端验收收尾 | `1363940`, `5d0ebd7`, `20c39e4`, `70078ca` | `main` |
 | 56 | 2026-10-22 | 交互式预设安装器 | `d953f75`, `34e9d30`, `1b679a3` | `main` |
