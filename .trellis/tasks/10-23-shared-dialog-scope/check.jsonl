@@ -1,0 +1,4 @@
+{"file":".trellis/spec/development/index.md","reason":"Internal module ownership, asynchronous identity, cleanup, configuration and documentation boundaries"}
+{"file":".trellis/spec/testing/index.md","reason":"Natural-exit lifecycle regressions, installed SDK seams, isolated configuration and honest evidence reporting"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Verify matching shared invariants and real removal of duplicated consumer mechanisms"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace dialog origin, stale continuations, save admission and preservation across consumers"}
