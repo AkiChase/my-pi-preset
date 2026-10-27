@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 61
-- **Last Active**: 2026-10-23
+- **Total Sessions**: 62
+- **Last Active**: 2026-10-27
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~104 | Active |
+| `journal-2.md` | ~142 | Active |
 | `journal-1.md` | ~1975 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 62 | 2026-10-27 | 修复 reload 后编辑器扩展安装失效 | `87559ed` | `main` |
 | 61 | 2026-10-23 | 共享对话作用域与真实终端验收 | `d799d5a`, `126a0d0`, `cf02ed7` | `main` |
 | 60 | 2026-10-23 | 内部浮层交互运行时 | `dcdd529`, `2f05295`, `8d77a95` | `main` |
 | 59 | 2026-10-23 | 完成 beautify 工具参数可见性 | `9983df4`, `ef9360e`, `2937db4`, `d626ae2`, `2c815c2`, `28b6772` | `main` |

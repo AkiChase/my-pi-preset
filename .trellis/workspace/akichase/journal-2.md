@@ -102,3 +102,41 @@
 ### Next Steps
 
 - 无待实施项；后续范围另行 Request Triage
+
+
+## Session 62: 修复 reload 后编辑器扩展安装失效
+<!-- trellis-session: v=2 fp=aaa2219da5bbd58f -->
+
+**Date**: 2026-10-27
+**Task**: 修复 reload 后编辑器扩展安装失效
+**Branch**: `main`
+
+### Summary
+
+修复 pi 1.4.0 reload 期间宿主占用焦点导致 Down opener、Beautify 外观与 @ 路径补全永久退休的问题，改为延续到焦点恢复后安装
+
+### Main Changes
+
+- 新增 installWhenEditorFocused：不挂载 UI 的同步 probe，焦点未就绪时在 session_start await 链外可取消重试
+- task-ui/beautify/at-path-completion 三处接入，保留原 handoff、描述符恢复与 setter 回滚
+- 补充 reload 焦点空窗回归，并在开发 spec 记录该时序约束
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `87559ed` | fix(editor): defer installation until reload restores focus |
+
+### Testing
+
+- [OK] 隔离配置下 pnpm typecheck 与 pnpm check 通过（1725/1725）
+- [OK] 聚焦 node --test 天然退出通过 105/105；独立 trellis-check 复核 56/56 且无阻塞发现
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 如需真实验收，在个人安装环境执行 /reload 并确认 ↓、外观与 @ 补全恢复
+- 未 push，未更新个人 Pi 安装
