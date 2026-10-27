@@ -54,7 +54,7 @@ void it('future delegated factory decorates a new editor and invalidates the old
     const queries = h.counts.query.length; e.setText('@local'); e.handleInput('/'); await pause(); assert.equal(h.counts.query.length, queries);
   } finally { await h.close(); }
 });
-for (const variant of ['missing', 'nonconfig', 'accessor', 'setter', 'overlay', 'throwing-request']) void it(`safe degradation ${variant} keeps actual mounted UI usable`, async () => {
+for (const variant of ['missing', 'nonconfig', 'accessor', 'setter', 'throwing-request']) void it(`safe degradation ${variant} keeps actual mounted UI usable`, async () => {
   const h = harness();
   const errors: unknown[][] = [], error = console.error; console.error = (...args: unknown[]) => { errors.push(args); };
   try { const e = h.editor, original = e.handleInput; e.setText('draft'); e.handleInput('\x1b[D'); const cursor = e.getCursor();
@@ -65,10 +65,8 @@ for (const variant of ['missing', 'nonconfig', 'accessor', 'setter', 'overlay', 
     if (variant === 'setter') { const setter = h.ctx.ui.setEditorComponent; let once = true;
       h.ctx.ui.setEditorComponent = factory => { if (once) { once = false; h.host.editorContainer.clear(); throw new Error('after unmount'); } setter(factory); };
     }
-    const overlay = variant === 'overlay' ? h.tui.showOverlay({ render: () => ['overlay'], invalidate() {} }) : undefined;
     h.install(); await h.start();
     assert.deepEqual(h.host.editorContainer.children, [e]); assert.ok(h.host.editorContainer.render(80).length); assert.equal(h.editor, e); assert.deepEqual(e.getCursor(), cursor);
-    if (overlay) { assert.equal(h.tui.hasOverlay(), true); overlay.hide(); h.tui.setFocus(e); }
     assert.equal(h.tui.getFocusedComponent(), e);
     e.handleInput('!'); assert.equal(e.getText(), 'draf!t');
     if (variant === 'throwing-request') { e.setText('@local'); e.handleInput('/'); await pause(); assert.equal(e.isShowingAutocomplete(), false); }

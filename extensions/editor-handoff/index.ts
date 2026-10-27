@@ -1,4 +1,49 @@
-import type { EditorComponent } from "@earendil-works/pi-tui";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { EditorComponent, TUI } from "@earendil-works/pi-tui";
+
+/** Probe without mounting UI, then retry outside session_start's await chain.
+ * Reload restores focus only AFTER all session_start handlers return. */
+export async function installWhenEditorFocused(
+    ctx: ExtensionContext,
+    inactive: () => boolean,
+    install: (screen: TUI, editor: unknown) => void,
+    fail: (error: unknown) => void,
+): Promise<() => void> {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const cancel = () => { cancelled = true; if (timer !== undefined) clearTimeout(timer); timer = undefined; };
+    try {
+        let screen: TUI | undefined;
+        await ctx.ui.custom<void>((tui, _theme, _keys, done) => {
+            screen = tui;
+            done();
+            return { render: () => [], invalidate() {} };
+        }, { overlay: true });
+        if (inactive()) return cancel;
+        if (!screen || !("getFocusedComponent" in screen) || typeof screen.getFocusedComponent !== "function") {
+            throw new Error("Editor installation requires public TUI.getFocusedComponent");
+        }
+        const focus = screen as TUI & { getFocusedComponent(): unknown };
+        const attempt = () => {
+            timer = undefined;
+            if (cancelled || inactive()) return;
+            try {
+                const editor = focus.getFocusedComponent();
+                // Containers/dialogs and overlays are temporary focus owners, not editors.
+                // Once an editor is focused, each consumer performs its own capability preflight.
+                if (focus.hasOverlay() || !editor || typeof editor !== "object" ||
+                    typeof Reflect.get(editor, "getText") !== "function" || Reflect.get(editor, "focused") !== true) {
+                    timer = setTimeout(attempt, 25);
+                    return;
+                }
+                install(focus, editor);
+            } catch (error) { cancel(); fail(error); }
+        };
+        attempt();
+    } catch (error) { cancel(); fail(error); }
+    return cancel;
+}
+
 export type LiveEditor = EditorComponent & { focused: boolean; isShowingAutocomplete(): boolean };
 
 /** Restore only a descriptor still owned by this lease, including inherited methods. */

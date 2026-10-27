@@ -1,0 +1,2 @@
+{"file":".trellis/spec/development/index.md","reason":"编辑器实例保护、activation 关闭与延迟副作用边界"}
+{"file":".trellis/spec/testing/index.md","reason":"针对性实际 SDK 回归和自然退出验证"}

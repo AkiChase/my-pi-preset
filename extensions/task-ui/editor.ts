@@ -2,7 +2,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { CustomEditor } from "@earendil-works/pi-coding-agent";
 import { isKeyRelease, isKeyRepeat, matchesKey, type EditorComponent, type TUI } from "@earendil-works/pi-tui";
 import type { TaskLifecycle } from "./lifecycle.ts";
-import { interpose, preserveHandoff, type LiveEditor } from "../editor-handoff/index.ts";
+import { installWhenEditorFocused, interpose, preserveHandoff, type LiveEditor } from "../editor-handoff/index.ts";
 
 type EditorFactory = NonNullable<Parameters<ExtensionContext["ui"]["setEditorComponent"]>[0]>;
 type FocusScreen = TUI & { getFocusedComponent(): unknown };
@@ -70,11 +70,13 @@ export function registerDownOpener(pi: ExtensionAPI, lifecycle: TaskLifecycle, e
     if (!enabled || !lifecycle.active) return () => {};
     const cell: Cell = {};
     let installed = false, closed = false;
+    let cancelInstall: (() => void) | undefined;
     let offStart: (() => void) | undefined;
     let access: DownPanelAccess | undefined = panel;
     const close = () => {
         if (closed) return;
         closed = true;
+        cancelInstall?.(); cancelInstall = undefined;
         const resources = cell.resources;
         cell.resources = undefined; access = undefined;
         offStart?.(); offStart = undefined;
@@ -87,35 +89,28 @@ export function registerDownOpener(pi: ExtensionAPI, lifecycle: TaskLifecycle, e
         if (closed || !lifecycle.active || installed || ctx.mode !== "tui" || !access) return;
         if (typeof ctx.ui.getEditorComponent !== "function" || typeof ctx.ui.setEditorComponent !== "function" || typeof ctx.ui.custom !== "function") return;
         installed = true;
-        const transaction: Handoff = { initial: true };
-        try {
-            let screen: TUI | undefined;
-            // Capture the public TUI before the destructive editor setter. Complete
-            // synchronously so the SDK never mounts this probe. If another overlay
-            // is already present, reject without done(): done would hide that overlay.
-            await ctx.ui.custom<void>((tui, _theme, _keys, done) => {
-                if (tui.hasOverlay()) throw new Error("Down opener installation deferred by an active overlay");
-                screen = tui;
-                done();
-                return { render: () => [], invalidate() {} };
-            }, { overlay: true });
-            if (closed || !lifecycle.active || !screen || !access) return;
-            if (!("getFocusedComponent" in screen) || typeof screen.getFocusedComponent !== "function") throw new Error("Down opener requires public TUI.getFocusedComponent");
-            const editor = screen.getFocusedComponent();
-            if (!liveEditor(editor) || !editor.focused || screen.hasOverlay()) throw new Error("Down opener needs the focused live editor during installation");
-            const previous = ctx.ui.getEditorComponent();
-            if (closed || !lifecycle.active) return;
-            // All potentially failing descriptor work occurs while the old editor
-            // is still mounted; unsupported editors therefore need no UI rollback.
-            transaction.restore = preserveHandoff(editor);
-            cell.resources = { ctx, panel: access, leases: new Set(), editors: new WeakSet() };
-            transaction.editor = decorate(cell, screen, editor) as LiveEditor;
-            const factory = factoryLease(cell, previous, transaction);
-            ctx.ui.setEditorComponent(factory);
-        } catch (error) {
+        const fail = (error: unknown) => {
             close();
             console.error("[task-ui] Down opener installation failed:", error);
-        } finally { transaction.restore?.(); transaction.restore = undefined; transaction.editor = undefined; }
+        };
+        cancelInstall = await installWhenEditorFocused(ctx, () => closed || !lifecycle.active, (screen, editor) => {
+            const transaction: Handoff = { initial: true };
+            try {
+                if (!access) return;
+                if (!liveEditor(editor)) throw new Error("Down opener requires a supported live editor");
+                const previous = ctx.ui.getEditorComponent();
+                if (closed || !lifecycle.active) return;
+                // All potentially failing descriptor work occurs while the old editor
+                // is still mounted; unsupported editors therefore need no UI rollback.
+                transaction.restore = preserveHandoff(editor);
+                cell.resources = { ctx, panel: access, leases: new Set(), editors: new WeakSet() };
+                transaction.editor = decorate(cell, screen, editor) as LiveEditor;
+                const factory = factoryLease(cell, previous, transaction);
+                ctx.ui.setEditorComponent(factory);
+            } catch (error) { fail(error); }
+            finally { transaction.restore?.(); transaction.restore = undefined; transaction.editor = undefined; }
+        }, fail);
+        if (closed) { cancelInstall(); cancelInstall = undefined; }
     });
     if (closed) offStart?.();
     return () => { close(); offClose(); };
