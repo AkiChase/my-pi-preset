@@ -192,12 +192,26 @@ export function renderFrame(state, { columns = 80, rows = 24, color = false, uni
   return [...body, "", ...footLines].slice(0, height).join("\n");
 }
 
+// The apply path forwards child bytes to our own terminal, so the child no longer
+// sees a TTY on stdout and chalk-style tools (pi, pnpm, npm) drop their colors.
+// Re-declare the decision the terminal already made instead of overriding it.
+// `FORCE_COLOR=true` rather than a number: a numeric value pins an exact level,
+// while `true` only enables color and still lets the child detect 256/truecolor.
+export function colorEnv(env = process.env, output = process.stdout) {
+  if (!output?.isTTY) return env;
+  if (env.FORCE_COLOR !== undefined || env.NO_COLOR !== undefined || env.TERM === "dumb") return env;
+  return { ...env, FORCE_COLOR: "true" };
+}
+
 // Each sync child owns a process group on POSIX: cancellation covers pi and its
 // descendants, not just the Node sync wrapper (which uses spawnSync internally).
-export function runSync(script, args, { preview = false, onStart, onOutput, input, maxBytes = 1024 * 1024, timeoutMs = 12 * 60 * 1000, env = process.env, command, cwd } = {}) {
+export function runSync(script, args, { preview = false, onStart, onOutput, input, output = process.stdout, maxBytes = 1024 * 1024, timeoutMs = 12 * 60 * 1000, env = process.env, command, cwd } = {}) {
   const grouped = process.platform !== "win32";
+  // Preview output is sanitized and repainted by the TUI, so only forwarded
+  // output needs the child's own colors restored.
+  const childEnv = preview ? env : colorEnv(env, output);
   const child = spawn(command ?? process.execPath, command ? args : [script, ...args, ...(preview ? ["--dry-run"] : [])], {
-    env, cwd, detached: grouped, stdio: [preview ? "ignore" : input ? "pipe" : "inherit", "pipe", "pipe"],
+    env: childEnv, cwd, detached: grouped, stdio: [preview ? "ignore" : input ? "pipe" : "inherit", "pipe", "pipe"],
   });
   const forwardedInput = !preview && input && child.stdin ? input.pipe(child.stdin) : undefined;
   let reason;
@@ -304,7 +318,7 @@ export async function runInstaller({ manifest, script, input = process.stdin, ou
     if (applying && state.dev && state.selected.has("packages")) {
       output.write(`Installing local dependencies in ${state.checkout}: pnpm install\n`);
       const dependencies = await runSync(undefined, ["install"], {
-        command: "pnpm", cwd: state.checkout, input, onStart: (job) => { active = job; },
+        command: "pnpm", cwd: state.checkout, input, output, onStart: (job) => { active = job; },
       });
       active = undefined;
       if (quitting) { resolveFinished(130); return; }
@@ -317,7 +331,7 @@ export async function runInstaller({ manifest, script, input = process.stdin, ou
     const result = await runSync(script, args, {
       preview: !applying,
       onStart: (job) => { active = job; },
-      ...(applying ? { input, onOutput: (chunk) => output.write(chunk) } : {}),
+      ...(applying ? { input, output, onOutput: (chunk) => output.write(chunk) } : {}),
     });
     active = undefined;
     busy = false;

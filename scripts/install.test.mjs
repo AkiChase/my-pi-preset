@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { createState, handleKey, syncArgs, renderFrame, runSync, cleanText, runInstaller, localCheckout } from "./install.mjs";
+import { createState, handleKey, syncArgs, renderFrame, runSync, cleanText, runInstaller, localCheckout, colorEnv } from "./install.mjs";
 
 const key = (state, name, text = "") => handleKey(state, text, { name });
 
@@ -55,6 +55,19 @@ test("pointer column, no borders, sanitized output and narrow layouts", () => {
 test("no TTY is refused before children are started", async () => {
   await assert.rejects(runInstaller({ input: { isTTY: false }, output: { isTTY: false } }), /needs a terminal/);
   assert.equal(localCheckout("/nonexistent/install.mjs"), undefined);
+});
+
+test("forwarded children regain terminal colors without overriding user choices", () => {
+  const tty = { isTTY: true };
+  const base = { TERM: "xterm-256color", PATH: "/x" };
+  // `true` rather than a number so the child still detects 256/truecolor levels.
+  assert.deepEqual(colorEnv(base, tty), { ...base, FORCE_COLOR: "true" });
+  for (const extra of [{ NO_COLOR: "1" }, { TERM: "dumb" }, { FORCE_COLOR: "0" }, { FORCE_COLOR: "3" }]) {
+    assert.deepEqual(colorEnv({ ...base, ...extra }, tty), { ...base, ...extra });
+  }
+  // Nothing to forward to, so nothing to restore.
+  assert.deepEqual(colorEnv(base, { isTTY: false }), base);
+  assert.deepEqual(base, { TERM: "xterm-256color", PATH: "/x" });
 });
 
 test("shell rejects arguments and a missing controlling terminal before bootstrap", () => {
