@@ -5,7 +5,8 @@
     "npm:pi-input-history": "latest",
     "npm:pi-web-access": "latest",
     "npm:@juicesharp/rpiv-ask-user-question": "latest",
-    "npm:@narumitw/pi-btw": "latest"
+    "npm:@narumitw/pi-btw": "latest",
+    "npm:@narumitw/pi-tui-kit": "latest"
   },
   "conflicts": [
     "npm:pi-patty-bg-tasks",
