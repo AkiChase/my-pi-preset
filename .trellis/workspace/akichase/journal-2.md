@@ -140,3 +140,43 @@
 
 - 如需真实验收，在个人安装环境执行 /reload 并确认 ↓、外观与 @ 补全恢复
 - 未 push，未更新个人 Pi 安装
+
+
+## Session 63: 完成规划阶段 research 派发修复
+<!-- trellis-session: v=2 fp=894387113d2ac13a -->
+
+**Date**: 2026-11-04
+**Task**: 完成规划阶段 research 派发修复
+**Branch**: `main`
+
+### Summary
+
+按角色放行 planning research，保留 implement/check 的 in_progress 门禁；完成独立审查、验证及用户授权归档。
+
+### Main Changes
+
+- 统一 TS/Python dispatch、材料查询和 worktree prepare/readiness 的角色状态规则；覆盖子 Agent 上下文、显式 task、状态漂移和 stop/shutdown。
+- 同步包内工作流、技能、角色、协议及 adapted hashes，保留历史 source metadata；未修改已安装包或部署副本。
+- 非 PR 任务直接提交 main，使用明确的非 PR 归档选项；已清除本会话绑定，另一个 task-viewer-toggle 任务的未提交材料完整保留。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3d7b2b4` | fix(trellis): allow planning research dispatch |
+| `3819563` | chore(task): archive 11-04-research-planning-dispatch |
+| `f3798ad` | docs(trellis): finalize research dispatch wrap-up record |
+
+### Testing
+
+- [OK] 隔离配置下 focused 49/49、Trellis 376/376、Python 39/39；pnpm check 严格类型检查及 1744/1744 通过。
+- [OK] 独立 trellis-check 无阻断 findings；仓库外旧策略负对照仅 planning/research 预期失败，本轮临时输出已清理。
+- [OK] 收尾文档首次空白检查发现多余 EOF 空行，已修正后复查通过；有意为空的 implement.jsonl 仍为 task validate 诊断，不伪称完整通过。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 若要在当前环境使用修复，后续显式更新包及部署资源并重载；未 push，未验证真实在线 provider。
