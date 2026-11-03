@@ -60,4 +60,5 @@ NOT_RUN：真实在线模型/provider 端到端派发、个人安装/同步、�
 - 归档提交范围仅本任务源/目标目录（无 parent/children）；journal 提交范围仅当前开发者 journal/index，归档后当前绑定应为空。按默认 `session_auto_commit` 执行。
 - 另一个任务 `.trellis/tasks/11-04-task-viewer-toggle/` 的未提交材料不属于本次收尾，完整保留、不 stage、不提交。
 - 本轮原始临时目录已清理；已安装包/已部署资源仍未更新，无 push。
-
+- 归档已成功：`3819563`，目录为 `.trellis/tasks/archive/2026-11/11-04-research-planning-dispatch`；current 查询为 `no-task`，本会话绑定已清除。
+- 收尾首次 `git diff --check` 发现本记录尾部额外空行，归档已完成；随后修正并再次检查，不把首次空白检查描述为 PASS。
