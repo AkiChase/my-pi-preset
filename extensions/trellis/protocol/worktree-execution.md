@@ -10,7 +10,7 @@
 
 ## 创建与准备
 
-先按项目 workflow 批准并 start 源任务。预览不写入、不预留；确认必须处于已有用户授权内，不因 CLI 参数获得额外权限：
+实施和审查先按项目 workflow 批准并 start 源任务；research 可在 `planning` 或 `in_progress` 阶段准备与派发，不需要为研究启动任务。显式指定任务不要求主会话先 active；准备和派发均不授予实施批准。预览不写入、不预留；创建、接纳和准备的确认必须处于已有用户授权内，不因 CLI 参数获得额外权限：
 
 ```bash
 python3 .trellis/scripts/worktree.py create --task .trellis/tasks/<slug>
@@ -44,7 +44,7 @@ python3 .trellis/scripts/worktree.py status --task .trellis/tasks/<slug> --json
 
 源材料可以包含获批的未提交内容。发现失效引用时，主 agent 根据源路径和 JSONL 行号核实迁移，在已有材料维护授权内修正源引用，重新查询并派发；无需同步目标材料。运行中要求变化由主会话通知和复核，不假装子 agent 已读到新版本，也不自动取消或推进阶段。
 
-子角色默认只读源管理材料、修改目标产品代码/测试并返回结果和证据；主会话维护任务、规范和生命周期。明确授权可允许 research 写源任务 `research/*.md`，或 implement/check 写源任务 `evidence/`；读取权限、任务身份和工具可用不代表任意源写授权。研究目录不保存实施/审查报告或测试日志。
+子角色默认只读源管理材料；research 也不得修改产品代码，implement/check 只在获批范围内修改目标产品代码/测试并返回结果和证据；主会话维护任务、规范和生命周期。明确授权可允许 research 写源任务 `research/*.md`，或 implement/check 写源任务 `evidence/`；读取权限、任务身份和工具可用不代表任意源写授权。研究目录不保存实施/审查报告或测试日志。
 
 仅支持严格 version 2 源权威绑定；旧格式或未知记录明确拒绝，不自动转换、删除或清理。原来的 `refresh`、`collect` 已删除，不提供材料复制/收集或迁移命令。产品代码集成另按获批 Git 工作流处理，不是任务材料同步。
 

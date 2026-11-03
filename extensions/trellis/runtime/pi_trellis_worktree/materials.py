@@ -27,6 +27,13 @@ def role_name(role):
     return role
 
 
+def require_execution_status(role, status, path=None):
+    role_name(role)
+    allowed = ("planning", "in_progress") if role == "research" else ("in_progress",)
+    if not isinstance(status, str) or status not in allowed:
+        raise DiagnosticError("source_not_approved", f"Source task for {role} must be {' or '.join(allowed)} for execution; dispatch/preparation does not start or approve a task", role=role, path=path)
+
+
 def task_path(root, task):
     task_slug(task)
     root = canonical(root)
@@ -162,8 +169,8 @@ def source_materials(root, task, role, approved=False):
                     raise ValueError("Expected a JSON object")
             except ValueError as error:
                 raise DiagnosticError("task_record_invalid", "Invalid task.json: " + str(error), role=role, path=str(path)) from error
-            if approved and record.get("status") != "in_progress":
-                raise DiagnosticError("source_not_approved", "Source task is not approved/in_progress for execution", role=role, path=str(path))
+            if approved:
+                require_execution_status(role, record.get("status"), str(path))
             metadata["sha256"] = digest({k: v for k, v in record.items() if k not in RUNTIME_FIELDS})
         files[label] = metadata
         seen_files.add(path)
@@ -299,8 +306,7 @@ def local_target(b):
 def prepare(b, role="implement"):
     role_name(role)
     source = Path(b["sourceRoot"])
-    if task_record(source, b["taskDir"]).get("status") != "in_progress":
-        raise DiagnosticError("source_not_approved", "Start/approve the source task through the normal workflow first; preparation does not advance a planning task", role=role, path=str(source / b["taskDir"] / "task.json"))
+    require_execution_status(role, task_record(source, b["taskDir"]).get("status"), str(source / b["taskDir"] / "task.json"))
     try:
         require_target_cli(local_target(b))
         return source_materials(source, b["taskDir"], role, approved=True)

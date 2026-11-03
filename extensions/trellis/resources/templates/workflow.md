@@ -75,6 +75,13 @@ Session-scoped pointers never infer another session. `task.py active <task>` bin
 changing task status/branch or running hooks; multiple sessions may bind the same task. It is not implementation
 approval. `deactivate` clears only your session binding, not task status.
 
+Task-scoped research may be dispatched while the source task is `planning` or `in_progress`;
+implementation/check dispatch requires `in_progress` and its approved scope. An explicit task reference
+can select a planning task without activating the main session. Research dispatch does not start a task,
+run start hooks or grant implementation approval; product code remains read-only, and source research
+writes still require explicit path-scoped authorization. Research requires valid task/PRD/workflow/spec
+materials but no implement/check manifest. Bound tasks retain managed preparation and no-fallback rules.
+
 ## Phase Index
 
 1. Plan: 1.0 orientation, 1.1 requirements, 1.2 design, 1.3 context, 1.4 review/start.

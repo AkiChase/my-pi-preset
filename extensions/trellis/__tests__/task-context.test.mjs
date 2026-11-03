@@ -4,8 +4,22 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { assembleDispatchPrompt, resolveTaskPath, readTaskRecord, INJECTED_MARKER, parseDispatchFacts } from '../lib/task-context.ts';
+import { assembleDispatchPrompt, resolveTaskPath, readTaskRecord, requireDispatchStatus, INJECTED_MARKER, parseDispatchFacts } from '../lib/task-context.ts';
 import { queryWorktree, requireMaterials, parseWorktreeQuery, WorktreeQueryError } from '../lib/worktree-query.ts';
+
+test('dispatch status policy agrees with native role material admission',async t=>{
+ const f=fixture(t);
+ for(const status of ['planning','in_progress','review','completed','done','unknown',null,{},false]) {
+  f.put(f.taskDir+'/task.json',JSON.stringify({status}));
+  for(const role of ['trellis-research','trellis-implement','trellis-check']) {
+   const allowed=status==='in_progress'||(role==='trellis-research'&&status==='planning');
+   if(allowed)requireDispatchStatus(role,status);else assert.throws(()=>requireDispatchStatus(role,status),/must be/);
+   const native=await f.query(role.slice(8));assert.equal(native.materials.state,allowed?'valid':'invalid');
+   if(!allowed)assert.equal(native.issues[0].code,'source_not_approved');
+  }
+ }
+ assert.throws(()=>requireDispatchStatus('unknown','in_progress'));
+});
 
 function fixture(t) {
  const root=realpathSync(mkdtempSync(join(tmpdir(),'pi-authority-')));t.after(()=>rmSync(root,{recursive:true,force:true}));

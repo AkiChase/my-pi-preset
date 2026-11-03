@@ -124,14 +124,15 @@ function project(t,scope,root) {
  const handlers=new Map(), events=new Map(), tools=new Map();
  const bus={on:(name,handler)=>{if(!events.has(name))events.set(name,new Set());events.get(name).add(handler);return()=>events.get(name).delete(handler);},emit:(name,data)=>{for(const handler of [...(events.get(name)||[])])handler(data);}};
  const pi={events:bus,on:(name,fn)=>handlers.set(name,fn),registerTool:tool=>tools.set(tool.name,tool)};
- registerDispatchTool(pi,async()=>task);
+ let active=task;
+ registerDispatchTool(pi,async()=>active);
  const replies=[];
  bus.on('subagents:rpc:ping',({requestId})=>bus.emit('subagents:rpc:ping:reply:'+requestId,{success:true,data:{version:3}}));
  let seq=0, spawnFailure;
  bus.on('subagents:rpc:spawn',params=>{replies.push(params);bus.emit('subagents:rpc:spawn:reply:'+params.requestId,spawnFailure ? {success:false,error:spawnFailure} : {success:true,data:{agent_id:'agent-'+(++seq)}});});
  const call=input=>tools.get('trellis_dispatch').execute('tool',{action:null,agent:null,task:null,prompt:null,...input},undefined,undefined,{cwd:root});
  const dispatch=(agent='trellis-implement')=>call({agent,prompt:'work'});
- return {root,task,put,run,dispatch,call,bus,replies,handlers,git,chdir,failSpawn:error=>{spawnFailure=error;}};
+ return {root,task,put,run,dispatch,call,bus,replies,handlers,git,chdir,setActive:value=>{active=value;},failSpawn:error=>{spawnFailure=error;}};
 }
 
 test('dispatch requires ready, uses target cwd/off, returns real id and prevents same-dir overlap',async t=>{
@@ -391,8 +392,64 @@ test('target checkout changes during final native query refuse managed spawn wit
  await assert.rejects(f.dispatch(),/checkout changed during prompt rendering/);assert.equal(f.replies.length,0);assert.equal(readExecution(c.binding),undefined);
 });
 
+test('research role status matrix dispatches planning without active task, start or hooks',async t=>{
+ for(const managed of [false,true]) await t.test(managed?'managed':'source',async child=>{
+  const f=managed?await readyFixture(child):await fixture(child);
+  f.setActive(undefined);
+  await assert.rejects(f.call({agent:'trellis-research',prompt:'research'}),/No task selected/);
+  assert.equal(f.replies.length,0);
+  for(const status of ['planning','in_progress','review','completed','done','unknown',null,{},false]) {
+   const record=JSON.stringify({status});f.put(f.task+'/task.json',record);
+   for(const agent of ['trellis-research','trellis-implement','trellis-check']) {
+    const before=f.replies.length;
+    const allowed=status==='in_progress'||(agent==='trellis-research'&&status==='planning');
+    const request=()=>f.call({task:f.task,agent,prompt:'scoped research/work'});
+    if(allowed) {
+     const result=await request();assert.equal(result.details.mode,managed?'managed':'source');
+     assert.match(f.replies.at(-1).prompt,/Do not start\/finish\/archive tasks, run hooks/);
+     if(agent==='trellis-research')assert.match(f.replies.at(-1).prompt,/do not modify product code/);
+     f.bus.emit('subagents:completed',{id:result.details.agentId});
+    } else {await assert.rejects(request(),/must be/);assert.equal(f.replies.length,before);}
+    assert.equal(readFileSync(join(f.root,f.task,'task.json'),'utf8'),record);
+    assert.equal(existsSync(join(f.root,'.trellis/.runtime/sessions')),false);
+   }
+  }
+ });
+});
+
+test('research rejects status drift after native facts in both directories without spawn or lease',async t=>{
+ for(const managed of [false,true]) await t.test(managed?'managed':'source',async child=>{
+  const f=managed?await readyFixture(child):await fixture(child);
+  f.put(f.task+'/task.json','{"status":"planning"}');let queries=0;
+  mockPython(child,f.root,args=>{
+   if(!args.includes('--role'))return;
+   const stdout=execFileSync(process.env.TRELLIS_PYTHON||'python3',args,{cwd:f.root,encoding:'utf8'});
+   if(++queries===2)f.put(f.task+'/task.json','{"status":"completed"}');
+   return {stdout};
+  });
+  await assert.rejects(f.dispatch('trellis-research'),/planning or in_progress/);
+  assert.equal(f.replies.length,0);assert.equal(queries,2);
+  assert.equal(managed?readExecution(f.prepared.binding):sourceRecord(f),undefined);
+ });
+});
+
+test('planning research keeps task and prepared binding requirements',async t=>{
+ const f=await fixture(t);f.put(f.task+'/task.json','{"status":"planning"}');await f.run();
+ await assert.rejects(f.dispatch('trellis-research'),/ready worktree/);assert.equal(f.replies.length,0);
+ await f.run({action:'prepare',role:'research'});
+ rmSync(join(f.root,f.task,'prd.md'));await assert.rejects(f.dispatch('trellis-research'),/Source material/);
+ assert.equal(f.replies.length,0);assert.equal(readExecution(readBinding(f.root,f.task)),undefined);
+});
+
 const scoped=fn=>t=>cwdScope.run({},()=>fn(t));
 const smoke=new Set([
+ 'dispatch old call shape/optional empty task works; stop requires no agent/prompt and waits for terminal evidence',
+ 'shutdown retains unknown lease instead of claiming a running child stopped',
+ 'source early terminal, stop and shutdown preserve lifecycle truth',
+ 'failed/unknown provider stop retains lease; source task and actual host cwd/config remain required',
+ 'research role status matrix dispatches planning without active task, start or hooks',
+ 'research rejects status drift after native facts in both directories without spawn or lease',
+ 'planning research keeps task and prepared binding requirements',
  'dispatch requires ready, uses target cwd/off, returns real id and prevents same-dir overlap',
  'modified target runtime is rejected before execution/spawn, even if it attempts lock-time material changes',
  'unbound source dispatch uses shared cwd, current materials, no binding and per-task overlap',

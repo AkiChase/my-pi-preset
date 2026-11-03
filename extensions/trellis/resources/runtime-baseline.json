@@ -272,7 +272,7 @@
       "sourcePath": "python/pi_trellis_worktree/materials.py",
       "sourceSha256": "1e51edfbed879dd5334c01f891bac1a7ffb61ad04df647f8afb2d2a1bc86f428",
       "license": "MIT",
-      "sha256": "e1215b6e70672cd1bb12976376c1ce6a9efca3949288e5894521f5f0be440d88",
+      "sha256": "a3d6db58bea984f079aac61b67e3b16cb9da1f40e56eb9bead88cd9688f26a76",
       "modified": true,
       "sourceRevision": "9af75d2f52f78ee932bb31563cc29fe7ce5a9b73"
     },
@@ -299,7 +299,7 @@
       "sourcePath": "python/pi_trellis_worktree/manager.py",
       "sourceSha256": "a846d18428fa5519864607e240a103b9b20185d015f461330b71983b785b4fa2",
       "license": "MIT",
-      "sha256": "8d4b04e31a160a489945b782edfe4715411edfd18f733e97d1a5726ee132671e",
+      "sha256": "047bb956710009097a5064402959fac0df47e3772cc87fd071f298546e827108",
       "modified": true,
       "sourceRevision": "9af75d2f52f78ee932bb31563cc29fe7ce5a9b73"
     },
@@ -328,6 +328,6 @@
       "modified": true
     }
   },
-  "releaseId": "pi-trellis-runtime-v1-fdce3a57938638e9a777eb02ba0bc31db6dc9df4b65a023c26e360d25550331b",
+  "releaseId": "pi-trellis-runtime-v1-f2aaad97d0b68ef31f48de73fdf5b5201b5a9d00e1c0736f9fe43125198fa207",
   "projectSourceRevision": "9af75d2f52f78ee932bb31563cc29fe7ce5a9b73"
 }

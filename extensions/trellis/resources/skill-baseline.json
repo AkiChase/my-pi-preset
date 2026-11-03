@@ -24,7 +24,7 @@
       "adapted": true
     },
     "trellis-brainstorm/SKILL.md": {
-      "sha256": "0bebf55ed3897071e996467c154565746c1af6f402cab9428459fbc997bf9cf6",
+      "sha256": "23a77f33cd72d7199d3db2aeb782f6a1ee80dcfcc4ad5b423a153957b6157f3b",
       "sourcePath": ".agents/skills/trellis-brainstorm/SKILL.md",
       "sourceSha256": "17d9bf209730c14f584eb97f38198d0683ad3f8da982d9a6e6d4e84c853f9a94",
       "license": "AGPL-3.0-only",

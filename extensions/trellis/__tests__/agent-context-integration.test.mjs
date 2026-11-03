@@ -365,7 +365,30 @@ test('verified child refuses every changed authority header without rebinding it
   assert.equal((await f.call(child,{command:'task.py current'},'bash')).block,true);
  }
 });
+test('planning research child startup verifies source materials without starting task or changing parent pointer',async t=>{
+ for(const managed of [false,true])await t.test(managed?'managed':'source',async childTest=>{
+  const f=managed?setup(childTest,copyPreparedChild(childTest,await preparedChildRoot())):setup(childTest);
+  const task='.trellis/tasks/a';f.put(task+'/task.json','{"status":"planning","title":"a"}');
+  f.put(task+'/implement.jsonl','broken');f.put(task+'/check.jsonl','broken');
+  const parent=f.ctx('planning-parent');f.pointer(parent,'b');
+  const parentFile=join(f.root,`.trellis/.runtime/sessions/${__internals.contextKey(f.root,parent)}.json`),parentBytes=readFileSync(parentFile);
+  const record=readFileSync(join(f.root,task,'task.json'));const binding=managed?readBinding(f.root,task):null;
+  const executionRoot=binding?.worktreePath??f.root;
+  const child={...f.ctx('planning-child'),cwd:executionRoot};await f.handlers.get('session_start')({},child);
+  const materials=requireMaterials(await queryWorktree(executionRoot,task,false,undefined,false,'research'));
+  const prompt=assembleDispatchPrompt({prompt:'Research only; do not edit products',contextId:binding?.contextId??'planning-research',role:'trellis-research',materials,executionRoot});
+  const sections={};await f.handlers.get('before_agent_start')({prompt,systemPromptOptions:{sections}},child);
+  assert.ok(sections['session-overview']);assert.doesNotMatch(f.messages.at(-1).content,/task_error/);
+  const key=__internals.contextKey(executionRoot,child);
+  assert.equal(JSON.parse(readFileSync(join(f.root,`.trellis/.runtime/sessions/${key}.json`))).current_task,task);
+  assert.deepEqual(readFileSync(join(f.root,task,'task.json')),record);assert.deepEqual(readFileSync(parentFile),parentBytes);
+  assert.equal(existsSync(join(f.root,task,'research')),false);
+  if(managed)assert.equal(existsSync(join(executionRoot,`.trellis/.runtime/sessions/${key}.json`)),false);
+ });
+});
+
 const smoke=new Set([
+ 'planning research child startup verifies source materials without starting task or changing parent pointer',
  'verified child refuses every changed authority header without rebinding its pointer',
  'managed startup registers execution checkout, then source-only child pointer/materials/CLI with target task absent',
  'nonstandard Git-file checkout rejected by native source identity never falls back to old pointer',

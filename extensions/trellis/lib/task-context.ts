@@ -11,6 +11,12 @@ export const CONTEXT_CLOSE = "<!-- pi-trellis:task-context:end -->";
 export function isTrellisRole(value: unknown): value is TrellisRole {
 	return value === "trellis-implement" || value === "trellis-check" || value === "trellis-research";
 }
+export function requireDispatchStatus(role: TrellisRole, status: unknown): void {
+	const allowed = role === "trellis-research" ? ["planning", "in_progress"] : ["in_progress"];
+	if (!isTrellisRole(role) || typeof status !== "string" || !allowed.includes(status)) {
+		throw new Error(`Source task for ${role} must be ${allowed.join(" or ")} before dispatch`);
+	}
+}
 function contained(root: string, path: string): boolean {
 	const rel = relative(root, path);
 	return rel === "" || (!isAbsolute(rel) && rel !== ".." && !rel.startsWith(`..${sep}`));
@@ -95,6 +101,7 @@ export function assembleDispatchPrompt(options: { prompt: string; contextId: str
 		...(m.manifest ? [`- ${m.manifest} (resolve project-relative rows from sourceRoot; expand directory rows and read every selected file)`] : ["Research has no implement/check manifest requirement."]),
 		"Paginate until every required file is fully read; a tool's truncated result is not completion. Missing/unreadable/changed source paths are explicit errors: report source path/manifest line to main, never use target copies.",
 		"Fingerprints describe source requirements, not proof of actual/full reads or a filesystem transaction. Report what you read and any source changes observed.",
+		...(options.role === "trellis-research" ? ["Research may run during planning or in_progress; do not modify product code or treat research dispatch as implementation approval."] : []),
 		"Work only within the assigned approved scope. Main owns task/spec/lifecycle integration. Source materials are read-only by default; research may write source task research only when explicitly authorized. Put authorized implementation/review evidence under this task's evidence/, never research/.",
 		"Do not start/finish/archive tasks, run hooks, commit, install/deploy/reload, manage worktrees or recursively dispatch roles. Tools and these rules are not an OS sandbox.", CONTEXT_CLOSE].join("\n");
 	return `${header}\n\n${stripDispatchClaims(options.prompt)}\n\n${rules}`;

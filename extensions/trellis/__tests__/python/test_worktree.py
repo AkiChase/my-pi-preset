@@ -195,6 +195,26 @@ class NativeContracts(unittest.TestCase):
             self.assertEqual(caught.exception.issue["code"], "material_changed")
             (self.root / added).unlink()
 
+    def test_execution_role_status_matrix_preserves_readonly_material_queries(self):
+        self.put(self.task + "/check.jsonl", json.dumps({"file": self.task + "/prd.md"}))
+        for status in ("planning", "in_progress", "review", "completed", "done", "unknown", None, {}, False):
+            record = json.dumps({"status": status})
+            self.put(self.task + "/task.json", record)
+            for role in ("research", "implement", "check"):
+                with self.subTest(status=status, role=role):
+                    # Material analysis without execution admission remains read-only.
+                    self.assertEqual(source_materials(self.root, self.task, role)["state"], "valid")
+                    allowed = status == "in_progress" or (role == "research" and status == "planning")
+                    if allowed:
+                        self.assertEqual(source_materials(self.root, self.task, role, approved=True)["state"], "valid")
+                    else:
+                        with self.assertRaises(DiagnosticError) as caught:
+                            source_materials(self.root, self.task, role, approved=True)
+                        self.assertEqual(caught.exception.issue["code"], "source_not_approved")
+                        self.assertEqual(caught.exception.issue["role"], role)
+                        self.assertEqual(caught.exception.issue["path"], str(self.root / self.task / "task.json"))
+                    self.assertEqual((self.root / self.task / "task.json").read_text(), record)
+
     def test_approval_comes_from_same_task_record_as_fingerprint(self):
         self.put(self.task + "/task.json", '{"status":"planning","requirement":"new"}')
         with self.assertRaises(DiagnosticError) as caught:

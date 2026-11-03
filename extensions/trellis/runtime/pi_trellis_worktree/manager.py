@@ -48,8 +48,6 @@ def query(cwd, task=None, ready=False, role=None):
             raise DiagnosticError("binding_not_ready", "No ready worktree binding; create/adopt then prepare first", role=role)
         if role is not None:
             try:
-                if task_record(source["root"], task).get("status") != "in_progress":
-                    raise DiagnosticError("source_not_approved", "Source task is not approved/in_progress for execution", role=role)
                 result["materials"] = validate_ready(b, role) if ready else source_materials(source["root"], task, role, approved=True)
             except (ValueError, OSError, UnicodeError) as error:
                 if ready:

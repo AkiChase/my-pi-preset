@@ -10,6 +10,8 @@ import { readBinding } from '../lib/bindings.ts';
 import { writeExecution } from '../lib/executions.ts';
 
 const smoke=new Set([
+ 'planning research prepares without lifecycle writes and readiness stays role-scoped',
+ 'planning task and broken own references fail; uncommitted source specs are valid without target comparison',
  'prepare preview/confirm use source materials without task copies, start, hooks, pointers or Git changes',
 ]);
 const test=(name,fn,options)=>smoke.has(name)?nativeTest(name,fn,options):undefined;
@@ -70,9 +72,28 @@ test('prepare preview/confirm use source materials without task copies, start, h
  await f.run({action:'remove',integratedInto:'HEAD'});assert.ok(!existsSync(target));assert.equal(readBinding(f.root,f.task),undefined);assert.ok(f.git('rev-parse',`refs/heads/${created.binding.branch}`));
 });
 
+test('planning research prepares without lifecycle writes and readiness stays role-scoped',async t=>{
+ const f=fixture(t);f.put(f.task+'/task.json','{"status":"planning"}');const created=await f.run(),target=created.binding.worktreePath;
+ const record=readFileSync(join(f.root,f.task,'task.json'));
+ const snapshot=()=>execFileSync('git',['-C',target,'status','--porcelain'],{encoding:'utf8'});const before=snapshot();
+ for(const role of ['implement','check'])await assert.rejects(f.run({action:'prepare',role}),/must be in_progress/);
+ const preview=await f.run({action:'prepare',role:'research',confirm:false});assert.equal(preview.preview,true);
+ const ready=await f.run({action:'prepare',role:'research'});assert.equal(ready.binding.preparationState,'ready');assert.equal(ready.materials.role,'research');
+ assert.equal((await f.run({action:'prepare',role:'research'})).reused,true);
+ const status=await f.run({action:'status'});assert.equal(status.materials.research.state,'valid');
+ for(const role of ['implement','check'])assert.equal(status.materials[role].issues[0].code,'source_not_approved');
+ const {queryWorktree,requireMaterials}=await import('../lib/worktree-query.ts');
+ assert.equal(requireMaterials(await queryWorktree(f.root,f.task,true,undefined,false,'research')).state,'valid');
+ for(const role of ['implement','check'])await assert.rejects(queryWorktree(f.root,f.task,true,undefined,false,role),/must be in_progress/);
+ assert.deepEqual(readFileSync(join(f.root,f.task,'task.json')),record);assert.equal(snapshot(),before);
+ assert.equal(existsSync(join(target,f.task)),false);
+ for(const root of [f.root,target])assert.equal(existsSync(join(root,'.trellis/.runtime/sessions')),false);
+ f.put(f.task+'/task.json','{"status":"completed"}');await assert.rejects(f.run({action:'prepare',role:'research'}),/planning or in_progress/);
+});
+
 test('planning task and broken own references fail; uncommitted source specs are valid without target comparison',async t=>{
  const f=fixture(t);await f.run();
- f.put(f.task+'/task.json','{"status":"planning"}');await assert.rejects(f.run({action:'prepare'}),/normal workflow/);
+ f.put(f.task+'/task.json','{"status":"planning"}');await assert.rejects(f.run({action:'prepare'}),/must be in_progress/);
  f.put(f.task+'/task.json','{"status":"in_progress"}');
  f.put(f.task+'/implement.jsonl',JSON.stringify({file:'.trellis/spec/missing.md'}));await assert.rejects(f.run({action:'prepare'}),/Source material/);
  f.put(f.task+'/implement.jsonl',JSON.stringify({file:'.trellis/spec/spec.md'}));

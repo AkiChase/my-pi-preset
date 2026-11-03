@@ -7,7 +7,7 @@ import { acquireBindingLock, sameIdentity } from "./bindings.ts";
 import { activeExecution, processToken, readExecution, writeExecution, worktreeSnapshot, type ExecutionRecord } from "./executions.ts";
 import { queryWorktree, requireMaterials, type MaterialRole } from "./worktree-query.ts";
 import { canonicalPath, validateText } from "./config.ts";
-import { assembleDispatchPrompt, isTrellisRole, readTaskRecord, type TrellisRole } from "./task-context.ts";
+import { assembleDispatchPrompt, isTrellisRole, readTaskRecord, requireDispatchStatus, type TrellisRole } from "./task-context.ts";
 import { readSourceExecution, sourceActive, sourceExecutionFile, sourceExecutionForAgent, writeSourceExecution, type SourceExecution } from "./source-executions.ts";
 
 import { adapterConfigured } from "./adapter-resources.ts";
@@ -113,7 +113,7 @@ export function registerDispatchTool(pi: ExtensionAPI, activeTask: (ctx: Extensi
 	});
 	pi.registerTool({
 		name: "trellis_dispatch", label: "Trellis Dispatch",
-		description: "Dispatch an approved Trellis role in the shared source directory when unbound, or its prepared managed worktree when bound. Never creates worktrees or falls back from a binding. Returns a real agent ID. Stop requests provider cancellation and retains occupancy until terminal evidence. Main coordinates shared-directory edits and phases. Use agent_manage status/output/wait with the returned agent_id; successful final retrieval consumes that run. Use subagent_message with agent_id/message to steer a running agent.",
+		description: "Dispatch an approved Trellis role in the shared source directory when unbound, or its prepared managed worktree when bound. Research accepts planning or in_progress tasks; implement/check require in_progress. Dispatch never starts or approves a task. Never creates worktrees or falls back from a binding. Returns a real agent ID. Stop requests provider cancellation and retains occupancy until terminal evidence. Main coordinates shared-directory edits and phases. Use agent_manage status/output/wait with the returned agent_id; successful final retrieval consumes that run. Use subagent_message with agent_id/message to steer a running agent.",
 		parameters: { type: "object", properties: { action: { anyOf: [{ type: "null" }, { type: "string", enum: ["dispatch", "stop", ""] }], description: "dispatch (default when null or empty) or stop an existing execution" }, agent: { anyOf: [{ type: "null" }, { type: "string", enum: ["trellis-implement", "trellis-check", "trellis-research", ""] }], description: "Required non-null Trellis role for dispatch; set null for stop" }, task: { anyOf: [{ type: "null" }, { type: "string" }], description: "Approved task reference; null or empty uses the local/active task" }, prompt: { anyOf: [{ type: "null" }, { type: "string" }], description: "Required non-empty text for dispatch; newlines/tabs are preserved, NUL is forbidden; set null for stop" } }, required: ["action", "agent", "task", "prompt"], additionalProperties: false } as unknown as Parameters<ExtensionAPI["registerTool"]>[0]["parameters"],
 		executionMode: "sequential",
 		async execute(_id, input, signal, _update, ctx) {
@@ -125,7 +125,7 @@ export function registerDispatchTool(pi: ExtensionAPI, activeTask: (ctx: Extensi
 			if (!verifyRuntime(source.root)) throw new Error("Supported Pi Trellis runtime manifest required before dispatch; no child was started");
 			if (!await adapterConfigured(source.root)) throw new Error("Persist the my-pi-preset package (its extensions/trellis.ts entry) in source/user settings (not only a one-shot -e path), so child sessions can load the context adapter");
 			const task = args.task ?? local?.taskDir ?? await activeTask(ctx);
-			if (!task) throw new Error("No approved active task");
+			if (!task) throw new Error("No task selected; provide task explicitly or bind an active task");
 			const { binding: initialBinding } = await queryWorktree(ctx.cwd, task, false, signal);
 			const identity = { sourceRoot: source.root, repositoryIdentity: source.commonDir, taskDir: task };
 			sourceIdentity = identity;
@@ -147,7 +147,7 @@ export function registerDispatchTool(pi: ExtensionAPI, activeTask: (ctx: Extensi
 				return { content: [{ type: "text", text: "Stop requested through provider. Lease retained until terminal evidence; directory/code preserved." }], details: { agentId: execution.agentId } };
 			}
 			if (!isTrellisRole(args.agent)) throw new Error("Unknown Trellis role");
-			if (readTaskRecord(source.root, task).status !== "in_progress") throw new Error("Source task must be in_progress before dispatch");
+			requireDispatchStatus(args.agent, readTaskRecord(source.root, task).status);
 			// Preserve custom agents; reject config that would silently defeat cwd/context rather than overwrite it.
 			const definition = readFileSync(join(source.root, ".pi/agents", `${args.agent}.md`), "utf8");
 			const header = /^---\r?\n([\s\S]*?)\r?\n---/.exec(definition)?.[1];
@@ -168,7 +168,7 @@ export function registerDispatchTool(pi: ExtensionAPI, activeTask: (ctx: Extensi
 					const assertSource = async () => {
 						const latest = await queryWorktree(ctx.cwd, task, false, signal, false, selectedRole);
 						if (latest.binding) throw new Error("Task became bound before source dispatch; inspect and retry");
-						if (readTaskRecord(source.root, task).status !== "in_progress") throw new Error("Source task must be in_progress before dispatch");
+						requireDispatchStatus(args.agent, readTaskRecord(source.root, task).status);
 						if (sourceActive(readSourceExecution(identity))) throw new Error("Task already has running/unknown source execution");
 						return requireMaterials(latest);
 					};
@@ -203,6 +203,7 @@ export function registerDispatchTool(pi: ExtensionAPI, activeTask: (ctx: Extensi
 				const prompt = assembleDispatchPrompt({ prompt: `Review base: ${executionBinding.baseCommit}\n\n${args.prompt}`, contextId: executionBinding.contextId, role: args.agent, materials: facts, executionRoot: executionBinding.worktreePath });
 				const final = await queryWorktree(ctx.cwd, task, true, signal, true, selectedRole);
 				if (!final.binding || !sameIdentity(final.binding, executionBinding) || requireMaterials(final).sourceFingerprint !== facts.sourceFingerprint || worktreeSnapshot(executionBinding) !== targetFingerprint) throw new Error("Materials or execution checkout changed during prompt rendering; inspect and retry dispatch");
+				requireDispatchStatus(args.agent, readTaskRecord(source.root, task).status);
 				signal?.throwIfAborted();
 				if (shuttingDown) throw new Error("Host session shut down before spawn");
 				const binding = executionBinding;
