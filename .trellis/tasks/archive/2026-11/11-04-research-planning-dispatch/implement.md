@@ -6,7 +6,7 @@
 
 任务已 start，为 `in_progress`。`implement.jsonl` 有意为空，直接实施无需派发 manifest；`check.jsonl` 有三个有效 spec 引用。start 使用 `--allow-empty-context`，不代表完整 task validate 通过。
 
-阶段检查点提交消息：`fix(trellis): allow planning research dispatch`。本记录与实现同一提交，具体哈希见 Git 历史和交付回复。不 push、不改写历史、不安装、不部署、不自动归档或写 journal。
+阶段检查点：`3d7b2b4` — `fix(trellis): allow planning research dispatch`。本记录与实现最初同一提交；用户随后以“收尾吧”批准验收归档、清除绑定、journal 及相应本地提交。不 push、不改写历史、不安装或部署。
 
 ## 完成项与验收映射
 
@@ -51,4 +51,13 @@ reviewer 指出 smoke 白名单意味着未注册的 stop/shutdown 声明不算�
 
 原始日志、negative runtime 副本和 reviewer 输出只在 `/tmp/trellis-research-planning.nD1FXA`；主会话已核实所有结果，无未解决诊断。任务仅保留 PRD、design、本记录、task.json 及两份角色 manifest，无 research/evidence 报告或原始输出。主会话确认本轮命令与 reviewer 均已终止后，仅删除本轮拥有目录 `/tmp/trellis-research-planning.nD1FXA`，并检查目录已不存在，清理成功。本记录保留所有最终结果和预期负对照失败事实，不依赖临时日志。
 
-NOT_RUN：真实在线模型/provider 端到端派发、个人安装/同步、已部署资源更新、生产 managed worktree、TUI。fake-pi/临时仓库回归不等同这些证据。修改的包内 runtime 需要后续显式部署更新；已安装包和本项目生成的部署副本均未为此手工修改。任务保留 active/in_progress 等待验收，不自动归档。
+NOT_RUN：真实在线模型/provider 端到端派发、个人安装/同步、已部署资源更新、生产 managed worktree、TUI。fake-pi/临时仓库回归不等同这些证据。修改的包内 runtime 需要后续显式部署更新；已安装包和本项目生成的部署副本均未为此手工修改。用户已以“收尾吧”验收并授权任务归档。
+
+## 收尾
+
+- 归档前复核 `3d7b2b4`、全部验收映射和完整最终测试记录，产品代码未再变化，无需机械重跑产品测试。
+- 此任务始终在 main 直接提交，未建立独立 PR 分支或创建 PR；`branch=base_branch=main` 是实际记录。依据 CLI 针对非 PR 任务的显式例外，用 `archive --skip-branch-validation`，不伪造或改写分支元数据。
+- 归档提交范围仅本任务源/目标目录（无 parent/children）；journal 提交范围仅当前开发者 journal/index，归档后当前绑定应为空。按默认 `session_auto_commit` 执行。
+- 另一个任务 `.trellis/tasks/11-04-task-viewer-toggle/` 的未提交材料不属于本次收尾，完整保留、不 stage、不提交。
+- 本轮原始临时目录已清理；已安装包/已部署资源仍未更新，无 push。
+
