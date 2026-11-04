@@ -147,3 +147,11 @@ tmux 设置 `extended-keys on`、`extended-keys-format csi-u`、`remain-on-exit 
 在主会话核实结果、故障与重跑、PID 和 server 退出、最小证据已留存后，删除仅本轮拥有的 `/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/pi-task-viewer-tmux.nmxPnY/`，包括临时 HOME/agent/project/tmp、驱动、原始截图与日志，确认路径已不存在。此前全量测试停滞的 ooZ33d 诊断目录未触碰，不把两轮清理混为一谈。
 
 物理键盘 Ctrl+Shift+T、真实鼠标/IME、实际问卷/pi-btw 包、light 主题、40 列、进程内 /new 或 /reload 仍 NOT_RUN；不使用模拟 CSI-u 和 fixture 的成功替代这些证据。源码/测试未变化，复用已有效的 1773/1773 pnpm check；本轮只对任务记录、证据与引用/whitespace 执行最终检查。
+
+## 验收与收尾授权
+
+用户在收到实现、回归和 15 项真实 CLI tmux 模拟结果后明确要求“好的，收尾吧”，接受本次完成范围并授权归档、清除绑定、记录 journal 及对应本地提交。产品提交 `c17dca8` 后仅有任务记录/证据更新（`77b300b`、`ed3bc6f`），产品和测试输入没有变化，以上验证仍有效；工作树与 staged scope 干净。
+
+本任务从创建到实施一直在 main 上直接完成，没有独立 feature branch、PR 或 push；branch/base_branch 同为 main、pr_url=null。因此采用原生 `task.py archive <task> --skip-branch-validation` 的明确非 PR 归档路径，不修改或虚构分支 metadata。归档只涉及当前任务的源/目标路径，无 children、managed worktree 或目标冲突。按项目默认开启的 session_auto_commit 执行归档与 journal，不包括无关源码或其他任务。
+
+所有新材料已复核：只保留 PRD、设计、实现与验证记录、角色 JSONL、task metadata 和一份必要的文字终端证据，不新增 raw logs/research 报告。成功 tmux 验证的独占临时目录已清理；首轮全量测试停滞未复现的诊断目录仍按上述原因保留，不声称已清理。未覆盖的物理键盘/第三方真实组合等限制保持不变，收尾不授权个人安装同步、reload、push 或历史改写。
