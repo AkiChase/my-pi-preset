@@ -1,0 +1,5 @@
+{"file":".trellis/spec/development/index.md","reason":"审查扩展会话身份、异步 admission、交互清理、SDK 接口与任务浏览器最小改动边界"}
+{"file":".trellis/spec/testing/index.md","reason":"Trellis 仅 fake-pi/handle mjs 逻辑测试，natural-exit、隔离环境与证据限制"}
+{"file":".trellis/spec/development/widget-display.md","reason":"隐藏提示使用临时状态，不能接管 Footer/widget 或覆盖常驻 Trellis 显示"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"追踪 command/raw-input 到浏览器 owner 与 session lifecycle 的身份和副作用"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"保留 TaskBrowser 实例及原编辑器，不以共享 UI framework 扩大任务"}

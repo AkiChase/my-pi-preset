@@ -950,6 +950,7 @@ export default function (pi: ExtensionAPI): void {
 		}
 	});
 	let registeredRoot: string | undefined;
+	let taskBrowser: ReturnType<typeof registerTaskBrowserCommand> | undefined;
 	let startupCwd: string | undefined;
 	const refreshProjectDisplay = async (ctx: ExtensionContext, known?: Session) => {
 		if (!ownsDisplay(ctx)) return;
@@ -964,7 +965,7 @@ export default function (pi: ExtensionAPI): void {
 	const registerProjectCapabilities = (root: string) => {
 		if (registeredRoot) return;
 		registeredRoot = root;
-		registerTaskBrowserCommand(pi, {
+		taskBrowser = registerTaskBrowserCommand(pi, {
 			findRoot: (cwd, ctx) => {
 				try {
 					const found = findRoot(cwd);
@@ -998,6 +999,7 @@ export default function (pi: ExtensionAPI): void {
 
 	pi.on("session_start", async (_event, ctx) => {
 		const startupGeneration = ++displayGeneration;
+		taskBrowser?.close();
 		if (displayClosed) return;
 		displayManager = ctx.sessionManager; displaySessionId = ctx.sessionManager.getSessionId();
 		const startupValid = () => ownsDisplay(ctx) && displayGeneration === startupGeneration;
@@ -1083,6 +1085,7 @@ export default function (pi: ExtensionAPI): void {
 			}
 		}
 
+		if (startupValid()) taskBrowser?.start(ctx);
 		await refreshProjectDisplay(ctx, current);
 	});
 
@@ -1295,6 +1298,7 @@ export default function (pi: ExtensionAPI): void {
 	// ---- Cleanup -----------------------------------------------------------
 
 	pi.on("session_shutdown", (_event, ctx) => {
+		taskBrowser?.close();
 		cancelCheck(); checkClosed = true;
 		displayClosed = true; displayGeneration++; widget.dispose();
 		clearDisplay(widget, ctx);

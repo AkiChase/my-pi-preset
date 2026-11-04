@@ -14,10 +14,10 @@ function fixture(t,runtime=false) {
  const root=mkdtempSync(join(tmpdir(),'pi-project-activation-'));t.after(()=>rmSync(root,{recursive:true,force:true}));return root;
 }
 function harness(root) {
- const commands=new Map(),tools=new Map(),handlers=new Map(),messages=[],notices=[],display={},publications=[];let subscriptions=0;
+ const commands=new Map(),tools=new Map(),handlers=new Map(),messages=[],notices=[],display={},publications=[],rawInputs=new Set();let subscriptions=0;
  trellis({registerMessageRenderer:()=>{},registerCommand:(n,c)=>commands.set(n,c),registerTool:t=>tools.set(t.name,t),events:{on:()=>{subscriptions++;return()=>{};},emit:(name,request)=>{if(name==='preset:widget-display:connect:v1')request.accept({set:content=>{publications.push(request.ctx);display.widget=content;return true;},dispose:()=>{display.widget=undefined;}});}},on:(n,h)=>{const previous=handlers.get(n);handlers.set(n,previous?async(...args)=>{await previous(...args);await h(...args);}:h);return()=>{};},getAllTools:()=>[{name:'subagent_run'}],sendMessage:m=>messages.push(m)});
- const ctx={cwd:root,hasUI:true,mode:"tui",sessionManager:{getSessionId:()=>root,getSessionFile:()=>undefined},ui:{theme:{fg:(_c,t)=>t,bold:t=>t},notify:t=>notices.push(t),setWidget:(_k,v)=>display.widget=v,setStatus:(_k,v)=>display.status=v}};
- return {commands,tools,handlers,messages,notices,display,publications,ctx,get subscriptions(){return subscriptions;}};
+ const ctx={cwd:root,hasUI:true,mode:"tui",sessionManager:{getSessionId:()=>root,getSessionFile:()=>undefined},ui:{theme:{fg:(_c,t)=>t,bold:t=>t},notify:t=>notices.push(t),onTerminalInput:listener=>{rawInputs.add(listener);return()=>rawInputs.delete(listener);},setWidget:(_k,v)=>display.widget=v,setStatus:(_k,v)=>display.status=v}};
+ return {commands,tools,handlers,messages,notices,display,publications,rawInputs,ctx,get subscriptions(){return subscriptions;}};
 }
 
 test('Trellis discovery stops at Git directory/file boundary and checks boundary Trellis first',t=>{
@@ -48,7 +48,7 @@ test('factory and fresh startup register only init, no RPC subscription, Python,
 test('supported startup registers viewer command and dispatch tool once; invalidation clears UI without state injection',async t=>{
  const root=fixture(t,true);const h=harness(root);
  await h.handlers.get('session_start')({},h.ctx);assert.deepEqual([...h.commands.keys()].sort(),['trellis-init','trellis-task-viewer']);assert.deepEqual([...h.tools.keys()],['trellis_dispatch']);assert.equal(h.subscriptions,2);assert.deepEqual(h.display.widget,['▸ trellis(0)']);
- await h.handlers.get('session_start')({},h.ctx);assert.equal(h.subscriptions,2);
+ await h.handlers.get('session_start')({},h.ctx);assert.equal(h.subscriptions,2);assert.equal(h.rawInputs.size,1);
  rmSync(join(root,'.trellis/scripts/task.py'));await h.handlers.get('agent_end')({},h.ctx);assert.equal(h.display.widget,undefined);assert.equal(h.display.status,undefined);
  await h.handlers.get('before_agent_start')({prompt:'inspect',systemPromptOptions:{sections:{}}},h.ctx);assert.deepEqual(h.messages,[]);
  await h.commands.get('trellis-task-viewer').handler('',{...h.ctx,mode:'tui'});assert.ok(h.notices.some(n=>/unavailable/.test(n)));
@@ -113,6 +113,17 @@ test('fresh runner cannot activate another project on session replacement withou
  assert.deepEqual([...h.commands.keys()],['trellis-init']);assert.equal(h.tools.size,0);assert.equal(h.subscriptions,0);assert.deepEqual(sections,{});assert.deepEqual(h.messages,[]);assert.equal(h.display.widget,undefined);assert.equal(h.display.status,undefined);
  assert.equal((await h.handlers.get('tool_call')({toolName:'subagent_run',input:{subagent_type:'trellis-check',prompt:'work'}},h.ctx))?.block,true);
  const reloaded=harness(b);await reloaded.handlers.get('session_start')({},reloaded.ctx);assert.ok(reloaded.commands.has('trellis-task-viewer'));assert.ok(reloaded.tools.has('trellis_dispatch'));
+});
+
+test('viewer session input is project-only and retired on replacement and shutdown',async t=>{
+ const unsupported=harness(fixture(t));await unsupported.handlers.get('session_start')({},unsupported.ctx);assert.equal(unsupported.rawInputs.size,0);
+ const root=fixture(t,true),h=harness(root);await h.handlers.get('session_start')({},h.ctx);
+ assert.equal(h.rawInputs.size,1);const old=[...h.rawInputs][0];
+ const fresh={...h.ctx,sessionManager:{getSessionId:()=>root,getSessionFile:()=>undefined}};
+ await h.handlers.get('session_start')({},fresh);assert.equal(h.rawInputs.size,1);assert.equal(old('\x1b[116;6u'),undefined);
+ const current=[...h.rawInputs][0];await h.handlers.get('session_shutdown')({},fresh);
+ assert.equal(h.rawInputs.size,0);assert.equal(current('\x1b[116;6u'),undefined);
+ await h.handlers.get('session_start')({},fresh);assert.equal(h.rawInputs.size,0,'retired activation cannot reinstall input');
 });
 
 test('late startup and stale manager refresh cannot replace the current display generation',async t=>{

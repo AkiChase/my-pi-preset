@@ -111,6 +111,7 @@ export class TaskBrowser {
 	private cachedListLayout?: { width: number; layout: ListLayout };
 	private current?: string;
 	private closed = false;
+	private hideHint?: string;
 
 	private root: string;
 	private tui: Pick<TUI, "terminal" | "requestRender">;
@@ -128,7 +129,9 @@ export class TaskBrowser {
 		readCurrent: () => string | undefined,
 		nativeLayout: NativeLayout,
 		unavailable: (error: NativeLayoutError) => void = () => {},
+		hideHint?: string,
 	) {
+		this.hideHint = hideHint;
 		this.root = root; this.tui = tui; this.themeSource = themeSource; this.done = done; this.readCurrent = readCurrent;
 		this.nativeLayout = nativeLayout; this.unavailable = unavailable;
 		this.listScroll = this.scrollView(width => this.listBody(width));
@@ -149,6 +152,7 @@ export class TaskBrowser {
 		while (end < rows.length && rows[end].prefix) end++;
 		if (start > 0) this.snapshot.rows = rows.slice(start, end).concat(rows.slice(0, start), rows.slice(end));
 	}
+	dispose(): void { this.closed = true; this.frame = undefined; }
 	invalidate(): void { this.cachedBody = undefined; this.cachedListLayout = undefined; this.frame = undefined; }
 	private refresh(): void {
 		const identity = this.snapshot.rows[this.selected]?.task.identity;
@@ -344,7 +348,7 @@ export class TaskBrowser {
 		return error;
 	}
 	render(width: number): string[] {
-		if (width < 1) return [];
+		if (this.closed || width < 1) return [];
 		width = Math.floor(width);
 		const rows = Math.max(1, Math.floor(this.tui.terminal.rows || 24));
 		try { return this.renderFrame(width, rows); }
@@ -363,9 +367,10 @@ export class TaskBrowser {
 		else if (width < 38) header.push(this.theme.fg("accent", `${SECTIONS[this.section]} (${this.section + 1}/${SECTIONS.length}) · ←/→`));
 		else header.push(SECTIONS.map((label, index) => index === this.section ? this.theme.bold(this.theme.fg("accent", label)) : this.theme.fg("muted", label)).join(" | "));
 		header.push(this.theme.fg("dim", "─".repeat(width)));
-		const hints = width < 70
+		let hints = width < 70
 			? this.mode === "list" ? `Esc ${this.range === "active" ? "Close" : "Back"} · r Refresh · ↑/↓ · Enter` : "Esc Back · r Refresh · ←/→ · ↑/↓"
 			: this.mode === "list" ? `↑/↓ Select · Enter Open · r Refresh · Esc ${this.range === "active" ? "Close" : "Back"}` : "←/→ Section · ↑/↓ Scroll · r Refresh · Esc Back";
+		if (this.hideHint) hints = `${this.hideHint} · ${hints}`;
 		// Collapse secondary fixed rows on tiny terminals; native layout still owns
 		// the body allocation (including zero-height viewports).
 		while (header.length > Math.max(1, rows - 2)) header.splice(1, 1);
