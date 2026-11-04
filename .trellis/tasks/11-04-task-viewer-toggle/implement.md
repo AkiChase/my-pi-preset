@@ -100,4 +100,50 @@
 
 本轮独占临时目录：`/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/pi-task-viewer-toggle.ooZ33d/`。此前全量停滞的具体根因未复现，因此保留首轮全量日志、最终重跑日志与有限 supervisor/复现材料用于后续诊断，不声称临时目录清理完成。无本轮活跃 shell/Agent 仍使用该目录；未把原始日志或探针提交到仓库 research/evidence。
 
-所有产品验收项已有相应逻辑/源码及最终回归证据；真实 Pi/TUI 挂载、终端外观、物理 Ctrl+Shift+T 和实际第三方插件组合 NOT_RUN，遵守 Trellis 逻辑测试边界，不声称真实终端验收通过。阶段实现已完成并提交为 `c17dca8`（`feat(trellis): toggle task viewer with Ctrl+Shift+T`），包含产品、测试、用户文档及必要任务材料；提交后工作树干净。该提交 hash 的后补记录单独作为任务检查点记录提交，不改变产品。等待用户使用验收，不自动归档/记录 journal/同步安装/reload。
+截至实现阶段提交，产品验收项已有逻辑/源码与回归证据，但真实 CLI/TUI、物理按键与第三方实际组合尚未验证。阶段实现已提交为 `c17dca8`（`feat(trellis): toggle task viewer with Ctrl+Shift+T`），后补 hash 记录为 `77b300b`，均未改写历史。追加真实终端验证见下节；仍等待用户使用验收，不自动归档/记录 journal/同步安装/reload。
+
+## 用户授权的 tmux 真实 CLI 模拟验证
+
+用户明确要求“你开 tmux 去模拟验证一下”，授权本轮隔离真实终端验证及本轮拥有的测试环境清理。本轮仅新增验证记录与最小证据，不改产品源码，不新增永久真实 host/TUI 自动化测试。
+
+### 环境、命令与边界
+
+使用已有 tmux 3.6a 和 Pi CLI 1.4.0，固定 dark 主题；所有控制命令都带独占 `tmux -L <test-id>`。创建仓库外临时 HOME、PI_CODING_AGENT_DIR、TMPDIR、项目和日志目录，使用 `env -i`，不连接个人 tmux panes、不继承认证/包注册、不安装依赖、不调用线上模型。
+
+有效 CLI 参数：
+
+```sh
+pi --offline --no-approve -ne -ns -np -nc --no-mcp --no-session --no-tools --no-themes --use-theme dark --tui-mode <fullscreen|regular> \
+  -e /Users/jyxc-dz-0101322/tools/my-pi-preset/extensions/trellis.ts \
+  -e <owned-run>/fixture.ts
+```
+
+此外显式设置 `PI_OFFLINE=1`、`PI_TELEMETRY=0`、`PI_TUI_WRITE_LOG=<owned-run>/<mode>-writes.log` 和仅用于离线 fixture 的事件路径。临时项目通过源码初始化引擎 `apply(plan(root, 'TmuxFixture'))` 创建，并验证 runtime；填充 2 个测试任务，每页 100 行含 CJK/组合字符/emoji 的文档。没有项目包下载；缺少 fd、subagent_run 与模型的启动警告符合 no-model/offline 隔离方式，不影响浏览器命令。
+
+tmux 设置 `extended-keys on`、`extended-keys-format csi-u`、`remain-on-exit on`。通过 `tmux send-keys -l` 注入 `\x1b[116;6u` 模拟 Ctrl+Shift+T，并注入 Kitty repeat/release 序列；普通 Enter/Right/Down/Escape/Ctrl+C 由 send-keys 驱动。使用有 deadline 的屏幕/事件条件等待而不是固定等待，整个矩阵设 120 秒上限；capture-pane 普通文字与 SGR 捕获、原始 ANSI 均先保存在独占仓库外目录。
+
+用于遮挡的 fixture 是真实 `ctx.ui.custom` overlay 与真实 Input，通过 `/fixture-overlay` 或测试 F6 入口打开。它不是实际 rpiv-ask-user-question 或 pi-btw，不能把结果描述为任意第三方兼容验证。
+
+### 首次失败与重跑
+
+首次驱动退出 1，0 个浏览器场景完成：启动被临时项目的 trust confirmation 阻塞，条件等待 10 秒后超时；文字 capture 明确显示 Trust project folder，stderr 为空。此时浏览器测试尚未开始，不是产品断言失败。只修正临时驱动，加 `--no-approve` 忽略项目发现资源（仍显式加载本次源码）；初始化 runtime 没有修改。首次独占 server 已停止，主会话另用 ps 确认 PID 20490 已退出；初始报告的 pid_gone=false 是 kill-server 之前的采样，不是残留进程结论。
+
+修正后首次矩阵退出 0，13 个 capture 场景 PASS。随后补充错误参数拒绝与显式命令恢复场景，最终完整矩阵再次退出 0，15/15 PASS：
+
+| 模式/尺寸 | 验证结果 |
+| --- | --- |
+| fullscreen 100×30 | 快捷首次打开、进入 Design 并滚动、隐藏态编辑草稿、repeat/release 不展开、快捷恢复原 viewport、错误命令参数保持隐藏、命令恢复原 viewport、隐藏 viewer 前置到 fixture overlay 之上、overlay 草稿恢复：PASS |
+| fullscreen 动态 100×30 → 80×24 | raw writes 确认新 frame 完成后恢复，仍在已滚动的 Design 页面而非 BETA-DESIGN-LINE-001 首页：PASS |
+| fullscreen 80×24 | Ctrl+C 完全关闭后快捷键打开默认列表；F6 覆盖可见 viewer 后快捷键前置而非误隐藏；再次隐藏恢复 covered-draft：PASS |
+| regular 80×24 | 快捷打开、隐藏后编辑 regular-draft、恢复；Esc 关闭后原 editor 草稿仍在：PASS |
+| 退出与资源 | 两个 CLI 均正常退出 0，shutdown 事件存在，PID 与独占 server 均退出：PASS |
+
+逐字节比对 `scrolled-design`、`restore-identical-viewport`、`command-restores-identical-viewport` 三份文字 capture 完全相同，首行文档 BETA-DESIGN-LINE-005、footer `11–36/201` 均一致。fixture 事件仅在主动 Escape 后出现 overlay-done，值分别为 overlay-draft 与 covered-draft；viewer 前置操作没有取消或提交 fixture。
+
+### 留存、清理和未覆盖项
+
+最终独占 server `tv-nmxPnY-24697` 已停止；CLI PID 24704（fullscreen）与 24917（regular）均经 ps 再次核实不存在，pane_dead=1、exit=0、shutdown event=true。保留一份最小、无凭据的恢复后文字终端画面，目的为支持阅读位置保留的使用验收：`evidence/tmux-restored-design.txt`，SHA256 `0c191eec8194c2a78c883905ee0b9bf3e17f8a93c3429b360824956937e2836c`。这是文字 capture，不是图像截图；不重复提交相同 before/after 或完整 ANSI 流。
+
+在主会话核实结果、故障与重跑、PID 和 server 退出、最小证据已留存后，删除仅本轮拥有的 `/private/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/pi-task-viewer-tmux.nmxPnY/`，包括临时 HOME/agent/project/tmp、驱动、原始截图与日志，确认路径已不存在。此前全量测试停滞的 ooZ33d 诊断目录未触碰，不把两轮清理混为一谈。
+
+物理键盘 Ctrl+Shift+T、真实鼠标/IME、实际问卷/pi-btw 包、light 主题、40 列、进程内 /new 或 /reload 仍 NOT_RUN；不使用模拟 CSI-u 和 fixture 的成功替代这些证据。源码/测试未变化，复用已有效的 1773/1773 pnpm check；本轮只对任务记录、证据与引用/whitespace 执行最终检查。
