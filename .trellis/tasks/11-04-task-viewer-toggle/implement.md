@@ -100,4 +100,4 @@
 
 本轮独占临时目录：`/var/folders/fx/bn7t1rq16xn7_66t233x_s1h0000gn/T/pi-task-viewer-toggle.ooZ33d/`。此前全量停滞的具体根因未复现，因此保留首轮全量日志、最终重跑日志与有限 supervisor/复现材料用于后续诊断，不声称临时目录清理完成。无本轮活跃 shell/Agent 仍使用该目录；未把原始日志或探针提交到仓库 research/evidence。
 
-所有产品验收项已有相应逻辑/源码及最终回归证据；真实 Pi/TUI 挂载、终端外观、物理 Ctrl+Shift+T 和实际第三方插件组合 NOT_RUN，遵守 Trellis 逻辑测试边界，不声称真实终端验收通过。阶段实现已完成，等待最终 scoped commit 和用户使用验收，不自动归档/记录 journal/同步安装/reload。
+所有产品验收项已有相应逻辑/源码及最终回归证据；真实 Pi/TUI 挂载、终端外观、物理 Ctrl+Shift+T 和实际第三方插件组合 NOT_RUN，遵守 Trellis 逻辑测试边界，不声称真实终端验收通过。阶段实现已完成并提交为 `c17dca8`（`feat(trellis): toggle task viewer with Ctrl+Shift+T`），包含产品、测试、用户文档及必要任务材料；提交后工作树干净。该提交 hash 的后补记录单独作为任务检查点记录提交，不改变产品。等待用户使用验收，不自动归档/记录 journal/同步安装/reload。
