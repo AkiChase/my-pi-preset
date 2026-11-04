@@ -180,3 +180,43 @@
 ### Next Steps
 
 - 若要在当前环境使用修复，后续显式更新包及部署资源并重载；未 push，未验证真实在线 provider。
+
+
+## Session 64: 任务浏览器快捷切换与真实终端验收收尾
+<!-- trellis-session: v=2 fp=4d07d97133d3e40d -->
+
+**Date**: 2026-11-04
+**Task**: 任务浏览器快捷切换与真实终端验收收尾
+**Branch**: `main`
+
+### Summary
+
+完成固定 Ctrl+Shift+T 的快捷打开、隐藏、保留状态恢复与跨弹窗前置，经过独立审查、回归和隔离 tmux 真实 CLI 验证；用户验收后归档并清除绑定。
+
+### Main Changes
+
+- 命令与会话级快捷入口共用浏览器 owner，区分新打开与隐藏恢复；补齐重复调用、异步退休、错误与重入提示清理。
+- 保留一份最小文字终端证据；任务归档到 .trellis/tasks/archive/2026-11/11-04-task-viewer-toggle，采用从未 PR-backed 的明确归档选项。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c17dca8` | feat(trellis): toggle task viewer with Ctrl+Shift+T |
+| `77b300b` | chore(trellis): record task viewer verification checkpoint |
+| `ed3bc6f` | test(trellis): record isolated tmux viewer verification |
+| `37b8be4` | chore(task): archive 11-04-task-viewer-toggle |
+
+### Testing
+
+- [OK] 专项自然退出 28/28；Trellis/scroll-panel 410/410；最终 pnpm check 严格类型检查及 1773/1773 通过。独立审查发现的两项问题经修复，原失败探针 2/2 重跑通过。
+- [OK] Pi 1.4.0/tmux 3.6a 离线隔离真实 CLI 15/15 场景通过，覆盖 fullscreen/regular、恢复 viewport、草稿、前置、拒绝和缩放；CLI 均正常退出，独占服务及临时环境已清理。
+- [OK] 首轮全量测试曾停滞约 10 小时并被停止，1769 PASS/1 CANCELLED；重跑带 180 秒硬上限并通过，根因未复现，必要诊断日志按实现记录保留。首次 tmux trust prompt 超时仅修正临时驱动后重跑通过。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 无待实施项；物理按键、真实鼠标/IME与实际问卷/pi-btw 组合仍未验证。未 push、未同步个人安装或 reload。
