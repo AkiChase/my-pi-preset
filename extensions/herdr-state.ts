@@ -1,6 +1,7 @@
 import net from "node:net";
 import path from "node:path";
 import type { ExtensionAPI, ExtensionContext, UIPromptKind, UIPromptStartEvent } from "@earendil-works/pi-coding-agent";
+import { herdrCorePresent, watchHerdrCoreState } from "./herdr-state/core.ts";
 
 // Reports Pi's lifecycle and explicit human-attention waits directly to Herdr. A custom screen
 // is not necessarily a question: browsers and settings panels remain notification-free. Standard
@@ -352,6 +353,6 @@ export function watchHerdrState(pi: ExtensionAPI, reporter: HerdrReporter): void
 
 export default function herdrState(pi: ExtensionAPI): void {
   const reporter = createHerdrReporter();
-  if (!reporter) return;
-  watchHerdrState(pi, reporter);
+  if (reporter) watchHerdrState(pi, reporter);
+  else if (herdrCorePresent()) watchHerdrCoreState(pi, askUserLabel);
 }

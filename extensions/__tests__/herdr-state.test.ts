@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ExtensionAPI, ExtensionContext, UIPromptEndEvent, UIPromptStartEvent } from "@earendil-works/pi-coding-agent";
-import {
+import herdrState, {
   askUserLabel,
   createHerdrReporter,
   herdrPresent,
@@ -32,6 +32,8 @@ function createFakePi() {
   };
   return {
     pi: pi as unknown as ExtensionAPI,
+    registrations: () => [...lifecycleHandlers.keys()],
+    busChannels: () => [...busHandlers.keys()],
     fireBus(channel: string, data: unknown) {
       for (const handler of busHandlers.get(channel) ?? []) handler(data);
     },
@@ -225,6 +227,40 @@ describe("direct Herdr reporter", () => {
     await sink.flush();
     assert.equal(sent[0]?.params.agent_session_id, "fallback-id");
     assert.deepEqual(stateRequests(sent).map((request) => request.params.state), ["working", "idle"]);
+  });
+});
+
+describe("Herdr entry routing", () => {
+  it("selects exactly one environment branch and preserves complete legacy-pane precedence", () => {
+    const keys = ["HERDR_ENV", "HERDR_SOCKET_PATH", "HERDR_PANE_ID", "HC_TERMINAL_ID", "HC_TERMINAL_SOCKET"] as const;
+    const saved = keys.map((key) => process.env[key]);
+    const cases: { env: NodeJS.ProcessEnv; branch: "none" | "core" | "socket" }[] = [
+      { env: {}, branch: "none" },
+      { env: { HC_TERMINAL_ID: "test-terminal" }, branch: "none" },
+      { env: { HC_TERMINAL_SOCKET: "/unused-test.sock" }, branch: "none" },
+      { env: { HC_TERMINAL_ID: "test-terminal", HC_TERMINAL_SOCKET: "/unused-test.sock" }, branch: "core" },
+      { env: { HERDR_ENV: "1", HERDR_SOCKET_PATH: "/unused-test.sock", HC_TERMINAL_ID: "test-terminal", HC_TERMINAL_SOCKET: "/unused-core.sock" }, branch: "core" },
+      { env: { HERDR_ENV: "1", HERDR_SOCKET_PATH: "/unused-test.sock", HERDR_PANE_ID: "test:pane", HC_TERMINAL_ID: "test-terminal", HC_TERMINAL_SOCKET: "/unused-core.sock" }, branch: "socket" },
+    ];
+    try {
+      for (const { env, branch } of cases) {
+        for (const key of keys) delete process.env[key];
+        Object.assign(process.env, env);
+        const fake = createFakePi();
+        herdrState(fake.pi);
+        if (branch === "none") assert.equal(fake.registrations().length, 0);
+        else if (branch === "core") {
+          assert.deepEqual(fake.registrations(), ["session_start", "session_shutdown"]);
+          assert.equal(fake.busChannels().length, 0, "core does not subscribe until the owning TUI session");
+        } else {
+          assert.ok(fake.registrations().includes("agent_start"));
+          assert.ok(fake.registrations().includes("ui_prompt_start"));
+          assert.equal(fake.busChannels().length, 2);
+        }
+      }
+    } finally {
+      keys.forEach((key, index) => { const value = saved[index]; if (value === undefined) delete process.env[key]; else process.env[key] = value; });
+    }
   });
 });
 
