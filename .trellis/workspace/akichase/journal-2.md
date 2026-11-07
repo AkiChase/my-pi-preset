@@ -220,3 +220,42 @@
 ### Next Steps
 
 - 无待实施项；物理按键、真实鼠标/IME与实际问卷/pi-btw 组合仍未验证。未 push、未同步个人安装或 reload。
+
+
+## Session 65: Herdr Core 问卷状态补齐收尾
+<!-- trellis-session: v=2 fp=66a6d4807d4f65eb -->
+
+**Date**: 2026-11-07
+**Task**: Herdr Core 问卷状态补齐收尾
+**Branch**: `main`
+
+### Summary
+
+按 A 方案补齐 core 问卷 Blocked 与标签，保留 Pi 原生状态和 TUI socket 通道；独立复查、隔离验证通过后，用户验收并授权归档与推送。
+
+### Main Changes
+
+- 公开 terminal receiver 合并问卷注意力，具名 ID 幂等配对、原生 Blocked 优先、latest snapshot 恢复与未知快照安全回退。
+- 修复独立审查发现的 rejection/shutdown 重入迟到回写，保留真实失败与复跑事实；仅清理本次 owned 临时输出。
+- 任务已归档至 .trellis/tasks/archive/2026-11/11-07-herdr-core-state；清除 session binding，保留六处并行未提交改动。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `55d1627` | feat(herdr-state): supplement core questionnaire status |
+| `ea6d16a` | chore(task): record herdr core status verification |
+| `fcbbb71` | chore(task): archive 11-07-herdr-core-state |
+
+### Testing
+
+- [OK] focused 42/42 自然退出；最终 pnpm check 严格类型检查及 1795/1795 通过，独立 P2 复查通过。
+- [OK] Pi 1.5.0/core 0.1.18 的隔离 regular/fullscreen 与禁用上报矩阵 37 个观察通过；正常退出且无残余 PID。SDK fixture 层为 1.4.0，未冒充同版本 CLI 端到端。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 按用户授权普通 push 到 origin/main；不更新个人安装或重启会话。已打开问卷热加载立即补报、online provider、物理 IME/鼠标及完整第三方键盘路径不在此次保证内。

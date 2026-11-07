@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 64
-- **Last Active**: 2026-11-04
+- **Total Sessions**: 65
+- **Last Active**: 2026-11-07
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~222 | Active |
+| `journal-2.md` | ~261 | Active |
 | `journal-1.md` | ~1975 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 65 | 2026-11-07 | Herdr Core 问卷状态补齐收尾 | `55d1627`, `ea6d16a`, `fcbbb71` | `main` |
 | 64 | 2026-11-04 | 任务浏览器快捷切换与真实终端验收收尾 | `c17dca8`, `77b300b`, `ed3bc6f`, `37b8be4` | `main` |
 | 63 | 2026-11-04 | 完成规划阶段 research 派发修复 | `3d7b2b4`, `3819563`, `f3798ad` | `main` |
 | 62 | 2026-10-27 | 修复 reload 后编辑器扩展安装失效 | `87559ed` | `main` |
