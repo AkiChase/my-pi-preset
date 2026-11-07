@@ -3,7 +3,7 @@
   "name": "herdr-core-state",
   "title": "Herdr Core 问卷等待状态补齐",
   "description": "保留 Pi 原生 OSC 7501 生命周期上报，仅补齐 herdr-core 问卷 Blocked 与标签",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -11,7 +11,7 @@
   "creator": "akichase",
   "assignee": "akichase",
   "createdAt": "2026-11-07",
-  "completedAt": null,
+  "completedAt": "2026-11-07",
   "branch": "main",
   "base_branch": "main",
   "worktree_path": null,
@@ -21,6 +21,6 @@
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "A 阶段已实现、独立复查与隔离验证通过；保留未知快照安全回退。等待用户验收与生命周期授权，未归档。",
+  "notes": "A 阶段已实现、独立复查与隔离验证通过；保留未知快照安全回退。用户已验收并授权收尾、journal 与普通推送到 origin/main；非 PR 任务。",
   "meta": {}
 }

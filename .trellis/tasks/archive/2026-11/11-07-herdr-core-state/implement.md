@@ -238,4 +238,12 @@ actual managed launcher 返回 **Pi 1.5.0**，不同于已有 1.4.0 SDK fixture�
 
 产品阶段提交：`55d16275aab501290dafd8f783fdf104524b3bf3`（`feat(herdr-state): supplement core questionnaire status`）。主会话核对实际提交仅包含 adapter/入口、四份回归源码以及耦合用户文档/规范，共 8 个文件；没有加入六份并行未提交改动。随后单独本地提交已筛选的六份任务材料，记录真实检查点和验证事实；这是授权实施记录，不是 archive/journal。
 
-task 保持 in_progress、active，等待用户验收与单独 finish-work 生命周期授权。不 push、不重写历史、不操作个人安装或个人会话。
+实施阶段结束时 task 保持 in_progress、active，等待用户验收与单独 finish-work 生命周期授权，未 push/改写历史/操作个人安装或会话。后续明确授权见下节。
+
+## 10. 用户批准的收尾与推送
+
+用户随后要求“收尾吧，然后push到远程”，验收当前 A 阶段并授权本次 archive、清除 task binding、journal 记录及非 force 推送。已重新核实检查点与 scoped diff，产品代码自最终 1795-test PASS、42-test 自然退出和 37 个实际终端观察后未变；不重复执行无输入变化的产品检查，也不将 task-validate 的空 implement 诊断记成 full PASS。
+
+任务实际在 main 完成，未创建 PR。保留真实 branch/base_branch，不伪造分支或改写历史；使用 CLI 明确提供的 `archive --skip-branch-validation` 非 PR 任务选项。归档只包含本任务的六份已筛选材料，无 children、raw 输出或历史任务清理。journal 只写当前 developer workspace；按现有默认 session_auto_commit 自动提交，不混入六处并行未提交改动。
+
+远程为 `origin`（GitHub AkiChase/my-pi-preset），目标 `main`；先 fetch 核实远端与本地历史，再普通 push，不 force、rebase 或 push 其他分支。push 后由 Git 远端引用核实结果；最终返回实际成功/失败状态。

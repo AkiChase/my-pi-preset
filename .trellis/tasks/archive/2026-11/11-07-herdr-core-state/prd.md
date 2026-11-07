@@ -69,6 +69,6 @@ R5 的安全回退与下节覆盖边界已随用户“按task做”的批准纳�
 
 ## 材料状态
 
-- 当前 A 阶段已实现、独立复查和隔离验证通过，产品检查点为 `55d1627`；证据与未运行限制见 `implement.md` 第 9 节。task 保持 in_progress，等待用户验收与单独生命周期授权，不执行归档。
+- 当前 A 阶段已实现、独立复查和隔离验证通过，产品检查点为 `55d1627`；证据与未运行限制见 `implement.md` 第 9 节。用户随后明确要求“收尾吧，然后push到远程”，验收当前阶段并授权归档、journal 与非 force 推送到 origin/main；执行记录见第 10 节。
 - 主会话直接实现的 implement manifest 仍空；check manifest 已选实际规范引用，供批准后独立审查使用。
 - task-validate 的空 implement manifest 诊断不能称为全部验证通过。
