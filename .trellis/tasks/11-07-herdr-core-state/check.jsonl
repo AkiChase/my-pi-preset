@@ -1,0 +1,14 @@
+{"file":".trellis/spec/development/index.md","reason":"Public receiver ownership, optional integration, cleanup and preservation contracts"}
+{"file":".trellis/spec/development/herdr-state.md","reason":"Preserve direct socket reporter and verify the scoped core extension contract"}
+{"file":".trellis/spec/testing/index.md","reason":"Actual SDK boundary coverage, isolated configuration, natural exit and evidence limits"}
+{"file":".trellis/spec/testing/tmux.md","reason":"Authorized isolated real terminal verification; current workflow governs temporary evidence storage"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse public descriptor lease without coupling core attention to unrelated display state"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Check activation identity, late events, side effect ownership and terminal compatibility"}
+{"file":"extensions/herdr-state.ts","reason":"Review mutual environment routing and unchanged direct socket channel"}
+{"file":"extensions/herdr-state/core.ts","reason":"Review public status receiver, native/attention ownership and disposal"}
+{"file":"extensions/herdr-state/__tests__/core-state.test.ts","reason":"Review pairing, unknown baseline, priority, reentry and activation regressions"}
+{"file":"extensions/herdr-state/__tests__/core-sdk.test.ts","reason":"Review actual SDK lifecycle, capability/cache and natural-exit assertions"}
+{"file":"extensions/herdr-state/__tests__/helpers.ts","reason":"Review typed test seams and subscription cleanup observability"}
+{"file":"extensions/__tests__/herdr-state.test.ts","reason":"Verify socket compatibility and mutually exclusive entry routing"}
+{"file":"extensions/editor-handoff/index.ts","reason":"Existing public descriptor lease reused without editor focus installation"}
+{"file":"docs/extensions/herdr-state.md","reason":"Verify current user-visible host behavior and safe coverage limitations"}
