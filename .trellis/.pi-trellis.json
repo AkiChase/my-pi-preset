@@ -1,6 +1,6 @@
 {
   "schemaVersion": 3,
-  "runtimeReleaseId": "pi-trellis-runtime-v1-fdce3a57938638e9a777eb02ba0bc31db6dc9df4b65a023c26e360d25550331b",
+  "runtimeReleaseId": "pi-trellis-runtime-v1-f2aaad97d0b68ef31f48de73fdf5b5201b5a9d00e1c0736f9fe43125198fa207",
   "files": {
     ".trellis/scripts/add_session.py": {
       "sha256": "432c29b3adcd3510f86b63803f6ecefc3901f3ee623ffda3e0b693ad83ca730c",
@@ -165,7 +165,7 @@
       "source": "runtime/pi_trellis_worktree/records.py"
     },
     ".trellis/scripts/pi_trellis_worktree/materials.py": {
-      "sha256": "e1215b6e70672cd1bb12976376c1ce6a9efca3949288e5894521f5f0be440d88",
+      "sha256": "a3d6db58bea984f079aac61b67e3b16cb9da1f40e56eb9bead88cd9688f26a76",
       "mode": 420,
       "kind": "runtime",
       "source": "runtime/pi_trellis_worktree/materials.py"
@@ -183,7 +183,7 @@
       "source": "runtime/pi_trellis_worktree/cli.py"
     },
     ".trellis/scripts/pi_trellis_worktree/manager.py": {
-      "sha256": "8d4b04e31a160a489945b782edfe4715411edfd18f733e97d1a5726ee132671e",
+      "sha256": "047bb956710009097a5064402959fac0df47e3772cc87fd071f298546e827108",
       "mode": 420,
       "kind": "runtime",
       "source": "runtime/pi_trellis_worktree/manager.py"
@@ -207,7 +207,7 @@
       "source": "agents/trellis-check.md"
     },
     ".pi/agents/trellis-research.md": {
-      "sha256": "da1b67085e922023aa60aefa34689d44d7d25047a09393dea273a92887f8e577",
+      "sha256": "2e07828ea804095c35f5799225a0702d4072719ff27b5f8e1f15c999eeece9c4",
       "mode": 420,
       "kind": "agent",
       "source": "agents/trellis-research.md"
@@ -228,7 +228,7 @@
   "templates": {
     ".trellis/workflow.md": {
       "origin": "package-default",
-      "sha256": "a4bfce5a8fb0429387ff58ea5daf8f57c6c0231486215d370a73860ad92f6ab7",
+      "sha256": "69c829d707e44feffe9f8df0c8d53b4cc6e3219b777b29932419cceed91cc476",
       "mode": 420,
       "source": "resources/templates/workflow.md"
     },
@@ -303,7 +303,7 @@
       "source": "skills/trellis-before-dev/SKILL.md"
     },
     ".pi/skills/trellis-brainstorm/SKILL.md": {
-      "sha256": "0bebf55ed3897071e996467c154565746c1af6f402cab9428459fbc997bf9cf6",
+      "sha256": "23a77f33cd72d7199d3db2aeb782f6a1ee80dcfcc4ad5b423a153957b6157f3b",
       "mode": 420,
       "source": "skills/trellis-brainstorm/SKILL.md"
     },

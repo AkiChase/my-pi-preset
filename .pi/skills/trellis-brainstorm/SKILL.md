@@ -48,17 +48,18 @@ Use a concise title from the user's request. Both the title and `--description` 
    - code, tests, fixtures, and configs
    - README files, docs, existing specs, and domain notes
    - related Trellis tasks, research files, and session history when present
-3. Separate what you found into:
+3. When task-scoped research is useful, dispatch `trellis-research` against this `planning` task before start; research also accepts `in_progress`. Explicitly select the task when the main session has no active task. Read valid source task/PRD/workflow/spec materials; no implement/check manifest is required. Research does not start the task or grant implementation approval, product code is read-only, and source `research/*.md` writes require explicit authorization. Bound tasks still require managed preparation.
+4. Separate what you found into:
    - confirmed facts
    - product intent still needed from the user
    - scope or risk decisions still needed from the user
    - likely out-of-scope items
-4. If a user-owned decision remains, ask the single highest-value question, include your recommendation and trade-off, then stop. Do not perform implementation work in the same turn.
-5. After each user answer, update `prd.md`, recompute the decision inventory, and repeat from step 2.
-6. When no user-owned decision remains, create or update `design.md` and `implement.md` for complex tasks.
-7. Run the requirement convergence gate, then the PRD convergence pass.
-8. Present the final planning summary. If the user has not already explicitly approved the same plan for implementation, stop and wait; do not run `task.py start` or edit product code.
-9. Once the reviewed plan has explicit implementation approval, save/review the required artifacts and run `task.py start`. If the artifacts change materially after approval, repeat the final review.
+5. If a user-owned decision remains, ask the single highest-value question, include your recommendation and trade-off, then stop. Do not perform implementation work in the same turn.
+6. After each user answer, update `prd.md`, recompute the decision inventory, and repeat from step 2.
+7. When no user-owned decision remains, create or update `design.md` and `implement.md` for complex tasks.
+8. Run the requirement convergence gate, then the PRD convergence pass.
+9. Present the final planning summary. If the user has not already explicitly approved the same plan for implementation, stop and wait; do not run `task.py start` or edit product code.
+10. Once the reviewed plan has explicit implementation approval, save/review the required artifacts and run `task.py start`. If the artifacts change materially after approval, repeat the final review.
 
 Do not invent a project-specific product/spec hierarchy. If the repository already has product, domain, or spec docs, use them. If it does not, proceed with the evidence that exists.
 
