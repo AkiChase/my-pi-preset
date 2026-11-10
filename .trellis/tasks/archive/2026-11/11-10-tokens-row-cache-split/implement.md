@@ -67,4 +67,12 @@ Node `v24.14.1`；已安装 SDK `1.5.1`；`PI_SDK_DIR=/Users/jyxc-dz-0101322/.pi
 
 本轮原始日志、隔离配置与测试 shim 在仓库外 `/tmp/pi-tokens-row.EaBi0M/`。SDK 兼容问题尚未解决，保留诊断材料，不清理、不把 raw logs 提交进任务。
 
-阶段只提交本任务代码/测试/用户文档、规范与最小 PRD/实施记录/manifests/task metadata，保留现有无关 Trellis 基础设施改动。独立审查无剩余本任务范围内问题；本阶段有 scoped 验证，完整仓库检查未通过。提交哈希在最终回复给出；任务不自动归档或记 journal。
+阶段检查点：`618353a8a666196be8173d45340147777629a44b`（`fix(agent-tasks): separate latest request and cumulative usage`）。只提交本任务代码/测试/用户文档、规范与最小 PRD/实施记录/manifests/task metadata，保留现有无关 Trellis 基础设施改动。独立审查无剩余本任务范围内问题；本阶段有 scoped 验证，完整仓库检查未通过。
+
+## 验收与收尾
+
+用户在获知 scoped PASS、全量 SDK 兼容失败及未执行真实终端/provider 验证后回复「那收尾吧」，接受本任务范围内交付并授权归档、解除绑定和 journal 记录。全量检查限制保持原样，不视为已解决。
+
+任务直接在 `main` 上完成本地提交，无独立 feature branch 或 PR；归档使用 `--skip-branch-validation` 的非 PR 任务选项，不伪造分支/合并信息。不 push、不改写历史、不安装或 reload。
+
+本轮临时材料 `/tmp/pi-tokens-row.EaBi0M/` 继续保留，原因是已有 SDK 兼容问题尚未解决。任务材料为五个必要文本文件，无原始日志、重复 review 报告或未批准 research 附件。
