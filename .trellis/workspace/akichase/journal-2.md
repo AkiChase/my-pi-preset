@@ -286,7 +286,7 @@
 ### Testing
 
 - [OK] UI 无 shim 62/62 PASS；相关 Agent/UI 回归在测试专用 Type 导出 shim 下 98/98 PASS，自然退出；不作为真实 host 兼容证明。
-- [OK] pnpm check exit 2：25 条错误与原始代码完全相同，新增 0；pnpm test exit 1：1338 tests / 1242 pass / 96 fail，SDK 兼容问题未解决。
+- [FAIL] pnpm check exit 2：25 条错误与原始代码完全相同，新增 0；pnpm test exit 1：1338 tests / 1242 pass / 96 fail，SDK 兼容问题未解决。
 
 ### Status
 
