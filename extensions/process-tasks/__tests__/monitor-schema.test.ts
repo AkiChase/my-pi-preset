@@ -102,6 +102,7 @@ void describe("monitor parameter schema", () => {
         assert.equal(schema.additionalProperties, false);
         assert.deepEqual(schema.required, ["command", "ws", "description", "timeout_ms", "wake_absent_ms"]);
         const properties = schema.properties as Record<string, { anyOf?: Record<string, unknown>[] }>;
+        for (const property of Object.values(properties)) assert.equal(Object.hasOwn(property, "default"), false);
         for (const field of ["command", "ws", "timeout_ms", "wake_absent_ms"]) assert.ok(properties[field]!.anyOf!.some(variant => variant.type === "null"));
         assert.equal(properties.description!.anyOf, undefined);
         const ws = properties.ws!.anyOf!.find(variant => variant.type === "object")!;
@@ -207,16 +208,21 @@ void describe("required-nullable wire boundary", () => {
         }
         const hostInvalid: unknown[] = [null, [], { ...base, typo: null }, { ...base, ws: [] }];
         for (const field of Object.keys(base)) {
-            const missing = { ...base }; delete missing[field]; hostInvalid.push(missing);
+            const missing = { ...base }; delete missing[field]; hostInvalid.push(missing, { ...base, [field]: undefined });
         }
-        for (const ws of [{ protocols: null }, { url: "ws://x" },
+        for (const ws of [{ protocols: null }, { url: "ws://x" }, { url: "ws://x", protocols: undefined },
+            { url: undefined, protocols: null },
             { url: "ws://x", protocols: null, typo: null }, { url: "ws://x", protocols: {} }]) {
             hostInvalid.push({ ...base, command: null, ws });
         }
         for (const key of ["timeout_ms", "wake_absent_ms"]) {
             for (const value of [-1, NaN, Infinity, -Infinity]) hostInvalid.push({ ...base, [key]: value });
         }
-        for (const args of hostInvalid) assert.ok(hostError(h.tool, args), `host accepted ${JSON.stringify(args)}`);
+        for (const args of hostInvalid) {
+            const before = structuredClone(args);
+            assert.ok(hostError(h.tool, args), `host accepted ${JSON.stringify(args)}`);
+            assert.deepEqual(args, before, "host rejection does not mutate the input");
+        }
         // Host scalar coercion is not raw-type validation: direct calls still reject.
         for (const args of [{ ...base, description: 7 }, { ...base, command: 7 },
             { ...base, command: null, ws: { url: 7, protocols: null } }, { ...base, timeout_ms: "0.5" }]) {
@@ -239,18 +245,26 @@ void describe("required-nullable wire boundary", () => {
     });
 
     it("documents SDK conversions without treating them as direct input acceptance", () => {
-        const { tool } = harness();
+        const { tool, reg } = harness();
         const base = monitorInput({ command: "true" });
-        for (const [input, expected] of [[0, null], [false, null], [undefined, null], [0.5, 0.5]] as const) {
-            const args = { ...base, timeout_ms: input };
-            const converted = validateToolArguments(tool as never, { id: "coercion", name: "monitor", arguments: args } as never) as Record<string, unknown>;
-            assert.equal(converted.timeout_ms, expected);
-            assert.equal(args.timeout_ms, input, "host does not mutate the caller envelope");
+        // Nullable means explicit null is accepted, not that required undefined is defaulted.
+        for (const key of ["timeout_ms", "wake_absent_ms"]) {
+            for (const [input, expected] of [[null, null], [0, null], [false, null], ["", null], [0.5, 0.5], ["0.5", 0.5], [true, 1]] as const) {
+                const args = Object.freeze({ ...base, [key]: input });
+                const converted = validateToolArguments(tool as never, { id: "coercion", name: "monitor", arguments: args } as never) as Record<string, unknown>;
+                assert.equal(converted[key], expected);
+                assert.equal(args[key], input, "host does not mutate the caller envelope");
+            }
+            const args = Object.freeze({ ...base, [key]: undefined });
+            assert.match(hostError(tool, args)!.message, new RegExp(`- ${key}: missing`));
+            assert.equal(args[key], undefined); assert.equal(Object.hasOwn(args, key), true);
         }
-        const converted = validateToolArguments(tool as never, { id: "strings", name: "monitor", arguments: {
-            ...base, command: null, description: null, ws: { url: null, protocols: [null] },
-        } } as never) as { description: string; ws: { url: string; protocols: string[] } };
+        const args = { ...base, command: null, description: null, ws: { url: null, protocols: [null] } };
+        const before = structuredClone(args);
+        const converted = validateToolArguments(tool as never, { id: "strings", name: "monitor", arguments: args } as never) as { description: string; ws: { url: string; protocols: string[] } };
         assert.equal(converted.description, "null"); assert.equal(converted.ws.url, "null"); assert.deepEqual(converted.ws.protocols, ["null"]);
+        assert.deepEqual(args, before);
+        assert.equal(reg.totalStarted, 0); assert.equal(reg.jobs.size, 0);
     });
 
     it("shallow normalization preserves null/defaults, fractions, arrays and input identity", () => {

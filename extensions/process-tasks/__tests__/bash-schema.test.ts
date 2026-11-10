@@ -105,7 +105,7 @@ function hostError(tool: ToolDef, args: unknown): Error | undefined {
 
 void describe("bash parameter schema — host validation", () => {
     it("requires exactly three nonnullable fields, without schema defaults", () => {
-        const { tool } = harness();
+        const { tool, reg } = harness();
         const schema = JSON.parse(JSON.stringify(tool.parameters));
         assert.deepEqual(schema.required, ["command", "background_after_seconds", "description"]);
         assert.equal(schema.additionalProperties, false);
@@ -114,9 +114,13 @@ void describe("bash parameter schema — host validation", () => {
             assert.equal(schema.properties[field].default, undefined);
             assert.notEqual(schema.properties[field].type, "null");
             assert.ok(schema.properties[field].description);
-            const args = bashInput({ command: "true" }) as Record<string, unknown>;
-            delete args[field];
-            assert.match(hostError(tool, args)!.message, new RegExp(field));
+            for (const missing of [true, false]) {
+                const args = { ...bashInput({ command: "true" }), [field]: undefined } as Record<string, unknown>;
+                if (missing) delete args[field];
+                Object.freeze(args); const before = Object.getOwnPropertyDescriptors(args);
+                assert.match(hostError(tool, args)!.message, new RegExp(`- ${field}: missing`));
+                assert.deepEqual(Object.getOwnPropertyDescriptors(args), before);
+            }
         }
         for (const seconds of [-1, 0, 0.125, MAX_BACKGROUND_AFTER_SECONDS]) {
             assert.deepEqual(hostValidate(tool, bashInput({ command: "true", background_after_seconds: seconds })), bashInput({ command: "true", background_after_seconds: seconds }));
@@ -126,19 +130,26 @@ void describe("bash parameter schema — host validation", () => {
         for (const key of ["run_in_background", "notify", "timeout", "timeuot"]) for (const value of [false, null, true]) {
             assert.match(hostError(tool, { ...bashInput({ command: "true" }), [key]: value })!.message, new RegExp(key));
         }
+        assert.equal(reg.totalStarted, 0); assert.equal(reg.jobs.size, 0);
     });
     it("records actual host scalar conversions separately from strict direct admission", () => {
-        const { tool } = harness();
-        for (const value of [null, false, 0, 0.125, true, undefined]) {
-            const expected = value === undefined ? "" : String(value);
-            const args = { ...bashInput({ command: "true" }), description: value };
-            assert.deepEqual(hostValidate(tool, args), { ...args, description: expected });
+        const { tool, reg } = harness();
+        // Required undefined values are missing, not scalar defaults (covered above).
+        for (const value of [null, false, 0, 0.125, true]) {
+            const args = Object.freeze({ ...bashInput({ command: "true" }), description: value });
+            assert.deepEqual(hostValidate(tool, args), { ...args, description: String(value) });
+            assert.equal(args.description, value);
         }
-        for (const [value, expected] of [[null, 0], [false, 0], ["", 0], ["0.125", 0.125], [true, 1], [undefined, 0]] as const) {
-            assert.deepEqual(hostValidate(tool, { ...bashInput({ command: "true" }), background_after_seconds: value }), bashInput({ command: "true", background_after_seconds: expected }));
+        for (const [value, expected] of [[null, 0], [false, 0], ["", 0], ["0.125", 0.125], [true, 1]] as const) {
+            const args = Object.freeze({ ...bashInput({ command: "true" }), background_after_seconds: value });
+            assert.deepEqual(hostValidate(tool, args), bashInput({ command: "true", background_after_seconds: expected }));
+            assert.equal(args.background_after_seconds, value);
         }
-        assert.deepEqual(hostValidate(tool, { ...bashInput({ command: "true" }), command: 42 }), bashInput({ command: "42" }));
+        const args = Object.freeze({ ...bashInput({ command: "true" }), command: 42 });
+        assert.deepEqual(hostValidate(tool, args), bashInput({ command: "42" }));
+        assert.equal(args.command, 42);
         assert.ok(hostError(tool, bashInput({ command: "" })));
+        assert.equal(reg.totalStarted, 0); assert.equal(reg.jobs.size, 0);
     });
 });
 

@@ -12,7 +12,7 @@ import type { TestContext } from "node:test";
 import register, { STATE_TYPE } from "../index.ts";
 import { RECAP_PROMPT } from "../output.ts";
 import { buildMaterial } from "../../shared/material.ts";
-import { deferred, FakeClock, flush, reply } from "./harness.ts";
+import { deferred, FakeClock, flush, harness as fakeHarness, reply } from "./harness.ts";
 
 async function sdkHarness(t: TestContext, options: { initial?: boolean; automatic?: boolean; thinking?: string; extra?: (pi: ExtensionAPI) => void; rpc?: boolean; tui?: boolean; persisted?: boolean; retry?: boolean; config?: Record<string, unknown> } = {}) {
     const directory = mkdtempSync(join(tmpdir(), "recap-actual-sdk-"));
@@ -281,25 +281,101 @@ it("actual SDK config titles/issues/model labels are single-line bounded and inv
     assert.equal(h.placeholders.length, 0); assert.match(h.titles.at(-2)!, /…/);
     assert.equal(JSON.parse(readFileSync(join(h.directory, "recap.json"), "utf8")).model, long);
 });
-it("actual SDK EISDIR append leaves history intact but unconfirmed recap cannot be restored or auto-reused in this activation", async t => {
+it("actual SDK EISDIR append rolls back entries, index and leaf; prior confirmed recap restores before a later refresh", async t => {
     const h = await sdkHarness(t, { initial: true, automatic: false, persisted: true, tui: true });
     const first = h.session.prompt("/recap"); await flush(); h.finishRecap(0, reply("prior confirmed")); await first;
     const prior = h.manager.getBranch().findLast(entry => entry.type === "custom" && entry.customType === STATE_TYPE)!;
+    const entries = structuredClone(h.manager.getEntries()), branch = structuredClone(h.manager.getBranch());
+    const tree = structuredClone(h.manager.getTree()), header = structuredClone(h.manager.getHeader());
+    const leaf = h.manager.getLeafId(); assert.equal(leaf, prior.id);
     const path = h.manager.getSessionFile()!; const disk = readFileSync(path, "utf8");
+    let appended = 0;
+    const unsubscribe = h.session.subscribe(event => { if (event.type === "entry_appended") appended++; });
+    t.after(unsubscribe);
     const command = h.session.prompt("/recap"); await flush(); renameSync(path, `${path}.backup`); mkdirSync(path);
-    h.finishRecap(1, reply("unconfirmed refresh")); await command;
-    const states = h.manager.getBranch().filter(entry => entry.type === "custom" && entry.customType === STATE_TYPE);
-    assert.equal(states.length, 2); assert.equal(states[0].id, prior.id); assert.equal((states.at(-1) as typeof prior & { data: { text: string } }).data.text, "unconfirmed refresh");
-    assert.equal(readFileSync(`${path}.backup`, "utf8"), disk);
-    assert.match(h.notices.at(-1)!, /persistence failed:.*EISDIR.*Persistence not confirmed; in-memory state may have changed/);
-    assert.doesNotMatch(h.notices.at(-1)!, /Saved recap was not overwritten/); assert.equal(h.currentWidget, undefined);
-    // Test fixture repairs only its own path so navigation may persist; product never rolls back history.
-    rmSync(path, { recursive: true }); renameSync(`${path}.backup`, path);
-    h.manager.appendSessionInfo("neutral force restore"); await h.session.navigateTree(states.at(-1)!.id); await h.clock.tick(0);
+    try {
+        h.finishRecap(1, reply("unconfirmed refresh")); await command;
+        const states = h.manager.getBranch().filter(entry => entry.type === "custom" && entry.customType === STATE_TYPE);
+        assert.deepEqual(states, [prior]);
+        assert.deepEqual(h.manager.getEntries(), entries, "failed append does not retain a file entry");
+        assert.equal(h.manager.getEntryCount(), entries.length, "failed append does not retain an indexed entry");
+        for (const entry of entries) assert.deepEqual(h.manager.getEntry(entry.id), entry);
+        assert.deepEqual(h.manager.getTree(), tree); assert.deepEqual(h.manager.getHeader(), header);
+        assert.deepEqual(h.manager.getBranch(), branch); assert.equal(h.manager.getLeafId(), leaf);
+        assert.deepEqual(h.manager.getLeafEntry(), prior); assert.equal(appended, 0);
+        assert.equal(readFileSync(`${path}.backup`, "utf8"), disk);
+        assert.match(h.notices.at(-1)!, /persistence failed:.*EISDIR.*Persistence not confirmed; in-memory state may have changed/);
+        assert.doesNotMatch(h.notices.at(-1)!, /Saved recap was not overwritten/); assert.equal(h.currentWidget, undefined);
+    } finally {
+        // Repair only this fixture's filesystem path; no product history rollback or fake SDK append.
+        rmSync(path, { recursive: true }); renameSync(`${path}.backup`, path);
+    }
+    assert.equal(readFileSync(path, "utf8"), disk);
+    const reopened = SessionManager.open(path);
+    assert.deepEqual(reopened.getEntries(), entries); assert.equal(reopened.getLeafId(), leaf);
+    assert.deepEqual(reopened.getEntry(prior.id), prior);
+    h.manager.appendSessionInfo("neutral force restore");
+    const navigation = await h.session.navigateTree(prior.id); assert.equal(navigation.cancelled, false);
+    await h.clock.tick(0);
+    assert.equal(h.manager.getLeafId(), prior.id); assert.deepEqual(h.manager.getBranch(), branch);
     assert.match(h.currentWidget!.render(120).join("\n"), /prior confirmed/); assert.doesNotMatch(h.currentWidget!.render(120).join("\n"), /unconfirmed/);
     assert.equal(h.recapStreams.length, 2);
+    const beforeRefresh = structuredClone(h.manager.getEntries());
     const manual = h.session.prompt("/recap"); await flush(); assert.equal(h.recapStreams.length, 3); h.finishRecap(2, reply("confirmed refresh")); await manual;
+    const refreshedEntries = h.manager.getEntries();
+    assert.deepEqual(refreshedEntries.slice(0, -1), beforeRefresh, "successful refresh retains all earlier history, including the abandoned neutral entry");
+    const refreshed = refreshedEntries.at(-1)!;
+    assert.equal(refreshed.type, "custom");
+    if (refreshed.type !== "custom") assert.fail("refresh must append a custom recap entry");
+    assert.equal(refreshed.customType, STATE_TYPE); assert.equal(refreshed.parentId, prior.id);
+    assert.equal((refreshed.data as { text: string }).text, "confirmed refresh");
+    assert.deepEqual(h.manager.getBranch().filter(entry => entry.type === "custom" && entry.customType === STATE_TYPE), [prior, refreshed]);
+    assert.equal(h.manager.getLeafId(), refreshed.id); assert.equal(appended, 1, "only the confirmed tool refresh emits entry_appended");
+    const persisted = SessionManager.open(path);
+    assert.deepEqual(persisted.getEntries(), refreshedEntries); assert.equal(persisted.getLeafId(), refreshed.id);
     assert.match(h.currentWidget!.render(120).join("\n"), /confirmed refresh/);
+});
+it("non-atomic fake host retains unconfirmed history but restores only prior confirmed recap and permits later refresh", async t => {
+    const h = fakeHarness(t, { initial: true, config: { model: "fixture/model", thinking: "high", automatic: false } });
+    await h.start();
+    const first = h.command(); await flush(); h.requests[0].resolve(reply("prior confirmed")); await first;
+    const prior = h.manager.getLeafEntry()!; const before = structuredClone(h.manager.getEntries());
+    // This fake host throws after its in-memory append, unlike the actual SDK's atomic EISDIR failure.
+    h.setOnAppend(() => { throw new Error("Fake host persistence failure after append"); });
+    const failed = h.command(); await flush(); h.requests[1].resolve(reply("unconfirmed refresh")); await failed;
+    const unconfirmed = h.manager.getLeafEntry()!;
+    assert.equal(unconfirmed.type, "custom");
+    if (unconfirmed.type !== "custom") assert.fail("fake host must retain the unconfirmed recap entry");
+    assert.equal((unconfirmed.data as { text: string }).text, "unconfirmed refresh");
+    assert.notEqual(unconfirmed.id, prior.id); assert.equal(unconfirmed.parentId, prior.id);
+    assert.deepEqual(h.manager.getEntries().slice(0, -1), before);
+    assert.deepEqual(h.manager.getBranch().filter(entry => entry.type === "custom" && entry.customType === STATE_TYPE), [prior, unconfirmed]);
+    assert.match(h.notices.at(-1)!, /persistence failed: Fake host persistence failure after append.*Persistence not confirmed; in-memory state may have changed/);
+    assert.doesNotMatch(h.notices.at(-1)!, /Saved recap was not overwritten/); assert.equal(h.widgets.at(-1), undefined);
+    h.setOnAppend(undefined);
+    await h.emit("session_tree"); await h.clock.tick(0);
+    const displayText = () => {
+        const content = h.widgets.at(-1) as Parameters<ExtensionUIContext["setWidget"]>[1];
+        assert.equal(typeof content, "function");
+        if (typeof content !== "function") assert.fail("prior confirmed recap must restore a widget");
+        const component = content({ requestRender() {} } as unknown as TUI, { fg: (_color: string, text: string) => text } as Theme);
+        return component.render(120).join("\n");
+    };
+    assert.match(displayText(), /prior confirmed/); assert.doesNotMatch(displayText(), /unconfirmed/);
+    assert.equal(h.requests.length, 2); assert.equal(h.manager.getLeafId(), unconfirmed.id);
+    h.selections.push("Toggle automatic"); await h.command("config");
+    await h.run(); await h.settled(); await h.clock.tick(300000);
+    assert.equal(h.requests.length, 2, "automatic evaluation reuses the prior confirmed material without a request");
+    assert.match(displayText(), /prior confirmed/); assert.doesNotMatch(displayText(), /unconfirmed/);
+    const beforeRefresh = structuredClone(h.manager.getEntries());
+    const manual = h.command(); await flush(); assert.equal(h.requests.length, 3); h.requests[2].resolve(reply("confirmed refresh")); await manual;
+    assert.deepEqual(h.manager.getEntries().slice(0, -1), beforeRefresh, "product does not delete unconfirmed append-only history");
+    const refreshed = h.manager.getLeafEntry()!;
+    assert.equal(refreshed.parentId, unconfirmed.id);
+    assert.equal(refreshed.type, "custom");
+    if (refreshed.type !== "custom") assert.fail("refresh must append a custom recap entry");
+    assert.equal((refreshed.data as { text: string }).text, "confirmed refresh");
+    assert.match(displayText(), /confirmed refresh/);
 });
 it("actual SDK model menu links missing thinking atomically and filters supported levels", async t => {
     const h = await sdkHarness(t, { rpc: true, automatic: false, config: { thinking: null, unknown: true } });

@@ -19,15 +19,20 @@ function registered(getOrigin: Parameters<typeof registerMemoryTools>[1]) {
 }
 
 it("memory_list schema is required, nonnullable, closed and has no defaults", () => {
-  const { tool, host } = registered(() => { throw new Error("must not run"); });
+  let origins = 0;
+  const { tool, host } = registered(() => { origins++; throw new Error("must not run"); });
   const schema = tool.parameters as { required: string[]; additionalProperties: boolean; properties: Record<string, { type: string; default?: unknown }> };
   assert.deepEqual(schema.required, ["query", "offset", "limit"]);
   assert.equal(schema.additionalProperties, false);
   for (const [field, type] of [["query", "string"], ["offset", "number"], ["limit", "number"]]) {
     assert.equal(schema.properties[field].type, type);
     assert.equal(Object.hasOwn(schema.properties[field], "default"), false);
-    const args = listInput(); delete args[field];
-    assert.throws(() => host(args), new RegExp(field));
+    for (const missing of [true, false]) {
+      const args = listInput({ [field]: undefined }); if (missing) delete args[field];
+      Object.freeze(args); const before = Object.getOwnPropertyDescriptors(args);
+      assert.throws(() => host(args), new RegExp(`- ${field}: missing`));
+      assert.deepEqual(Object.getOwnPropertyDescriptors(args), before);
+    }
   }
   assert.throws(() => host(listInput({ unknown: null })), /unknown/);
   for (const query of ["😀".repeat(161)]) assert.throws(() => host(listInput({ query })), /query/);
@@ -36,19 +41,30 @@ it("memory_list schema is required, nonnullable, closed and has no defaults", ()
   for (const offset of [-1, Number.MAX_SAFE_INTEGER + 1, 1.5, "1.5"]) assert.throws(() => host(listInput({ offset })), /offset/);
   for (const limit of [0, 51, 1.5, "1.5"]) assert.throws(() => host(listInput({ limit })), /limit/);
   for (const args of [listInput(), listInput({ query: "😀".repeat(160), offset: Number.MAX_SAFE_INTEGER, limit: 50 }), listInput({ limit: 1 })]) assert.deepEqual(host(args), args);
+  assert.equal(origins, 0);
 });
 
 it("installed host scalar conversion is distinct from strict direct admission", () => {
   const { host } = registered(() => { throw new Error("must not run"); });
   // The SDK converts a clone before validation; the raw scalar cannot be recovered at execute.
-  for (const [value, converted] of [[null, "null"], [false, "false"], [0, "0"], [undefined, ""]] as const) {
-    const args = listInput({ query: value });
+  for (const [value, converted] of [[null, "null"], [false, "false"], [0, "0"]] as const) {
+    const args = Object.freeze(listInput({ query: value }));
     assert.deepEqual(host(args), listInput({ query: converted }));
     assert.equal(args.query, value);
   }
-  for (const value of [null, false, "", undefined]) assert.deepEqual(host(listInput({ offset: value })), listInput());
-  for (const value of [null, false, "", undefined]) assert.throws(() => host(listInput({ limit: value })), /limit/);
-  assert.deepEqual(host(listInput({ offset: "2", limit: "3" })), listInput({ offset: 2, limit: 3 }));
+  for (const value of [null, false, ""]) {
+    const args = Object.freeze(listInput({ offset: value }));
+    assert.deepEqual(host(args), listInput());
+    assert.equal(args.offset, value);
+  }
+  for (const value of [null, false, ""]) {
+    const args = Object.freeze(listInput({ limit: value }));
+    assert.throws(() => host(args), /limit/);
+    assert.equal(args.limit, value);
+  }
+  const args = Object.freeze(listInput({ offset: "2", limit: "3" }));
+  assert.deepEqual(host(args), listInput({ offset: 2, limit: 3 }));
+  assert.deepEqual(args, listInput({ offset: "2", limit: "3" }));
 });
 
 it("direct malformed list calls fail safely before origin or reads and do not mutate inputs", async () => {

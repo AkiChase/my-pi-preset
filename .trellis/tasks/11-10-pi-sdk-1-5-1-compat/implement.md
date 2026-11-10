@@ -100,4 +100,16 @@ reviewer 核对了旧 parser 对 kind array 的 loose normalization；实际 SDK
 
 SDK source与controlled fixture确认：只 quit runtime.dispose 在 abort→shutdown→session.dispose 后等待 settleCredentialWrites；session replacement 不等待，精确顺序保留。设计材料已澄清此差异。
 
-日志保留 `/tmp/pi-sdk-compat.ZDRQNy/stage2/logs/*-first.log`、`continuation/logs/{guard-red,guard-green,at-path,editor,lifecycle,typecheck}.log`、`review/`、`main-full-test.log`。未使用 shim/force-exit 证明 focused cleanup；真实 TUI/IME/在线 provider NOT_RUN。准备 stage2检查点提交。
+日志保留 `/tmp/pi-sdk-compat.ZDRQNy/stage2/logs/*-first.log`、`continuation/logs/{guard-red,guard-green,at-path,editor,lifecycle,typecheck}.log`、`review/`、`main-full-test.log`。未使用 shim/force-exit 证明 focused cleanup；真实 TUI/IME/在线 provider NOT_RUN。stage2检查点已提交：`f4494fc`。
+
+### 阶段 3 完成记录
+
+实施 `agent_trellis_implement_8_65b27baf`、独立审查 `agent_trellis_check_9_17e75f03`。只修改四个测试文件：Memory list-arguments、Bash schema、Monitor schema、Recap sdk-runtime；未改产品/schema。
+
+首跑自然退出：Memory/Recap131 tests /129 pass /2 fail，Process schema29/27/2，均exit1。修复 required missing/undefined 的真实host拒绝预期，保留其余合法scalar转换、输入不变和zero origin/job effects。实际注册schema probe确认效果与产品约束未变。
+
+真实SDK Recap EISDIR用例改为强断言 atomic rollback：entries/index/tree/branch/header/leaf/disk不变，失败不emit entry_appended；恢复自有 fixture路径后重新打开磁盘和导航，确认prior recap恢复、后续successful refresh真正持久化。研究原称有独立 non-atomic coverage，完整搜索发现实际没有，新增一个fake-host真实 append后抛错用例，验证未确认历史保留但不得显示/自动复用，后续刷新保留全部append-only历史；产品保守处理未改。
+
+最终自然退出（实施与review均通过）：Memory/Recap132/132、Bash/Monitor schema29/29，exit0；typecheck exit0；reviewer scalar probe exit0。`pnpm test` exit0，1806/1806、81 suites、skip/cancel=0（既有full force-exit不替代自然退出证据）。`git diff --check` PASS。
+
+review无blocker、无fix。主会话检查完整diff和日志；原始失败/重跑在 `/tmp/pi-sdk-compat.ZDRQNy/stage3/logs/`、`review/logs/` 与 scalar-probe临时文件，保留真实SDK和fake证据层区分。阶段3准备检查点提交。
