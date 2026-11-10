@@ -1,3 +1,4 @@
+import { keyText, keyHint } from "@earendil-works/pi-coding-agent";
 import { launchMetadata, launchText } from "../../runtime-tasks/launch.ts";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
@@ -20,7 +21,7 @@ import { loadExtensions, resolver, ToolExecutionComponent, KeybindingsManager, t
 const theme = themeSdk.theme as Theme;
 const entry = fileURLToPath(new URL("../../beautify.ts", import.meta.url));
 const tick = () => new Promise<void>(resolve => setImmediate(resolve));
-function context(args = {}, overrides = {}): RenderContext { return { args, toolCallId: "test", invalidate() {}, lastComponent: undefined, state: {}, cwd: "/fixture", executionStarted: true, argsComplete: true, isPartial: false, expanded: true, showImages: true, isError: false, durationMs: 0, outputPad: 0, ...overrides }; }
+function context(args = {}, overrides = {}): RenderContext { return { args, toolCallId: "test", invalidate() {}, lastComponent: undefined, state: {}, cwd: "/fixture", executionStarted: true, argsComplete: true, isPartial: false, expanded: true, showImages: true, isError: false, durationMs: 0, outputPad: 0, keyText, keyHint, ...overrides }; }
 function tui() {
   const screen = new TuiMainScreen({ columns: 120, rows: 40, kittyProtocolActive: false, start() {}, stop() {}, async drainInput() {}, write() {}, moveBy() {}, hideCursor() {}, showCursor() {}, clearLine() {}, clearFromCursor() {}, clearScreen() {}, setTitle() {}, setProgress() {}, setProgramStatus() {} }); screen.requestRender = () => {}; return screen;
 }

@@ -1,5 +1,6 @@
 import { nullableControl } from "../../shared/tool-arguments.ts";
-import { Type, StringEnum } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
+import { StringEnum } from "@earendil-works/pi-ai";
 import type { AgentConfig, AgentInvocation, IsolationMode, JoinMode, ThinkingLevel } from "./types.ts";
 
 /**

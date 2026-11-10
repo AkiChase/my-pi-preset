@@ -1,3 +1,4 @@
+import { keyText, keyHint } from "@earendil-works/pi-coding-agent";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -142,7 +143,7 @@ test("registered bash preserves original final title text/order/tones in folded 
 test("expanded empty calls restore the hint at the compact separator budget boundary", () => {
   setKeybindings(new KeybindingsManager());
   for (const name of ["bash", "read", "find", "grep"] as const) {
-    const ctx: RenderContext = { args: {}, toolCallId: "empty-budget", invalidate() {}, lastComponent: undefined, state: {}, cwd: "/fixture", executionStarted: false, argsComplete: false, isPartial: true, expanded: true, showImages: true, isError: false, durationMs: undefined, outputPad: 0 };
+    const ctx: RenderContext = { args: {}, toolCallId: "empty-budget", invalidate() {}, lastComponent: undefined, state: {}, cwd: "/fixture", executionStarted: false, argsComplete: false, isPartial: true, expanded: true, showImages: true, isError: false, durationMs: undefined, outputPad: 0, keyText, keyHint };
     const call = renderers(name, () => []).renderCall!({}, themeSdk.theme, ctx);
     // With no detail, the compact helper uses two separators (four cells).
     for (const width of [name.length + 2 + "ctrl+o expand".length, name.length + 3 + "ctrl+o expand".length]) {

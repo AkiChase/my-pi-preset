@@ -28,7 +28,7 @@ function fixture() {
       partial = { path, workPath: path, baseSha: "base", branch: "saved" };
       reached.resolve(); await gate.promise;
     }
-    return { stdout: args[1] === "--show-toplevel" ? root : args[1] === "HEAD" ? "base" : "true", stderr: "", code: 0, killed: false };
+    return { stdout: args[1] === "--show-toplevel" ? root : args[1] === "HEAD" ? "base" : "true", stderr: "", code: 0, killed: false, truncated: false };
   };
   // SDK private fields are not involved: only its public exec surface is used.
   const pi = { exec } as ExtensionAPI;
@@ -72,7 +72,7 @@ void it("actual worktree cleanup failures preserve unsaved files and generated b
     const calls: string[][] = [];
     const exec: ExtensionAPI["exec"] = async (_cmd, args) => {
       calls.push(args);
-      return { stdout: args[0] === "status" ? " M unsaved.txt" : "", stderr: "failed", code: args.includes(fail) ? 1 : 0, killed: false };
+      return { stdout: args[0] === "status" ? " M unsaved.txt" : "", stderr: "failed", code: args.includes(fail) ? 1 : 0, killed: false, truncated: false };
     };
     try {
       const result = await cleanupWorktree({ exec } as ExtensionAPI, root, { path: tree, workPath: tree, baseSha: "base", branch: "saved" }, "test");
@@ -87,7 +87,7 @@ void it("actual worktree cleanup failures preserve unsaved files and generated b
 void it("actual cleanup cancellation between awaits starts no subsequent git and keeps artifacts", async () => {
   const root = mkdtempSync(join(tmpdir(), "worktree-cleanup-cancel-"));
   const controller = new AbortController(), calls: string[][] = [];
-  const exec: ExtensionAPI["exec"] = async (_cmd, args) => { calls.push(args); controller.abort(); return { stdout: " M file", stderr: "", code: 0, killed: false }; };
+  const exec: ExtensionAPI["exec"] = async (_cmd, args) => { calls.push(args); controller.abort(); return { stdout: " M file", stderr: "", code: 0, killed: false, truncated: false }; };
   try {
     const result = await cleanupWorktree({ exec } as ExtensionAPI, root, { path: root, workPath: root, branch: "saved", baseSha: "base" }, "test", { signal: controller.signal });
     assert.equal(result.preserved, true); assert.equal(calls.length, 1); assert.equal(existsSync(root), true);
@@ -100,7 +100,7 @@ void it("actual runner cleanup waits for its output hook and in-flight git, stop
   const session = { messages: [], sessionManager: { getSessionFile: () => join(f.root, "cleanup-child.jsonl") }, abort: async () => {}, dispose() {} } as unknown as import("@earendil-works/pi-coding-agent").AgentSession;
   const exec: ExtensionAPI["exec"] = async (_cmd, args, options) => {
     f.calls.push({ args, options }); cleanupReached.resolve(); await cleanupGate.promise;
-    return { stdout: " M unsaved.txt", stderr: "", code: 0, killed: false };
+    return { stdout: " M unsaved.txt", stderr: "", code: 0, killed: false, truncated: false };
   };
   const tree = join(f.root, "ready-tree"); mkdirSync(tree); writeFileSync(join(tree, "unsaved.txt"), "keep");
   const manager = new AgentManager(undefined, 1, undefined, undefined, undefined, {

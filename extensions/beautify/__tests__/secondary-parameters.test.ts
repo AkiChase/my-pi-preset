@@ -1,3 +1,4 @@
+import { keyText, keyHint } from "@earendil-works/pi-coding-agent";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { stripVTControlCharacters as plain } from "node:util";
@@ -63,7 +64,7 @@ for (const fixture of fixtures) {
 }
 
 function context(args: Args): RenderContext {
-  return { args, toolCallId: "secondary", invalidate() {}, lastComponent: undefined, state: {}, cwd: "/fixture", executionStarted: false, argsComplete: false, isPartial: true, expanded: false, showImages: true, isError: false, durationMs: undefined, outputPad: 0 };
+  return { args, toolCallId: "secondary", invalidate() {}, lastComponent: undefined, state: {}, cwd: "/fixture", executionStarted: false, argsComplete: false, isPartial: true, expanded: false, showImages: true, isError: false, durationMs: undefined, outputPad: 0, keyText, keyHint };
 }
 
 test("secondary derivation preserves existing metadata, explicit false/zero, and skips absent/empty parameters", () => {

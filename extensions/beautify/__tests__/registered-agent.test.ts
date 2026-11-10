@@ -1,3 +1,4 @@
+import { keyText, keyHint } from "@earendil-works/pi-coding-agent";
 import { stripVTControlCharacters as plain } from "node:util";
 import { setKeybindings, TuiMainScreen, visibleWidth } from "@earendil-works/pi-tui";
 import { fileURLToPath } from "node:url";
@@ -50,7 +51,7 @@ test("actual registered Agent launch/manage renders config, lifecycle outcomes a
     events: { emit() {}, on: () => () => {} }, appendEntry() {}, sendMessage() {}, getFlag: () => undefined, getAllTools: () => [], getActiveTools: () => [],
   } as unknown as ExtensionAPI;
   const ctx = { cwd, hasUI: false, mode: "print", ui: { setStatus() {}, setWidget() {}, notify() {} }, sessionManager: { getSessionId: () => "offline-beautify", getSessionFile: () => rootSessionFile, getBranch: () => [] }, modelRegistry: {} } as unknown as ExtensionToolContext;
-  const viewContext = (args: Record<string, unknown>): RenderContext => ({ args, toolCallId: "display", invalidate() {}, lastComponent: undefined, state: {}, cwd, executionStarted: true, argsComplete: true, isPartial: false, expanded: false, showImages: true, isError: false, durationMs: 0, outputPad: 1 });
+  const viewContext = (args: Record<string, unknown>): RenderContext => ({ args, toolCallId: "display", invalidate() {}, lastComponent: undefined, state: {}, cwd, executionStarted: true, argsComplete: true, isPartial: false, expanded: false, showImages: true, isError: false, durationMs: 0, outputPad: 1, keyText, keyHint });
   const execute = (args: Record<string, unknown>, signal?: AbortSignal) => tools.get("agent_manage")!.execute("get-result", complete(args), signal, undefined, ctx);
   const loaded = await loadExtensions([fileURLToPath(new URL("../../beautify.ts", import.meta.url))], cwd);
   assert.deepEqual(loaded.errors, []);

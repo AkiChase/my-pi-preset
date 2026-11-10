@@ -1,3 +1,4 @@
+import { keyText, keyHint } from "@earendil-works/pi-coding-agent";
 import { processInput } from "../../runtime-tasks/__tests__/process-input.ts";
 import { managementContract } from "../tools/management.ts";
 import assert from "node:assert/strict";
@@ -38,7 +39,7 @@ test("process renderer normalizes nullable IDs and preserves strict result/fallb
 
 const theme = themeSdk.theme as Theme;
 const raw = (text: string) => ({ content: [{ type: "text" as const, text }], details: undefined });
-const context = (args: Record<string, unknown>, extra = {}): RenderContext => ({ args, toolCallId: "test", invalidate() {}, lastComponent: undefined, state: {}, cwd: "/fixture", executionStarted: true, argsComplete: true, isPartial: false, expanded: false, showImages: true, isError: false, durationMs: 0, outputPad: 2, ...extra });
+const context = (args: Record<string, unknown>, extra = {}): RenderContext => ({ args, toolCallId: "test", invalidate() {}, lastComponent: undefined, state: {}, cwd: "/fixture", executionStarted: true, argsComplete: true, isPartial: false, expanded: false, showImages: true, isError: false, durationMs: 0, outputPad: 2, keyText, keyHint, ...extra });
 const screen = new TuiMainScreen({ columns: 120, rows: 40, kittyProtocolActive: false, start() {}, stop() {}, async drainInput() {}, write() {}, moveBy() {}, hideCursor() {}, showCursor() {}, clearLine() {}, clearFromCursor() {}, clearScreen() {}, setTitle() {}, setProgress() {}, setProgramStatus() {} });
 screen.requestRender = () => {};
 const rows = (component: InstanceType<typeof ToolExecutionComponent>, width = 120): string[] => component.render(width).map((row: string) => plain(row).trimEnd()).filter((row: string) => row.trim());

@@ -588,7 +588,7 @@ void it("actual factory shutdown releases queued launch/retrieval and awaited re
 });
 
 void it("actual factory workflow termination drains its in-flight host gate and blocks late journal/notice", { timeout: 10_000 }, async () => {
-  const gate = deferred<{ code: number; stdout: string; stderr: string; killed: boolean }>();
+  const gate = deferred<{ code: number; stdout: string; stderr: string; killed: boolean; truncated: boolean }>();
   let entered = false, gateSignal: AbortSignal | undefined;
   const f = await factory({}, {}, { exec: async (_command, _args, options) => { entered = true; gateSignal = options?.signal; return gate.promise; } });
   try {
@@ -599,10 +599,10 @@ void it("actual factory workflow termination drains its in-flight host gate and 
     assert.equal(entered, true); const id = (result.details as { taskId: string }).taskId;
     let closed = false; const closing = f.lifecycle.shutdown().then(() => { closed = true; });
     await pause(40); assert.equal(gateSignal?.aborted, true); assert.equal(closed, false, "worker termination cannot stand in for gate drain");
-    gate.resolve({ code: 0, stdout: "late pass", stderr: "", killed: false }); await closing;
+    gate.resolve({ code: 0, stdout: "late pass", stderr: "", killed: false, truncated: false }); await closing;
     assert.equal(f.notices.length, 0); assert.equal(f.source.list().length, 0);
     assert.throws(() => readFileSync(join(f.artifactDir, `${id}.workflow.jsonl`)), /ENOENT/);
-  } finally { gate.resolve({ code: 1, stdout: "", stderr: "", killed: true }); await f.close(); }
+  } finally { gate.resolve({ code: 1, stdout: "", stderr: "", killed: true, truncated: false }); await f.close(); }
 });
 
 void it("actual CLI workflow repeated start executes once; shutdown forbids late entry/next-turn delivery", { timeout: 10_000 }, async () => {

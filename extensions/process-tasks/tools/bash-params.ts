@@ -1,5 +1,5 @@
 /** Explicit bash foreground/background request contract. */
-import { Type } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
 import type { ProcessTasksConfig } from "../config.ts";
 
 /** Maximum foreground wait in seconds without overflowing Node's timer range. */

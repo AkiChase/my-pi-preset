@@ -1,3 +1,4 @@
+import { keyText, keyHint } from "@earendil-works/pi-coding-agent";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -65,7 +66,7 @@ test("actual loader monitor and process host cards show snapshots/ranges/stats a
     const originalCall = tools.get("monitor")!.renderCall!(args, themeSdk.theme, {
       args, toolCallId: "original-monitor-call", invalidate() {}, lastComponent: undefined, state: {}, cwd: dir,
       executionStarted: true, argsComplete: true, isPartial: false, expanded: true, showImages: true,
-      isError: false, durationMs: undefined, outputPad: 0,
+      isError: false, durationMs: undefined, outputPad: 0, keyText, keyHint,
     } satisfies RenderContext);
     assert.match(plain(originalCall.render(40).join("\n")).trimStart(), /^monitor/);
     assert.equal(job.outcomeSurfaced, noConsumption);

@@ -3,7 +3,8 @@ import { nullableControl, parseControlArguments } from "../shared/tool-arguments
 import { createToolCallHeading } from "../beautify/tool-call-heading.ts";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { AgentToolUpdateCallback } from "@earendil-works/pi-agent-core";
-import { Type, StringEnum } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
+import { StringEnum } from "@earendil-works/pi-ai";
 import { createRuntimeTaskFacade, type RuntimeTaskCapability } from "./facade.ts";
 import { TASK_ACTIONS, TASK_LOG_TYPES, isRuntimeTaskMetadata, type RuntimeTaskParams, type RuntimeTaskResult, type RuntimeTaskDetails } from "./contracts.ts";
 import { executionId, parseExecutionId } from "./execution-id.ts";
@@ -174,7 +175,7 @@ export function managementTool(group: ManagementGroup, capabilities: readonly Ru
   }, { additionalProperties: false });
   let closed = false;
   const close = () => { closed = true; facade.close(); };
-  const execute = async (id: string, input: ProcessManagementParams | AgentManagementParams, signal: AbortSignal | undefined, update: AgentToolUpdateCallback<ManagementDetails> | undefined, ctx: ExtensionContext) => {
+  const execute = async (id: string, input: unknown, signal: AbortSignal | undefined, update: AgentToolUpdateCallback<ManagementDetails> | undefined, ctx: ExtensionContext) => {
     let params: ManagementParams = input as ManagementParams;
     let error: string | undefined;
     try { params = group === "agent" ? parseAgentManagementParams(input) : parseProcessManagementParams(input); }

@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/development/index.md", "reason": "公开 SDK/schema/状态所有权与显示契约"}
+{"file": ".trellis/spec/testing/index.md", "reason": "SDK 隔离、自然退出与真实 fixture 回归"}
+{"file": ".trellis/spec/development/widget-display.md", "reason": "Footer/widget takeover 生命周期"}
+{"file": ".trellis/spec/guides/index.md", "reason": "跨层和复用检查"}

@@ -5,7 +5,7 @@ import { launchMetadata, launchText } from "../../runtime-tasks/launch.ts";
 // Monitor tool: event-arrival notifications, bounded batching, optional silence wakes.
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Type } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
 import type { BackgroundRegistry } from "../state.ts";
 import {
     isTerminalStatus,

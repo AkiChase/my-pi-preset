@@ -7,7 +7,7 @@
  * Also registers process diagnostic commands; shared controls belong to composition.
  */
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, MessageRenderOptions } from "@earendil-works/pi-coding-agent";
 import { createBashToolDefinition } from "@earendil-works/pi-coding-agent";
 import { BackgroundRegistry } from "./state.ts";
 import { createProcessLifecycleParticipant, detectNonInteractive, terminateJobSilently } from "./lifecycle.ts";
@@ -74,7 +74,7 @@ export default function (pi: ExtensionAPI, options: ProcessTasksOptions = {}) {
     // ── Message rendering ─────────────────────────────────────────
     // Delivery, batching, and terminal-outcome ownership remain in notify.ts
     // and monitor-notifications.ts. This is only the custom-message view.
-    const renderTaskNotification = (message: { content: unknown; details?: unknown }, options: { expanded: boolean; outputPad: number }, theme: Parameters<typeof renderProcessNotification>[2]) =>
+    const renderTaskNotification = (message: { content: unknown; details?: unknown }, options: MessageRenderOptions, theme: Parameters<typeof renderProcessNotification>[2]) =>
         renderProcessNotification(message, options, theme, config);
     pi.registerMessageRenderer(EVENT.taskNotification, (message, options, theme) =>
         renderTaskNotification(message, options, theme)

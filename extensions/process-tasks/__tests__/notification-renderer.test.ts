@@ -1,3 +1,4 @@
+import { keyText, keyHint, type MessageRenderOptions } from "@earendil-works/pi-coding-agent";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { visibleWidth } from "@earendil-works/pi-tui";
@@ -8,8 +9,8 @@ const theme = {
   bg: (_colour: string, text: string) => text,
 } as never;
 const config = { failureTailLinesShown: 2 };
-const collapsed = { expanded: false, outputPad: 0 };
-const expanded = { expanded: true, outputPad: 0 };
+const collapsed = { expanded: false, outputPad: 0, keyText, keyHint } satisfies MessageRenderOptions;
+const expanded = { ...collapsed, expanded: true } satisfies MessageRenderOptions;
 
 describe("process notification cards", () => {
   it("retains the configured terminal tail budget and expands to delivered tail text", () => {
