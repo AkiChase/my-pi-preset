@@ -259,3 +259,39 @@
 ### Next Steps
 
 - 按用户授权普通 push 到 origin/main；不更新个人安装或重启会话。已打开问卷热加载立即补报、online provider、物理 IME/鼠标及完整第三方键盘路径不在此次保证内。
+
+
+## Session 66: 子 Agent 最近请求与累计用量展示
+<!-- trellis-session: v=2 fp=cf6f044d8ec4d61e -->
+
+**Date**: 2026-11-10
+**Task**: 子 Agent 最近请求与累计用量展示
+**Branch**: `main`
+
+### Summary
+
+外层与详情统一显示最近完成请求的完整输入/输出，新增 Usage Σ 分类累计，保留计费账本；独立审查及限定回归通过，已有 SDK 兼容失败另行保留。任务已验收归档。
+
+### Main Changes
+
+- 外层 ↑/↓ 与 Last req 共用自身最近请求快照，新请求期间保留上次值；Usage Σ 单列 fresh input/output/R/W，并明确嵌套账本归属。
+- 修复窄行 descendant 计数挤掉生命周期状态点，保持固定详情头 metadata；补充用户文档与执行契约。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `618353a` | fix(agent-tasks): separate latest request and cumulative usage |
+
+### Testing
+
+- [OK] UI 无 shim 62/62 PASS；相关 Agent/UI 回归在测试专用 Type 导出 shim 下 98/98 PASS，自然退出；不作为真实 host 兼容证明。
+- [OK] pnpm check exit 2：25 条错误与原始代码完全相同，新增 0；pnpm test exit 1：1338 tests / 1242 pass / 96 fail，SDK 兼容问题未解决。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 已有 SDK 兼容问题另行处理；诊断材料保留于 /tmp/pi-tokens-row.EaBi0M/。未执行安装、同步、reload 或 push。
