@@ -295,3 +295,45 @@
 ### Next Steps
 
 - 已有 SDK 兼容问题另行处理；诊断材料保留于 /tmp/pi-tokens-row.EaBi0M/。未执行安装、同步、reload 或 push。
+
+
+## Session 67: Pi SDK 1.5.1 兼容修复与完整检查恢复
+<!-- trellis-session: v=2 fp=e8a83bcb3e7f5fbc -->
+
+**Date**: 2026-11-10
+**Task**: Pi SDK 1.5.1 兼容修复与完整检查恢复
+**Branch**: `main`
+
+### Summary
+
+完成公开API/类型、host fixture与编辑器状态保持、校验/持久化回归及契约整合四阶段修复；各阶段独立审查，最终无shim完整检查通过，任务已验收归档。
+
+### Main Changes
+
+- 修复Type公开导入、ExecResult.truncated和renderer hints/full options契约，保持schema JSON与执行admission不变。
+- 补齐真实SDK dialog/overlay/runtime服务夹具；修复expanded-text handoff导致的collapsed paste状态丢失，保留正常setText与descriptor rollback。
+- 更新required missing/undefined和SDK原子append失败预期；新增非原子host未确认状态保护回归，保留失败/修复记录。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `667327d` | fix(sdk): restore public schema imports and render contracts |
+| `f4494fc` | fix(sdk): preserve editor handoff and update host fixtures |
+| `a61ed07` | test(sdk): align validation and persistence expectations |
+| `b1967c5` | docs(sdk): capture compatibility contracts and verification |
+
+### Testing
+
+- [OK] pnpm check 无shim exit0：strict typecheck通过，1806/1806 tests、81 suites、skip/cancel=0。
+- [OK] Agent/Process/Runtime/Task UI自然退出891/891；layout/loader/manifest自然退出22/22。
+- [OK] 补全61/61、Beautify+editor127/127、shared/runtime64/64、Memory/Recap132/132及Bash/Monitor schema29/29均自然退出通过；各阶段独立审查无剩余blocker。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 物理终端/IME、实际CLI bundle、第三方input-history组合、在线provider为NOT_RUN；若需要进一步验证，另行授权。
+- 本任务owned临时输出已核对并清理，旧任务诊断不动；未安装、修改SDK、sync/reload/push或改写历史，六处无关Trellis改动保留。

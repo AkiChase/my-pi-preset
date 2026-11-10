@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 66
+- **Total Sessions**: 67
 - **Last Active**: 2026-11-10
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~297 | Active |
+| `journal-2.md` | ~339 | Active |
 | `journal-1.md` | ~1975 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 67 | 2026-11-10 | Pi SDK 1.5.1 兼容修复与完整检查恢复 | `667327d`, `f4494fc`, `a61ed07`, `b1967c5` | `main` |
 | 66 | 2026-11-10 | 子 Agent 最近请求与累计用量展示 | `618353a` | `main` |
 | 65 | 2026-11-07 | Herdr Core 问卷状态补齐收尾 | `55d1627`, `ea6d16a`, `fcbbb71` | `main` |
 | 64 | 2026-11-04 | 任务浏览器快捷切换与真实终端验收收尾 | `c17dca8`, `77b300b`, `ed3bc6f`, `37b8be4` | `main` |
