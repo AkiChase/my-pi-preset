@@ -47,7 +47,7 @@ function component(f: ReturnType<typeof sourceFixture>, options: { now?: () => n
 }
 
 void it("shared panel shows all modes, bounded details, list/detail scroll, safe widths and path-only copy", async () => {
-    const a = view("前台🦊\u001b[31m\u0007"), b = view("queued", { status: "queued", executionMode: "background", waitCount: 2, stats: { tokens: 12, toolUses: 3 } });
+    const a = view("前台🦊\u001b[31m\u0007"), b = view("queued", { status: "queued", executionMode: "background", waitCount: 2, stats: { tokens: 12, latestRequest: { input: 10, output: 2 }, cumulativeUsage: { input: 10, output: 2, cacheRead: 0, cacheWrite: 0 }, toolUses: 3 } });
     const f = sourceFixture([a, b]);
     f.details.set(b.key, { text: Array.from({ length: 90 }, (_, i) => `line ${i} 中文😀\u001b]0;title\u0007\u0000`).join("\n"), omittedBefore: 8, omittedAfter: 9 });
     const copied: string[] = []; const h = component(f, { copy: async path => { copied.push(path); } });
@@ -62,7 +62,7 @@ void it("shared panel shows all modes, bounded details, list/detail scroll, safe
         h.panel.handleInput("\r");
         const rendered = h.panel.render(180).join("\n");
         assert.match(rendered, /agent · background/); assert.match(rendered, /queued/); assert.match(rendered, /omitted before 8, after 9/);
-        assert.match(rendered, /Tokens\s+12/); assert.match(rendered, /Activity\s+3 tool uses/); assert.doesNotMatch(rendered, /tokens: |toolUses|\{"/);
+        assert.match(rendered, /Last req\s+↑10 ↓2/); assert.match(rendered, /Activity\s+3 tool uses/); assert.doesNotMatch(rendered, /tokens: |toolUses|\{"/);
         h.panel.handleInput("\u001b[H");
         const first = h.panel.render(180).join("\n"); assert.match(first, /line 0/);
         h.panel.handleInput("j"); assert.notEqual(h.panel.render(180).join("\n"), first);
@@ -448,7 +448,7 @@ void it("stop and detach-all keep the header height and scroll origin fixed (no 
 
 void it("detail renders kind-specific labelled sections without raw stats or JSON", () => {
     const agent = view("agent", { title: "Explore", description: "Inspect the login flow", stats: { model: "provider/model-x", thinking: "high", durationMs: 83_000,
-        turnCount: 4, maxTurns: 20, toolUses: 1, tokens: 51_234, inputTokens: 40_100, outputTokens: 11_134, cost: 0.034, activity: "reading src/a.ts" },
+        turnCount: 4, maxTurns: 20, toolUses: 1, tokens: 51_234, inputTokens: 40_100, outputTokens: 11_134, latestRequest: { input: 286_100, output: 3200 }, cumulativeUsage: { input: 40_100, output: 11_134, cacheRead: 1_500_000, cacheWrite: 55_000 }, cost: 0.034, activity: "reading src/a.ts" },
         executionConfig: { kind: "agent", phase: "session-effective", model: "provider/model-x", inherit_context: true, differences: [{ field: "thinking", requested: "low", actual: "high", reason: "agent-configuration" }] } });
     const failed = view("sh", { kind: "shell", status: "failed", title: "tests", description: "npm test", stats: { pid: 42, exitCode: 2, durationMs: 1000 },
         artifacts: [{ kind: "log", path: "/tmp/sh.log" }] });
@@ -462,7 +462,7 @@ void it("detail renders kind-specific labelled sections without raw stats or JSO
     try {
         const a = detail(agent.key);
         for (const pattern of [/Inspect the login flow/, /Model\s+provider\/model-x · thinking high/, /Context\s+inherits context/, /Override\s+thinking: low → high/,
-            /1m23s/, /Activity\s+4\/20 turns · 1 tool use/, /Tokens\s+51\.2k \(in 40\.1k · out 11\.1k\)/, /\$0\.03/, /reading src\/a\.ts/, /conversation\s+\/tmp\/agent.output/, /── Output · 20–40 \/ 100/])
+            /1m23s/, /Activity\s+4\/20 turns · 1 tool use/, /Last req\s+↑286\.1k ↓3\.2k/, /Usage Σ\s+↑40\.1k ↓11\.1k R1\.5M W55\.0k/, /\$0\.03/, /reading src\/a\.ts/, /conversation\s+\/tmp\/agent.output/, /── Output · 20–40 \/ 100/])
             assert.match(a, pattern);
         assert.doesNotMatch(a, /\{"|durationMs|inputTokens|Execution config/);
         const s = detail(failed.key);
@@ -798,5 +798,51 @@ void it("fixed agent header changes terminal state in place, keeps history and r
             assert.equal(h.panel.getState().detailScrollTop, top);
             assert.equal(h.panel.getState().followingEnd, false);
         }
+    } finally { h.panel.dispose(); f.coordinator.dispose(); }
+});
+
+void it("latest request matches outer row; cumulative cache categories and fixed metadata survive the eight-line header", async () => {
+    const { renderDetailHeader } = await import("../detail-view.ts");
+    const { taskLine } = await import("../presentation.ts");
+    const theme = { fg: (_: string, text: string) => text };
+    const agent = view("persistent-agent", { title: "reviewer-10", description: "Review usage", stats: {
+        tokens: 625_400, inputTokens: 53_000, outputTokens: 19_000,
+        latestRequest: { input: 286_100, output: 3200 },
+        cumulativeUsage: { input: 53_000, output: 19_000, cacheRead: 1_500_000, cacheWrite: 55_000 },
+        model: "provider/model", thinking: "high", turnCount: 3, toolUses: 4,
+    }, executionConfig: { kind: "agent", phase: "session-effective", inherit_context: true, isolated: true,
+        differences: [{ field: "thinking", requested: "low", actual: "high" }] } });
+    for (const width of [40, 80, 160]) {
+        const header = renderDetailHeader(agent, theme, width);
+        assert.equal(header.length, 8);
+        const text = header.join("\n");
+        assert.match(text, /Last req\s+↑286\.1k ↓3\.2k/);
+        assert.match(text, /Usage Σ\s+↑53\.0k ↓19\.0k R1\.5M W55\.0k/);
+        for (const label of [/agent · foreground/, /Model/, /Context/, /Activity/, /ID\s+persistent-agent/, /conversation\s+\/tmp/]) assert.match(text, label);
+        assert.doesNotMatch(text, /Tokens|625\.4k|in 53/);
+        assert.ok(header.every(line => visibleWidth(line) <= width));
+        assert.match(taskLine(agent, width, theme), /↑286\.1k ↓3\.2k/);
+    }
+    const multipleOverrides = { ...agent, executionConfig: { kind: "agent" as const, phase: "session-effective" as const,
+        differences: [
+            { field: "thinking" as const, requested: "low", actual: "high" },
+            { field: "model" as const, requested: "asked-model", actual: "actual-model" },
+            { field: "mode" as const, requested: "foreground", actual: "background" },
+        ] } };
+    const overridesHeader = renderDetailHeader(multipleOverrides, theme, 160).join("\n");
+    for (const pattern of [/thinking: low → high/, /model: asked-model → actual-model/, /mode: foreground → background/,
+        /Last req/, /Usage Σ/, /ID\s+persistent-agent/, /conversation\s+\/tmp/]) assert.match(overridesHeader, pattern);
+    const unknown = { ...agent, stats: { tokens: 625_400 } };
+    assert.match(renderDetailHeader(unknown, theme, 100).join("\n"), /Last req\s+↑— ↓—/);
+    const zero = { ...agent, stats: { latestRequest: { input: 0, output: 0 }, cumulativeUsage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } } };
+    assert.match(renderDetailHeader(zero, theme, 100).join("\n"), /Last req\s+↑0 ↓0\nUsage Σ\s+↑0 ↓0 R0 W0/);
+    const f = sourceFixture([agent]), h = component(f);
+    try {
+        h.panel.handleInput("\r");
+        const fixed = h.panel.render(100).map(stripTerminalSequences).slice(0, 10);
+        h.panel.handleInput("\u001b[H"); h.panel.handleInput("j");
+        assert.deepEqual(h.panel.render(100).map(stripTerminalSequences).slice(0, 10), fixed);
+        assert.match(fixed.join("\n"), /ID\s+persistent-agent/);
+        assert.match(fixed.join("\n"), /conversation\s+\/tmp/);
     } finally { h.panel.dispose(); f.coordinator.dispose(); }
 });

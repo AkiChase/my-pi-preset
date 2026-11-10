@@ -45,6 +45,10 @@ export interface TaskView extends TaskIdentity {
     readonly stats: Readonly<{
         pid?: number; exitCode?: number; durationMs?: number;
         tokens?: number; inputTokens?: number; outputTokens?: number; cost?: number;
+        /** Last observed own request: input includes fresh input + cache read + cache write. */
+        latestRequest?: Readonly<{ input: number; output: number }>;
+        /** Lifetime categories, with fresh input separate from cache spend. */
+        cumulativeUsage?: Readonly<{ input: number; output: number; cacheRead: number; cacheWrite: number }>;
         toolUses?: number; turnCount?: number; maxTurns?: number; activity?: string;
         /** One-line preview of the latest message the running task sent to its parent. */
         latestMessage?: string;

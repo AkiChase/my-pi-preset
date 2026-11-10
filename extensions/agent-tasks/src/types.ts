@@ -149,6 +149,9 @@ export interface AgentRecord {
    * excluded — see issue #38). Initialized to zeros at spawn.
    */
   lifetimeUsage: LifetimeUsage;
+  /** Last own assistant message_end usage; retained during subsequent requests/resumes.
+   * Absent until observed, never derived from lifetime or nested-child spend. */
+  latestRequestUsage?: Readonly<LifetimeUsage>;
   /** Number of times this agent's session has compacted. Initialized to 0 at spawn. */
   compactionCount: number;
   /**

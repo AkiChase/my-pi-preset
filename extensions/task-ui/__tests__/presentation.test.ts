@@ -24,7 +24,7 @@ void it("agent titles preserve the stable public identity while other kinds use 
 });
 void it("status dots are execution-state based and selected styling does not change them", () => {
     for (const status of ["starting", "queued", "running", "paused", "completed", "failed", "stopped"] as const) {
-        const row = view(status, { status, waitCount: 2, stats: { tokens: 1234, durationMs: 61200 } });
+        const row = view(status, { status, waitCount: 2, stats: { tokens: 1234, latestRequest: { input: 2000, output: 174 }, durationMs: 61200 } });
         const dot = { starting: "●", queued: "○", running: "●", paused: "Ⅱ", completed: "✓", failed: "✕", stopped: "■" }[status];
         assert.equal(taskDot(row), dot);
         assert.equal(taskStatusColor(row), ({ starting: "accent", running: "accent", queued: "muted", paused: "warning", completed: "success", failed: "error", stopped: "dim" }[status]));
@@ -33,17 +33,17 @@ void it("status dots are execution-state based and selected styling does not cha
         assert.ok(selected.startsWith("\u001b[44m"));
         assert.doesNotMatch(selected, /\[(?:running|queued)\]/);
         assert.ok(selected.includes(dot));
-        assert.match(selected, /1m1s · ↓ 1.2k/);
+        assert.match(selected, /1m1s · ↑2.0k ↓174/);
     }
 });
 void it("task lines bound Unicode/control input and retain state/statistics before long titles", () => {
-    const row = view("row", { description: "中文😀\u001b[31m\u001b]0;bad\u0007".repeat(100), stats: { tokens: 1234567, durationMs: 99000 } });
+    const row = view("row", { description: "中文😀\u001b[31m\u001b]0;bad\u0007".repeat(100), stats: { tokens: 1234567, latestRequest: { input: 1234567, output: 0 }, durationMs: 99000 } });
     for (const width of [0, 1, 2, 3, 7, 12, 20, 32, 50, 100]) {
         const line = taskLine(row, width, theme, { prefix: "│  ".repeat(100) + "└─", selected: true });
         assert.equal(visibleWidth(line), width);
         assert.doesNotMatch(cleanTaskText(line), /[\u0000-\u001f\u007f-\u009f]/);
         if (width >= 20) assert.match(line, /●/);
-        if (width >= 50) assert.match(line, /↓ 1.2M/);
+        if (width >= 50) assert.match(line, /↑1.2M ↓0/);
     }
     assert.equal(taskDuration(view("x", { startedAt: 1000, endedAt: 4200 }), 99999), "3s");
     assert.equal(taskDuration(view("x", { stats: { durationMs: -3 } })), "0s");
@@ -184,4 +184,30 @@ void it("agent runtime keeps pending cleanup visible before counters and sanitiz
     const out = taskStatusLine(running, 80, theme);
     assert.doesNotMatch(out, /\u001b|\u0007|\n|unsafe/);
     assert.match(out, /setup activity/);
+});
+
+void it("narrow agent rows retain lifecycle identity before descendant counts and request statistics", () => {
+    for (const status of ["queued", "starting", "running", "completed", "failed", "stopped", "interrupted"] as const) {
+        const row = view("reviewer-10", { status, stats: { durationMs: 30_000, latestRequest: { input: 286_100, output: 3200 } } });
+        for (const width of [1, 2, 3, 5, 7, 12, 20, 30, 50]) for (const children of [1, 123]) {
+            const line = taskLine(row, width, theme, { children, prefix: "│  ".repeat(20) + "└─", selected: true });
+            assert.equal(visibleWidth(line), width);
+            assert.ok(stripTerminalSequences(line).includes(taskDot(row)), `${status}/${width}/${children}: lifecycle glyph`);
+            if (width >= 50) assert.match(stripTerminalSequences(line), /↑286\.1k ↓3\.2k/);
+        }
+    }
+});
+
+void it("agent rows use only the last own request, not cumulative output, with unknown and measured zero distinct", () => {
+    const { tokens, inputTokens, outputTokens } = { tokens: 625_400, inputTokens: 53_000, outputTokens: 19_000 };
+    const unknown = view("unknown", { stats: { tokens, inputTokens, outputTokens } });
+    assert.match(taskLine(unknown, 100, theme), /↑— ↓—/);
+    assert.doesNotMatch(taskLine(unknown, 100, theme), /625\.4k|53\.0k|19\.0k/);
+    const zero = { ...unknown, stats: { ...unknown.stats, latestRequest: { input: 0, output: 0 } } };
+    assert.match(taskLine(zero, 100, theme), /↑0 ↓0/);
+    const heavy = { ...unknown, stats: { ...unknown.stats, latestRequest: { input: 286_100, output: 3200 } } };
+    assert.match(taskLine(heavy, 100, theme), /↑286\.1k ↓3\.2k/);
+    const workflow = { ...heavy, kind: "workflow" as const };
+    assert.match(taskLine(workflow, 100, theme), /↓ 625\.4k/);
+    assert.doesNotMatch(taskLine(workflow, 100, theme), /↑286\.1k/);
 });

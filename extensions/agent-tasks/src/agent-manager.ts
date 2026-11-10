@@ -957,6 +957,7 @@ export class AgentManager {
       onTextDelta: (delta, text) => { if (this.current(record, run) && !record.abortController?.signal.aborted) { this.notifyChanged(); try { if (this.current(record, run) && !record.abortController?.signal.aborted) options.onTextDelta?.(delta, text); } catch { /* isolate optional observer */ } } },
       onAssistantUsage: (usage) => {
         if (!this.current(record, run) || record.status === "stopped") return;
+        record.latestRequestUsage = Object.freeze({ ...usage });
         addUsage(record.lifetimeUsage, usage);
         try { if (this.current(record, run) && !record.abortController?.signal.aborted) this.onUsage?.(record, usage); } catch { /* isolate optional observer */ }
         this.notifyChanged();
@@ -1405,6 +1406,7 @@ export class AgentManager {
       onTurnEnd: count => { if (!this.current(record, run) || record.status === "stopped") return; record.turnCount = count; this.notifyChanged(); try { if (this.current(record, run) && !record.abortController?.signal.aborted) options.onTurnEnd?.(count); } catch { /* isolate optional observer */ } },
       onAssistantUsage: usage => {
         if (!this.current(record, run) || record.status === "stopped") return;
+        record.latestRequestUsage = Object.freeze({ ...usage });
         addUsage(record.lifetimeUsage, usage); try { if (this.current(record, run) && !record.abortController?.signal.aborted) this.onUsage?.(record, usage); } catch { /* isolate optional observer */ }
         this.notifyChanged(); try { if (this.current(record, run) && !record.abortController?.signal.aborted) options.onAssistantUsage?.(usage); } catch { /* isolate optional observer */ }
       },

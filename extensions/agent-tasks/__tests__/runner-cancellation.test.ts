@@ -614,3 +614,131 @@ void it("actual new/resume runner forwards IDs, host duration and failure withou
     assert.equal(f.listeners.size, 0);
   } finally { await f.close(); }
 });
+
+void it("own request snapshots follow actual new/resume usage events, retain while pending and never infer from lifetime", async () => {
+  const f = fixture(), coordinator = new TaskCoordinator();
+  const { createAgentTaskSource } = await import("../src/source.ts");
+  const { getLifetimeTotal, toReportedUsage, PendingUsagePool } = await import("../src/usage.ts");
+  const reported = new PendingUsagePool();
+  const manager = new AgentManager(undefined, 1, undefined, undefined, (_record, usage) => reported.add(usage), {
+    runAgent: (ctx, type, prompt, options) => runAgent(ctx, type, prompt, options, f.deps),
+  });
+  const source = createAgentTaskSource(manager, coordinator, new Map());
+  const emit = (usage?: { input: number; output: number; cacheRead?: number; cacheWrite?: number; cost?: { total: number } }) => {
+    const message: import("@earendil-works/pi-ai").AssistantMessage = { role: "assistant", api: "openai-responses", provider: "offline", model: "fixture",
+      timestamp: 0, stopReason: "stop", content: [], usage: {
+        input: usage?.input ?? 0, output: usage?.output ?? 0, cacheRead: usage?.cacheRead ?? 0, cacheWrite: usage?.cacheWrite ?? 0,
+        totalTokens: (usage?.input ?? 0) + (usage?.output ?? 0) + (usage?.cacheRead ?? 0) + (usage?.cacheWrite ?? 0),
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: usage?.cost?.total ?? 0 },
+      } };
+    // Deliberately exercise a provider event lacking usage, even though the SDK
+    // declares it required. Do not silently turn that absence into measured zero.
+    if (!usage) Reflect.deleteProperty(message, "usage");
+    for (const listener of f.listeners) listener({ type: "message_end", message });
+  };
+  const first = { input: 53_000, output: 174, cacheRead: 233_100, cacheWrite: 0, cost: { total: 0.02 } };
+  const second = { input: 0, output: 3200, cacheRead: 200_000, cacheWrite: 86_100, cost: { total: 0.03 } };
+  const requestGate = deferred(), entered = deferred();
+  try {
+    f.session.prompt = async () => { emit(); };
+    const id = manager.spawn(f.pi, f.ctx, "general-purpose", "unknown", { description: "usage", isolated: true });
+    await manager.waitForAll();
+    assert.equal(source.list()[0]!.stats.latestRequest, undefined, "no usage is unknown even after a run completes");
+    assert.deepEqual(source.list()[0]!.stats.cumulativeUsage, { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
+    assert.equal(reported.drain(), undefined);
+    f.session.prompt = async () => { emit({ input: 0, output: 0 }); };
+    manager.resumeRun(id, "measured zero"); await manager.waitForAll();
+    assert.deepEqual(source.list()[0]!.stats.latestRequest, { input: 0, output: 0 });
+    assert.ok(Object.isFrozen(manager.getRecord(id)!.latestRequestUsage));
+    f.session.prompt = async () => {
+      emit(first);
+      const previous = source.list()[0]!;
+      assert.deepEqual(previous.stats.latestRequest, { input: 286_100, output: 174 });
+      assert.ok(Object.isFrozen(previous.stats.latestRequest) && Object.isFrozen(previous.stats.cumulativeUsage));
+      entered.resolve(); await requestGate.promise;
+      emit(); // A request with no usage must not erase the last measured result.
+      assert.deepEqual(source.list()[0]!.stats.latestRequest, previous.stats.latestRequest);
+      for (const listener of f.listeners) listener({ type: "compaction_end", aborted: false, reason: "manual", result: { tokensBefore: 400_000 } } as AgentSessionEvent);
+      emit(second);
+      assert.deepEqual(previous.stats.latestRequest, { input: 286_100, output: 174 }, "older views are immutable snapshots");
+    };
+    manager.resumeRun(id, "multiple requests"); await entered.promise;
+    const record = manager.getRecord(id)!;
+    assert.equal(record.status, "running");
+    assert.deepEqual(source.list()[0]!.stats.latestRequest, { input: 286_100, output: 174 }, "retained throughout next request");
+    requestGate.resolve(); await manager.waitForAll();
+    const prior = await manager.getRun(id)!.terminal;
+    const final = source.list()[0]!;
+    assert.deepEqual(final.stats.latestRequest, { input: 286_100, output: 3200 });
+    assert.deepEqual(final.stats.cumulativeUsage, { input: 53_000, output: 3374, cacheRead: 433_100, cacheWrite: 86_100 });
+    assert.equal(record.compactionCount, 1);
+    assert.equal(getLifetimeTotal(record.lifetimeUsage), 142_474, "legacy lifetime total still excludes cacheRead");
+    assert.deepEqual(reported.drain(), toReportedUsage(record.lifetimeUsage), "parent billing retains all categories exactly once");
+    f.session.prompt = async () => { emit({ input: 40, output: 5, cacheRead: 0, cacheWrite: 0 }); };
+    manager.resumeRun(id, "uncached resume"); await manager.waitForAll();
+    assert.deepEqual(source.list()[0]!.stats.latestRequest, { input: 40, output: 5 });
+    assert.deepEqual(prior.latestRequestUsage, { input: 0, output: 3200, cacheRead: 200_000, cacheWrite: 86_100, cost: 0.03 });
+    assert.equal(f.listeners.size, 0);
+  } finally { requestGate.resolve(); source.dispose(); coordinator.dispose(); await manager.dispose(); await f.close(); }
+});
+
+void it("actual fresh runner usage populates own snapshot and missing later usage retains it", async () => {
+  const f = fixture();
+  const manager = new AgentManager(undefined, 1, undefined, undefined, undefined, {
+    runAgent: (ctx, type, prompt, options) => runAgent(ctx, type, prompt, options, f.deps),
+  });
+  try {
+    f.session.prompt = async () => {
+      for (const listener of f.listeners) listener({ type: "message_end", message: { role: "assistant", usage: {
+        input: 10, output: 174, cacheRead: 250_000, cacheWrite: 36_090, cost: { total: 0 },
+      } } } as AgentSessionEvent);
+    };
+    const id = manager.spawn(f.pi, f.ctx, "general-purpose", "fresh", { description: "fresh usage", isolated: true });
+    await manager.waitForAll();
+    assert.deepEqual(manager.getRecord(id)!.latestRequestUsage, { input: 10, output: 174, cacheRead: 250_000, cacheWrite: 36_090, cost: 0 });
+    const before = manager.getRecord(id)!.latestRequestUsage;
+    f.session.prompt = async () => {};
+    manager.resumeRun(id, "no usage resume"); await manager.waitForAll();
+    assert.equal(manager.getRecord(id)!.latestRequestUsage, before);
+  } finally { await manager.dispose(); await f.close(); }
+});
+
+void it("nested tool billing still folds into ancestors without manufacturing or replacing their own request", async () => {
+  const f = fixture();
+  const { createNestedSubagentTools } = await import("../src/nested-tools.ts");
+  const { createAgentTaskSource } = await import("../src/source.ts");
+  const { completeToolCall } = await import("./tool-inputs.ts");
+  const manager = new AgentManager(undefined, 1, undefined, undefined, undefined, {
+    runAgent: (ctx, type, prompt, options) => runAgent(ctx, type, prompt, options, f.deps),
+  });
+  const coordinator = new TaskCoordinator(), source = createAgentTaskSource(manager, coordinator, new Map());
+  try {
+    const id = manager.spawn(f.pi, f.ctx, "general-purpose", "parent", { description: "parent", isolated: true });
+    await manager.waitForAll();
+    const record = manager.getRecord(id)!;
+    const nested = { input: 100, output: 20, cacheRead: 900, cacheWrite: 30 };
+    const tools = createNestedSubagentTools({ manager: {
+      getRecord: candidate => manager.getRecord(candidate), awaitStartup: async () => {}, spawn: () => { throw new Error("unexpected background"); },
+      resume: async () => undefined,
+      spawnAndWait: async (_pi, _ctx, _type, _prompt, options) => {
+        options.onAssistantUsage?.(nested);
+        return { id: "child", record: { ...record, id: "child", status: "completed", result: "done" } };
+      },
+    }, pi: f.pi, parentAgentId: id, depth: 1, maxSubagentDepth: 2, allowedSubagents: "all", configCwd: f.ctx.cwd });
+    const tool = tools.find(tool => tool.name === "subagent_run")!;
+    const toolCtx = { ...f.ctx, tools: [], executeTool: async () => { throw new Error("unexpected nested tool call"); } };
+    const result = await tool.execute("nested", completeToolCall(tool.parameters, { prompt: "nested", description: "nested", subagent_type: "general-purpose" }), undefined, undefined, toolCtx);
+    assert.notEqual(result.isError, true);
+    assert.deepEqual(record.lifetimeUsage, { ...nested, cost: 0 });
+    assert.equal(source.list()[0]!.stats.latestRequest, undefined, "child usage cannot invent a parent's request");
+    f.session.prompt = async () => {
+      for (const listener of f.listeners) listener({ type: "message_end", message: { role: "assistant", usage: { input: 5, output: 7 } } } as AgentSessionEvent);
+    };
+    manager.resumeRun(id, "own usage"); await manager.waitForAll();
+    const own = record.latestRequestUsage;
+    await tool.execute("nested2", completeToolCall(tool.parameters, { prompt: "nested", description: "nested", subagent_type: "general-purpose" }), undefined, undefined, toolCtx);
+    assert.equal(record.latestRequestUsage, own, "later nested billing must not replace the own snapshot");
+    assert.deepEqual(source.list()[0]!.stats.latestRequest, { input: 5, output: 7 });
+    assert.deepEqual(source.list()[0]!.stats.cumulativeUsage, { input: 205, output: 47, cacheRead: 1800, cacheWrite: 60 });
+  } finally { source.dispose(); coordinator.dispose(); await manager.dispose(); await f.close(); }
+});

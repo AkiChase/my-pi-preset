@@ -14,7 +14,7 @@ const theme = { fg: (_color: string, text: string) => text };
 function view(id: string, patch: Partial<TaskView> = {}): TaskView {
     const identity = { sourceId: "overview", taskId: id, runId: "1" };
     return { ...identity, key: taskKey(identity), kind: "agent", title: `alias-${id}`, description: `Description ${id}`, status: "running", executionMode: "background", waitCount: 0,
-        startedAt: 100_000, stats: { tokens: 12 }, artifacts: [], capabilities: { stop: true, details: true }, ...patch };
+        startedAt: 100_000, stats: { tokens: 12, latestRequest: { input: 10, output: 2 } }, artifacts: [], capabilities: { stop: true, details: true }, ...patch };
 }
 function fixture(display = true, shortcutBackground = DEFAULTS.shortcutBackground, animations = true) {
     const handlers = new Map<string, Set<(event: never, ctx: ExtensionContext) => unknown>>();
@@ -68,7 +68,7 @@ it("overview keeps nested Agent rows and reports bounded truncation", () => {
     }
     const lines = overviewLines(selected, 100, 24, theme, 103_000);
     assert.equal(lines.length, 6); assert.equal(lines[5], "+3 hidden");
-    assert.match(lines[0], /^● alias-0 \(1\) +3s · ↓ 12/);
+    assert.match(lines[0], /^● alias-0 \(1\) +3s · ↑10 ↓2/);
     assert.match(lines[1], /^└─ ● alias-child/);
     const malicious = view("safe", { description: "中文🙂\u001b]0;BAD\u0007\n描述\u001b[31m", status: "paused" });
     for (const width of [0, 1, 2, 5, 20, 40, 80]) for (const line of overviewLines([malicious], width, 24, theme, 103_000)) {
@@ -86,10 +86,10 @@ it("retention is unpinned whole-root four seconds, orphan/cycle safe and new run
     const orphan = view("orphan", { parentKey: "missing" }), a = view("a"), b = view("b", { parentKey: a.key });
     assert.deepEqual(model.refresh([orphan, { ...a, parentKey: b.key }, b], 104_000).map(v => v.taskId), ["orphan", "a", "b"]);
     const resumed = view("parent", { runId: "2", key: taskKey({ sourceId: "overview", taskId: "parent", runId: "2" }),
-        startedAt: 104_000, stats: { tokens: 3210, durationMs: 2000 } });
+        startedAt: 104_000, stats: { tokens: 3210, latestRequest: { input: 1000, output: 2210 }, durationMs: 2000 } });
     assert.deepEqual(model.refresh([resumed], 106_000), [resumed]);
     const line = overviewLines([resumed], 100, 24, theme, 999_000).join("\n");
-    assert.match(line, /2s · ↓ 3\.2k/); assert.doesNotMatch(line, /completed/);
+    assert.match(line, /2s · ↑1\.0k ↓2\.2k/); assert.doesNotMatch(line, /completed/);
     model.clear(); assert.deepEqual(model.refresh([], 106_001), []);
 });
 it("actual widget owner/client hide at expiry without source events; clocks and late reset/shutdown callbacks are fenced", async t => {

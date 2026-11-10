@@ -1,6 +1,6 @@
 import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import type { TaskDetail, TaskMessageEntry, TaskView } from "./types.ts";
-import { cleanTaskText, taskOneLine, taskTokens, type TaskTheme } from "./presentation.ts";
+import { cleanTaskText, taskOneLine, taskTokens, taskLastRequest, type TaskTheme } from "./presentation.ts";
 
 const LABEL_WIDTH = 10;
 
@@ -77,12 +77,19 @@ function fields(view: TaskView, theme: TaskTheme, now: number | undefined): [str
         const progress = view.kind === "workflow" && s.totalCount !== undefined ? `${s.doneCount ?? 0}/${s.totalCount} agents` : undefined;
         const activity = join(theme, [progress, turns, tools]);
         if (activity) rows.push(["Activity", activity]);
-        const total = taskTokens(s.tokens);
-        if (total) {
-            const split = s.inputTokens !== undefined || s.outputTokens !== undefined
-                ? theme.fg("dim", ` (in ${taskTokens(s.inputTokens ?? 0)} · out ${taskTokens(s.outputTokens ?? 0)})`) : "";
-            rows.push(["Tokens", total + split + (s.cost !== undefined && Number.isFinite(s.cost) && s.cost > 0
-                ? ` · $${s.cost < 0.01 ? s.cost.toFixed(4) : s.cost.toFixed(2)}` : "")]);
+        const cost = s.cost !== undefined && Number.isFinite(s.cost) && s.cost > 0
+            ? ` · $${s.cost < 0.01 ? s.cost.toFixed(4) : s.cost.toFixed(2)}` : "";
+        if (view.kind === "agent") {
+            rows.push(["Last req", taskLastRequest(view)]);
+            const u = s.cumulativeUsage;
+            rows.push(["Usage Σ", `↑${taskTokens(u?.input) ?? "—"} ↓${taskTokens(u?.output) ?? "—"} R${taskTokens(u?.cacheRead) ?? "—"} W${taskTokens(u?.cacheWrite) ?? "—"}${cost}`]);
+        } else {
+            const total = taskTokens(s.tokens);
+            if (total) {
+                const split = s.inputTokens !== undefined || s.outputTokens !== undefined
+                    ? theme.fg("dim", ` (in ${taskTokens(s.inputTokens ?? 0)} · out ${taskTokens(s.outputTokens ?? 0)})`) : "";
+                rows.push(["Tokens", total + split + cost]);
+            }
         }
     }
     if (view.kind === "shell" || view.kind === "monitor") {
@@ -117,13 +124,20 @@ export function renderDetailHeader(view: TaskView, theme: TaskTheme, width: numb
     // Compact configuration differences into one bounded row, leaving core statistics room.
     const overrides = metadata.filter(([label]) => label === "Override");
     const context = metadata.findIndex(([label]) => label === "Context");
-    if (overrides.length && context >= 0) {
-        metadata[context][1] += " · " + overrides.map(([, value]) => `Override ${value}`).join(" · ");
-        for (let i = metadata.length - 1; i >= 0; i--) if (metadata[i][0] === "Override") metadata.splice(i, 1);
+    if (overrides.length) {
+        const index = context >= 0 ? context : metadata.findIndex(([label]) => label === "Override");
+        metadata[index][1] = context >= 0
+            ? metadata[index][1] + " · " + overrides.map(([, value]) => `Override ${value}`).join(" · ")
+            : overrides.map(([, value]) => value).join(" · ");
+        for (let i = metadata.length - 1; i >= 0; i--) if (metadata[i][0] === "Override" && i !== index) metadata.splice(i, 1);
     }
+    // Adding request/cumulative rows must not evict the fixed identity/artifact metadata.
+    // When necessary, share the agent's descriptive row with its kind/mode.
+    const budget = Math.max(0, Math.floor(maxLines));
+    if (view.kind === "agent" && lines.length > 1 && lines.length + metadata.length + (view.artifacts.length ? 1 : 0) > budget)
+        lines.splice(0, 2, `${lines[0]} · ${lines[1]}`);
     // Artifacts remain in the summary even when statistics overflow it. Copy retains full paths.
     const artifact = view.artifacts[0];
-    const budget = Math.max(0, Math.floor(maxLines));
     const available = Math.max(0, budget - lines.length - (artifact ? 1 : 0));
     lines.push(...metadata.slice(0, available).map(([label, value]) => `${theme.fg("dim", label)}  ${value}`));
     if (artifact && budget > lines.length) lines.push(`${theme.fg("dim", artifact.kind)}  ${taskOneLine(artifact.path)}${view.artifacts.length > 1 ? ` (+${view.artifacts.length - 1})` : ""}`);

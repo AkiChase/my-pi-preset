@@ -83,6 +83,16 @@ Use injected themes and SDK terminal-column helpers, not string length/hard-code
 
 Task Panel operations beyond stop (steer, workflow pause/resume, child skip/retry) are optional `TaskView.capabilities` flags plus optional `TaskSource.steer/control`. The source computes flags from the same current-window predicate it rechecks inside the action; the coordinator routes only to an identity that `list()` still advertises; panels gate keys and footer hints on the flags and target the identity captured at key press or composer open. Results show through view state, never inserted feedback rows that shift fixed layout. Structured detail (`TaskDetail.conversation`) is bounded, unstyled external text built by the source; the panel sanitizes before styling.
 
+## Agent Usage Display Contract
+
+1. **Scope/trigger:** Agent usage crosses own assistant events → `AgentRecord` → immutable `TaskView` → overview/detail. A lifetime ledger is not a latest-request measurement or context-window occupancy.
+2. **Signatures:** `AgentRecord.latestRequestUsage?: Readonly<LifetimeUsage>`; `TaskView.stats.latestRequest?: Readonly<{ input: number; output: number }>`; `cumulativeUsage?: Readonly<{ input: number; output: number; cacheRead: number; cacheWrite: number }>`.
+3. **Contract:** Only own assistant `message_end` usage updates the frozen latest snapshot in both fresh and resume callbacks. Overview `↑/↓` and detail `Last req` share full prompt input (`input + cacheRead + cacheWrite`) and output. Retain the snapshot during subsequent requests, missing usage and compaction. Detail `Usage Σ` uses existing lifetime categories: fresh input (↑), output (↓), cacheRead (R), cacheWrite (W), including owned nested-child spend; do not sum parent/child ledger rows again. Keep parent billing, legacy tool payloads and workflow totals unchanged.
+4. **Validation/absence matrix:** Before any observed usage → `↑— ↓—`; measured zeros → `↑0 ↓0`; absent/non-finite/negative projected values → `—`. A child usage callback may update an ancestor's lifetime ledger but must never invent or replace its own latest request. Compact secondary rows/counts without evicting lifecycle identity or fixed detail ID/artifact metadata.
+5. **Cases:** Base: uncached request `input=40, output=5` → `↑40 ↓5`. Cache-heavy: `input=10, cacheRead=250000, cacheWrite=36090, output=174` → `↑286.1k ↓174`. Bad: derive the latest prompt size from a lifetime sum or reset the previous measurement when the next request starts.
+6. **Required tests:** `agent-tasks/__tests__/runner-cancellation.test.ts` drives fresh/resume events, pending retention, absent vs zero usage, immutable snapshots, compaction, parent reporting and nested attribution. Task UI `presentation`, `panel` and `overview` tests assert matching request metrics, separate cumulative categories, eight-line header retention, Unicode/ANSI width bounds and lifecycle glyphs with descendant counts. Existing SDK compatibility shims are test-only evidence, not real-host acceptance.
+7. **Wrong vs correct:** Wrong: `↓625.4k` for cumulative `input + output + cacheWrite`. Correct: latest `↑286.1k ↓3.2k`, with separately labelled cumulative `Usage Σ ↑53.0k ↓19.0k R1.5M W55.0k`.
+
 ## Synchronization and Configuration Safety
 
 For direct user-extension pruning, follow [Direct User Extension Sync Contract](direct-user-extensions.md).

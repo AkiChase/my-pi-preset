@@ -68,7 +68,7 @@ Pending 表示仍在排队，不代表 Agent 已读或处理；`Submitting` 表�
 
 底栏会显示命令、Monitor、Agent 和 workflow 的活动与排队数量，以及当前等待次数。Agent 和 workflow 的根任务概览紧接用量行显示；命令和 Monitor 不在这里逐项展开。概览最多显示五个根任务，终态保留四秒；空间不足时 Pi 可能裁剪内容。
 
-Agent 的 tokens 包含 input、output 和 cacheWrite，不含 cacheRead；继续会话时显示累计 tokens，耗时只计算当前一轮。Workflow 的统计可能稍有延迟。`/task-detach` 只解除当前等待，不会停止仍在运行的任务。
+Agent 行的 `↑/↓` 和详情的 `Last req` 显示该 Agent 自身最近一次已完成请求的输入／输出：输入包含 fresh input、cacheRead 和 cacheWrite，不包含嵌套子 Agent 的请求。下一请求进行中保留上次实际值，尚无请求用量时显示 `—`。详情的 `Usage Σ` 分别显示累计 fresh input（↑）、output（↓）、cacheRead（R）和 cacheWrite（W），包含该 Agent 及其所属嵌套子 Agent 的用量；父行与子行的累计数不能再次相加。这些是跨请求用量，不是当前上下文占用。继续会话时耗时只计算当前一轮。Workflow 的统计可能稍有延迟。`/task-detach` 只解除当前等待，不会停止仍在运行的任务。
 
 ## 命令进程
 

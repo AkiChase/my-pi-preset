@@ -52,6 +52,11 @@ export function taskTokens(tokens: number | undefined): string | undefined {
     return tokens >= 1_000_000 ? `${(tokens / 1_000_000).toFixed(1)}M` : tokens >= 1_000 ? `${(tokens / 1_000).toFixed(1)}k` : String(Math.floor(tokens));
 }
 
+/** Shared row/detail request metric; unknown is not a measured zero. */
+export function taskLastRequest(view: TaskView): string {
+    return `↑${taskTokens(view.stats.latestRequest?.input) ?? "—"} ↓${taskTokens(view.stats.latestRequest?.output) ?? "—"}`;
+}
+
 export type TaskTheme = Pick<Theme, "fg"> & Partial<Pick<Theme, "bg" | "bold" | "style" | "colors" | "getColorMode">>;
 export interface TaskLineOptions { prefix?: string; children?: number; selected?: boolean; now?: number }
 
@@ -60,21 +65,27 @@ export function taskLine(view: TaskView, width: number, theme: TaskTheme, option
     width = Math.max(0, Math.floor(width));
     if (!width) return "";
     const fit = (text: string, size: number) => truncateToWidth(text, Math.max(0, size), "…");
-    const stats = [taskDuration(view, options.now), taskTokens(view.stats.tokens) === undefined ? undefined : `↓ ${taskTokens(view.stats.tokens)}`].filter(Boolean).join(" · ");
+    const isAgent = view.kind === "agent";
+    const usage = isAgent ? taskLastRequest(view) : taskTokens(view.stats.tokens) === undefined ? undefined : `↓ ${taskTokens(view.stats.tokens)}`;
+    const stats = [taskDuration(view, options.now), usage].filter(Boolean).join(" · ");
     // Narrow terminals drop secondary numbers/indentation, never lifecycle identity.
     const dot = theme.fg(taskStatusColor(view), taskDot(view));
-    const budget = Math.max(0, width - 2);
-    let suffix = stats;
-    suffix = fit(suffix, Math.max(0, budget - (budget >= 5 ? 2 : 0)));
-    const leftWidth = Math.max(0, budget - visibleWidth(suffix) - 1);
+    const budget = Math.max(0, isAgent && width < 7 ? width : width - 2);
     const count = options.children ? ` (${options.children})` : "";
-    const titleWidth = Math.max(0, leftWidth - visibleWidth(count));
+    let suffix = stats;
+    const identityReserve = isAgent ? Math.min(budget, 5 + visibleWidth(count)) : budget >= 5 ? 2 : 0;
+    suffix = isAgent && budget <= identityReserve ? "" : fit(suffix, Math.max(0, budget - identityReserve));
+    const leftWidth = Math.max(0, budget - visibleWidth(suffix) - (isAgent && !suffix ? 0 : 1));
+    // Descendant counts are secondary to the lifecycle glyph and agent name.
+    const visibleCount = isAgent ? fit(count, Math.max(0, leftWidth - 5)) : count;
+    const titleWidth = Math.max(0, leftWidth - visibleWidth(visibleCount));
     const title = view.kind === "agent" ? taskTitle(view) : `${view.kind} ${taskTitle(view)}`;
     const prefix = cleanTaskText(options.prefix ?? "").replace(/[\r\n]/g, "");
-    const prefixBudget = Math.max(0, titleWidth - 3);
+    const prefixBudget = Math.max(0, titleWidth - (isAgent ? 5 : 3));
     const tree = visibleWidth(prefix) <= prefixBudget ? prefix : prefixBudget >= 3 ? "…" + prefix.slice(-2) : "";
-    const left = fit(`${tree ? tree + " " : ""}${dot} ${title}`, titleWidth) + fit(count, leftWidth);
-    let line = fit(`${left}${left ? " " : ""}${theme.fg(taskStatusColor(view), suffix)}`, width);
+    const identity = isAgent && titleWidth < 3 ? dot : `${tree ? tree + " " : ""}${dot} ${title}`;
+    const left = fit(identity, titleWidth) + fit(visibleCount, leftWidth);
+    let line = fit(`${left}${left && (!isAgent || suffix) ? " " : ""}${theme.fg(taskStatusColor(view), suffix)}`, width);
     line += " ".repeat(Math.max(0, width - visibleWidth(line)));
     if (!options.selected || !theme.bg) return line;
     // Host foreground wrappers/truncation can emit reset-all or background reset.
@@ -92,7 +103,7 @@ export function taskStatusLine(view: TaskView, width: number, theme: TaskTheme, 
             taskDuration(view, now) ? `Agent runtime ${taskDuration(view, now)}` : undefined,
             view.status === "running" || view.status === "starting" ? taskOneLine(view.stats.activity ?? "") : undefined,
             view.stats.turnCount === undefined ? undefined : `${view.stats.turnCount} turns`,
-            view.stats.toolUses === undefined ? undefined : `${view.stats.toolUses} tools`, taskTokens(view.stats.tokens)].filter(Boolean);
+            view.stats.toolUses === undefined ? undefined : `${view.stats.toolUses} tools`].filter(Boolean);
         return truncateToWidth(theme.fg("dim", parts.join(" · ")), width, "…");
     }
     const state = theme.fg(taskStatusColor(view), taskDot(view));
