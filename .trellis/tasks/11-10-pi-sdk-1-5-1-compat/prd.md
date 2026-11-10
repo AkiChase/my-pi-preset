@@ -33,6 +33,7 @@ Node `v24.14.1`，SDK `1.5.1`，离线既有依赖。隔离 `PI_CODING_AGENT_DIR
 - `beautify/__tests__/harness.mjs`、`at-path-completion/__tests__/host-reset.test.ts:8`、`shared/widget-display/__tests__/sdk-footer.test.ts:18–25`、`shared/interaction/__tests__/sdk-overlay.test.ts:12–23` 缺 extensionOverlays。SDK `interactive-mode.js:2025,2438–2445,2480` 的 reset/open/done 使用真实 registry。补夹具字段，继续调用实际 SDK 方法，不重写假的 reset 算法。
 - `task-ui/__tests__/sdk-runtime.test.ts:106` 的服务夹具仅强转 cwd/agentDir。SDK `agent-session-runtime.js:301–309` 卸载后等待 modelRuntime.settleCredentialWrites。补最小 typed service 并断言调用顺序/等待，不创建真实凭据服务。
 - 安装夹具恢复后再判断是否存在真正的产品行为缺口；保留编辑器 identity/history/paste、Down、❯、目录续查取消、Footer takeover、动画与资源清理契约。
+- 阶段2夹具修复后复现 3 个真实 collapsed-paste handoff 回归：SDK1.5.1 setter 使用 getExpandedText，`extensions/editor-handoff/index.ts:86–89` 的临时重复 setText guard 只比较 getText，导致 cursor 从 `{line:0,col:21}` 变为 `{line:150,col:0}`。在原 R2 保持现有 paste/identity 契约内最小适配 guard；不改变用户行为或所有者架构。
 
 ### R3 持久化与参数转换预期
 

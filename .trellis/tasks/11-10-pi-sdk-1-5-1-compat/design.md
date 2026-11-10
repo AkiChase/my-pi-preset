@@ -9,7 +9,7 @@
 ## 夹具边界
 
 1. Editor/Overlay/Footer 的实际 InteractiveMode 方法需要 extensionDialogs / extensionOverlays。补齐 host state，而非在产品里容忍任意缺失内部 host 字段或复制 SDK reset 算法。
-2. runtime 夹具仅实现此次实际使用的服务方法，包括 settleCredentialWrites；断言 SDK 卸载等待凭据收敛。不创建真实 credentials，不把类型强转当服务实现证据。
+2. runtime 夹具仅实现此次实际使用的服务方法，包括 settleCredentialWrites；断言 quit `runtime.dispose()` 在 abort→shutdown→session disposal 后等待凭据收敛。new/resume/fork/import replacement 不等待该收敛，保留实际 SDK 顺序。不创建真实 credentials，不把类型强转当服务实现证据。
 3. ExecResult 夹具使用明确 truncated:false，与 killed 独立。
 4. 现有窄内部 autocomplete seam 未变：tryTriggerAutocomplete(false) 表示 display-only 查询，force/explicitTab 保持 false。保留票据、abort 和 live editor identity，不扩大 private API 访问。
 

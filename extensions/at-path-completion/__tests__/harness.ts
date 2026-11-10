@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { CustomEditor, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { CombinedAutocompleteProvider, Container, TuiMainScreen, setKeybindings, type AutocompleteProvider, type EditorComponent } from "@earendil-works/pi-tui";
+import { CombinedAutocompleteProvider, Container, TuiMainScreen, setKeybindings, type AutocompleteProvider, type Component, type EditorComponent, type OverlayHandle } from "@earendil-works/pi-tui";
 import { InteractiveMode, KeybindingsManager, themeSdk } from "../../task-ui/__tests__/editor-host.mjs";
 import atPathCompletion from "../index.ts";
 export const pause = (ms = 100) => new Promise<void>(resolve => setTimeout(resolve, ms));
@@ -34,6 +34,8 @@ export function harness() {
     ui: tui, editor: original as EditorComponent, defaultEditor: original, keybindings: keys,
     autocompleteProvider: base, autocompleteProviderWrappers: [] as ((current: AutocompleteProvider) => AutocompleteProvider)[],
     editorContainer: new Container(), statusContainer: new Container(), activeStatusIndicator: undefined,
+    extensionDialogs: [] as { component: Component & { dispose?(): void } }[],
+    extensionOverlays: new Map<OverlayHandle, () => void>(),
     editorComponentFactory: undefined as NonNullable<Parameters<ExtensionContext['ui']['setEditorComponent']>[0]> | undefined,
     disposeActiveSelector() {}, setExtensionStatus() {}, showExtensionNotify() {},
     addExtensionTerminalInputListener() { counts.raw++; return () => {}; },

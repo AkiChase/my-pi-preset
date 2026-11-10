@@ -80,6 +80,8 @@ export function makeHost(name) {
     defaultWorkingMessage: "Working...", idleStatus: { invalidate() {}, render() { return []; } },
     setCustomEditorComponent: interactive.InteractiveMode.prototype.setCustomEditorComponent,
     extensionDialogs: [], programStatus: { setBlocked(_name, _value) {} },
+    /** @type {Map<import('@earendil-works/pi-tui').OverlayHandle, () => void>} */
+    extensionOverlays: new Map(),
     showTopExtensionDialog: interactive.InteractiveMode.prototype.showTopExtensionDialog,
     clearExtensionTerminalInputListeners() {}, setExtensionFooter() {}, setExtensionHeader() {},
     clearExtensionWidgets() {}, footerDataProvider: { clearExtensionStatuses() {}, setExtensionStatus() {} }, footer: { invalidate() {} },

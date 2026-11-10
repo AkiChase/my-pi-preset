@@ -20,6 +20,8 @@ Scoped gates（无 shim）：
 
 补 at-path/Task UI editor/Beautify harness 的 dialog state，补 host-reset/shared overlay/Footer fixture registry，补 sdk-runtime 最小 modelRuntime service。优先修复缺失夹具，产品 owner 除非实证显示相同 SDK 兼容缺口不改。
 
+阶段2首跑已修复 registry/services，但揭示共享 `preserveHandoff` 仅识别 getText 的重复写入，不识别 SDK1.5.1 getExpandedText，3 个现有 collapsed-paste 回归失败。主会话核对实际 owner 和差异，明确授权在本阶段 R2 原有状态保持范围内最小适配 `extensions/editor-handoff/index.ts` 临时 guard，并验证不同文本仍传递、descriptor lease 正常恢复。不是新 UX 或架构范围。
+
 Scoped gates（自然退出）：
 
 - `node --test extensions/at-path-completion/__tests__/*.test.ts`。
@@ -82,4 +84,20 @@ Recap SDK EISDIR 用例验证原子回滚与先前确认内容恢复；Memory ho
 
 reviewer 核对了旧 parser 对 kind array 的 loose normalization；实际 SDK schema 拒绝，tool execute invalid_arguments 且 capability effects=0，原有未变，无新增 admission bug。未作范围外 parser 修复。
 
-原始日志/probes `/tmp/pi-sdk-compat.ZDRQNy/stage1/` 保留；真实 TUI/IME/bundle/在线 provider NOT_RUN。主会话已核对实际 diff/日志，review 无剩余阶段1 blocker，准备阶段检查点提交。
+原始日志/probes `/tmp/pi-sdk-compat.ZDRQNy/stage1/` 保留；真实 TUI/IME/bundle/在线 provider NOT_RUN。主会话已核对实际 diff/日志，review 无剩余阶段1 blocker，检查点已提交：`667327d`。
+
+### 阶段 2 完成记录
+
+首次实施 `agent_trellis_implement_5_03748998` 修复六处 fixture state/service，实际 SDK 方法保留。首跑自然退出：at-path 61/60/1 fail，Beautify+Task UI 123/121/2 fail，shared/runtime 64/64 PASS，typecheck PASS。三失败都是 SDK expanded-text redundant setText 破坏 collapsed paste，主会话核对 `preserveHandoff` 后授权在原 R2 状态保持范围内修正临时 guard。
+
+续作 `agent_trellis_implement_6_ab8c4c0d`：temporary guard 比较 displayed/getExpandedText，仍转发不同文本；新增四个实际 editor/descriptor/SDK失败 rollback 测试。新增 guard 用例 RED：2 pass/2 fail，修复后 GREEN：4/4，原失败未删除或弱化。
+
+独立审查 `agent_trellis_check_7_a37e6fb2` 无 blocker、无 review edits；实际 stage2八个产品/测试文件变更，主会话核对完整 diff 和最终日志。
+
+无 shim，自然退出 gate（续作和 reviewer均同样通过）：at-path 61/61、Beautify+Task UI editor 127/127、shared interaction/widget/runtime 64/64，全部 exit0；`pnpm typecheck` exit0；`git diff --check` PASS。
+
+主会话 stage2 `pnpm test` exit1，1805 tests / 1801 pass / 4 fail。仅剩 stage3 Memory scalar、bash schema、monitor required-nullable、Recap EISDIR；无模块加载级联失败。四个 guard 新测试使全量计数从1801增至1805。
+
+SDK source与controlled fixture确认：只 quit runtime.dispose 在 abort→shutdown→session.dispose 后等待 settleCredentialWrites；session replacement 不等待，精确顺序保留。设计材料已澄清此差异。
+
+日志保留 `/tmp/pi-sdk-compat.ZDRQNy/stage2/logs/*-first.log`、`continuation/logs/{guard-red,guard-green,at-path,editor,lifecycle,typecheck}.log`、`review/`、`main-full-test.log`。未使用 shim/force-exit 证明 focused cleanup；真实 TUI/IME/在线 provider NOT_RUN。准备 stage2检查点提交。

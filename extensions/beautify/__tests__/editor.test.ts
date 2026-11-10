@@ -5,6 +5,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import beautify from "../index.ts";
 import { registerAppearance } from "../editor/owner.ts";
 import { decorateAppearance } from "../editor/appearance.ts";
+import { preserveHandoff } from "../../editor-handoff/index.ts";
 import { registerDownOpener } from "../../task-ui/editor.ts";
 import { TaskLifecycle } from "../../task-ui/lifecycle.ts";
 import { TaskCoordinator } from "../../task-ui/coordinator.ts";
@@ -336,4 +337,77 @@ test("migrated later border wrapper and nondelegating render retain their receiv
     custom.setText("unchanged"); const release = decorateAppearance(custom);
     try { assert.deepEqual(custom.render(40), ["custom:unchanged"]); custom.handleInput("!"); assert.deepEqual(custom.render(40), ["custom:unchanged!"]); } finally { release(); }
   } finally { close(); h.dispose(); }
+});
+
+for (const expandedAvailable of [true, false]) test(`handoff shields only redundant public text writes (expanded API=${expandedAvailable}) and restores descriptors`, () => {
+  const h = makeHost(`text-guard-${expandedAvailable}`), editor = h.editor;
+  let restore: (() => void) | undefined;
+  try {
+    editor.handleInput(`\x1b[200~${"line\n".repeat(150)}\x1b[201~`);
+    const displayed = editor.getText(), expanded = editor.getExpandedText(), cursor = editor.getCursor();
+    assert.notEqual(displayed, expanded);
+    if (!expandedAvailable) Reflect.set(editor, "getExpandedText", undefined);
+    const nativeSet = editor.setText, writes: string[] = [];
+    editor.setText = function (text: string) { assert.equal(this, editor); writes.push(text); nativeSet.call(this, text); };
+    const keys = ["setText", "setAutocompleteProvider", "setPaddingX", "setAutocompleteMaxVisible", "onSubmit", "onChange", "borderColor", "actionHandlers", "onEscape", "onCtrlD", "onPasteImage", "onExtensionShortcut"];
+    const descriptors = keys.map(key => Object.getOwnPropertyDescriptor(editor, key));
+    restore = preserveHandoff(editor);
+    editor.setText(displayed);
+    if (expandedAvailable) editor.setText(expanded);
+    assert.deepEqual(writes, []);
+    assert.equal(editor.getText(), displayed); assert.deepEqual(editor.getCursor(), cursor);
+    if (expandedAvailable) assert.equal(editor.getExpandedText(), expanded);
+    editor.setText("different draft");
+    assert.deepEqual(writes, ["different draft"]); assert.equal(editor.getText(), "different draft");
+    editor.setText(editor.getText());
+    assert.deepEqual(writes, ["different draft"], "compare the live public text, not a captured initial snapshot");
+    restore(); restore = undefined;
+    keys.forEach((key, index) => assert.deepEqual(Object.getOwnPropertyDescriptor(editor, key), descriptors[index]));
+    editor.handleInput("\x1b[D"); const beforeNormalWrite = editor.getCursor();
+    editor.setText(editor.getText());
+    assert.deepEqual(writes, ["different draft", "different draft"]);
+    assert.notDeepEqual(editor.getCursor(), beforeNormalWrite, "normal repeated setText remains destructive after the lease ends");
+  } finally { restore?.(); h.dispose(); }
+});
+
+test("handoff partial descriptor failure rolls back every lease without losing collapsed paste", () => {
+  const h = makeHost("text-guard-preflight-failure"), editor = h.editor;
+  try {
+    editor.handleInput(`\x1b[200~${"line\n".repeat(150)}\x1b[201~`);
+    const displayed = editor.getText(), expanded = editor.getExpandedText(), cursor = editor.getCursor();
+    const keys = ["setText", "setAutocompleteProvider", "setPaddingX", "setAutocompleteMaxVisible", "onSubmit", "onChange", "borderColor", "actionHandlers"];
+    const descriptors = keys.map(key => Object.getOwnPropertyDescriptor(editor, key));
+    let once = true;
+    const proxy = new Proxy(editor, { defineProperty(target, key, descriptor) {
+      const result = Reflect.defineProperty(target, key, descriptor);
+      if (key === "onChange" && once) { once = false; throw new Error("handoff descriptor mutation"); }
+      return result;
+    } });
+    assert.throws(() => preserveHandoff(proxy), /handoff descriptor mutation/);
+    keys.forEach((key, index) => assert.deepEqual(Object.getOwnPropertyDescriptor(editor, key), descriptors[index]));
+    assert.equal(editor.getText(), displayed); assert.equal(editor.getExpandedText(), expanded); assert.deepEqual(editor.getCursor(), cursor);
+    editor.setText("after failed preflight"); assert.equal(editor.getText(), "after failed preflight");
+  } finally { h.dispose(); }
+});
+
+test("actual SDK setter failure rollback preserves collapsed paste and restores normal setText", async () => {
+  const h = makeHost("text-guard-mount-failure"), editor = h.editor;
+  const setter = h.host.setCustomEditorComponent;
+  let once = true;
+  h.host.setCustomEditorComponent = function (factory: unknown) {
+    setter.call(this, factory);
+    if (once) { once = false; throw new Error("after mounting collapsed paste"); }
+  };
+  try {
+    editor.handleInput(`\x1b[200~${"line\n".repeat(150)}\x1b[201~`);
+    const displayed = editor.getText(), expanded = editor.getExpandedText(), cursor = editor.getCursor();
+    const nativeSet = editor.setText, descriptor = Object.getOwnPropertyDescriptor(editor, "setText");
+    registerAppearance(h.pi as unknown as ExtensionAPI); await h.fire("session_start");
+    assert.equal(h.editor, editor); assert.equal(h.tui.getFocusedComponent(), editor);
+    assert.deepEqual(h.host.editorContainer.children, [editor]);
+    assert.equal(editor.getText(), displayed); assert.equal(editor.getExpandedText(), expanded); assert.deepEqual(editor.getCursor(), cursor);
+    assert.equal(editor.setText, nativeSet); assert.deepEqual(Object.getOwnPropertyDescriptor(editor, "setText"), descriptor);
+    editor.handleInput("\r"); assert.equal(h.counts.submit[0], expanded.trimEnd());
+    editor.setText("normal editing"); assert.equal(editor.getText(), "normal editing");
+  } finally { await h.fire("session_shutdown"); h.dispose(); }
 });

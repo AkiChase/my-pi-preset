@@ -102,7 +102,22 @@ void it("actual SDK runtime new/resume/fork/import/quit creates fresh factories;
         return result;
     }
     let current: ReturnType<typeof activate> | undefined;
-    const services = { cwd: dir, agentDir } as AgentSessionServices;
+    let releaseCredentials!: () => void;
+    let credentialWaitStarted!: () => void;
+    const credentialWrites = new Promise<void>(resolve => { releaseCredentials = resolve; });
+    const credentialWait = new Promise<void>(resolve => { credentialWaitStarted = resolve; });
+    const modelRuntime: Pick<AgentSessionServices["modelRuntime"], "settleCredentialWrites"> = {
+        async settleCredentialWrites() {
+            order.push("credentials:wait");
+            credentialWaitStarted();
+            await credentialWrites;
+            order.push("credentials:settled");
+        },
+    };
+    // Only runtime.dispose uses this model service; replacement does not settle credentials.
+    const partialServices = { cwd: dir, agentDir, modelRuntime } satisfies
+        Pick<AgentSessionServices, "cwd" | "agentDir"> & { modelRuntime: typeof modelRuntime };
+    const services = partialServices as AgentSessionServices;
     const factory: CreateAgentSessionRuntimeFactory = async (options) => {
         order.push("create");
         const h = activate(options.sessionManager);
@@ -154,12 +169,22 @@ void it("actual SDK runtime new/resume/fork/import/quit creates fresh factories;
         assert.ok(order.includes("shutdown:resume")); assert.ok(order.includes("shutdown:fork"));
         const newest = current!;
         await newest.execute("bash", { command: "printf LAST_FACTORY" });
-        await runtime.dispose();
+        order.length = 0;
+        let disposalComplete = false;
+        const disposal = runtime.dispose().then(() => { disposalComplete = true; });
+        await credentialWait;
+        await new Promise<void>(resolve => setImmediate(resolve));
         assert.equal(newest.lifecycle.phase, "closed");
-        assert.ok(order.includes("shutdown:quit"));
+        assert.deepEqual(order, ["abort", "shutdown:quit", "dispose", "credentials:wait"]);
+        assert.equal(disposalComplete, false, "quit disposal must wait for credential writes after session cleanup");
+        releaseCredentials();
+        await disposal;
+        assert.equal(disposalComplete, true);
+        assert.deepEqual(order, ["abort", "shutdown:quit", "dispose", "credentials:wait", "credentials:settled"]);
         assert.equal(initial.messages.length, 0);
         assert.equal(newest.messages.length, 0);
     } finally {
+        releaseCredentials();
         for (const h of activations) await h.lifecycle.shutdown();
         if (oldLogDir === undefined) delete process.env.PROCESS_TASKS_LOG_DIR;
         else process.env.PROCESS_TASKS_LOG_DIR = oldLogDir;

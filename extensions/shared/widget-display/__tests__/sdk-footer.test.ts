@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
-import { Container, type Component } from "@earendil-works/pi-tui";
+import { Container, type Component, type OverlayHandle } from "@earendil-works/pi-tui";
 import { initTheme, createEventBus, SessionManager, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import owner from "../owner.ts";
 import statusBar from "../../../status-bar.ts";
@@ -19,7 +19,7 @@ for (const ownerFirst of [true, false]) it(`installed SDK Footer setter/factory/
         footerContainer: new Container(), footer: { render: () => ["native"], invalidate() {} }, footerDataProvider: provider,
         ui: { requestRender() {}, hideOverlay() {} }, defaultEditor: {}, activeStatusIndicator: undefined,
         setExtensionFooter(factory: unknown) { factories++; InteractiveMode.prototype.setExtensionFooter.call(seam, factory); },
-        extensionDialogs: [], showTopExtensionDialog() {},
+        extensionDialogs: [], extensionOverlays: new Map<OverlayHandle, () => void>(), showTopExtensionDialog() {},
         clearExtensionTerminalInputListeners() {}, setExtensionHeader() {}, clearExtensionWidgets() {}, setCustomEditorComponent() {},
         setupAutocompleteProvider() {}, updateTerminalTitle() {}, setWorkingIndicator() {}, setHiddenThinkingLabel() {},
     };

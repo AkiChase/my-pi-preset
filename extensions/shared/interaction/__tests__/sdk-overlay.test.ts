@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
 import type { ExtensionContext, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
-import { Input } from "@earendil-works/pi-tui";
+import { Input, type OverlayHandle } from "@earendil-works/pi-tui";
 import { InteractiveMode, KeybindingsManager } from "../../../task-ui/__tests__/editor-host.mjs";
 import { runOverlay } from "../overlay.ts";
 import type { OverlayInteraction } from "../overlay.ts";
@@ -10,6 +10,7 @@ it("installed SDK custom overlay preserves component focus/input and closes its 
     const events: string[] = [];
     let mounted!: Input & { dispose(): void };
     const host = {
+        extensionOverlays: new Map<OverlayHandle, () => void>(),
         editor: { getText: () => "unchanged draft" },
         keybindings: KeybindingsManager.create(),
         ui: {
@@ -33,6 +34,7 @@ it("installed SDK custom overlay preserves component focus/input and closes its 
     });
     await Promise.resolve();
     assert.ok(mounted instanceof Input);
+    assert.equal(host.extensionOverlays.size, 1);
     mounted.focused = true; mounted.handleInput("hello");
     assert.equal(input.focused, true); assert.equal(input.getValue(), "hello");
     // A different topmost overlay must never be hidden by our completion.
@@ -40,5 +42,6 @@ it("installed SDK custom overlay preserves component focus/input and closes its 
     runtime.complete(input.getValue());
     assert.deepEqual(await pending, { kind: "completed", value: "hello" });
     assert.equal(disposed, 1);
+    assert.equal(host.extensionOverlays.size, 0);
     assert.deepEqual(events, ["install", "install", "hide own overlay"]);
 });

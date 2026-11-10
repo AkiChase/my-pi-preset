@@ -3,7 +3,7 @@ const layout = await loadNativeLayout();
 import assert from "node:assert/strict";
 import { it } from "node:test";
 import { SessionManager, CustomEditor, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { Container, TuiMainScreen, setKeybindings, type AutocompleteProvider, type EditorComponent } from "@earendil-works/pi-tui";
+import { Container, TuiMainScreen, setKeybindings, type AutocompleteProvider, type Component, type EditorComponent, type OverlayHandle } from "@earendil-works/pi-tui";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -44,6 +44,8 @@ function harness() {
     const host = {
         ui: tui, editor: defaultEditor as EditorComponent, defaultEditor, keybindings: keys, autocompleteProvider: provider,
         editorContainer: new Container(), statusContainer: new Container(), activeStatusIndicator: undefined,
+        extensionDialogs: [] as { component: Component & { dispose?(): void } }[],
+        extensionOverlays: new Map<OverlayHandle, () => void>(),
         editorComponentFactory: undefined as EditorFactory | undefined,
         disposeActiveSelector() {}, setExtensionStatus() {},
         showExtensionCustom: InteractiveMode.prototype.showExtensionCustom,

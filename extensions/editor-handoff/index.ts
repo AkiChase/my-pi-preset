@@ -81,15 +81,18 @@ export function interpose(target: object, key: PropertyKey, descriptor: Property
     };
 }
 
-/** Pi 1.1's setter redundantly rewires even the SAME live instance. Shield only that
- * synchronous handoff: setText otherwise destroys history draft, cursor, pastes and completion.
+/** The host setter redundantly rewires even the SAME live instance, using displayed
+ * or expanded text. Shield only that synchronous handoff: setText otherwise destroys
+ * history draft, cursor, pastes and completion.
  * All properties here are public EditorComponent/CustomEditor API, not editing internals. */
 export function preserveHandoff(editor: LiveEditor): () => void {
     const restores: (() => void)[] = [];
     try {
         const setText = editor.setText;
         restores.push(interpose(editor, "setText", { writable: true, value: function (this: LiveEditor, text: string) {
-            if (text !== this.getText()) setText.call(this, text);
+            if (text !== this.getText() && (typeof this.getExpandedText !== "function" || text !== this.getExpandedText())) {
+                setText.call(this, text);
+            }
         } }));
         for (const key of ["setAutocompleteProvider", "setPaddingX", "setAutocompleteMaxVisible"] as const) {
             if (typeof editor[key] === "function") restores.push(interpose(editor, key, { writable: true, value: () => {} }));
