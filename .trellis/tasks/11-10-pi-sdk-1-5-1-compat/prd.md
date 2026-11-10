@@ -58,12 +58,12 @@ Node `v24.14.1`，SDK `1.5.1`，离线既有依赖。隔离 `PI_CODING_AGENT_DIR
 
 ## 验收
 
-- [ ] A1：当前 SDK 1.5.1 下 `pnpm check` 无 shim exit 0。（R1–R4）
-- [ ] A2：受影响 Agent/Process/Runtime/Task UI、补全/Beautify、shared overlay/Footer、Memory/Recap focused suites 自然退出通过。（R2–R4）
-- [ ] A3：工具/schema/render 行为、编辑器 identity/focus/history/paste、执行取消和资源 cleanup 无退化。（R1、R2）
-- [ ] A4：Recap 失败后已确认状态/磁盘保护、Memory missing/标量/direct-call admission 回归正确。（R3）
-- [ ] A5：最近请求与累计用量现有回归通过，无关改动保持原样，所有失败/重跑/NOT_RUN 如实记录。（R4）
+- [x] A1：当前 SDK 1.5.1 下 `pnpm check` 无 shim exit 0。（R1–R4）
+- [x] A2：受影响 Agent/Process/Runtime/Task UI、补全/Beautify、shared overlay/Footer、Memory/Recap focused suites 自然退出通过。（R2–R4）
+- [x] A3：工具/schema/render 行为、编辑器 identity/focus/history/paste、执行取消和资源 cleanup 的相关回归通过。（R1、R2）
+- [x] A4：Recap 失败后已确认状态/磁盘保护、Memory missing/标量/direct-call admission 回归正确。（R3）
+- [x] A5：最近请求与累计用量现有回归通过，无关改动保持原样，所有失败/重跑/NOT_RUN 如实记录。（R4）
 
 ## 材料
 
-本任务原始验证材料 `/tmp/pi-sdk-compat.ZDRQNy/`；旧任务材料 `/tmp/pi-tokens-row.EaBi0M/` 只读引用，不迁移/清理。长期记录在本任务 implement.md；研究角色返回直接证据，未写 source research/ 或产品文件。
+本任务执行时原始验证材料 `/tmp/pi-sdk-compat.ZDRQNy/` 已由主会话检查后清理，结果、失败原因、重跑关系与限制保存在 implement.md。旧任务材料 `/tmp/pi-tokens-row.EaBi0M/` 保持原样，未迁移/清理。研究角色返回直接证据，未写 source research/ 或产品文件。

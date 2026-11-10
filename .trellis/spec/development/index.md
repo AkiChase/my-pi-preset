@@ -12,6 +12,8 @@ There is no build step: Pi loads TypeScript through its host loader; static chec
 
 Preserve vendor originals, exact baselines, licenses and intentional local deviations in owning provenance files. Repository-owned forks may be edited in place; do not invent an upstream sync obligation or duplicate their standalone tool registration. Declare conflicting standalone sources when this preset owns registration. Do not hand-edit generated runtime, roles or managed AGENTS blocks to change project conventions.
 
+SDK-facing changes also follow [SDK Compatibility Boundaries](sdk-compatibility.md): public imports/render contracts, transient editor handoff, actual host fixtures and persistence/validation semantics.
+
 ## Extension Execution and State
 
 For direct Herdr state reporting, follow [Herdr State Extension Contract](herdr-state.md).

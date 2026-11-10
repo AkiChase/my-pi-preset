@@ -112,4 +112,29 @@ SDK source与controlled fixture确认：只 quit runtime.dispose 在 abort→shu
 
 最终自然退出（实施与review均通过）：Memory/Recap132/132、Bash/Monitor schema29/29，exit0；typecheck exit0；reviewer scalar probe exit0。`pnpm test` exit0，1806/1806、81 suites、skip/cancel=0（既有full force-exit不替代自然退出证据）。`git diff --check` PASS。
 
-review无blocker、无fix。主会话检查完整diff和日志；原始失败/重跑在 `/tmp/pi-sdk-compat.ZDRQNy/stage3/logs/`、`review/logs/` 与 scalar-probe临时文件，保留真实SDK和fake证据层区分。阶段3准备检查点提交。
+review无blocker、无fix。主会话检查完整diff和日志；原始失败/重跑执行时位于 `/tmp/pi-sdk-compat.ZDRQNy/stage3/logs/`、`review/logs/` 与 scalar-probe临时文件，真实SDK和fake证据层区分保存在记录中。阶段3检查点已提交：`a61ed07`。
+
+### 阶段 4 集成结果与契约收敛
+
+主会话最终环境：Node24.14.1，已安装 SDK1.5.1，`PI_SDK_DIR=/Users/jyxc-dz-0101322/.pi/agent/install/releases/1.5.1/node_modules`，执行时 `PI_CODING_AGENT_DIR=/tmp/pi-sdk-compat.ZDRQNy/integration/main-config`。没有兼容 shim、安装/下载、SDK文件修改、个人 reload/sync、push/history rewrite。
+
+| 最终实际命令 | 结果 |
+| --- | --- |
+| `pnpm check` | PASS exit0，strict typecheck成功；1806 tests /1806 pass /0 fail /0 skipped /0 cancelled，81 suites |
+| `node --test --test-concurrency=8 extensions/agent-tasks/__tests__/*.test.ts extensions/process-tasks/__tests__/*.test.ts extensions/runtime-tasks/__tests__/*.test.ts extensions/task-ui/__tests__/*.test.ts` | PASS exit0，891/891，68 suites，自然退出，无 force-exit |
+| `node --test extensions/shared/scroll-panel/__tests__/*.test.ts extensions/agent-tasks/__tests__/loading.test.ts scripts/pi-manifest.test.mjs` | PASS exit0，22/22，4 suites，自然退出 |
+| `git diff --check`、`task.py validate 11-10-pi-sdk-1-5-1-compat` | PASS exit0；implement/check manifests均5条有效引用 |
+| Spec link/size/discovery | PASS；development index 30658 bytes、sdk-compatibility3321、testing index17311，均在单文件注入预算内；开发层/测试层发现未变 |
+| 物理终端/IME、第三方input-history组合、实际CLI bundle/TUI、在线provider | NOT_RUN，未授权；不以组件/source-layout回归冒充这些验证 |
+
+阶段2 at-path61、Beautify+editor127、shared/runtime64及阶段3Memory/Recap132、Process schema29自然退出结果覆盖最终相同代码；独立review无fix，因此这些有效结果直接复用。Full package既有force-exit不能证明自然cleanup，最终891项自然退出证据单独给出。最近请求/累计用量回归包含在Task UI与Agent suites中，未回退618353a功能。
+
+代码分别经阶段独立review，主会话核对实际diff；阶段4只补充SDK契约/验证规范与材料，不改变程序输入，最终测试结果仍覆盖最终代码。SDK contract最初直接放入development index导致33427 bytes注入警告，已拆为 `sdk-compatibility.md` 并在index/manifests引用，复验无截断警告。
+
+未新增用户功能，现有用户文档描述保持成立；不将SDK迁移史或测试教程塞入用户docs。未变动受provenance资源约束的vendor/runtime资源，因此不伪造hash更新。SDK契约记录公开import/render、输入unknown parse-before-effects、temporary displayed/expanded handoff、真实hostfixture、quit credentialsettlement和atomic/non-atomic persistence区别。
+
+## 最终材料、清理与交付状态
+
+本任务临时原始材料在结果与失败/重跑关系整合后由主会话核对完毕。所有本任务子角色和shell命令终态已取得；管理工具无运行中本任务执行，`lsof +D /tmp/pi-sdk-compat.ZDRQNy` 无open files（exit1）。按已有授权仅删除本任务owned目录，确认路径不存在。前文临时日志路径是执行时位置，已删除，不是永久记录依赖。旧 `/tmp/pi-tokens-row.EaBi0M/` 仍存在且保持只读原样。
+
+实施阶段检查点：`667327d`（公开API/类型）、`f4494fc`（hostfixtures与paste状态保持）、`a61ed07`（校验/持久化回归）。本阶段仅提交spec/材料整合，hash在交付回复中报告。六个无关Trellis改动保留；未自动归档、deactivate或journal，等待用户接受后收尾。

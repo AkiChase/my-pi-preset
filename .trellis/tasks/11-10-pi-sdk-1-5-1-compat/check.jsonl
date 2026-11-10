@@ -2,3 +2,4 @@
 {"file": ".trellis/spec/testing/index.md", "reason": "SDK 隔离、自然退出与真实 fixture 回归"}
 {"file": ".trellis/spec/development/widget-display.md", "reason": "Footer/widget takeover 生命周期"}
 {"file": ".trellis/spec/guides/index.md", "reason": "跨层和复用检查"}
+{"file": ".trellis/spec/development/sdk-compatibility.md", "reason": "SDK 公共契约与失败保护复核"}
