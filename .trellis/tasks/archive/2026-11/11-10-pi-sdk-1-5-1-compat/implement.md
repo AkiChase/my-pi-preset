@@ -137,4 +137,10 @@ review无blocker、无fix。主会话检查完整diff和日志；原始失败/�
 
 本任务临时原始材料在结果与失败/重跑关系整合后由主会话核对完毕。所有本任务子角色和shell命令终态已取得；管理工具无运行中本任务执行，`lsof +D /tmp/pi-sdk-compat.ZDRQNy` 无open files（exit1）。按已有授权仅删除本任务owned目录，确认路径不存在。前文临时日志路径是执行时位置，已删除，不是永久记录依赖。旧 `/tmp/pi-tokens-row.EaBi0M/` 仍存在且保持只读原样。
 
-实施阶段检查点：`667327d`（公开API/类型）、`f4494fc`（hostfixtures与paste状态保持）、`a61ed07`（校验/持久化回归）。本阶段仅提交spec/材料整合，hash在交付回复中报告。六个无关Trellis改动保留；未自动归档、deactivate或journal，等待用户接受后收尾。
+实施阶段检查点：`667327d`（公开API/类型）、`f4494fc`（hostfixtures与paste状态保持）、`a61ed07`（校验/持久化回归），最终spec/验证整合检查点 `b1967c5`。六个无关Trellis改动保留。
+
+## 验收与收尾授权
+
+用户在获知无shim完整检查1806/1806、自然退出891/891与22/22，以及物理终端/IME/CLI bundle/在线provider未运行的限制后回复「收尾吧」，接受本任务范围内交付，授权归档、清除当前绑定和记录journal。
+
+本任务直接在main完成四阶段本地提交，无独立feature branch或PR；归档使用非PR任务的 `--skip-branch-validation`，不伪造分支或合并信息。不push、不改写历史、不安装、同步或reload。保留执行失败与修复关系以及全部NOT_RUN限制。
