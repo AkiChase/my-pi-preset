@@ -66,7 +66,7 @@ git diff --check
 
 ## 阶段 2 实施与验证记录
 
-阶段 2 已提交：`1685395`（`fix(trellis): ignore permission drift during bounded reads`）。两阶段产品提交均已核验；最终任务保持 in_progress 待用户验收，不进行 push、安装、部署、archive 或 journal。
+阶段 2 已提交：`1685395`（`fix(trellis): ignore permission drift during bounded reads`）。两阶段产品提交均已核验；实施结束时任务保持 in_progress 待用户验收，未进行 push、安装、部署、archive 或 journal。用户后来明确授权“收尾吧”，见下方验收与收尾记录。
 
 主会话直接修改三处 bounded-read identity：不再比较 mode/ctime，保留 dev/ino、文件类型、size、mtime 读取期间变化检测；Python 目录 guard 继续检测目录成员变化，源 graph 二次读取仍比较内容 hash。没有添加第二套权限恢复或迁移机制。
 
@@ -85,3 +85,9 @@ git diff --check
 - 规范完整记录为 `.trellis/spec/development/trellis-resource-provenance.md`（7段可执行契约），development index 链接到它。内联扩写曾使 index 达33706字节触发32768 injection警告；提取为独立规范后 index30463字节、规范3784字节，role manifest各5条 validate通过且无warning，链接检查通过。未改用户文档，其现有行为描述仍准确。
 - 两阶段最终 `git diff --check` 通过；用户已安装包、项目生成副本未改。未验证真实Pi host/UI（Trellis按规范使用逻辑fake-pi测试）；无独立lint命令，不声称 lint PASS。
 - 主会话核验并以 `lsof -nP +D` 确认无活动句柄后，已删除本任务 5 个自建临时目录：research、implement、两次check和main；仅删除明确列出的本任务路径，未清理系统/harness或其他会话输出。无持久化原始日志；结论与失败事实已在此保留。
+
+## 验收与收尾
+
+用户明确回复“收尾吧”，接受成果并授权 task archive、当前绑定清理和 journal 记录。收尾前 Git clean，提交为 `95f93f6`、`1685395`、`17d003b`；测试输入未变，复用上述有效验证，不重复运行产品测试。
+
+任务只在 main 完成 scoped 本地提交，没有 PR 或独立特性分支（task.json 的 pr_url 为 null）。归档采用 CLI 明确提供的非 PR 任务选项 `--skip-branch-validation`，保留真实 branch/base_branch 记录，不伪造分支或改写历史。归档与 journal 使用项目默认 auto-commit；无并行修改、子任务或新原始附件需要纳入。未更新个人已安装包、其他仓库或此仓库的生成资源，不 push。
