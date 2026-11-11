@@ -17,13 +17,13 @@ function fixture(t) {
 test('preview is read-only and both adopts exactly five files with backups and honest provenance',t=>{
  const f=fixture(t),manifestPath='.trellis/.pi-trellis.json',m=JSON.parse(readFileSync(join(f.root,manifestPath)));
  f.put('.trellis/workflow.md','custom workflow');chmodSync(join(f.root,'.trellis/workflow.md'),0o640);
- m.templates['.trellis/workflow.md']={origin:'preserved-project',sha256:digest('custom workflow'),mode:0o640,source:{kind:'project-snapshot',revision:null}};
+ m.templates['.trellis/workflow.md']={origin:'preserved-project',sha256:digest('custom workflow'),source:{kind:'project-snapshot',revision:null}};
  f.put(manifestPath,JSON.stringify(m));f.put('.trellis/spec/index.md','custom index');rmSync(join(f.root,'.trellis/spec/guides/index.md'));
  f.put('.trellis/spec/own/rules.md','project rules');f.put('.trellis/.runtime/sessions/foreign.json','{"current_task":null}');
  const before=f.snapshot(),p=templatePlan(f.root,'both');assert.deepEqual(f.snapshot(),before);assert.equal(p.rows.length,5);
  assert.deepEqual(p.rows.map(r=>r.state),['Replace','Replace','Create','Same','Same']);
  const backup=applyTemplatePlan(p);assert.ok(backup);
- assert.equal(readFileSync(join(f.root,backup,'.trellis/workflow.md'),'utf8'),'custom workflow');assert.equal(lstatSync(join(f.root,backup,'.trellis/workflow.md')).mode&0o777,0o640);
+ assert.equal(readFileSync(join(f.root,backup,'.trellis/workflow.md'),'utf8'),'custom workflow');assert.equal(lstatSync(join(f.root,backup,'.trellis/workflow.md')).mode&0o777,0o600);
  assert.equal(readFileSync(join(f.root,backup,manifestPath),'utf8'),JSON.stringify(m));
  assert.ok(verifyRuntime(f.root));const after=f.snapshot();
  for(const [path,value] of Object.entries(before))if(!p.rows.some(r=>r.path===path)&&path!==manifestPath)assert.equal(after[path],value,path);
@@ -39,7 +39,7 @@ test('workflow/spec scopes preserve all unselected files, including custom docum
 });
 test('missing preserved workflow is explicitly restored by adoption, not safe update',t=>{
  const f=fixture(t),file=join(f.root,'.trellis/.pi-trellis.json'),m=JSON.parse(readFileSync(file));
- m.templates['.trellis/workflow.md']={origin:'preserved-project',sha256:null,mode:null,source:{kind:'project-snapshot',revision:null}};writeFileSync(file,JSON.stringify(m));rmSync(join(f.root,'.trellis/workflow.md'));
+ m.templates['.trellis/workflow.md']={origin:'preserved-project',sha256:null,source:{kind:'project-snapshot',revision:null}};writeFileSync(file,JSON.stringify(m));rmSync(join(f.root,'.trellis/workflow.md'));
  assert.ok(!resourcePlan(f.root,'update').changes.some(c=>c.path==='.trellis/workflow.md'));
  const p=templatePlan(f.root,'workflow');assert.equal(p.rows[0].state,'Create');applyTemplatePlan(p);assert.ok(verifyRuntime(f.root));
  rmSync(join(f.root,'.trellis/workflow.md'));applyResourcePlan(resourcePlan(f.root,'update'));assert.ok(existsSync(join(f.root,'.trellis/workflow.md')));
@@ -48,7 +48,7 @@ test('changed selected file, Same file, manifest or forged plan refuses stale co
  for(const route of ['change','same','manifest','forged']){const f=fixture(t);f.put('.trellis/workflow.md','old');const p=templatePlan(f.root,'both');
  if(route==='change')f.put('.trellis/workflow.md','concurrent');
  if(route==='same')f.put('.trellis/spec/guides/index.md','concurrent');
- if(route==='manifest')f.put('.trellis/.pi-trellis.json',JSON.stringify({...p.manifest,templates:{...p.manifest.templates,'.trellis/workflow.md':{origin:'preserved-project',sha256:null,mode:null,source:{kind:'project-snapshot',revision:null}}}}));
+ if(route==='manifest')f.put('.trellis/.pi-trellis.json',JSON.stringify({...p.manifest,templates:{...p.manifest.templates,'.trellis/workflow.md':{origin:'preserved-project',sha256:null,source:{kind:'project-snapshot',revision:null}}}}));
  if(route==='forged')p.changes[0].path='victim.txt';
  const before=f.snapshot();assert.throws(()=>applyTemplatePlan(p),/changed since template preview/);assert.deepEqual(f.snapshot(),before);}
 });
@@ -78,12 +78,12 @@ test('invalid initialization record after preview prevents writes and backup cre
 });
 test('valid changed initialization record still invalidates preview',t=>{
  const f=fixture(t);f.put('.trellis/workflow.md','custom');const p=templatePlan(f.root,'workflow');
- const file='.trellis/.runtime/init-operation.json',op=JSON.parse(readFileSync(join(f.root,file)));op.completed=[];f.put(file,JSON.stringify(op));const before=f.snapshot();
+ const file='.trellis/.runtime/init-operation.json',op=JSON.parse(readFileSync(join(f.root,file)));op.plan.actions[0].output=Buffer.from('changed historical output').toString('base64');const {planHash,...body}=op.plan;op.plan.planHash=digest(JSON.stringify(body));f.put(file,JSON.stringify(op));const before=f.snapshot();
  assert.throws(()=>applyTemplatePlan(p),/changed since template preview/);assert.deepEqual(f.snapshot(),before);
 });
 test('package template drift during publication preserves backups and original manifest',t=>{
  const f=fixture(t);f.put('.trellis/workflow.md','custom');const file=join(f.root,'.trellis/.pi-trellis.json'),m=JSON.parse(readFileSync(file));
- m.templates['.trellis/workflow.md']={origin:'preserved-project',sha256:digest('custom'),mode:0o644,source:{kind:'project-snapshot',revision:null}};writeFileSync(file,JSON.stringify(m));
+ m.templates['.trellis/workflow.md']={origin:'preserved-project',sha256:digest('custom'),source:{kind:'project-snapshot',revision:null}};writeFileSync(file,JSON.stringify(m));
  const original=readFileSync(file),p=templatePlan(f.root,'workflow');
  const template=join(packageRoot,'resources/templates/workflow.md'),baseline=join(packageRoot,'resources/template-baseline.json'),data=Buffer.from('changed package workflow');
  const metadata=JSON.parse(readFileSync(baseline));metadata.files['workflow.md'].sha256=digest(data);

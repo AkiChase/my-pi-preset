@@ -39,7 +39,7 @@ function preserve(root) {
   const mode = path === workflow ? 0o640 : 0o644;
   if (absent) rmSync(join(root, path));
   else { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), content); chmodSync(join(root, path), mode); }
-  manifest.templates[path] = { origin: 'preserved-project', sha256: absent ? null : digest(content), mode: absent ? null : mode, source: { kind: 'project-snapshot', revision } };
+  manifest.templates[path] = { origin: 'preserved-project', sha256: absent ? null : digest(content), source: { kind: 'project-snapshot', revision } };
  }
  writeFileSync(join(root, manifestPath), JSON.stringify(manifest, null, 2) + '\n');
 }
@@ -49,15 +49,15 @@ function rehash(plan) { const { planHash, ...body } = plan; plan.planHash = dige
 test('manifest separates exact runtime/roles from seven preserved old-project templates and an absent index', t => {
  const f = preserved(t), before = f.snapshot(), release = runtimeBaseline().releaseId;
  const m = verifyRuntime(f.root);
- assert.equal(m.schemaVersion, 3); assert.equal(m.runtimeReleaseId, release);
+ assert.equal(m.schemaVersion, 4); assert.equal(m.runtimeReleaseId, release);
  assert.equal(Object.values(m.files).filter(v => v.kind === 'runtime').length, Object.keys(runtimeBaseline().files).length);
  assert.equal(Object.values(m.files).filter(v => v.kind === 'agent').length, 3);
  assert.equal(Object.keys(m.templates).length, 8);
  for (const [path, value] of Object.entries(m.templates)) {
   assert.equal(value.origin, 'preserved-project');
   assert.equal(Object.hasOwn(m.files, path), false);
-  if (path === missingIndex) assert.deepEqual([value.sha256, value.mode], [null, null]);
-  else { assert.equal(value.sha256, digest(readFileSync(join(f.root, path)))); assert.equal(value.mode, lstatSync(join(f.root, path)).mode & 0o777); }
+  if (path === missingIndex) assert.equal(value.sha256, null);
+  else { assert.equal(value.sha256, digest(readFileSync(join(f.root, path)))); assert.equal(Object.hasOwn(value, "mode"), false); }
  }
  assert.equal(inspect(f.root).state, 'ready'); assert.deepEqual(f.snapshot(), before);
  // Provenance is an initial diagnostic, not an assertion of current editable bytes.
@@ -80,7 +80,7 @@ test('preserved clone identity setup/retry retains exact provenance and all proj
 
 const malformedManifests = {
  'unreleased schema1': m => { m.schemaVersion = 1; },
- 'unreleased schema4': m => { m.schemaVersion = 4; },
+ 'unreleased schema5': m => { m.schemaVersion = 5; },
  'skills under schema2': m => { m.schemaVersion = 2; },
  'schema3 without skills': m => { delete m.skills; },
  'unknown skill entry': m => { m.skills['.pi/skills/trellis-extra/SKILL.md'] = m.skills['.pi/skills/trellis-start/SKILL.md']; },
@@ -123,7 +123,6 @@ const malformedManifests = {
  'short hash': m => { m.templates[workflow].sha256 = 'a'.repeat(63); },
  'hash trailing newline': m => { m.templates[workflow].sha256 = 'a'.repeat(64) + '\n'; },
  'uppercase hash': m => { m.templates[workflow].sha256 = 'A'.repeat(64); },
- 'null hash with mode': m => { m.templates[workflow].sha256 = null; },
  'hash with null mode': m => { m.templates[workflow].mode = null; },
  'string mode': m => { m.templates[workflow].mode = '0644'; },
  'fractional mode': m => { m.templates[workflow].mode = 1.5; },
@@ -159,12 +158,12 @@ test('stale role/template fingerprints are safe updates while runtime rows and m
 	// A role row that only records older bytes/mode is a safe update, never a blocked project: dispatch
 	// reads the role file without hash checks, and Update restores the exact current fingerprint.
 	const f = fixture(t), role = '.pi/agents/trellis-check.md';
-	f.manifest.files[role] = { ...f.manifest.files[role], sha256: digest('older role wording'), mode: 0o600 };
+	f.manifest.files[role] = { ...f.manifest.files[role], sha256: digest('older role wording') };
 	f.put(manifestPath, f.manifest);
 	assert.equal(inspect(f.root).state, 'ready'); assert.ok(verifyRuntime(f.root));
 	assert.ok(readFileSync(join(f.root, role), 'utf8').startsWith('---'));
 	// A package-default template row with an older fingerprint is likewise a safe refresh of the record.
-	f.manifest.templates[workflow] = { ...f.manifest.templates[workflow], sha256: digest('older workflow'), mode: 0o640 };
+	f.manifest.templates[workflow] = { ...f.manifest.templates[workflow], sha256: digest('older workflow') };
 	f.put(manifestPath, f.manifest); assert.ok(verifyRuntime(f.root));
 	// Only runtime rows must equal the current package bytes, and every row still needs a valid shape.
 	for (const [field, value] of [['sha256', digest('untrusted')], ['mode', 0o600], ['source', 'runtime/other.py']]) {
@@ -173,7 +172,7 @@ test('stale role/template fingerprints are safe updates while runtime rows and m
 	for (const [field, value] of [['sha256', null], ['mode', null], ['sha256', 'A'.repeat(64)], ['mode', 0o1000], ['source', 'resources/templates/config.yaml']]) {
 	 const g = fixture(t); g.manifest.templates[workflow][field] = value; g.put(manifestPath, g.manifest); assert.throws(() => verifyRuntime(g.root));
 	}
-	for (const attack of ['bytes', 'mode']) {
+	for (const attack of ['bytes']) {
 	 const g = preserved(t), path = '.trellis/scripts/task.py';
 	 if (attack === 'bytes') g.put(path, '# untrusted runtime\n'); else chmodSync(join(g.root, path), 0o600);
 	 const before = g.snapshot(); assert.throws(() => verifyRuntime(g.root), /missing or modified/); assert.deepEqual(g.snapshot(), before);
@@ -192,16 +191,18 @@ test('bounded null/64-character revisions and mixed provenance are diagnostic, n
 
 for (const attack of ['preserved manifest output', 'arbitrary template output', 'identity template action']) {
  test(`preserved diagnostic provenance cannot authorize recovery: ${attack}`, t => {
-  const f = attack === 'identity template action' ? preserved(t) : fixture(t);
+  const freshRoot = attack === 'identity template action' ? undefined : mkdtempSync(join(tmpdir(), 'pi-manifest-recovery-'));
+  if (freshRoot) t.after(() => rmSync(freshRoot, { recursive: true, force: true }));
+  const f = freshRoot ? shape(freshRoot) : preserved(t);
   if (attack === 'identity template action') rmSync(join(f.root, '.trellis/.developer'));
   const p = plan(f.root, 'Returning User'); assert.throws(() => apply(p, { afterWrite: () => { throw Error('interrupt'); } }));
   const opPath = '.trellis/.runtime/init-operation.json', op = JSON.parse(readFileSync(join(f.root, opPath))), q = op.plan;
   if (attack === 'preserved manifest output') {
    const action = q.actions.find(a => a.kind === 'manifest'), m = JSON.parse(Buffer.from(action.output, 'base64'));
-   m.templates[workflow] = { origin: 'preserved-project', sha256: null, mode: null, source: { kind: 'project-snapshot', revision: null } };
+   m.templates[workflow] = { origin: 'preserved-project', sha256: null, source: { kind: 'project-snapshot', revision: null } };
    action.output = Buffer.from(JSON.stringify(m, null, 2) + '\n').toString('base64');
   } else if (attack === 'arbitrary template output') q.actions.find(a => a.kind === 'template').output = Buffer.from('untrusted template').toString('base64');
-  else { q.actions.push({ path: missingIndex, original: null, kind: 'template', mode: 0o644, output: Buffer.from('untrusted').toString('base64') }); q.guards[missingIndex] = null; }
+  else { q.actions.push({ path: missingIndex, original: null, kind: 'template', output: Buffer.from('untrusted').toString('base64') }); q.guards[missingIndex] = null; }
   rehash(q); f.put(opPath, op); const before = f.snapshot();
   assert.equal(inspect(f.root).state, 'conflict'); assert.throws(() => plan(f.root, 'Returning User')); assert.throws(() => apply(q)); assert.deepEqual(f.snapshot(), before);
  });

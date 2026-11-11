@@ -67,10 +67,10 @@ test('special/directory and denied descriptors fail explicitly, independent conf
  const open=fs.openSync;t.mock.method(fs,'openSync',(path,...args)=>{if(String(path).endsWith('/.trellis/.developer'))throw Object.assign(Error('Permission denied'),{code:'EACCES'});return open(path,...args);});syncBuiltinESMExports();t.after(()=>{t.mock.restoreAll();syncBuiltinESMExports();});r=f.check();assert.equal(item(r,'developer').status,'issue');assert.match(item(r,'developer').summary,/Permission denied/);
 });
 
-test('runtime missing/hash/mode, missing role and required docs collect fixed inventory while customization stays legal',t=>{
+test('runtime missing/hash, chmod tolerated, missing role and required docs collect fixed inventory while customization stays legal',t=>{
  const f=fixture(t,true);f.put('.trellis/workflow.md','custom workflow');f.put('.trellis/spec/index.md','custom spec');assert.equal(item(f.check(),'documents').status,'pass');
  rmSync(join(f.root,'.trellis/scripts/task.py'));f.put('.trellis/scripts/get_context.py','changed');chmodSync(join(f.root,'.trellis/scripts/get_developer.py'),0o600);rmSync(join(f.root,'.pi/agents/trellis-check.md'));rmSync(join(f.root,'.trellis/spec/guides/index.md'));
- const r=f.check(),report=formatDiagnostics(r);assert.match(report,/Missing: .trellis\/scripts\/task.py/);assert.match(report,/Hash mismatch: .trellis\/scripts\/get_context.py/);assert.match(report,/Mode mismatch: .trellis\/scripts\/get_developer.py/);assert.equal(item(r,'inventory:agent').status,'issue');assert.equal(item(r,'documents').status,'issue');assert.equal(item(r,'runtime-probe').status,'blocked');
+ const r=f.check(),report=formatDiagnostics(r);assert.match(report,/Missing: .trellis\/scripts\/task.py/);assert.match(report,/Hash mismatch: .trellis\/scripts\/get_context.py/);assert.doesNotMatch(report,/Mode mismatch|Hash mismatch: .trellis\/scripts\/get_developer.py/);assert.equal(item(r,'inventory:agent').status,'issue');assert.equal(item(r,'documents').status,'issue');assert.equal(item(r,'runtime-probe').status,'blocked');
 });
 
 test('legal empty resource lock and completed audit never execute recovery or re-read historical task',t=>{

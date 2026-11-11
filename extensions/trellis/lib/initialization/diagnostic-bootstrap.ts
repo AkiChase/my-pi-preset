@@ -39,8 +39,8 @@ else:
     for name, row in request['sources'].items():
         if not isinstance(name, str) or not (name == 'diagnostics' or name == 'common' or name.startswith('common.') or name == 'pi_trellis_worktree' or name.startswith('pi_trellis_worktree.')):
             raise ValueError("Non-reserved source namespace")
-        exact(row, ['data', 'sha256', 'mode', 'origin', 'package'])
-        if not isinstance(row['data'], str) or not isinstance(row['sha256'], str) or not re.fullmatch(r'[a-f0-9]{64}', row['sha256']) or type(row['mode']) is not int or not 0 <= row['mode'] <= 511 or type(row['package']) is not bool:
+        exact(row, ['data', 'sha256', 'origin', 'package'])
+        if not isinstance(row['data'], str) or not isinstance(row['sha256'], str) or not re.fullmatch(r'[a-f0-9]{64}', row['sha256']) or type(row['package']) is not bool:
             raise ValueError("Invalid source row")
         if not isinstance(row['origin'], str) or not row['origin'].startswith(scope['executionRoot'] + '/.trellis/scripts/') or '..' in row['origin'].split('/'):
             raise ValueError("Invalid deployed source origin")

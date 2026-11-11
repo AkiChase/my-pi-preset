@@ -17,7 +17,7 @@ const text = (root: string, path: string, error: string | null = null) => {
 };
 const currentError = (id: string) => result.items.find(i => i.id === id && i.status !== "pass" && i.status !== "skipped")?.summary ?? null;
 let manifestDigest: string | undefined;
-let captured: Record<string, { data: string; sha256: string; mode: number; origin: string; package: boolean }> | undefined;
+let captured: Record<string, { data: string; sha256: string; origin: string; package: boolean }> | undefined;
 try {
 	result = collectDiagnostics(scope, { reader });
 	parentPort!.postMessage({ type: "static", result });
@@ -35,8 +35,8 @@ try {
 		const deployed = `.trellis/scripts/${path}`, expected = manifest.files[deployed];
 		if (!expected || expected.kind !== "runtime") throw Error(`Required deployment source missing: ${path}`);
 		const source = reader.file(root, deployed, DIAGNOSTIC_LIMITS.file, true);
-		if (!source || source.sha256 !== expected.sha256 || source.mode !== expected.mode) throw Error(`Captured deployment source changed: ${path}`);
-		captured[name] = { data: source.data.toString("base64"), sha256: source.sha256, mode: source.mode, origin: join(root, deployed), package: path.endsWith("/__init__.py") };
+		if (!source || source.sha256 !== expected.sha256) throw Error(`Captured deployment source changed: ${path}`);
+		captured[name] = { data: source.data.toString("base64"), sha256: source.sha256, origin: join(root, deployed), package: path.endsWith("/__init__.py") };
 	}
 	let workspace = text(root, `.trellis/workspace/${result.facts.developer}/index.md`, currentError("workspace"));
 	if (workerData.developer) {
@@ -60,7 +60,7 @@ try {
 				// Absolute paths are local to previously authorized roots/stores. No new ref discovery.
 				const route = routes.get(path)!;
 				const after = original(route.root, route.path, route.limit);
-				if (before?.sha256 !== after?.sha256 || before?.mode !== after?.mode) throw Error("Consumer snapshot changed during probe");
+				if (before?.sha256 !== after?.sha256) throw Error("Consumer snapshot changed during probe");
 			}
 			parentPort!.postMessage({ type: "rechecked", valid: true, usage: { text: reader.textBytes, inventory: reader.inventoryBytes } });
 		} catch (error) { parentPort!.postMessage({ type: "rechecked", valid: false, reason: error instanceof Error ? error.message : "Recheck failed" }); }

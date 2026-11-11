@@ -34,7 +34,7 @@ export function reviewRootBlocks(readFile: (path: string) => (Fingerprint & { da
 		let actual: ReturnType<typeof readFile>;
 		try { actual = readFile(path); }
 		catch (error) { return { path, state: "Unreadable file — preserved", before: null, reason: error instanceof Error ? error.message : String(error) }; }
-		const before = actual ? { sha256: actual.sha256, mode: actual.mode } : null;
+		const before = actual ? { sha256: actual.sha256 } : null;
 		const block = template(source, reader);
 		let next: Buffer;
 		try { next = replaceBlock(actual?.data, block, start, end); }

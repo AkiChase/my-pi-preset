@@ -14,17 +14,17 @@ function fixture(t) {
  put('.trellis/.developer','name=Old User\ninitialized_at=legacy\n');put('.trellis/scripts/task.py','legacy runtime');put('.trellis/scripts/extra.py','custom script');put('.trellis/.version','0.6.16');put('.trellis/workflow.md','custom workflow\r\n');put('.trellis/config.yaml','custom config');put('.trellis/tasks/old/task.json','history');put('.trellis/workspace/Old User/journal-1.md','journal');put('.pi/agents/trellis-check.md','old role document');put('AGENTS.md','prefix\r\n<!-- TRELLIS:START -->old<!-- TRELLIS:END -->\r\nsuffix');chmodSync(join(root,'AGENTS.md'),0o640);chmodSync(join(root,'.trellis/config.yaml'),0o600);
  return {root,put};
 }
-test('adopts legacy with exact runtime, preserved documents/modes, no backups/deletion/onboarding',t=>{
+test('adopts legacy with exact runtime, preserved documents, no backups/deletion/onboarding',t=>{
  const f=fixture(t),p=adoptPlan(f.root);assert.equal(inspect(f.root).state,'unsupported');assert.ok(!existsSync(join(f.root,'.trellis/.pi-trellis.json')));assert.match(adoptionSummary(p),/Legacy — left in place: .trellis\/scripts\/extra.py/);
  // Preview is read-only: no template is created and no legacy runtime/role byte is touched.
  assert.ok(!existsSync(join(f.root,'.trellis/spec/index.md')));assert.equal(readFileSync(join(f.root,'.trellis/scripts/task.py'),'utf8'),'legacy runtime');assert.equal(readFileSync(join(f.root,'.pi/agents/trellis-check.md'),'utf8'),'old role document');
  assert.deepEqual(p.rows.filter(r=>r.path==='AGENTS.md').map(r=>r.state),['Replace block']);
  assert.equal(applyAdoptPlan(p).state,'ready');const m=verifyRuntime(f.root);
- for(const [path,r] of Object.entries(m.files)){assert.equal(digest(readFileSync(join(f.root,path))),r.sha256);assert.equal(lstatSync(join(f.root,path)).mode&0o777,r.mode);}
+ for(const [path,r] of Object.entries(m.files)){assert.equal(digest(readFileSync(join(f.root,path))),r.sha256);assert.equal(lstatSync(join(f.root,path)).mode&0o777,0o644);assert.equal(Object.hasOwn(r,"mode"),false);}
  assert.notEqual(readFileSync(join(f.root,'.pi/agents/trellis-check.md'),'utf8'),'old role document');
  assert.equal(m.templates['.trellis/workflow.md'].origin,'preserved-project');assert.equal(m.templates['.trellis/spec/index.md'].origin,'package-default');
  // Preserved provenance records the actual bytes/mode and a diagnostic-only snapshot source.
- assert.deepEqual(m.templates['.trellis/config.yaml'],{origin:'preserved-project',sha256:digest('custom config'),mode:0o600,source:{kind:'project-snapshot',revision:null}});
+ assert.deepEqual(m.templates['.trellis/config.yaml'],{origin:'preserved-project',sha256:digest('custom config'),source:{kind:'project-snapshot',revision:null}});
  assert.equal(lstatSync(join(f.root,'.trellis/config.yaml')).mode&0o777,0o600);
  test('HOME is refused and the extension stops blocking runtime commands after adoption',t=>{
  const f=fixture(t),home=process.env.HOME;
@@ -42,7 +42,7 @@ test('adopts legacy with exact runtime, preserved documents/modes, no backups/de
  });
 });
 for(const [path,text] of [['.trellis/workflow.md','custom workflow\r\n'],['.trellis/config.yaml','custom config'],['.trellis/tasks/old/task.json','history'],['.trellis/workspace/Old User/journal-1.md','journal'],['.trellis/scripts/extra.py','custom script'],['.trellis/.version','0.6.16']])assert.equal(readFileSync(join(f.root,path),'utf8'),text);
- const agents=readFileSync(join(f.root,'AGENTS.md'),'utf8');assert.ok(agents.startsWith('prefix\r\n'));assert.ok(agents.endsWith('\r\nsuffix'));assert.equal(lstatSync(join(f.root,'AGENTS.md')).mode&0o777,0o640);
+ const agents=readFileSync(join(f.root,'AGENTS.md'),'utf8');assert.ok(agents.startsWith('prefix\r\n'));assert.ok(agents.endsWith('\r\nsuffix'));assert.equal(lstatSync(join(f.root,'AGENTS.md')).mode&0o777,0o644);
  assert.ok(!existsSync(join(f.root,'.trellis/.runtime/adopt-backups')));assert.ok(!existsSync(join(f.root,'.trellis/.runtime/init-operation.json')));assert.ok(!existsSync(join(f.root,'.trellis/tasks/00-bootstrap-guidelines')));assert.throws(()=>adoptPlan(f.root));
 });
 test('missing identity adopts as supported and interrupted manifest-less adoption can be reconfirmed',t=>{

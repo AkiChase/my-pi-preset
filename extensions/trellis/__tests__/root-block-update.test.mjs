@@ -38,8 +38,9 @@ test('outdated AGENTS block is backed up and replaced; surrounding bytes are pre
  const backup = applyResourcePlan(plan);
  assert.match(backup, /^\.trellis\/\.runtime\/resource-backups\/[0-9a-f-]{36}$/);
  assert.deepEqual(readFileSync(join(root, backup, 'AGENTS.md')), original);
+ assert.equal(statSync(join(root, backup, 'AGENTS.md')).mode & 0o777, 0o600);
  assert.equal(readFileSync(file, 'utf8'), `# Project\r\nprefix line\r\n\r\n${block}\r\n\r\n# Conventions\r\n- keep me\r\n`);
- assert.equal(statSync(file).mode & 0o777, 0o640);
+ assert.equal(statSync(file).mode & 0o777, 0o644);
  assert.ok(verifyRuntime(root));
  assert.equal(rowOf(resourcePlan(root, 'update'), 'AGENTS.md').state, 'Current block');
 });

@@ -14,7 +14,7 @@ import { apply, plan } from '../lib/initialization/engine.ts';
 import { readSourceExecution } from '../lib/source-executions.ts';
 import { readBinding } from '../lib/bindings.ts';
 import { queryWorktree } from '../lib/worktree-query.ts';
-import { mockPython } from './runtime-fixture.mjs';
+import { mockPython, rehomeOperationRecord } from './runtime-fixture.mjs';
 import { parseDispatchFacts } from '../lib/task-context.ts';
 
 // Build the initialized Git/Trellis project once and copy it per case.
@@ -40,6 +40,8 @@ function rebase(from,to) {
  if(existsSync(bindings))files.push(...readdirSync(bindings).map(name=>join(bindings,name)));
  const escape=path=>JSON.stringify(path).slice(1,-1);
  for(const file of files)if(existsSync(file))writeFileSync(file,readFileSync(file,'utf8').replaceAll(escape(from),escape(to)));
+ // Completed operation integrity covers the original plan shape, including its canonical root.
+ rehomeOperationRecord(from,to);
 }
 async function copyProject(from) {
  const root=canonicalPath(mkdtempSync(join(tmpdir(),'pi-dispatch-')));
@@ -244,8 +246,8 @@ test('shutdown while spawn reply is pending retains unknown with returned id, ne
 
 test('supported source/target release mismatch rejects before provider ping/spawn or target CLI execution',async t=>{
  const f=await stateFixture(t),c=f.prepared;let ping=0;f.bus.on('subagents:rpc:ping',()=>{ping++;});
- const manifest=join(f.root,'.trellis/.pi-trellis.json'),original=readFileSync(manifest);const changed=JSON.parse(original);changed.runtimeReleaseId='unsupported-release';writeFileSync(manifest,JSON.stringify(changed));await assert.rejects(f.dispatch(),/Unsupported project runtime release/);assert.equal(ping,0);assert.equal(f.replies.length,0);writeFileSync(manifest,original);
- const target=join(c.binding.worktreePath,'.trellis/.pi-trellis.json'),record=JSON.parse(readFileSync(target));record.runtimeReleaseId='unsupported-target';writeFileSync(target,JSON.stringify(record));await assert.rejects(f.dispatch(),/Unsupported project runtime release/);assert.equal(f.replies.length,0);assert.equal(readExecution(c.binding),undefined);
+ const manifest=join(f.root,'.trellis/.pi-trellis.json'),original=readFileSync(manifest);const changed=JSON.parse(original);changed.runtimeReleaseId='pi-trellis-runtime-v1-'+'f'.repeat(64);writeFileSync(manifest,JSON.stringify(changed));await assert.rejects(f.dispatch(),/Unsupported project runtime release/);assert.equal(ping,0);assert.equal(f.replies.length,0);writeFileSync(manifest,original);
+ const target=join(c.binding.worktreePath,'.trellis/.pi-trellis.json'),record=JSON.parse(readFileSync(target));record.runtimeReleaseId='pi-trellis-runtime-v1-'+'e'.repeat(64);writeFileSync(target,JSON.stringify(record));await assert.rejects(f.dispatch(),/Unsupported project runtime release/);assert.equal(f.replies.length,0);assert.equal(readExecution(c.binding),undefined);
 });
 
 test('valid multiline dispatch prose retains exact lines through the registered tool',async t=>{
@@ -450,6 +452,7 @@ const smoke=new Set([
  'research role status matrix dispatches planning without active task, start or hooks',
  'research rejects status drift after native facts in both directories without spawn or lease',
  'planning research keeps task and prepared binding requirements',
+ 'supported source/target release mismatch rejects before provider ping/spawn or target CLI execution',
  'dispatch requires ready, uses target cwd/off, returns real id and prevents same-dir overlap',
  'modified target runtime is rejected before execution/spawn, even if it attempts lock-time material changes',
  'unbound source dispatch uses shared cwd, current materials, no binding and per-task overlap',

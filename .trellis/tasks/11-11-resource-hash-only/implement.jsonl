@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/development/index.md", "reason": "资源所有权、内容校验与开发约束"}
+{"file": ".trellis/spec/testing/index.md", "reason": "Trellis fixtures、隔离验证与自然退出测试"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "统一真实资源 owner 与语义"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "schema、发布和诊断跨层边界"}

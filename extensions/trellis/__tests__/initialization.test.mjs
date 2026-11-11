@@ -9,12 +9,8 @@ import trellis, { __internals } from '../index.ts';
 import { copyRuntimeFixture } from './runtime-fixture.mjs';
 import { inspect, plan, apply, validateUsername, usernameSlug, runtimeBaseline, verifyRuntime, digest } from '../lib/initialization/engine.ts';
 
-const smoke=new Set([
- 'fresh inspect and complete plan are read-only; apply publishes exact release/modes and canonical task without binding/hooks/Git',
- 'unsafe/Unicode username validation and upstream-compatible slug do not slug identity',
- 'interrupted publication preserves outputs and resumes only identical recorded operation; divergent edits never overwritten',
-]);
-const test=(name,fn,options)=>smoke.has(name)?nativeTest(name,fn,options):undefined;
+// Register resource/recovery safety regressions; unrelated host routing remains outside this task.
+const test=(name,fn,options)=>/task_error|unsupported deployed release/.test(name)?undefined:nativeTest(name,fn,options);
 
 export function fixture(t, initialized=false) {
  const root=initialized?copyRuntimeFixture(t,{user:'Dev'}):mkdtempSync(join(tmpdir(),'pi init space '));if(!initialized)t.after(()=>rmSync(root,{recursive:true,force:true}));
@@ -24,11 +20,11 @@ export function fixture(t, initialized=false) {
  return {root,put,snapshot,run};
 }
 
-test('fresh inspect and complete plan are read-only; apply publishes exact release/modes and canonical task without binding/hooks/Git',t=>{
+test('fresh inspect and complete plan are read-only; apply publishes exact release/default permissions and canonical task without binding/hooks/Git',t=>{
  const f=fixture(t),before=f.snapshot();assert.equal(inspect(f.root).state,'fresh');const p=plan(f.root,'李 小明');assert.deepEqual(f.snapshot(),before);assert.equal(p.operation,'initialize');assert.equal(apply(p).developer,'李 小明');
- const manifest=verifyRuntime(f.root);assert.equal(manifest.schemaVersion,3);assert.equal(manifest.runtimeReleaseId,runtimeBaseline().releaseId);assert.equal(Object.keys(manifest.files).length,Object.keys(runtimeBaseline().files).length+3);assert.equal(Object.keys(manifest.templates).length,8);
+ const manifest=verifyRuntime(f.root);assert.equal(manifest.schemaVersion,4);assert.equal(manifest.runtimeReleaseId,runtimeBaseline().releaseId);assert.equal(Object.keys(manifest.files).length,Object.keys(runtimeBaseline().files).length+3);assert.equal(Object.keys(manifest.templates).length,8);
  assert.equal(Object.keys(manifest.skills).length,Object.keys(JSON.parse(readFileSync(new URL('../resources/skill-baseline.json',import.meta.url))).files).length);
- for(const [path,record] of Object.entries({...manifest.files,...manifest.templates,...manifest.skills})){assert.equal(digest(readFileSync(join(f.root,path))),record.sha256,path);assert.equal(lstatSync(join(f.root,path)).mode&0o777,record.mode);}
+ for(const [path,record] of Object.entries({...manifest.files,...manifest.templates,...manifest.skills})){assert.equal(digest(readFileSync(join(f.root,path))),record.sha256,path);assert.equal(lstatSync(join(f.root,path)).mode&0o777,0o644);assert.equal(Object.hasOwn(record,"mode"),false);}
  assert.ok(Object.values(manifest.templates).every(record=>record.origin==='package-default'));
  const task=JSON.parse(readFileSync(join(f.root,p.task,'task.json')));assert.equal(Object.keys(task).length,24);assert.equal(task.status,'in_progress');assert.equal(task.creator,'李 小明');assert.equal(task.assignee,'李 小明');assert.equal(task.dev_type,'docs');assert.equal(task.priority,'P1');assert.deepEqual(task.relatedFiles,['.trellis/spec/']);
  assert.equal(existsSync(join(f.root,'.trellis/.runtime/sessions')),false);assert.ok(existsSync(join(f.root,'.pi/skills/trellis-start/SKILL.md')));assert.equal(existsSync(join(f.root,'.trellis/spec/frontend')),false);assert.equal(existsSync(join(f.root,'.trellis/spec/backend')),false);

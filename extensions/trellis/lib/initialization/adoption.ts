@@ -8,7 +8,7 @@ const MANIFEST = ".trellis/.pi-trellis.json", LOCK = ".trellis/.runtime/init.loc
 export interface AdoptPlan {
  root: string; releaseId: string;
  rows: { path: string; state: string }[];
- changes: { path: string; data: Buffer; mode: number; before: Fingerprint | null }[];
+ changes: { path: string; data: Buffer; before: Fingerprint | null }[];
  guards: Record<string, Fingerprint | null>;
  manifest: InstalledManifest;
  legacy: string[];
@@ -20,18 +20,18 @@ export function adoptPlan(rootInput: string): AdoptPlan {
  // An existing lock is never removed or guessed stale, independently of the inspection diagnostic text.
  try { lstatSync(checkedPath(root, LOCK)); throw new Error("Initialization lock exists; inspect its owner before adopting"); }
  catch (e) { if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e; }
- const value: AdoptPlan = { root, releaseId: state.releaseId, rows: [], changes: [], guards: { [MANIFEST]: null, [OPERATION]: null }, manifest: { schemaVersion: 3, runtimeReleaseId: state.releaseId, files: packageResources(), templates: {}, skills: {} }, legacy: [] };
+ const value: AdoptPlan = { root, releaseId: state.releaseId, rows: [], changes: [], guards: { [MANIFEST]: null, [OPERATION]: null }, manifest: { schemaVersion: 4, runtimeReleaseId: state.releaseId, files: packageResources(), templates: {}, skills: {} }, legacy: [] };
  const revision = projectRevision(root);
- function add(path: string, data: Buffer, mode: number, label: string) {
+ function add(path: string, data: Buffer, label: string) {
   const before = stamp(root, path); value.guards[path] = before;
-  const same = equal(before, { sha256: digest(data), mode });
+  const same = equal(before, { sha256: digest(data) });
   value.rows.push({ path, state: same ? "Current" : label });
-  if (!same) value.changes.push({ path, data, mode, before });
+  if (!same) value.changes.push({ path, data, before });
  }
  for (const [path, want] of Object.entries(value.manifest.files)) {
   const data = readFileSync(checkedPath(packageRoot, want.source));
   if (digest(data) !== want.sha256) throw new Error(`Package hash mismatch: ${path}`);
-  add(path, data, want.mode, stamp(root, path) ? "Replace" : "Install");
+  add(path, data, stamp(root, path) ? "Replace" : "Install");
  }
  for (const [path, want] of Object.entries(defaultTemplates())) {
   const actual = stamp(root, path); value.guards[path] = actual;
@@ -39,7 +39,7 @@ export function adoptPlan(rootInput: string): AdoptPlan {
    value.rows.push({ path, state: "Preserve" });
    value.manifest.templates[path] = { ...actual, origin: "preserved-project", source: { kind: "project-snapshot", revision } };
   } else {
-   add(path, readFileSync(checkedPath(packageRoot, want.source)), want.mode, "Create");
+   add(path, readFileSync(checkedPath(packageRoot, want.source)), "Create");
    value.manifest.templates[path] = want;
   }
  }
@@ -50,14 +50,14 @@ export function adoptPlan(rootInput: string): AdoptPlan {
  for (const [path, want] of Object.entries(skills.next)) {
   const data = readFileSync(checkedPath(packageRoot, want.source));
   if (digest(data) !== want.sha256) throw new Error(`Package hash mismatch: ${path}`);
-  add(path, data, want.mode, "Install");
+  add(path, data, "Install");
  }
  value.manifest.skills = skills.next;
  for (const [path, source, start, end] of [["AGENTS.md", "agents-block.md", "<!-- TRELLIS:START -->", "<!-- TRELLIS:END -->"], [".gitignore", "root.gitignore-block.txt", "# pi-trellis:ignore:start", "# pi-trellis:ignore:end"]]) {
   const before = stamp(root, path), existing = read(root, path);
-  add(path, replaceBlock(existing, template(source), start, end), before?.mode ?? 0o644, existing?.includes(start) ? "Replace block" : before ? "Append block" : "Create");
+  add(path, replaceBlock(existing, template(source), start, end), existing?.includes(start) ? "Replace block" : before ? "Append block" : "Create");
  }
- add(".gitattributes", journalAttributes(read(root, ".gitattributes"), template("journal.gitattributes")), stamp(root, ".gitattributes")?.mode ?? 0o644, "Append journal attribute");
+ add(".gitattributes", journalAttributes(read(root, ".gitattributes"), template("journal.gitattributes")), "Append journal attribute");
  function legacy(path: string) { value.legacy.push(path); }
  for (const path of [".trellis/.version", ".trellis/.template-hashes.json", ".pi/.pi-trellis-hashes.json", ".trellis/agents"]) {
   try { lstatSync(checkedPath(root, path)); legacy(path); } catch (e) { if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e; }
@@ -124,8 +124,8 @@ export function applyAdoptPlan(value: AdoptPlan, options: { afterWrite?: (path: 
   assertAdoptedSkillFoldersOwned(fresh);
   for (const change of fresh.changes) {
    recheck();
-   atomicFile(root, change.path, change.data, change.mode, change.before);
-   outputs.set(change.path, { sha256: digest(change.data), mode: change.mode });
+   atomicFile(root, change.path, change.data, 0o644, change.before);
+   outputs.set(change.path, { sha256: digest(change.data) });
    options.afterWrite?.(change.path);
   }
   recheck();

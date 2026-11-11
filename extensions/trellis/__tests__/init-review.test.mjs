@@ -9,8 +9,7 @@ import { plan, apply, inspect, digest, verifyRuntime } from '../lib/initializati
 import { resourcePlan, applyResourcePlan } from '../lib/initialization/resources.ts';
 import { copyRuntimeFixture, rehomeOperationRecord } from './runtime-fixture.mjs';
 
-const smoke=new Set(['forged incomplete operation cannot authorize unknown runtime']);
-const test=(name,fn,options)=>smoke.has(name)?nativeTest(name,fn,options):undefined;
+const test=(name,fn,options)=>name==='invalid task records cannot enter disk fast path or injected active task'?undefined:nativeTest(name,fn,options);
 
 function shape(root) {
  const put=(path,content)=>{mkdirSync(dirname(join(root,path)),{recursive:true});writeFileSync(join(root,path),content);};
@@ -50,7 +49,7 @@ for(const attack of ['unknown runtime','changed runtime','overwrite identity','o
   const change=(kind,text)=>{const a=q.actions.find(a=>a.kind===kind);a.output=Buffer.from(text).toString('base64');return a;};
   if(attack==='unknown runtime') {const a=q.actions.find(a=>a.kind==='runtime');a.path='.trellis/scripts/custom.py';q.guards[a.path]=null;}
   if(attack==='changed runtime') change('runtime','print("untrusted")\n');
-  if(attack==='overwrite identity'||attack==='overwrite history') {const kind=attack==='overwrite identity'?'identity':'workspace';const a=q.actions.find(a=>a.kind===kind);f.put(a.path,'existing user bytes');a.original={sha256:digest('existing user bytes'),mode:0o644};q.guards[a.path]=a.original;}
+  if(attack==='overwrite identity'||attack==='overwrite history') {const kind=attack==='overwrite identity'?'identity':'workspace';const a=q.actions.find(a=>a.kind===kind);f.put(a.path,'existing user bytes');a.original={sha256:digest('existing user bytes')};q.guards[a.path]=a.original;}
   if(attack==='root replacement') change('root','Replacement instructions\n');
   if(attack==='missing required output') {const a=q.actions.find(a=>a.kind==='agent');q.actions=q.actions.filter(x=>x!==a);delete q.guards[a.path];}
   if(attack==='manifest source') {const a=q.actions.find(a=>a.kind==='manifest'),m=JSON.parse(Buffer.from(a.output,'base64'));m.files['.trellis/scripts/task.py'].source='untrusted';a.output=Buffer.from(JSON.stringify(m)).toString('base64');}
@@ -63,13 +62,12 @@ for(const attack of ['unknown runtime','changed runtime','overwrite identity','o
 }
 // Roles are read by dispatch without hash checks and templates are user documents: an older recorded
 // fingerprint is a safe update, not a blocked or malformed project.
-for(const attack of ['stale template hash','stale role hash','stale role mode']) {
+for(const attack of ['stale template hash','stale role hash']) {
  test(`resource manifest treats ${attack} as a safe update without writing`,t=>{
   const f=fixture(t);const file=join(f.root,'.trellis/.pi-trellis.json'),m=JSON.parse(readFileSync(file));
   const role=attack!=='stale template hash';
   if(!role)m.templates['.trellis/workflow.md'].sha256=digest('not shipped');
   if(attack==='stale role hash')m.files['.pi/agents/trellis-check.md'].sha256=digest('older role wording');
-  if(attack==='stale role mode')m.files['.pi/agents/trellis-check.md'].mode=0o600;
   f.put('.trellis/.pi-trellis.json',JSON.stringify(m));const before=f.snapshot();
   // The runtime gate accepts a stale role/template fingerprint; only the exact key set and format are enforced.
   assert.ok(verifyRuntime(f.root));assert.equal(inspect(f.root).state,'ready');
@@ -87,7 +85,7 @@ test('root suffix alone cannot replace user prefix or duplicate an owned block, 
   const f=fresh(t);f.put('AGENTS.md','User bytes\n');const p=plan(f.root,'Dev');assert.throws(()=>apply(p,{afterWrite:()=>{throw Error('interrupt');}}));
   const file=join(f.root,'.trellis/.runtime/init-operation.json'),record=JSON.parse(readFileSync(file)),q=record.plan,a=q.actions.find(a=>a.path==='AGENTS.md');
   if(attack==='changed prefix')a.output=Buffer.from('Malicious prefix\n'+readFileSync(new URL('../resources/templates/agents-block.md',import.meta.url),'utf8')).toString('base64');
-  if(attack==='duplicate block'){const block=readFileSync(new URL('../resources/templates/agents-block.md',import.meta.url),'utf8');f.put('AGENTS.md',block);a.original={sha256:digest(block),mode:0o644};q.guards[a.path]=a.original;a.output=Buffer.from(block+block).toString('base64');}
+  if(attack==='duplicate block'){const block=readFileSync(new URL('../resources/templates/agents-block.md',import.meta.url),'utf8');f.put('AGENTS.md',block);a.original={sha256:digest(block)};q.guards[a.path]=a.original;a.output=Buffer.from(block+block).toString('base64');}
   if(attack==='skip root')q.actions=q.actions.filter(x=>x!==a);
   rehash(q);f.put('.trellis/.runtime/init-operation.json',JSON.stringify(record));const before=f.snapshot();assert.throws(()=>plan(f.root,'Dev'));assert.throws(()=>apply(q));assert.deepEqual(f.snapshot(),before);
  }
@@ -109,10 +107,10 @@ test('completed operation remains diagnostic after legitimate task edits; custom
 });
 
 test('forged root append cannot bypass conflicting journal attributes',t=>{
- const f=fresh(t),p=plan(f.root,'Dev');assert.throws(()=>apply(p,{afterWrite:()=>{throw Error('interrupt');}}));const file=join(f.root,'.trellis/.runtime/init-operation.json'),record=JSON.parse(readFileSync(file)),q=record.plan,a=q.actions.find(a=>a.path==='.gitattributes');const original='*.md merge=ours\n';f.put(a.path,original);a.original={sha256:digest(original),mode:0o644};q.guards[a.path]=a.original;a.output=Buffer.from(original+readFileSync(new URL('../resources/templates/journal.gitattributes',import.meta.url),'utf8')).toString('base64');rehash(q);f.put('.trellis/.runtime/init-operation.json',JSON.stringify(record));const before=f.snapshot();assert.throws(()=>plan(f.root,'Dev'));assert.deepEqual(f.snapshot(),before);
+ const f=fresh(t),p=plan(f.root,'Dev');assert.throws(()=>apply(p,{afterWrite:()=>{throw Error('interrupt');}}));const file=join(f.root,'.trellis/.runtime/init-operation.json'),record=JSON.parse(readFileSync(file)),q=record.plan,a=q.actions.find(a=>a.path==='.gitattributes');const original='*.md merge=ours\n';f.put(a.path,original);a.original={sha256:digest(original)};q.guards[a.path]=a.original;a.output=Buffer.from(original+readFileSync(new URL('../resources/templates/journal.gitattributes',import.meta.url),'utf8')).toString('base64');rehash(q);f.put('.trellis/.runtime/init-operation.json',JSON.stringify(record));const before=f.snapshot();assert.throws(()=>plan(f.root,'Dev'));assert.deepEqual(f.snapshot(),before);
 });
 test('forged identity operation on an unsupported manifest cannot publish identity first',t=>{
- const f=fixture(t);rmSync(join(f.root,'.trellis/.developer'));const p=plan(f.root,'Dev');const path='.trellis/.pi-trellis.json',manifest=JSON.parse(readFileSync(join(f.root,path)));manifest.runtimeReleaseId='unsupported';const value=JSON.stringify(manifest);f.put(path,value);p.guards[path]={sha256:digest(value),mode:0o644};rehash(p);const before=f.snapshot();assert.throws(()=>apply(p));assert.deepEqual(f.snapshot(),before);
+ const f=fixture(t);rmSync(join(f.root,'.trellis/.developer'));const p=plan(f.root,'Dev');const path='.trellis/.pi-trellis.json',manifest=JSON.parse(readFileSync(join(f.root,path)));manifest.runtimeReleaseId='unsupported';const value=JSON.stringify(manifest);f.put(path,value);p.guards[path]={sha256:digest(value)};rehash(p);const before=f.snapshot();assert.throws(()=>apply(p));assert.deepEqual(f.snapshot(),before);
 });
 
 test('invalid task records cannot enter disk fast path or injected active task',async t=>{

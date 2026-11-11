@@ -16,26 +16,26 @@ const LOCK = ".trellis/.runtime/init.lock";
 const MAX_BYTES = 4 * 1024 * 1024;
 export const digest = (bytes: string | Buffer) => createHash("sha256").update(bytes).digest("hex");
 const json = (value: unknown) => JSON.stringify(value, null, 2) + "\n";
-export interface Fingerprint { sha256: string; mode: number }
+export interface Fingerprint { sha256: string }
 export type TemplateProvenance =
 	| (Fingerprint & { origin: "package-default"; source: string })
-	| ((Fingerprint | { sha256: null; mode: null }) & { origin: "preserved-project"; source: { kind: "project-snapshot"; revision: string | null } });
+	| ((Fingerprint | { sha256: null }) & { origin: "preserved-project"; source: { kind: "project-snapshot"; revision: string | null } });
 /** Last-published Trellis skill file: update guard and diagnostics only, never execution authority. */
 export type SkillRecord = Fingerprint & { source: string };
 export interface InstalledManifest {
-	/** Schema 2 (previous release) has no skills map; every write publishes schema 3. */
-	schemaVersion: 2 | 3; runtimeReleaseId: string;
+	/** Internal normalized format; legacy schema 2/3 inputs are parsed before comparison. */
+	schemaVersion: 4; runtimeReleaseId: string;
 	files: Record<string, Fingerprint & { kind: "runtime" | "agent"; source: string }>;
 	templates: Record<string, TemplateProvenance>;
-	/** Schema 3 only. Rows may be absent (skill not deployed yet); unknown rows are rejected. */
+	/** Rows may be absent (skill not deployed yet); unknown rows are rejected. */
 	skills?: Record<string, SkillRecord>;
 }
 export interface FileAction {
-	path: string; original: Fingerprint | null; output: string; mode: number;
+	path: string; original: Fingerprint | null; output: string;
 	kind: "runtime" | "agent" | "skill" | "template" | "identity" | "workspace" | "task" | "root" | "manifest";
 }
 export interface InitPlan {
-	schemaVersion: 1; root: string; user: string; releaseId: string; operation: "initialize" | "identity";
+	schemaVersion: 2; root: string; user: string; releaseId: string; operation: "initialize" | "identity";
 	workspaceReused: boolean; task: string; taskReused: boolean;
 	actions: FileAction[]; guards: Record<string, Fingerprint | null>; planHash: string;
 }
@@ -81,15 +81,15 @@ function bytes(root: string, path: string): Buffer | undefined {
 }
 function fingerprint(root: string, path: string): Fingerprint | null {
 	const value = bytes(root, path);
-	return value === undefined ? null : { sha256: digest(value), mode: lstatSync(checkedPath(root, path)).mode & 0o777 };
+	return value === undefined ? null : { sha256: digest(value) };
 }
-function same(a: Fingerprint | null, b: Fingerprint | null): boolean { return a?.sha256 === b?.sha256 && a?.mode === b?.mode; }
+function same(a: Fingerprint | null, b: Fingerprint | null): boolean { return a?.sha256 === b?.sha256; }
 function parse<T>(root: string, path: string): T | undefined {
 	const value = bytes(root, path);
 	return value === undefined ? undefined : JSON.parse(value.toString("utf8"));
 }
 export const defaultProvenanceReader: ProvenanceReader = {
-	file(root, path, _limit, _inventory, binary = false) { const data = bytes(root, path); return data === undefined ? undefined : { data, ...(binary ? {} : { text: provenanceText(data) }), bytes: data.length, sha256: digest(data), mode: lstatSync(checkedPath(root, path)).mode & 0o777 }; },
+	file(root, path, _limit, _inventory, binary = false) { const data = bytes(root, path); return data === undefined ? undefined : { data, ...(binary ? {} : { text: provenanceText(data) }), bytes: data.length, sha256: digest(data) }; },
 	json(root, path) { const data = bytes(root, path); return data === undefined ? undefined : JSON.parse(provenanceText(data)); },
 	stat(root, path) { try { return lstatSync(checkedPath(root, path)); } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined; throw error; } },
 	path: checkedPath,
@@ -128,32 +128,32 @@ function fields(value: unknown, keys: string[], label: string): asserts value is
 }
 function checkFingerprint(value: Fingerprint | null): void {
 	if (value === null) return;
-	fields(value, ["sha256", "mode"], "fingerprint");
-	if (typeof value.sha256 !== "string" || value.sha256.length !== 64 || !/^[a-f0-9]{64}$/.test(value.sha256) || !Number.isInteger(value.mode) || value.mode < 0 || value.mode > 0o777) throw new Error("Invalid fingerprint");
+	fields(value, ["sha256"], "fingerprint");
+	if (typeof value.sha256 !== "string" || value.sha256.length !== 64 || !/^[a-f0-9]{64}$/.test(value.sha256)) throw new Error("Invalid fingerprint");
 }
 export function packageResources(reader: ProvenanceReader = defaultProvenanceReader, baseline = runtimeBaseline(reader)): InstalledManifest["files"] {
 	const files: InstalledManifest["files"] = {};
 	for (const [path, record] of Object.entries(baseline.files)) {
 		const source = `runtime/${path}`;
-		files[`.trellis/scripts/${path}`] = { sha256: record.sha256, mode: reader.stat(packageRoot, source)!.mode & 0o777, kind: "runtime", source };
+		files[`.trellis/scripts/${path}`] = { sha256: record.sha256, kind: "runtime", source };
 	}
 	const agents = reader.json(packageRoot, "resources/agent-baseline.json");
 	if (!object(agents) || !object(agents.files)) throw Error("Malformed package role baseline");
 	for (const role of ["implement", "check", "research"]) {
 		const source = `agents/trellis-${role}.md`, sha256 = reader.file(packageRoot, source, MAX_BYTES, true)?.sha256;
 		if (!sha256 || sha256 !== agents.files[role]?.adapted) throw new Error(`Package role hash mismatch: ${role}`);
-		files[`.pi/agents/trellis-${role}.md`] = { sha256, mode: 0o644, kind: "agent", source };
+		files[`.pi/agents/trellis-${role}.md`] = { sha256, kind: "agent", source };
 	}
 	return files;
 }
 export function defaultTemplates(reader: ProvenanceReader = defaultProvenanceReader): Record<string, Fingerprint & { origin: "package-default"; source: string }> {
 	return Object.fromEntries(Object.entries(templateTargets).map(([source, target]) => [target, {
-		origin: "package-default", sha256: digest(template(source, reader)), mode: 0o644, source: `resources/templates/${source}`,
+		origin: "package-default", sha256: digest(template(source, reader)), source: `resources/templates/${source}`,
 	}]));
 }
 /** Deployed project skill folder root; package sources live under `skills/`. */
 export const SKILL_ROOT = ".pi/skills";
-/** `assets/` may hold binary files: byte/hash/mode checks only, no text validation. */
+/** `assets/` may hold binary files: byte/hash checks only, no text validation. */
 export const binarySkillFile = (path: string) => path.split("/").includes("assets");
 /** `.pi/skills/<name>` for a deployed skill target. */
 export const skillFolder = (target: string) => target.split("/").slice(0, 3).join("/");
@@ -170,8 +170,8 @@ export function packageSkills(reader: ProvenanceReader = defaultProvenanceReader
 		if (parts.length < 2 || !/^trellis-[a-z0-9-]+$/.test(parts[0]) || parts.some(part => !part || part === "." || part === ".." || part.includes("\\")) || !object(record) || typeof record.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(record.sha256)) throw new Error("Malformed package skill inventory");
 		const source = `skills/${path}`, file = reader.file(packageRoot, source, MAX_BYTES, true, binarySkillFile(path));
 		if (!file || file.sha256 !== record.sha256) throw new Error(`Package skill hash mismatch: ${path}`);
-		// Git tracks only the executable bit; publish normalized modes independent of package umask.
-		skills[`${SKILL_ROOT}/${path}`] = { sha256: file.sha256, mode: file.mode & 0o111 ? 0o755 : 0o644, source };
+		// Package checkout permissions never become publication policy.
+		skills[`${SKILL_ROOT}/${path}`] = { sha256: file.sha256, source };
 	}
 	for (const name of new Set(paths.map(path => path.split("/")[0]))) if (!skills[`${SKILL_ROOT}/${name}/SKILL.md`]) throw new Error(`Package skill entry missing: ${name}`);
 	return skills;
@@ -181,9 +181,9 @@ export function validateSkillRecords(value: unknown, expected: Record<string, Sk
 	if (!object(value) || Object.keys(value).length > Object.keys(expected).length) throw new Error("Malformed project skill provenance");
 	for (const [path, row] of Object.entries(value)) {
 		if (!Object.hasOwn(expected, path)) throw new Error(`Unknown managed skill entry: ${path}`);
-		fields(row, ["sha256", "mode", "source"], "project skill entry");
+		fields(row, ["sha256", "source"], "project skill entry");
 		if (row.source !== expected[path].source) throw new Error(`Malformed project skill provenance: ${path}`);
-		checkFingerprint({ sha256: row.sha256, mode: row.mode });
+		checkFingerprint({ sha256: row.sha256 });
 	}
 }
 /** Files and foreign entries (symlinks, specials, non-directory folder) below one skill folder; undefined when absent. Bounded. */
@@ -212,55 +212,73 @@ export function packageProvenance(reader: ProvenanceReader = defaultProvenanceRe
 	const baseline = runtimeBaseline(reader);
 	return { release: baseline.releaseId, files: packageResources(reader, baseline), templates: defaultTemplates(reader), skills: packageSkills(reader) };
 }
-export function validateManifest(manifest: unknown, pkg: PackageProvenance = packageProvenance()): asserts manifest is InstalledManifest {
-	const schema = object(manifest) ? manifest.schemaVersion : undefined;
-	fields(manifest, ["schemaVersion", "runtimeReleaseId", "files", "templates", ...(schema === 3 ? ["skills"] : [])], "project resource manifest");
-	if (![2, 3].includes(manifest.schemaVersion) || manifest.runtimeReleaseId !== pkg.release || !object(manifest.files) || !object(manifest.templates)) throw new Error("Unsupported project runtime release; explicit upgrade is not available");
-	// Skills are independent of runtime authority: customized or missing skills never block execution.
-	if (manifest.schemaVersion === 3) validateSkillRecords(manifest.skills, pkg.skills);
-	const expected = pkg.files;
-	if (Object.keys(manifest.files).length !== Object.keys(expected).length) throw new Error("Incomplete or unknown managed resource entries");
-	for (const [path, record] of Object.entries(expected)) {
-		const installed = manifest.files[path];
-		fields(installed, ["sha256", "mode", "kind", "source"], "project resource entry");
-		// Roles are read by dispatch without hash checks: only runtime rows are executed, so only they
-		// need the exact current bytes. Role/template rows must stay well-formed and belong to the
-		// package, while a stale fingerprint is a safe update, never a blocked project.
-		for (const key of Object.keys(record) as (keyof typeof record)[]) {
-			if (key !== "sha256" && key !== "mode" && installed[key] !== record[key]) throw new Error(`Malformed project resource provenance: ${path}`);
-		}
-		if (typeof installed.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(installed.sha256) || !Number.isInteger(installed.mode) || installed.mode < 0 || installed.mode > 0o777) throw new Error(`Malformed project resource provenance: ${path}`);
-		if (record.kind === "runtime" && (installed.sha256 !== record.sha256 || installed.mode !== record.mode)) throw new Error(`Malformed project resource provenance: ${path}`);
-	}
-	const defaults = pkg.templates;
-	if (Object.keys(manifest.templates).length !== Object.keys(defaults).length) throw new Error("Incomplete or unknown template provenance entries");
-	for (const [path, record] of Object.entries(defaults)) {
-		const installed = manifest.templates[path];
-		fields(installed, ["origin", "sha256", "mode", "source"], "template provenance");
-		if (installed.origin === "package-default") {
-			if (installed.source !== record.source || typeof installed.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(installed.sha256) || !Number.isInteger(installed.mode) || installed.mode < 0 || installed.mode > 0o777) throw new Error(`Malformed package template provenance: ${path}`);
-			// A stale fingerprint is a safe update, never a blocked project.
-		} else if (installed.origin === "preserved-project") {
-			// Diagnostic provenance only: no arbitrary source path, executable or output authority.
-			fields(installed.source, ["kind", "revision"], "preserved template source");
-			if (installed.source.kind !== "project-snapshot" || !(installed.source.revision === null || typeof installed.source.revision === "string" && [40, 64].includes(installed.source.revision.length) && !/[^a-f0-9]/.test(installed.source.revision))) throw new Error(`Malformed preserved template source: ${path}`);
-			if (installed.sha256 === null && installed.mode === null) continue;
-			checkFingerprint({ sha256: installed.sha256, mode: installed.mode });
-		} else throw new Error(`Unknown template origin: ${path}`);
-	}
+/** Strict serialized shape parser. Legacy permission fields are validated, then discarded everywhere.
+ * Schema 4 never accepts mode; normalization does not mutate the input or authorize resource paths. */
+export function normalizeManifest(value: unknown): InstalledManifest {
+ const schema = object(value) ? value.schemaVersion : undefined, legacy = schema === 2 || schema === 3;
+ fields(value, ["schemaVersion", "runtimeReleaseId", "files", "templates", ...(schema === 2 ? [] : ["skills"])], "project resource manifest");
+ if (![2, 3, 4].includes(schema) || typeof value.runtimeReleaseId !== "string" || !/^pi-trellis-runtime-v1-[a-f0-9]{64}$/.test(value.runtimeReleaseId) || value.runtimeReleaseId.length !== 86 || !object(value.files) || !object(value.templates) || !Object.keys(value.files).length || Object.keys(value.files).length > 512 || !Object.keys(value.templates).length || Object.keys(value.templates).length > 512) throw Error("Invalid managed project manifest");
+ const validHash = (hash: unknown) => typeof hash === "string" && hash.length === 64 && /^[a-f0-9]{64}$/.test(hash);
+ const validMode = (mode: unknown) => Number.isInteger(mode) && (mode as number) >= 0 && (mode as number) <= 0o777;
+ const rowFingerprint = (row: Record<string, any>, nullable = false) => {
+  if (nullable && row.sha256 === null && (!legacy || row.mode === null)) return;
+  if (!validHash(row.sha256) || legacy && !validMode(row.mode)) throw Error("Invalid resource fingerprint");
+ };
+ const files: InstalledManifest["files"] = Object.create(null), templates: InstalledManifest["templates"] = Object.create(null), skills: Record<string, SkillRecord> = Object.create(null);
+ for (const [path, row] of Object.entries(value.files)) {
+  fields(row, ["sha256", ...(legacy ? ["mode"] : []), "kind", "source"], "project resource entry"); rowFingerprint(row);
+  if (!["runtime", "agent"].includes(row.kind) || typeof row.source !== "string") throw Error("Invalid resource kind/source");
+  files[path] = { sha256: row.sha256, kind: row.kind, source: row.source };
+ }
+ for (const [path, row] of Object.entries(value.templates)) {
+  fields(row, ["origin", "sha256", ...(legacy ? ["mode"] : []), "source"], "template provenance");
+  if (row.origin === "package-default") {
+   rowFingerprint(row); if (typeof row.source !== "string") throw Error("Invalid template source");
+   templates[path] = { origin: row.origin, sha256: row.sha256, source: row.source };
+  } else if (row.origin === "preserved-project") {
+   fields(row.source, ["kind", "revision"], "preserved template source");
+   if (row.source.kind !== "project-snapshot" || !(row.source.revision === null || typeof row.source.revision === "string" && [40, 64].includes(row.source.revision.length) && /^[a-f0-9]+$/.test(row.source.revision))) throw Error("Invalid preserved template source");
+   rowFingerprint(row, true);
+   templates[path] = { origin: row.origin, sha256: row.sha256, source: { kind: "project-snapshot", revision: row.source.revision } };
+  } else throw Error("Unknown template origin");
+ }
+ if (schema !== 2) {
+  if (!object(value.skills) || Object.keys(value.skills).length > 512) throw Error("Invalid skill provenance map");
+  for (const [path, row] of Object.entries(value.skills)) {
+   fields(row, ["sha256", ...(legacy ? ["mode"] : []), "source"], "project skill entry"); rowFingerprint(row);
+   if (typeof row.source !== "string") throw Error("Invalid skill source");
+   skills[path] = { sha256: row.sha256, source: row.source };
+  }
+ }
+ return { schemaVersion: 4, runtimeReleaseId: value.runtimeReleaseId, files: { ...files }, templates: { ...templates }, skills: { ...skills } };
+}
+export function validateManifest(value: unknown, pkg: PackageProvenance = packageProvenance()): void {
+ const manifest = normalizeManifest(value);
+ if (manifest.runtimeReleaseId !== pkg.release) throw new Error("Unsupported project runtime release; explicit upgrade is not available");
+ validateSkillRecords(manifest.skills, pkg.skills);
+ if (Object.keys(manifest.files).length !== Object.keys(pkg.files).length || Object.keys(manifest.templates).length !== Object.keys(pkg.templates).length) throw Error("Incomplete or unknown managed resource entries");
+ for (const [path, record] of Object.entries(pkg.files)) {
+  const installed = manifest.files[path];
+  if (!installed || installed.source !== record.source || installed.kind !== record.kind || record.kind === "runtime" && installed.sha256 !== record.sha256) throw Error(`Malformed project resource provenance: ${path}`);
+ }
+ for (const [path, record] of Object.entries(pkg.templates)) {
+  const installed = manifest.templates[path];
+  if (!installed || installed.origin === "package-default" && installed.source !== record.source) throw Error(`Malformed package template provenance: ${path}`);
+ }
 }
 export function verifyRuntime(root: string, reader: ProvenanceReader = defaultProvenanceReader, pkg?: PackageProvenance): InstalledManifest | undefined {
 	const operation = reader.json(root, OPERATION);
 	if (operation !== undefined) {
-		fields(operation, ["schemaVersion", "status", "plan", "completed"], "initialization operation");
-		if (operation.schemaVersion !== 1 || operation.status !== "complete") throw new Error("Initialization operation is incomplete or invalid; runtime execution is blocked");
+		validateOperationEnvelope(operation, realpathSync(root));
+		if (operation.status !== "complete") throw new Error("Initialization operation is incomplete or invalid; runtime execution is blocked");
 	}
 	return verifiedManifest(root, reader, pkg);
 }
 function verifiedManifest(root: string, reader: ProvenanceReader = defaultProvenanceReader, pkg?: PackageProvenance): InstalledManifest | undefined {
-	const manifest = reader.json(root, MANIFEST);
-	if (manifest === undefined) return undefined;
-	validateManifest(manifest, pkg ?? packageProvenance(reader));
+	const raw = reader.json(root, MANIFEST);
+	if (raw === undefined) return undefined;
+	validateManifest(raw, pkg ?? packageProvenance(reader));
+	const manifest = normalizeManifest(raw);
 	for (const [path, record] of Object.entries(manifest.files)) {
 		reader.path(root, path);
 		if (record.kind === "runtime" && !same(reader.file(root, path, MAX_BYTES, true) ?? null, record)) throw new Error(`Project runtime is missing or modified: ${path}`);
@@ -268,15 +286,48 @@ function verifiedManifest(root: string, reader: ProvenanceReader = defaultProven
 	for (const path of Object.keys(manifest.templates)) reader.path(root, path);
 	return manifest;
 }
+/** Completed records are history, never output authority. Hash the original serialized plan shape
+ * before interpreting it; legacy incomplete plans are explicitly rejected without conversion. */
+export function validateOperationEnvelope(value: unknown, root: string, pathCheck: (path: string) => void = path => {
+ // History routes must remain bounded/local syntactically; do not inspect mutable historical files.
+ if (typeof path !== "string" || path.length > 8192 || !path || /[\\\\\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/u.test(path) || path.startsWith("/") || path.split("/").some(part => !part || part === "." || part === "..")) throw Error("Invalid bounded initialization path");
+}): asserts value is Operation {
+ fields(value, ["schemaVersion", "status", "plan", "completed"], "initialization operation");
+ if (value.schemaVersion !== 1 || !["incomplete", "complete"].includes(value.status) || !object(value.plan) || value.plan.root !== root || !Array.isArray(value.completed) || value.completed.length > 256) throw Error("Invalid initialization operation envelope/root");
+ const p = value.plan;
+ fields(p, ["schemaVersion", "root", "user", "releaseId", "operation", "workspaceReused", "task", "taskReused", "actions", "guards", "planHash"], "initialization plan envelope");
+ const { planHash, ...body } = p;
+ if (typeof planHash !== "string" || !/^[a-f0-9]{64}$/.test(planHash) || digest(JSON.stringify(body)) !== planHash || Buffer.byteLength(json(value)) > MAX_BYTES) throw Error("Initialization plan envelope hash or size mismatch");
+ const legacy = p.schemaVersion === 1;
+ if (![1, 2].includes(p.schemaVersion) || typeof p.releaseId !== "string" || p.releaseId.length !== 86 || !/^pi-trellis-runtime-v1-[a-f0-9]{64}$/.test(p.releaseId) || !["initialize", "identity"].includes(p.operation) || typeof p.workspaceReused !== "boolean" || typeof p.taskReused !== "boolean" || !Array.isArray(p.actions) || !p.actions.length || p.actions.length > 256 || !object(p.guards) || Object.keys(p.guards).length > 512) throw Error("Invalid initialization plan envelope");
+ validateUsername(p.user);
+ pathCheck(p.task);
+ if (p.task !== `.trellis/tasks/00-${p.operation === "initialize" ? "bootstrap-guidelines" : `join-${usernameSlug(p.user)}`}`) throw Error("Invalid initialization task route");
+ const modeValid = (v: unknown) => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 0o777;
+ const fingerprintValid = (v: unknown) => {
+  if (v === null) return;
+  fields(v, ["sha256", ...(legacy ? ["mode"] : [])], "initialization fingerprint");
+  if (typeof v.sha256 !== "string" || v.sha256.length !== 64 || !/^[a-f0-9]{64}$/.test(v.sha256) || legacy && !modeValid(v.mode)) throw Error("Invalid initialization fingerprint");
+ };
+ const paths = new Set<string>();
+ for (const action of p.actions) {
+  fields(action, ["path", "original", "output", ...(legacy ? ["mode"] : []), "kind"], "initialization action envelope"); pathCheck(action.path);
+  if (paths.has(action.path) || legacy && !modeValid(action.mode) || typeof action.output !== "string" || Buffer.from(action.output, "base64").toString("base64") !== action.output || !["runtime", "agent", "skill", "template", "identity", "workspace", "task", "root", "manifest"].includes(action.kind)) throw Error("Invalid initialization action envelope");
+  fingerprintValid(action.original);
+  const guard = p.guards[action.path];
+  if (!Object.hasOwn(p.guards, action.path) || (action.original === null ? guard !== null : !object(guard) || action.original.sha256 !== guard.sha256 || legacy && action.original.mode !== guard.mode)) throw Error("Invalid initialization action guard");
+  paths.add(action.path);
+ }
+ for (const [path, fingerprint] of Object.entries(p.guards)) { pathCheck(path); fingerprintValid(fingerprint); }
+ if (new Set(value.completed).size !== value.completed.length || value.completed.some((p: unknown) => typeof p !== "string" || !paths.has(p)) || value.status === "complete" && value.completed.length !== paths.size) throw Error("Invalid initialization completion entries");
+ if (legacy && value.status === "incomplete") throw Error("Legacy incomplete initialization is not supported; preserve the record and partial files for manual inspection. No migration or retry was performed.");
+}
 function readOperation(root: string): Operation | undefined {
-	const record = parse<Operation>(root, OPERATION);
-	if (record === undefined) return undefined;
-	fields(record, ["schemaVersion", "status", "plan", "completed"], "initialization operation");
-	if (record.schemaVersion !== 1 || !["incomplete", "complete"].includes(record.status) || !Array.isArray(record.completed) || record.completed.length > 256 || record.completed.some(p => typeof p !== "string")) throw new Error("Malformed initialization operation record");
-	if (!object(record.plan) || record.plan.root !== root) throw new Error("Initialization operation belongs to another project");
-	validatePlan(record.plan, record.status === "incomplete");
-	if (new Set(record.completed).size !== record.completed.length || record.completed.some(path => !record.plan.actions.some(action => action.path === path))) throw new Error("Invalid initialization completion steps");
-	return record;
+ const record = parse<unknown>(root, OPERATION);
+ if (record === undefined) return undefined;
+ validateOperationEnvelope(record, root);
+ if (record.status === "incomplete") validatePlan(record.plan);
+ return record;
 }
 export function inspect(rootInput: string): Inspection {
 	const root = realpathSync(resolve(rootInput));
@@ -380,7 +431,7 @@ function reusedTask(root: string, task: string, user: string, id: string): void 
 /** Recorded hashes detect drift, not authority. Reconstruct all permitted output from package sources. */
 function validatePlan(plan: InitPlan, verifyExisting = true): void {
 	fields(plan, ["schemaVersion", "root", "user", "releaseId", "operation", "workspaceReused", "task", "taskReused", "actions", "guards", "planHash"], "initialization plan");
-	if (plan.schemaVersion !== 1 || !["initialize", "identity"].includes(plan.operation) || typeof plan.root !== "string" || !Array.isArray(plan.actions) || plan.actions.length > 256 || !object(plan.guards) || Object.keys(plan.guards).length > 512) throw new Error("Invalid initialization plan");
+	if (plan.schemaVersion !== 2 || !["initialize", "identity"].includes(plan.operation) || typeof plan.root !== "string" || !Array.isArray(plan.actions) || plan.actions.length > 256 || !object(plan.guards) || Object.keys(plan.guards).length > 512) throw new Error("Invalid initialization plan");
 	if (realpathSync(plan.root) !== plan.root || !lstatSync(plan.root).isDirectory() || plan.root === realpathSync(homedir()) || bytes(plan.root, ".trellis/.runtime/pi-trellis/binding.json")) throw new Error("Initialization requires a canonical source project, not HOME or a managed worktree");
 	validateUsername(plan.user);
 	if (plan.releaseId !== runtimeBaseline().releaseId || typeof plan.taskReused !== "boolean" || typeof plan.workspaceReused !== "boolean") throw new Error("Invalid plan result fields");
@@ -390,26 +441,26 @@ function validatePlan(plan: InitPlan, verifyExisting = true): void {
 	if (digest(JSON.stringify(body)) !== planHash || Buffer.byteLength(json(plan)) > MAX_BYTES) throw new Error("Initialization plan hash or size is invalid");
 	const seen = new Map<string, FileAction>();
 	for (const action of plan.actions) {
-		fields(action, ["path", "original", "output", "mode", "kind"], "file action");
-		if (typeof action.path !== "string" || typeof action.output !== "string" || !Number.isInteger(action.mode) || action.mode < 0 || action.mode > 0o777 || seen.has(action.path)) throw new Error("Invalid/duplicate file action");
+		fields(action, ["path", "original", "output", "kind"], "file action");
+		if (typeof action.path !== "string" || typeof action.output !== "string" || seen.has(action.path)) throw new Error("Invalid/duplicate file action");
 		checkedPath(plan.root, action.path); seen.set(action.path, action); checkFingerprint(action.original);
 		if (!Object.hasOwn(plan.guards, action.path) || Buffer.from(action.output, "base64").toString("base64") !== action.output || !same(action.original, plan.guards[action.path])) throw new Error("File action has invalid bytes or original guard");
 		if (action.kind !== "root" && action.original !== null) throw new Error("Initialization may only create missing resources; existing user files are never recovery authority");
 	}
 	for (const [path, value] of Object.entries(plan.guards)) { checkedPath(plan.root, path); checkFingerprint(value); }
 	const allowed = new Set<string>();
-	function requireOutput(path: string, value: Buffer | string, kind: FileAction["kind"], mode = 0o644, preserve = false) {
+	function requireOutput(path: string, value: Buffer | string, kind: FileAction["kind"], preserve = false) {
 		allowed.add(path);
 		const action = seen.get(path);
 		if (!action && preserve && Object.hasOwn(plan.guards, path) && plan.guards[path] !== null) return;
-		if (!action || action.kind !== kind || action.mode !== mode || action.output !== Buffer.from(value).toString("base64")) throw new Error(`Noncanonical or missing initialization output: ${path}`);
+		if (!action || action.kind !== kind || action.output !== Buffer.from(value).toString("base64")) throw new Error(`Noncanonical or missing initialization output: ${path}`);
 	}
 	const identity = seen.get(".trellis/.developer");
 	const stamp = identity && /^name=[^\n]+\ninitialized_at=([^\n]+)\n$/.exec(Buffer.from(identity.output, "base64").toString("utf8"))?.[1];
 	if (!stamp) throw new Error("Missing canonical developer output");
 	const generated = skeleton(plan.root, plan.user, stamp, plan.operation);
 	requireOutput(".trellis/.developer", generated.developer[".developer"], "identity");
-	for (const name of ["journal-1.md", "index.md"]) requireOutput(`.trellis/workspace/${plan.user}/${name}`, generated.developer[name], "workspace", 0o644, true);
+	for (const name of ["journal-1.md", "index.md"]) requireOutput(`.trellis/workspace/${plan.user}/${name}`, generated.developer[name], "workspace", true);
 	for (const [name, value] of [["task.json", json(generated.task)], ["prd.md", template(`tasks/${plan.operation === "initialize" ? "bootstrap" : "join"}-prd.md`)] ] as const) {
 		if (plan.taskReused) {
 			allowed.add(`${plan.task}/${name}`);
@@ -420,16 +471,16 @@ function validatePlan(plan: InitPlan, verifyExisting = true): void {
 	allowed.add(MANIFEST);
 	const resources = packageResources();
 	if (plan.operation === "initialize") {
-		for (const [path, resource] of Object.entries(resources)) requireOutput(path, readFileSync(checkedPath(packageRoot, resource.source)), resource.kind, resource.mode);
+		for (const [path, resource] of Object.entries(resources)) requireOutput(path, readFileSync(checkedPath(packageRoot, resource.source)), resource.kind);
 		const skills = packageSkills(), order = new Map(plan.actions.map((action, index) => [action.path, index]));
 		for (const [path, resource] of Object.entries(skills)) {
-			requireOutput(path, readFileSync(checkedPath(packageRoot, resource.source)), "skill", resource.mode);
+			requireOutput(path, readFileSync(checkedPath(packageRoot, resource.source)), "skill");
 			// A new skill folder becomes discoverable only after its supporting files exist.
 			if (order.get(path)! > order.get(`${skillFolder(path)}/SKILL.md`)!) throw new Error(`Skill entry must publish after its supporting files: ${path}`);
 		}
 		const templates = defaultTemplates();
-		for (const [path, resource] of Object.entries(templates)) requireOutput(path, readFileSync(checkedPath(packageRoot, resource.source)), "template", resource.mode);
-		requireOutput(MANIFEST, json({ schemaVersion: 3, runtimeReleaseId: plan.releaseId, files: resources, templates, skills } satisfies InstalledManifest), "manifest");
+		for (const [path, resource] of Object.entries(templates)) requireOutput(path, readFileSync(checkedPath(packageRoot, resource.source)), "template");
+		requireOutput(MANIFEST, json({ schemaVersion: 4, runtimeReleaseId: plan.releaseId, files: resources, templates, skills } satisfies InstalledManifest), "manifest");
 		if (plan.actions.at(-1)?.path !== MANIFEST) throw new Error("Manifest must publish after required outputs");
 		for (const [path, source] of [["AGENTS.md", "agents-block.md"], [".gitignore", "root.gitignore-block.txt"], [".gitattributes", "journal.gitattributes"]]) {
 			allowed.add(path);
@@ -443,7 +494,7 @@ function validatePlan(plan: InitPlan, verifyExisting = true): void {
 				}
 				continue;
 			}
-			if (action.kind !== "root" || action.mode !== (action.original?.mode ?? 0o644)) throw new Error("Invalid root action ownership");
+			if (action.kind !== "root") throw new Error("Invalid root action ownership");
 			const output = Buffer.from(action.output, "base64"), block = template(source);
 			if (!output.subarray(-block.length).equals(block)) throw new Error("Root recovery may only append the canonical block");
 			const prefix = output.subarray(0, output.length - block.length);
@@ -469,7 +520,7 @@ function verifyOutputs(plan: InitPlan, beforeManifest = false): void {
 	if (runtimeBaseline().releaseId !== plan.releaseId) throw new Error("Package runtime changed before publication");
 	for (const action of plan.actions) {
 		if (beforeManifest && action.path === MANIFEST) continue;
-		if (!same(fingerprint(plan.root, action.path), { sha256: digest(Buffer.from(action.output, "base64")), mode: action.mode })) throw new Error(`Initialization output is missing or modified: ${action.path}`);
+		if (!same(fingerprint(plan.root, action.path), { sha256: digest(Buffer.from(action.output, "base64")) })) throw new Error(`Initialization output is missing or modified: ${action.path}`);
 	}
 	if (plan.taskReused) reusedTask(plan.root, plan.task, plan.user, plan.task.split("/00-")[1]);
 	for (const name of ["journal-1.md", "index.md"]) if (!bytes(plan.root, `.trellis/workspace/${plan.user}/${name}`)) throw new Error("Initialization workspace output is missing");
@@ -479,7 +530,7 @@ function recheck(plan: InitPlan, retry: boolean): void {
 		const actual = fingerprint(plan.root, path);
 		if (same(actual, original)) continue;
 		const action = retry ? plan.actions.find(a => a.path === path) : undefined;
-		if (action && same(actual, { sha256: digest(Buffer.from(action.output, "base64")), mode: action.mode })) continue;
+		if (action && same(actual, { sha256: digest(Buffer.from(action.output, "base64")) })) continue;
 		throw new Error(`Project changed since preview; preserved without overwrite: ${path}`);
 	}
 }
@@ -503,16 +554,16 @@ export function plan(rootInput: string, userInput: string): InitPlan | undefined
 			if (record.kind === "runtime") guards[path] = fingerprint(root, path);
 		}
 	}
-	function add(path: string, content: Buffer | string, kind: FileAction["kind"], mode = 0o644, preserve = false) {
+	function add(path: string, content: Buffer | string, kind: FileAction["kind"], preserve = false) {
 		const value = Buffer.isBuffer(content) ? content : Buffer.from(content);
 		const original = fingerprint(root, path); guards[path] = original;
 		if (preserve && original) return;
 		if (original && kind !== "root" && kind !== "manifest") throw new Error(`Unknown existing file would collide: ${path}`);
-		if (!same(original, { sha256: digest(value), mode: original?.mode ?? mode })) actions.push({ path, original, output: value.toString("base64"), mode: original?.mode ?? mode, kind });
+		if (!same(original, { sha256: digest(value) })) actions.push({ path, original, output: value.toString("base64"), kind });
 	}
 	if (operation === "initialize") {
 		for (const [target, resource] of Object.entries(packageResources())) {
-			add(target, readFileSync(checkedPath(packageRoot, resource.source)), resource.kind, resource.mode);
+			add(target, readFileSync(checkedPath(packageRoot, resource.source)), resource.kind);
 			files[target] = resource;
 		}
 		// Never mix package files into, or claim, an existing same-name skill folder.
@@ -520,7 +571,7 @@ export function plan(rootInput: string, userInput: string): InitPlan | undefined
 		for (const folder of new Set(Object.keys(skills).map(skillFolder))) {
 			if (skillFolderEntries(root, folder)) throw new Error(`Skill folder exists and is not managed by Trellis; preserved without changes: ${folder}. Move or rename it, then initialize again.`);
 		}
-		for (const [target, resource] of Object.entries(skills)) add(target, readFileSync(checkedPath(packageRoot, resource.source)), "skill", resource.mode);
+		for (const [target, resource] of Object.entries(skills)) add(target, readFileSync(checkedPath(packageRoot, resource.source)), "skill");
 		for (const [source, target] of Object.entries(templateTargets)) add(target, template(source), "template");
 		for (const [path, source, start, end] of [["AGENTS.md", "agents-block.md", "<!-- TRELLIS:START -->", "<!-- TRELLIS:END -->"], [".gitignore", "root.gitignore-block.txt", "# pi-trellis:ignore:start", "# pi-trellis:ignore:end"]]) {
 			add(path, appendBlock(bytes(root, path), template(source), start, end), "root");
@@ -532,7 +583,7 @@ export function plan(rootInput: string, userInput: string): InitPlan | undefined
 	const workspacePath = `.trellis/workspace/${user}`;
 	let workspaceReused = false;
 	try { workspaceReused = lstatSync(checkedPath(root, workspacePath)).isDirectory(); } catch (e) { if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e; }
-	for (const name of ["journal-1.md", "index.md"]) add(`${workspacePath}/${name}`, generated.developer[name], "workspace", 0o644, true);
+	for (const name of ["journal-1.md", "index.md"]) add(`${workspacePath}/${name}`, generated.developer[name], "workspace", true);
 	const task = `.trellis/tasks/00-${operation === "initialize" ? "bootstrap-guidelines" : `join-${usernameSlug(user)}`}`;
 	let taskReused = false;
 	try {
@@ -542,8 +593,8 @@ export function plan(rootInput: string, userInput: string): InitPlan | undefined
 	} catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
 	if (!taskReused) { add(`${task}/task.json`, json(generated.task), "task"); add(`${task}/prd.md`, template(`tasks/${operation === "initialize" ? "bootstrap" : "join"}-prd.md`), "task"); }
 	guards[MANIFEST] = fingerprint(root, MANIFEST);
-	if (operation === "initialize") add(MANIFEST, json({ schemaVersion: 3, runtimeReleaseId: state.releaseId, files, templates: defaultTemplates(), skills: packageSkills() } satisfies InstalledManifest), "manifest");
-	const body = { schemaVersion: 1 as const, root, user, releaseId: state.releaseId, operation, workspaceReused, task, taskReused, actions, guards };
+	if (operation === "initialize") add(MANIFEST, json({ schemaVersion: 4, runtimeReleaseId: state.releaseId, files, templates: defaultTemplates(), skills: packageSkills() } satisfies InstalledManifest), "manifest");
+	const body = { schemaVersion: 2 as const, root, user, releaseId: state.releaseId, operation, workspaceReused, task, taskReused, actions, guards };
 	const result = { ...body, planHash: digest(JSON.stringify(body)) }; validatePlan(result); return result;
 }
 function atomic(root: string, path: string, value: Buffer, mode: number, expected: Fingerprint | null): void {
@@ -592,8 +643,8 @@ export function apply(plan: InitPlan, options: { afterWrite?: (path: string, cou
 		for (const action of plan.actions) {
 			if (action.path === MANIFEST) verifyOutputs(plan, true);
 			recheck(plan, true);
-			const value = Buffer.from(action.output, "base64"), actual = fingerprint(plan.root, action.path), output = { sha256: digest(value), mode: action.mode };
-			if (!same(actual, output)) atomic(plan.root, action.path, value, action.mode, action.original);
+			const value = Buffer.from(action.output, "base64"), actual = fingerprint(plan.root, action.path), output = { sha256: digest(value) };
+			if (!same(actual, output)) atomic(plan.root, action.path, value, 0o644, action.original);
 			if (!record.completed.includes(action.path)) record.completed.push(action.path);
 			save(); options.afterWrite?.(action.path, ++count);
 		}

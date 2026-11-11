@@ -4,7 +4,7 @@ import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, realpat
 import { isAbsolute, join, resolve } from "node:path";
 import { discoverProject } from "../project-state.ts";
 import { containsPath } from "../config.ts";
-import { binarySkillFile, checkedPath, digest, packageRoot, validateUsername, packageProvenance, type PackageProvenance, type InstalledManifest } from "./engine.ts";
+import { binarySkillFile, checkedPath, digest, packageRoot, validateUsername, packageProvenance, normalizeManifest, validateOperationEnvelope, type PackageProvenance, type InstalledManifest } from "./engine.ts";
 import { reviewSkills } from "./skills.ts";
 import { PRESERVED_ROOT_BLOCK_STATES, ROOT_BLOCKS, reviewRootBlocks } from "./root-blocks.ts";
 
@@ -54,9 +54,8 @@ function fields(value: unknown, keys: string[], label: string): asserts value is
 	if (!object(value) || Object.keys(value).length !== keys.length || keys.some(key => !Object.hasOwn(value, key))) throw Error(`Malformed ${label} schema`);
 }
 const hash = (value: unknown): value is string => typeof value === "string" && /^[a-f0-9]{64}$/.test(value) && value.length === 64;
-const mode = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 0o777;
 function safePath(path: unknown): asserts path is string {
-	if (typeof path !== "string" || path.length > 8192 || !path || isAbsolute(path) || /[\\\p{C}\p{Zl}\p{Zp}]/u.test(path) || path.split("/").some(p => !p || p === "." || p === "..")) throw Error("Invalid bounded resource path");
+	if (typeof path !== "string" || path.length > 8192 || !path || isAbsolute(path) || /[\\\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/u.test(path) || path.split("/").some(p => !p || p === "." || p === "..")) throw Error("Invalid bounded resource path");
 }
 const clean = (value: string, limit = 500) => value.replace(/[\p{C}\p{Zl}\p{Zp}]/gu, " ").slice(0, limit);
 const identity = (s: Stats) => [s.dev, s.ino, s.mode, s.size, s.mtimeMs, s.ctimeMs].join(":");
@@ -77,7 +76,7 @@ export class DiagnosticReader {
 		this.root(root); const file = checkedPath(root, path);
 		try { return lstatSync(file); } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined; throw error; }
 	}
-	file(root: string, path: string, limit = DIAGNOSTIC_LIMITS.file, inventory = false, binary = false): { data: Buffer; text?: string; sha256: string; mode: number; bytes: number } | undefined {
+	file(root: string, path: string, limit = DIAGNOSTIC_LIMITS.file, inventory = false, binary = false): { data: Buffer; text?: string; sha256: string; bytes: number } | undefined {
 		this.checkpoint(); safePath(path); const file = checkedPath(root, path), before = this.stat(root, path);
 		if (!before) return undefined;
 		if (!before.isFile() || before.size > limit) throw Error(`Expected regular file no larger than ${limit} bytes`);
@@ -105,9 +104,9 @@ export class DiagnosticReader {
 			}
 			if (length !== before.size || identity(fstatSync(fd)) !== identity(before) || identity(this.stat(root, path)!) !== identity(before) || checkedPath(root, path) !== file) throw Error("File changed during bounded read");
 			const bytes = Buffer.concat(chunks, length);
-			// Only skill assets are byte/hash/mode-checked without text validation.
+			// Only skill assets are byte/hash-checked without text validation.
 			if (!binary && (!isUtf8(bytes) || bytes.includes(0))) throw Error("Invalid UTF-8 or NUL bytes");
-			return { data: bytes, ...(inventory || binary ? {} : { text: bytes.toString("utf8") }), sha256: hasher.digest("hex"), mode: before.mode & 0o777, bytes: length };
+			return { data: bytes, ...(inventory || binary ? {} : { text: bytes.toString("utf8") }), sha256: hasher.digest("hex"), bytes: length };
 		} finally { closeSync(fd); }
 	}
 	json(root: string, path: string, limit = DIAGNOSTIC_LIMITS.file): unknown {
@@ -125,86 +124,31 @@ export function diagnosticExecutionRoot(cwd: string): string {
 type PackageSnapshot = PackageProvenance;
 /** Static provenance snapshot only. No unbounded engine validators, dynamic imports or project code. */
 function packageSnapshot(reader: DiagnosticReader): PackageSnapshot { return packageProvenance(reader); }
-function manifestEnvelope(value: unknown): asserts value is InstalledManifest {
-	fields(value, ["schemaVersion", "runtimeReleaseId", "files", "templates", ...(object(value) && value.schemaVersion === 3 ? ["skills"] : [])], "project resource manifest");
-	if (![2, 3].includes(value.schemaVersion) || typeof value.runtimeReleaseId !== "string" || value.runtimeReleaseId.length !== 86 || !/^pi-trellis-runtime-v1-[a-f0-9]{64}$/.test(value.runtimeReleaseId) || !object(value.files) || !Object.keys(value.files).length || Object.keys(value.files).length > DIAGNOSTIC_LIMITS.entries || !object(value.templates) || !Object.keys(value.templates).length || Object.keys(value.templates).length > DIAGNOSTIC_LIMITS.entries) throw Error("Invalid/nonempty managed project manifest required");
-	for (const [path, row] of Object.entries(value.files)) {
-		safePath(path); fields(row, ["sha256", "mode", "kind", "source"], "project resource entry");
-		if (!hash(row.sha256) || !mode(row.mode) || !["runtime", "agent"].includes(row.kind)) throw Error("Invalid resource fingerprint/kind");
-		safePath(row.source);
-	}
-	if (value.schemaVersion === 3) {
-		if (!object(value.skills) || Object.keys(value.skills).length > DIAGNOSTIC_LIMITS.entries) throw Error("Invalid skill provenance map");
-		for (const [path, row] of Object.entries(value.skills)) {
-			safePath(path); fields(row, ["sha256", "mode", "source"], "project skill entry");
-			if (!hash(row.sha256) || !mode(row.mode)) throw Error("Invalid skill fingerprint");
-			safePath(row.source);
-		}
-	}
-	for (const [path, row] of Object.entries(value.templates)) {
-		safePath(path); fields(row, ["origin", "sha256", "mode", "source"], "template provenance");
-		if (row.origin === "package-default") {
-			if (!hash(row.sha256) || !mode(row.mode)) throw Error("Invalid template fingerprint");
-			safePath(row.source);
-		} else if (row.origin === "preserved-project") {
-			fields(row.source, ["kind", "revision"], "preserved template source");
-			if (row.source.kind !== "project-snapshot" || !(row.source.revision === null || typeof row.source.revision === "string" && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(row.source.revision) && [40, 64].includes(row.source.revision.length)) || !(row.sha256 === null && row.mode === null) && (!hash(row.sha256) || !mode(row.mode))) throw Error("Invalid preserved template provenance");
-		} else throw Error("Unknown template origin");
-	}
+function manifestEnvelope(value: unknown): InstalledManifest {
+ const manifest = normalizeManifest(value);
+ for (const [path, row] of Object.entries({ ...manifest.files, ...manifest.skills })) { safePath(path); safePath(row.source); }
+ for (const [path, row] of Object.entries(manifest.templates)) { safePath(path); if (row.origin === "package-default") safePath(row.source); }
+ return manifest;
 }
 function manifestSnapshot(value: unknown, pkg: PackageSnapshot): InstalledManifest {
-	manifestEnvelope(value);
-	if (![2, 3].includes(value.schemaVersion) || typeof value.runtimeReleaseId !== "string" || !/^pi-trellis-runtime-v1-[a-f0-9]{64}$/.test(value.runtimeReleaseId) || value.runtimeReleaseId.length !== 86 || !object(value.files) || !object(value.templates)) throw Error("Invalid managed project manifest");
-	// Same rule as Update: absent skill rows are planned additions; unknown or wrong-source rows are rejected.
-	for (const [path, row] of Object.entries(value.skills ?? {})) if (!Object.hasOwn(pkg.skills, path) || row.source !== pkg.skills[path].source) throw Error(`Unknown or invalid skill provenance: ${path}`);
-	// An older release may lack rows for package-added files; the current release must match exactly.
-	const older = value.runtimeReleaseId !== pkg.release;
-	if (Object.keys(value.files).some(path => !Object.hasOwn(pkg.files, path)) || !older && Object.keys(value.files).length !== Object.keys(pkg.files).length || Object.keys(value.templates).length !== Object.keys(pkg.templates).length) throw Error("Incomplete or unknown managed resource entries");
-	for (const [path, expected] of Object.entries(pkg.files)) {
-		if (older && !Object.hasOwn(value.files, path)) continue;
-		const row = value.files[path]; fields(row, ["sha256", "mode", "kind", "source"], "project resource entry");
-		if (!hash(row.sha256) || !mode(row.mode) || row.source !== expected.source || row.kind !== expected.kind) throw Error(`Invalid resource provenance: ${path}`);
-		// Roles are never hash-checked by dispatch, so a stale role row is a safe update, not damage;
-		// only executable runtime rows must match the current package bytes and mode exactly.
-		if (expected.kind === "runtime" && (row.sha256 !== expected.sha256 || row.mode !== expected.mode)) throw Error(`Malformed project resource provenance: ${path}`);
-	}
-	for (const [path, expected] of Object.entries(pkg.templates)) {
-		const row = value.templates[path]; fields(row, ["origin", "sha256", "mode", "source"], "template provenance");
-		if (row.origin === "package-default") {
-			if (row.source !== expected.source || !hash(row.sha256) || !mode(row.mode)) throw Error(`Malformed package template provenance: ${path}`);
-		} else if (row.origin === "preserved-project") {
-			fields(row.source, ["kind", "revision"], "preserved template source");
-			if (row.source.kind !== "project-snapshot" || !(row.source.revision === null || typeof row.source.revision === "string" && [40, 64].includes(row.source.revision.length) && /^[a-f0-9]+$/.test(row.source.revision))) throw Error(`Malformed preserved template source: ${path}`);
-			if (!(row.sha256 === null && row.mode === null) && (!hash(row.sha256) || !mode(row.mode))) throw Error(`Invalid template fingerprint: ${path}`);
-		} else throw Error(`Unknown template origin: ${path}`);
-	}
-	return value as InstalledManifest;
+ const manifest = manifestEnvelope(value), older = manifest.runtimeReleaseId !== pkg.release;
+ for (const [path, row] of Object.entries(manifest.skills ?? {})) if (!Object.hasOwn(pkg.skills, path) || row.source !== pkg.skills[path].source) throw Error(`Unknown or invalid skill provenance: ${path}`);
+ if (Object.keys(manifest.files).some(path => !Object.hasOwn(pkg.files, path)) || !older && Object.keys(manifest.files).length !== Object.keys(pkg.files).length || Object.keys(manifest.templates).length !== Object.keys(pkg.templates).length) throw Error("Incomplete or unknown managed resource entries");
+ for (const [path, expected] of Object.entries(pkg.files)) {
+  if (older && !Object.hasOwn(manifest.files, path)) continue;
+  const row = manifest.files[path];
+  if (!row || row.source !== expected.source || row.kind !== expected.kind || expected.kind === "runtime" && row.sha256 !== expected.sha256) throw Error(`Malformed project resource provenance: ${path}`);
+ }
+ for (const [path, expected] of Object.entries(pkg.templates)) {
+  const row = manifest.templates[path];
+  if (!row || row.origin === "package-default" && row.source !== expected.source) throw Error(`Malformed package template provenance: ${path}`);
+ }
+ return manifest;
 }
 function operationSnapshot(value: unknown, root: string): "incomplete" | "complete" {
-	fields(value, ["schemaVersion", "status", "plan", "completed"], "initialization operation");
-	if (value.schemaVersion !== 1 || !["incomplete", "complete"].includes(value.status) || !object(value.plan) || value.plan.root !== root || !Array.isArray(value.completed) || value.completed.length > 256) throw Error("Invalid initialization operation envelope/root");
-	fields(value.plan, ["schemaVersion", "root", "user", "releaseId", "operation", "workspaceReused", "task", "taskReused", "actions", "guards", "planHash"], "initialization plan envelope");
-	validateUsername(value.plan.user);
-	if (value.plan.schemaVersion !== 1 || typeof value.plan.releaseId !== "string" || value.plan.releaseId.length !== 86 || !/^pi-trellis-runtime-v1-[a-f0-9]{64}$/.test(value.plan.releaseId) || !["initialize", "identity"].includes(value.plan.operation) || typeof value.plan.workspaceReused !== "boolean" || typeof value.plan.taskReused !== "boolean" || !Array.isArray(value.plan.actions) || value.plan.actions.length > 256 || !object(value.plan.guards) || Object.keys(value.plan.guards).length > 512 || !hash(value.plan.planHash)) throw Error("Invalid initialization plan envelope");
-	safePath(value.plan.task);
-	if (!value.plan.task.startsWith(".trellis/tasks/")) throw Error("Invalid initialization task route");
-	const paths = new Set<string>();
-	for (const action of value.plan.actions) {
-		fields(action, ["path", "original", "output", "mode", "kind"], "initialization action envelope");
-		safePath(action.path);
-		if (paths.has(action.path) || !mode(action.mode) || typeof action.output !== "string" || !["runtime", "agent", "skill", "template", "identity", "workspace", "task", "root", "manifest"].includes(action.kind)) throw Error("Invalid initialization action envelope");
-		if (action.original !== null) { fields(action.original, ["sha256", "mode"], "initialization fingerprint"); if (!hash(action.original.sha256) || !mode(action.original.mode)) throw Error("Invalid initialization fingerprint"); }
-		paths.add(action.path);
-	}
-	for (const [path, fingerprint] of Object.entries(value.plan.guards)) {
-		safePath(path);
-		if (fingerprint !== null) { fields(fingerprint, ["sha256", "mode"], "initialization guard"); if (!hash(fingerprint.sha256) || !mode(fingerprint.mode)) throw Error("Invalid initialization guard"); }
-	}
-	if (new Set(value.completed).size !== value.completed.length || value.completed.some((p: unknown) => typeof p !== "string" || !paths.has(p)) || value.status === "complete" && value.completed.length !== paths.size) throw Error("Invalid initialization completion entries");
-	const { planHash, ...body } = value.plan;
-	if (digest(JSON.stringify(body)) !== planHash) throw Error("Initialization plan envelope hash mismatch");
-	// Do not reconstruct outputs, resolve action destinations or revalidate historical user task bytes.
-	return value.status;
+ // Bounded structural/history validation only; no historical output reconstruction or route I/O.
+ validateOperationEnvelope(value, root, safePath);
+ return value.status;
 }
 export function collectDiagnostics(scope: DiagnosticScope, options: { signal?: AbortSignal; reader?: DiagnosticReader } = {}): DiagnosticResult {
 	const reader = options.reader ?? new DiagnosticReader(options.signal), result: DiagnosticResult = { schemaVersion: 1, scope: { ...scope }, items: [], omitted: 0, facts: { project: "unsafe", packageValid: false, runtimeStaticValid: false, resourcesRestorable: false, operationInvalid: false, locked: false, managedMarker: false } };
@@ -253,12 +197,12 @@ export function collectDiagnostics(scope: DiagnosticScope, options: { signal?: A
 			result.facts.managedMarker = !!reader.stat(root!, ".trellis/.runtime/pi-trellis/binding.json");
 			if (result.facts.managedMarker) add("marker", "project", "issue", "This directory is a managed task worktree checkout", [".trellis/.runtime/pi-trellis/binding.json"], "Check reports the deployment of the source project; runtime probes are skipped here.", "Run /trellis-init → Check project from the source project checkout.", "warning");
 		}, "Managed checkout marker could not be read safely.", "Run /trellis-init → Check project from the source project checkout.");
-		let raw: unknown;
+		let raw: InstalledManifest | undefined;
 		attempt("manifest", "resources", MANIFEST, () => {
-			raw = reader.json(root!, MANIFEST);
+			const value = reader.json(root!, MANIFEST);
+			raw = value === undefined ? undefined : manifestEnvelope(value);
 			if (raw === undefined) { add("manifest", "resources", result.facts.project === "fresh" ? "skipped" : "issue", result.facts.project === "fresh" ? "No manifest: project is not initialized" : "No managed project manifest", [MANIFEST], "No project code is authorized.", "Use /trellis-init; review and explicitly confirm Initialize project or Adopt project."); return; }
-			manifestEnvelope(raw);
-			if (!pkg) { add("manifest", "resources", "blocked", "Manifest provenance blocked by package validation", [MANIFEST], "Only its envelope was checked; no execution authorization.", "Review the package error first."); return; }
+						if (!pkg) { add("manifest", "resources", "blocked", "Manifest provenance blocked by package validation", [MANIFEST], "Only its envelope was checked; no execution authorization.", "Review the package error first."); return; }
 			result.facts.manifest = manifestSnapshot(raw, pkg);
 			add("manifest", "resources", raw.runtimeReleaseId === pkg.release ? "pass" : "issue", raw.runtimeReleaseId === pkg.release ? "Nonempty manifest provenance verified" : "Unsupported project runtime release", [MANIFEST], raw.runtimeReleaseId === pkg.release ? "" : "Old project code remains unauthorized.", raw.runtimeReleaseId === pkg.release ? "" : "Review an explicit resource update; Check does not upgrade.");
 		}, "Manifest is not execution authority; fixed inventory checks continue independently.", "Review the manifest and explicitly reconcile/update through the supported menu.");
@@ -301,21 +245,21 @@ export function collectDiagnostics(scope: DiagnosticScope, options: { signal?: A
 					try {
 						const actual = reader.file(root, path, DIAGNOSTIC_LIMITS.file, true), installed = result.facts.manifest?.files[path];
 						if (!actual) { total++; if (problems.length < 12) problems.push(`Missing: ${path}`); if (kind === "runtime") runtimeValid = false; continue; }
-						if (actual.sha256 !== expected.sha256 || actual.mode !== expected.mode) {
-							total++; if (problems.length < 12) problems.push(`${actual.sha256 !== expected.sha256 ? "Hash mismatch" : "Mode mismatch"}: ${path}`);
+						if (actual.sha256 !== expected.sha256) {
+							total++; if (problems.length < 12) problems.push(`Hash mismatch: ${path}`);
 							if (kind === "runtime") runtimeValid = false;
-							if (!installed || actual.sha256 !== installed.sha256 || actual.mode !== installed.mode) restorable = false;
+							if (!installed || actual.sha256 !== installed.sha256) restorable = false;
 						}
 					} catch (error) { if (error instanceof Cancelled) { inventoryCancelled = true; runtimeValid = false; restorable = false; break; } total++; restorable = false; if (kind === "runtime") runtimeValid = false; if (problems.length < 12) problems.push(`${path}: ${error instanceof Error ? error.message : "read failed"}`); }
 				}
-				add(`inventory:${kind}`, "resources", inventoryCancelled ? "cancelled" : total ? "issue" : "pass", inventoryCancelled ? "Inventory cancelled; checks not completed" : total ? `${total} fixed ${kind} resource problem(s)${total > problems.length ? `; ${total - problems.length} path details omitted` : ""}` : `Fixed ${kind} inventory verified (static)`, problems, kind === "runtime" && total ? "Runtime bytes/modes do not authorize execution." : total ? "Missing/modified roles affect dispatch or explicit update conflicts; customization alone does not prove runtime failure." : "", total ? "Review these fixed paths; explicitly update/restore resources. Custom bytes are never overwritten by Check." : "", kind === "agent" ? "warning" : total ? "error" : "info");
+				add(`inventory:${kind}`, "resources", inventoryCancelled ? "cancelled" : total ? "issue" : "pass", inventoryCancelled ? "Inventory cancelled; checks not completed" : total ? `${total} fixed ${kind} resource problem(s)${total > problems.length ? `; ${total - problems.length} path details omitted` : ""}` : `Fixed ${kind} inventory verified (static)`, problems, kind === "runtime" && total ? "Runtime bytes do not authorize execution." : total ? "Missing/modified roles affect dispatch or explicit update conflicts; customization alone does not prove runtime failure." : "", total ? "Review these fixed paths; explicitly update/restore resources. Custom bytes are never overwritten by Check." : "", kind === "agent" ? "warning" : total ? "error" : "info");
 			}
 			result.facts.resourcesRestorable = restorable;
 			// Project skills: same classification as Update resources; never part of runtime validity.
 			if (result.facts.manifest) attempt("inventory:skill", "resources", ".pi/skills", () => {
 				const review = reviewSkills(root!, result.facts.manifest!.skills ?? {}, pkg!.skills, path => {
-					try { const file = reader.file(root!, path, DIAGNOSTIC_LIMITS.file, true, binarySkillFile(path)); return file ? { sha256: file.sha256, mode: file.mode } : null; }
-					catch (error) { if (error instanceof Cancelled) throw error; return { sha256: "unreadable", mode: -1 }; }
+					try { const file = reader.file(root!, path, DIAGNOSTIC_LIMITS.file, true, binarySkillFile(path)); return file ? { sha256: file.sha256 } : null; }
+					catch (error) { if (error instanceof Cancelled) throw error; return { sha256: "unreadable" }; }
 				});
 				const problems = review.rows.filter(row => row.state !== "Current"), conflicts = review.conflicts.length;
 				if (!problems.length) { add("inventory:skill", "resources", "pass", "Project skills match the package (static)"); return; }

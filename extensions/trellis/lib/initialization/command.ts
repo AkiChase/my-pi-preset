@@ -5,7 +5,7 @@ import { adoptPlan, applyAdoptPlan, adoptionDialog } from "./adoption.ts";
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { applyResourcePlan, read, readStamped, resourcePlan, templatePlan, applyTemplatePlan, type TemplateScope } from "./resources.ts";
 import { initializationRoot } from "../project-state.ts";
-import { inspect, plan, apply, checkedPath, packageResources, packageSkills, defaultTemplates, runtimeBaseline, verifyRuntime, validateUsername, SKILL_ROOT, type Inspection, type InitPlan } from "./engine.ts";
+import { inspect, plan, apply, checkedPath, packageResources, packageSkills, defaultTemplates, runtimeBaseline, verifyRuntime, validateOperationEnvelope, validateUsername, SKILL_ROOT, type Inspection, type InitPlan } from "./engine.ts";
 import { runDiagnostics } from "./diagnostic-runtime.ts";
 import { PRESERVED_ROOT_BLOCK_STATES, reviewRootBlocks } from "./root-blocks.ts";
 import { collectDiagnostics, formatDiagnostics, buildDiagnosticReport, type DiagnosticScope } from "./diagnostics.ts";
@@ -114,7 +114,8 @@ function menuSnapshot(cwd: string): MenuSnapshot {
 		const operation = read(root, ".trellis/.runtime/init-operation.json");
 		if (operation) {
 			const record = JSON.parse(operation.toString("utf8"));
-			if (record?.schemaVersion === 1 && record.status === "incomplete" && record.plan?.root === root && typeof record.plan.user === "string" && typeof record.plan.releaseId === "string" && Array.isArray(record.completed)) {
+			validateOperationEnvelope(record, root);
+			if (record.status === "incomplete") {
 				validateUsername(record.plan.user);
 				state.state = "incomplete"; state.releaseId = record.plan.releaseId;
 				return { state, view: view(STATUS.incomplete), operations: [RESUME] };
@@ -139,7 +140,7 @@ function menuSnapshot(cwd: string): MenuSnapshot {
 		if (!runtimeError) {
 			state.state = state.developer ? "ready" : "supported";
 			// Schema 2 predates deployed skills: runtime stays usable, Update adds them explicitly.
-			const issues = state.manifest!.schemaVersion === 3 ? [] : [`Project skills not deployed; choose ${UPDATE}.`];
+			const issues = Object.keys(state.manifest!.skills ?? {}).length ? [] : [`Project skills not deployed; choose ${UPDATE}.`];
 			const blocks = reviewRootBlocks(path => readStamped(root, path)).filter(block => block.state !== "Current block");
 			const preserved = blocks.filter(block => PRESERVED_ROOT_BLOCK_STATES.includes(block.state)), stale = blocks.filter(block => !preserved.includes(block));
 			if (stale.length) issues.push(`Trellis block out of date: ${stale.map(block => block.path).join(", ")}; choose ${UPDATE}.`);

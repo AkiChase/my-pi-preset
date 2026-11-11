@@ -9,7 +9,7 @@ import { plan, apply, verifyRuntime, digest, packageSkills, packageRoot, SKILL_R
 import { resourcePlan, applyResourcePlan } from '../lib/initialization/resources.ts';
 import { collectDiagnostics, DiagnosticReader } from '../lib/initialization/diagnostics.ts';
 import { registerInitCommand, ACTIONS } from '../lib/initialization/command.ts';
-import { copyRuntimeFixture } from './runtime-fixture.mjs';
+import { copyRuntimeFixture, legacyManifest } from './runtime-fixture.mjs';
 
 const MANIFEST = '.trellis/.pi-trellis.json';
 const skills = packageSkills();
@@ -33,7 +33,7 @@ function snapshot(root, dir = root) {
 /** The previous release: schema 2, no skills recorded or deployed. */
 function olderProject(t) {
  const root = copyRuntimeFixture(t), m = manifest(root);
- delete m.skills; m.schemaVersion = 2; writeManifest(root, m);
+ writeManifest(root, legacyManifest(m, 2));
  rmSync(join(root, SKILL_ROOT), { recursive: true });
  return root;
 }
@@ -45,12 +45,12 @@ test('fresh init publishes every package skill file with manifest records; suppo
  assert.equal(order.at(-1), MANIFEST);
  apply(p);
  const m = verifyRuntime(root);
- assert.equal(m.schemaVersion, 3);
+ assert.equal(m.schemaVersion, 4);
  assert.deepEqual(m.skills, skills);
  for (const [path, record] of Object.entries(m.skills)) {
   assert.equal(record.source, `skills/${path.slice(SKILL_ROOT.length + 1)}`);
   assert.equal(digest(readFileSync(join(root, path))), record.sha256, path);
-  assert.equal(lstatSync(join(root, path)).mode & 0o777, record.mode, path);
+  assert.equal(lstatSync(join(root, path)).mode & 0o777, 0o644, path);
  }
  // Skills are recorded separately from runtime/agent files and nothing else lands in .pi/skills.
  assert.ok(!Object.keys(m.files).some(path => path.startsWith(SKILL_ROOT)));
@@ -82,10 +82,10 @@ test('previous-release project keeps runtime authority and gets an explicit Upda
  assert.deepEqual(p.report.conflicts, []); assert.equal(p.unchanged, false);
  assert.deepEqual(p.changes.map(c => c.path), Object.keys(skills));
  assert.ok(p.report.rows.filter(r => r.path.startsWith(SKILL_ROOT)).every(r => r.state === 'New — will install'));
- assert.deepEqual(p.manifest.skills, skills); assert.equal(p.manifest.schemaVersion, 3);
+ assert.deepEqual(p.manifest.skills, skills); assert.equal(p.manifest.schemaVersion, 4);
  applyResourcePlan(p);
  const m = verifyRuntime(root);
- assert.equal(m.schemaVersion, 3); assert.deepEqual(m.skills, skills);
+ assert.equal(m.schemaVersion, 4); assert.deepEqual(m.skills, skills);
  for (const [path, record] of Object.entries(skills)) assert.equal(digest(readFileSync(join(root, path))), record.sha256);
  assert.equal(resourcePlan(root, 'update').unchanged, true);
 });
@@ -94,14 +94,14 @@ test('unknown entries and unsupported schema versions remain rejected', t => {
  const root = olderProject(t), base = manifest(root);
  for (const mutate of [
   m => { m.files['.trellis/scripts/unknown.py'] = m.files['.trellis/scripts/task.py']; },
-  m => { m.schemaVersion = 3; m.skills = { '.pi/skills/trellis-extra/SKILL.md': { ...skills[entry] } }; },
-  m => { m.schemaVersion = 3; m.skills = { [entry]: { ...skills[entry], source: 'skills/trellis-start/SKILL.md' } }; },
+  m => { Object.assign(m, legacyManifest(m, 3)); m.skills = { '.pi/skills/trellis-extra/SKILL.md': { ...skills[entry], mode: 0o644 } }; },
+  m => { Object.assign(m, legacyManifest(m, 3)); m.skills = { [entry]: { ...skills[entry], mode: 0o644, source: 'skills/trellis-start/SKILL.md' } }; },
   m => { m.skills = {}; },
-  m => { m.schemaVersion = 4; m.skills = {}; },
+  m => { m.schemaVersion = 5; m.skills = {}; },
  ]) {
   const m = structuredClone(base); mutate(m); writeManifest(root, m);
   const before = snapshot(root);
-  assert.throws(() => resourcePlan(root, 'update'), /Unsupported|Invalid/);
+  assert.throws(() => resourcePlan(root, 'update'), /Unsupported|Invalid|Malformed/);
   assert.throws(() => verifyRuntime(root));
   assert.deepEqual(snapshot(root), before);
  }
@@ -169,7 +169,7 @@ test('skill customization, deletion or missing folders never affect the runtime 
  assert.equal(clean.status, 'pass');
 });
 
-test('binary skill assets are byte/hash/mode checked without text validation', t => {
+test('binary skill assets are byte/hash checked without text validation', t => {
  const root = fresh(t), reader = new DiagnosticReader();
  put(root, 'asset.bin', Buffer.from([0, 255, 1]));
  assert.throws(() => reader.file(root, 'asset.bin', 1024, true), /UTF-8 or NUL/);

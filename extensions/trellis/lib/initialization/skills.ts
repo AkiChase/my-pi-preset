@@ -13,7 +13,7 @@ export interface SkillReview {
 	/** Next last-published records; conflicts keep their prior record or stay unrecorded. */
 	next: Record<string, SkillRecord>;
 }
-const equal = (a: Fingerprint | null | undefined, b: Fingerprint | null | undefined) => !!a && !!b && a.sha256 === b.sha256 && a.mode === b.mode;
+const equal = (a: Fingerprint | null | undefined, b: Fingerprint | null | undefined) => !!a && !!b && a.sha256 === b.sha256;
 
 /**
  * Classify deployed Trellis skills against recorded last-published rows and the package inventory.

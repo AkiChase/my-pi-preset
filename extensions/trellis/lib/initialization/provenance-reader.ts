@@ -3,10 +3,10 @@ import type { Fingerprint } from "./engine.ts";
 
 /** Default initialization and diagnostics use the same provenance policy, with different I/O owners. */
 export interface ProvenanceReader {
-	/** `binary` skips text validation (skill assets only); size/hash/mode remain checked. */
+	/** `binary` skips text validation (skill assets only); size/hash remain checked. */
 	file(root: string, path: string, limit?: number, inventory?: boolean, binary?: boolean): (Fingerprint & { data: Buffer; bytes: number; text?: string }) | undefined;
 	json(root: string, path: string, limit?: number): unknown;
-	stat(root: string, path: string): { mode: number } | undefined;
+	stat(root: string, path: string): object | undefined;
 	path(root: string, path: string): string;
 }
 export function provenanceText(data: Buffer): string {

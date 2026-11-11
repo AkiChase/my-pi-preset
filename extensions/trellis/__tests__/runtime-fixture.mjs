@@ -53,6 +53,30 @@ export function rehomeOperationRecord(from, to) {
  writeFileSync(record, JSON.stringify(operation, null, 2) + '\n');
 }
 
+/** Construct the exact legacy serialized shape; production must validate before discarding modes. */
+export function legacyManifest(manifest, schemaVersion = 3, mode = 0o664) {
+ const value = structuredClone(manifest);
+ value.schemaVersion = schemaVersion;
+ for (const row of Object.values(value.files)) row.mode = mode;
+ for (const row of Object.values(value.templates)) row.mode = row.sha256 === null ? null : mode;
+ if (schemaVersion === 2) delete value.skills;
+ else for (const row of Object.values(value.skills ?? {})) row.mode = mode;
+ return value;
+}
+export function legacyOperation(operation, mode = 0o664) {
+ const value = structuredClone(operation), p = value.plan;
+ p.schemaVersion = 1;
+ for (const action of p.actions) {
+  action.mode = mode;
+  if (action.original) action.original.mode = mode;
+  if (action.kind === 'manifest') action.output = Buffer.from(JSON.stringify(legacyManifest(JSON.parse(Buffer.from(action.output, 'base64'))), null, 2) + '\n').toString('base64');
+ }
+ for (const guard of Object.values(p.guards)) if (guard) guard.mode = mode;
+ const { planHash, ...body } = p;
+ p.planHash = digest(JSON.stringify(body));
+ return value;
+}
+
 // Adversarial CLI replies / spawn failures belong at the host execution
 // boundary. Manifest and Python bytes remain genuinely supported throughout.
 // One shared execFile router keyed by project root lets concurrent tests mock
