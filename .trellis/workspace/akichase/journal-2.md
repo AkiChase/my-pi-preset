@@ -337,3 +337,41 @@
 
 - 物理终端/IME、实际CLI bundle、第三方input-history组合、在线provider为NOT_RUN；若需要进一步验证，另行授权。
 - 本任务owned临时输出已核对并清理，旧任务诊断不动；未安装、修改SDK、sync/reload/push或改写历史，六处无关Trellis改动保留。
+
+
+## Session 68: 清理 Trellis 资源权限指纹
+<!-- trellis-session: v=2 fp=633b1fbb41918737 -->
+
+**Date**: 2026-11-11
+**Task**: 清理 Trellis 资源权限指纹
+**Branch**: `main`
+
+### Summary
+
+资源一致性统一采用内容哈希，清理 manifest、初始化计划、发布/备份/诊断以及读取中的权限依赖；完成两个阶段和独立审查，用户验收后归档。
+
+### Main Changes
+
+- 新 manifest schema 4 与新初始化计划不记录 mode；旧正常项目兼容，不实现旧中断初始化迁移。
+- 移除 mode/ctime 读取身份依赖，保留内容、inode、路径、文件类型和锁保护；同步 Python runtime 内容基线与长期规范。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `95f93f6` | fix(trellis): use content-only resource fingerprints |
+| `1685395` | fix(trellis): ignore permission drift during bounded reads |
+| `17d003b` | docs(trellis): record hash-only cleanup verification |
+
+### Testing
+
+- [OK] Trellis 自然退出 465/465；Python 42/42；pnpm check 最终 1866/1866，typecheck 通过。
+- [OK] 首次全仓出现未修改 agent-tasks 通知时序用例失败；单独及无重叠整仓复跑通过，未修改无关代码，失败事实保留在任务记录。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 已初始化 Trellis 的仓库使用新版扩展后各执行一次 Update resources；未自动更新个人安装或其他仓库，未 push。
