@@ -27,11 +27,11 @@ pnpm typecheck
 
 ## 阶段 2：读取期间权限漂移与集成
 
-- [ ] 清理 diagnostics reader、task-context 和 Python materials 的 mode/ctime 隐式依赖；对文件、目录分别保留内容变化、inode、路径及文件类型保护，不机械移除整组身份检查。
-- [ ] 修改对应 TS/Python 回归，独立证明读中 chmod 容忍与内容/路径替换拒绝。
-- [ ] Python runtime 字节、当前 baseline sha256 / runtimeReleaseId 同阶段更新；保持历史 source hashes 不变。
-- [ ] 核查全部权限关键词，分类每个剩余使用：必要创建权限、文件类型、无关业务 mode；确认无资源指纹权限残留。
-- [ ] focused / 全 Trellis 自然退出 / Python / 全仓检查，独立审查，主会话验证后本地提交阶段 2。
+- [x] 清理 diagnostics reader、task-context 和 Python materials 的 mode/ctime 隐式依赖；对文件、目录分别保留内容变化、inode、路径及文件类型保护，不机械移除整组身份检查。
+- [x] 修改对应 TS/Python 回归，独立证明读中 chmod 容忍与内容/路径替换拒绝。
+- [x] Python runtime 字节、当前 baseline sha256 / runtimeReleaseId 同阶段更新；保持历史 source hashes 不变。
+- [x] 核查全部权限关键词，分类每个剩余使用：必要创建权限、文件类型、无关业务 mode；确认无资源指纹权限残留。
+- [x] focused / 全 Trellis 自然退出 / Python / 全仓检查，独立审查；阶段 2 进入本地提交检查点。
 
 阶段 2 与集成命令：
 
@@ -60,6 +60,26 @@ git diff --check
 - 独立审查负向复现两处局部问题（均 exit1）：完成 operation 可空动作；历史路径拒绝合法私用 Unicode 字符导致计划可建而发布后失败。分别加入非空动作校验、路径拒绝集合与用户名契约一致，保留控制符、代理项和非法路径拒绝。
 - 主会话核验独审最终日志：上述 focused 命令加 `resource-hash-only.test.mjs` 为 **219/219 exit0**，consumer 为 **44/44 exit0**；`pnpm typecheck` exit0（linked 0 new packages），`git diff --check` exit0。Node v24.14.1，已链接 SDK 1.5.1，均仓库外 `PI_CODING_AGENT_DIR` 隔离、自然退出。现有 consumer smoke 过滤外的定义未执行，不计覆盖。
 - 阶段 1 全 Trellis / Python / `pnpm check` NOT_RUN，留阶段 2 集成；仓库无独立 lint 脚本。
-- 原始材料暂存 `/tmp/trellis-hash-implement.Ybcact/`、`/tmp/trellis-hash-check.2LXcd0/`；关键失败原因和复跑结果已在此自包含保留，不依赖临时链接作为唯一证据。
+- 原始材料当时暂存 `/tmp/trellis-hash-implement.Ybcact/`、`/tmp/trellis-hash-check.2LXcd0/`；关键失败原因和复跑结果已在此自包含保留，最终核验后已清理，不依赖临时链接作为唯一证据。
 
-后续原始输出使用主会话自建 `/tmp/trellis-hash-main.yQeRM8/`。阶段 2 尚未实施。
+阶段 1 已提交：`95f93f6`（`fix(trellis): use content-only resource fingerprints`）。后续原始输出曾使用主会话自建 `/tmp/trellis-hash-main.yQeRM8/`，最终已清理。
+
+## 阶段 2 实施与验证进度
+
+主会话直接修改三处 bounded-read identity：不再比较 mode/ctime，保留 dev/ino、文件类型、size、mtime 读取期间变化检测；Python 目录 guard 继续检测目录成员变化，源 graph 二次读取仍比较内容 hash。没有添加第二套权限恢复或迁移机制。
+
+最终关键词核查另清理了阶段 1 遗留的两项依赖：删除仅为包权限采集存在的 ProvenanceReader.stat 接口/默认实现；旧完成 action guard 的一致性仅比较 hash，不再比较两份旧权限（旧 shape 合法数字检查和原始 planHash 检查仍保留）。
+
+- 新增 `read-content-identity.test.mjs`：TS task/diagnostic 在 open/read 中 chmod 容忍、同大小内容写入拒绝、路径/descriptor 替换拒绝。
+- Python `test_worktree.py` 新增 open/read chmod、目录展开中 chmod 不改 graph hash、同大小内容修改拒绝；旧 inode/ancestor/FIFO/目录新增检测测试保留。
+- Python materials 当前内容 hash 和 releaseId 同阶段更新，sourceSha256 / 来源历史不变；未改项目生成副本。
+- 首次 focused（read-content-identity/task-context/init-diagnostics）**43/43 exit0**，Python discover **42 tests OK exit0**。Python argparse 的 refresh/collect 错误文本是预期拒绝测试，不是 suite 失败。
+- 环境：Node v24.14.1、已链接 SDK1.5.1，主会话仓库外 agent-dir 隔离；新增回归自然退出，无依赖安装。
+- 阶段 2 独立审查（review base `95f93f6`）无阻断发现、无自修编辑；主会话核对其日志：focused **131/131 exit0**、Python **42 tests OK exit0**、`pnpm typecheck` exit0，所有当前 runtime hashes/release 一致、upstream/sourceSha256 历史未变。Node24.14.1、Python3.14.7、pnpm10.33.0、现有SDK1.5.1，仓库外 agent-dir 隔离。
+- 主会话完整 Trellis：`node --test extensions/trellis/__tests__/*.test.mjs` **465/465 exit0**、无 force-exit。配置全仓 suite 自身使用 force-exit，其 PASS 不作为自然退出证据。
+- 首次 `pnpm check`：typecheck 通过，suite **1865 pass /1 fail，exit1**。失败位于未修改的 `extensions/agent-tasks/__tests__/tool-waits.test.ts:862`（`group send synchronous resume marks only the original submitted runs`），260ms 固定等待后只观察到1条而非2条通知。与全 Trellis/独审验证并行时出现；未改无关模块。
+- 单独 `node --test --test-name-pattern='group send synchronous resume marks only the original submitted runs' extensions/agent-tasks/__tests__/tool-waits.test.ts` **1/1 exit0**；没有其他验证任务重叠时重新 `pnpm check` **1866/1866 exit0**，typecheck 同样 exit0。与时序波动相符，但未声称确定了所有竞态根因；保留首次失败事实。
+- 最终扫描剩余 mode 使用仅为：合法旧 schema/operation shape识别；默认文件/私有锁目录创建；文件类型检查；无关 UI/执行业务模式。新资源/新plan/captured-source不发布权限，旧action/guard也不比较权限一致性。
+- 规范完整记录为 `.trellis/spec/development/trellis-resource-provenance.md`（7段可执行契约），development index 链接到它。内联扩写曾使 index 达33706字节触发32768 injection警告；提取为独立规范后 index30463字节、规范3784字节，role manifest各5条 validate通过且无warning，链接检查通过。未改用户文档，其现有行为描述仍准确。
+- 两阶段最终 `git diff --check` 通过；用户已安装包、项目生成副本未改。未验证真实Pi host/UI（Trellis按规范使用逻辑fake-pi测试）；无独立lint命令，不声称 lint PASS。
+- 主会话核验并以 `lsof -nP +D` 确认无活动句柄后，已删除本任务 5 个自建临时目录：research、implement、两次check和main；仅删除明确列出的本任务路径，未清理系统/harness或其他会话输出。无持久化原始日志；结论与失败事实已在此保留。

@@ -91,7 +91,6 @@ function parse<T>(root: string, path: string): T | undefined {
 export const defaultProvenanceReader: ProvenanceReader = {
 	file(root, path, _limit, _inventory, binary = false) { const data = bytes(root, path); return data === undefined ? undefined : { data, ...(binary ? {} : { text: provenanceText(data) }), bytes: data.length, sha256: digest(data) }; },
 	json(root, path) { const data = bytes(root, path); return data === undefined ? undefined : JSON.parse(provenanceText(data)); },
-	stat(root, path) { try { return lstatSync(checkedPath(root, path)); } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined; throw error; } },
 	path: checkedPath,
 };
 export function runtimeBaseline(reader: ProvenanceReader = defaultProvenanceReader) {
@@ -315,7 +314,7 @@ export function validateOperationEnvelope(value: unknown, root: string, pathChec
   if (paths.has(action.path) || legacy && !modeValid(action.mode) || typeof action.output !== "string" || Buffer.from(action.output, "base64").toString("base64") !== action.output || !["runtime", "agent", "skill", "template", "identity", "workspace", "task", "root", "manifest"].includes(action.kind)) throw Error("Invalid initialization action envelope");
   fingerprintValid(action.original);
   const guard = p.guards[action.path];
-  if (!Object.hasOwn(p.guards, action.path) || (action.original === null ? guard !== null : !object(guard) || action.original.sha256 !== guard.sha256 || legacy && action.original.mode !== guard.mode)) throw Error("Invalid initialization action guard");
+  if (!Object.hasOwn(p.guards, action.path) || (action.original === null ? guard !== null : !object(guard) || action.original.sha256 !== guard.sha256)) throw Error("Invalid initialization action guard");
   paths.add(action.path);
  }
  for (const [path, fingerprint] of Object.entries(p.guards)) { pathCheck(path); fingerprintValid(fingerprint); }

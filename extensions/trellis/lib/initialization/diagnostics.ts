@@ -58,7 +58,8 @@ function safePath(path: unknown): asserts path is string {
 	if (typeof path !== "string" || path.length > 8192 || !path || isAbsolute(path) || /[\\\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/u.test(path) || path.split("/").some(p => !p || p === "." || p === "..")) throw Error("Invalid bounded resource path");
 }
 const clean = (value: string, limit = 500) => value.replace(/[\p{C}\p{Zl}\p{Zp}]/gu, " ").slice(0, limit);
-const identity = (s: Stats) => [s.dev, s.ino, s.mode, s.size, s.mtimeMs, s.ctimeMs].join(":");
+// chmod/atime/ctime are not content drift; keep descriptor, type and write-time fences.
+const identity = (s: Stats) => [s.dev, s.ino, s.isFile(), s.size, s.mtimeMs].join(":");
 class Cancelled extends Error {}
 /** S1 has byte budgets/cooperative checkpoints, NOT a hard wall-clock deadline. S2 owns the terminable worker. */
 export class DiagnosticReader {

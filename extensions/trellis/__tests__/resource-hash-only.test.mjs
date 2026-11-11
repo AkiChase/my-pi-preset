@@ -178,6 +178,17 @@ test('adoption preserves chmod-only exact skills and root bytes without inheriti
  assert.equal(lstatSync(join(root,entry)).ino,inode);assert.equal(lstatSync(join(root,entry)).mode&0o777,0o755);assert.equal(lstatSync(join(root,'AGENTS.md')).mode&0o777,0o644);noMode(json(root,MANIFEST));assert.equal(Object.keys(json(root,MANIFEST).skills).length,Object.keys(m.skills).length);
 });
 
+test('legacy completed action guards ignore permission differences after original plan hash verification',t=>{
+ const root=copyRuntimeFixture(t),legacy=legacyOperation(json(root,OPERATION));
+ const action=legacy.plan.actions.find(row=>row.kind==='root'),sha256=digest('historical root bytes');
+ assert.ok(action);action.original={sha256,mode:0o644};legacy.plan.guards[action.path]={sha256,mode:0o664};
+ const {planHash,...body}=legacy.plan;legacy.plan.planHash=digest(JSON.stringify(body));put(root,OPERATION,legacy);
+ assert.ok(verifyRuntime(root));assert.equal(item(collectDiagnostics({cwd:root}),'operation').status,'pass');
+ legacy.plan.guards[action.path].sha256=digest('different bytes');
+ const {planHash:previous,...changed}=legacy.plan;legacy.plan.planHash=digest(JSON.stringify(changed));put(root,OPERATION,legacy);
+ assert.throws(()=>verifyRuntime(root),/action guard/);
+});
+
 test('pure chmod deployment passes static/worker/bootstrap/recheck diagnostics with no writes',async t=>{
  const root=copyRuntimeFixture(t),m=json(root,MANIFEST);
  for(const path of Object.keys({...m.files,...m.templates,...m.skills}))chmodSync(join(root,path),0o664);

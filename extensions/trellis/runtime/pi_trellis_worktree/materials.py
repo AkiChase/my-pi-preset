@@ -73,8 +73,9 @@ def safe_path(root, task, path):
 
 
 def file_identity(value):
-    # Reads may update atime; it is not source drift.
-    return (value.st_dev, value.st_ino, value.st_mode, value.st_size, value.st_mtime_ns, value.st_ctime_ns)
+    # Permission/atime/ctime changes are not content drift. Keep type, inode,
+    # size and write-time fences, including directory membership changes.
+    return (value.st_dev, value.st_ino, stat.S_IFMT(value.st_mode), value.st_size, value.st_mtime_ns)
 
 
 def read_material(root, task, label, limit=MAX_MATERIAL, retain=False):

@@ -97,6 +97,109 @@ class NativeContracts(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "path/control bounds"):
             safe_path(self.root, self.task, "x" * 4097)
 
+    def test_permission_changes_during_open_and_read_are_not_material_drift(self):
+        label = self.task + "/prd.md"
+        path = self.root / label
+        original_open, original_fdopen = os.open, os.fdopen
+        for phase in ("open", "read"):
+            with self.subTest(phase=phase):
+                path.chmod(0o644)
+                changed = False
+
+                def opened(file, *args, **kwargs):
+                    nonlocal changed
+                    fd = original_open(file, *args, **kwargs)
+                    if file == path and phase == "open":
+                        changed = True
+                        path.chmod(0o664)
+                    return fd
+
+                class PermissionStream:
+                    def __init__(self, stream):
+                        self.stream = stream
+                    def __enter__(self):
+                        return self
+                    def __exit__(self, *args):
+                        self.stream.close()
+                    def fileno(self):
+                        return self.stream.fileno()
+                    def read(self, size):
+                        nonlocal changed
+                        data = self.stream.read(size)
+                        if data and not changed and phase == "read":
+                            changed = True
+                            path.chmod(0o664)
+                        return data
+
+                def stream(fd, *args, **kwargs):
+                    return PermissionStream(original_fdopen(fd, *args, **kwargs))
+
+                with patch.object(os, "open", opened), patch.object(os, "fdopen", stream):
+                    metadata, data = read_material(self.root, self.task, label, retain=True)
+                self.assertTrue(changed)
+                self.assertEqual(data, b"requirements")
+                import hashlib
+                self.assertEqual(metadata["sha256"], hashlib.sha256(data).hexdigest())
+                self.assertNotIn("mode", metadata)
+
+    def test_graph_directory_chmod_does_not_change_content_fingerprint(self):
+        from pi_trellis_worktree import materials
+        folder = self.task + "/research"
+        late = folder + "/late.md"
+        self.put(late, "late")
+        self.put(self.task + "/implement.jsonl", json.dumps({"file": folder, "type": "directory"}))
+        original = source_materials(self.root, self.task, "implement")["sourceFingerprint"]
+        read = materials.read_material
+        changed = False
+
+        def raced(root, task, label, *args, **kwargs):
+            nonlocal changed
+            value = read(root, task, label, *args, **kwargs)
+            if label == late and not changed:
+                changed = True
+                (self.root / folder).chmod(0o700)
+                (self.root / late).chmod(0o664)
+            return value
+
+        with patch.object(materials, "read_material", raced):
+            current = source_materials(self.root, self.task, "implement")["sourceFingerprint"]
+        self.assertTrue(changed)
+        self.assertEqual(current, original)
+
+    def test_same_size_content_write_during_read_still_fails(self):
+        label = self.task + "/prd.md"
+        path = self.root / label
+        before = path.stat()
+        original_fdopen = os.fdopen
+        changed = False
+
+        class WritingStream:
+            def __init__(self, stream):
+                self.stream = stream
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                self.stream.close()
+            def fileno(self):
+                return self.stream.fileno()
+            def read(self, size):
+                nonlocal changed
+                data = self.stream.read(size)
+                if data and not changed:
+                    changed = True
+                    path.write_bytes(b"new contents")
+                    os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns + 1_000_000_000))
+                return data
+
+        def opened(fd, *args, **kwargs):
+            return WritingStream(original_fdopen(fd, *args, **kwargs))
+
+        with patch.object(os, "fdopen", opened), self.assertRaises(DiagnosticError) as caught:
+            read_material(self.root, self.task, label)
+        self.assertTrue(changed)
+        self.assertEqual(caught.exception.issue["code"], "material_changed")
+        self.assertEqual(path.read_bytes(), b"new contents")
+
     def test_read_fence_detects_concurrent_replacement_not_access_time(self):
         label = self.task + "/prd.md"
         original_fdopen = os.fdopen

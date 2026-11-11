@@ -6,7 +6,6 @@ export interface ProvenanceReader {
 	/** `binary` skips text validation (skill assets only); size/hash remain checked. */
 	file(root: string, path: string, limit?: number, inventory?: boolean, binary?: boolean): (Fingerprint & { data: Buffer; bytes: number; text?: string }) | undefined;
 	json(root: string, path: string, limit?: number): unknown;
-	stat(root: string, path: string): object | undefined;
 	path(root: string, path: string): string;
 }
 export function provenanceText(data: Buffer): string {

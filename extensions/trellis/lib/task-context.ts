@@ -37,7 +37,8 @@ export function resolveTaskPath(sourceRoot: string, taskDir: string): string {
 export function readTaskRecord(sourceRoot: string, taskDir: string): Record<string, unknown> {
 	const task = resolveTaskPath(sourceRoot, taskDir), path = join(task, "task.json"), info = lstatSync(path);
 	if (!info.isFile() || info.size > 1024 * 1024) throw new Error("task.json must be a regular file under 1 MiB");
-	const identity = (s: Stats) => [s.dev, s.ino, s.mode, s.size, s.mtimeMs, s.ctimeMs].join(":");
+	// Permissions and ctime can change without a content write; they are not read authority.
+	const identity = (s: Stats) => [s.dev, s.ino, s.isFile(), s.size, s.mtimeMs].join(":");
 	const fd = openSync(path, constants.O_RDONLY | constants.O_NONBLOCK | constants.O_NOFOLLOW);
 	let bytes: Buffer;
 	try {
