@@ -64,7 +64,9 @@ git diff --check
 
 阶段 1 已提交：`95f93f6`（`fix(trellis): use content-only resource fingerprints`）。后续原始输出曾使用主会话自建 `/tmp/trellis-hash-main.yQeRM8/`，最终已清理。
 
-## 阶段 2 实施与验证进度
+## 阶段 2 实施与验证记录
+
+阶段 2 已提交：`1685395`（`fix(trellis): ignore permission drift during bounded reads`）。两阶段产品提交均已核验；最终任务保持 in_progress 待用户验收，不进行 push、安装、部署、archive 或 journal。
 
 主会话直接修改三处 bounded-read identity：不再比较 mode/ctime，保留 dev/ino、文件类型、size、mtime 读取期间变化检测；Python 目录 guard 继续检测目录成员变化，源 graph 二次读取仍比较内容 hash。没有添加第二套权限恢复或迁移机制。
 
