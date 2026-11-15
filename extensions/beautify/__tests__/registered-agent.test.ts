@@ -107,6 +107,7 @@ test("actual registered Agent launch/manage renders config, lifecycle outcomes a
     const launchComponent = display("subagent_run", launchArgs, launched as Awaited<ReturnType<typeof execute>>);
     const launchCard = plain(launchComponent.render(160).join("\n"));
     assert.match(launchCard, /Completed/);
+    assert.doesNotMatch(launchCard, /manually backgrounded|↻/, "an explicit background launch keeps its original card");
     assert.equal((launchCard.match(/subagent_run/g) ?? []).length, 1, "public factory must not leave a second legacy title");
     launchComponent.setExpanded(true);
     assert.match(plain(launchComponent.render(160).join("\n")), /pending session confirmation/);
@@ -183,6 +184,19 @@ test("actual registered Agent launch/manage renders config, lifecycle outcomes a
     assert.match(plain(foregroundComponent.render(160).join("\n")), /Actual foreground final/);
     const foregroundIdentity = (foregroundFinal.details as { runtimeLaunch: { agent_id: string } }).runtimeLaunch.agent_id;
     display("agent_manage", complete({ action: "status", agent_id: foregroundIdentity }), await execute({ action: "status", agent_id: foregroundIdentity }));
+    const detachRun = tools.get("subagent_run")!.execute("manual-detach", foregroundArgs, undefined, undefined, ctx);
+    await tick();
+    coordinator.detachAll();
+    const detachedResult = await detachRun as Awaited<ReturnType<typeof execute>>;
+    const detachedComponent = display("subagent_run", foregroundArgs, detachedResult);
+    detachedComponent.setExpanded(false);
+    const detachedCard = plain(detachedComponent.render(160).join("\n"));
+    assert.match(detachedCard, /Completed/, "the call marker still reports the returned tool call");
+    assert.match(detachedCard, /↻1/, "progress observed at detach stays visible");
+    assert.match(detachedCard, /Target: manually backgrounded by user \(ID: /);
+    detachedComponent.setExpanded(true);
+    assert.match(plain(detachedComponent.render(160).join("\n")), /mode: requested foreground, effective background \(manual-detach\)/);
+    finish({ session, responseText: "detached final", aborted: false, steered: false }); await tick();
     const failedRun = tools.get("subagent_run")!.execute("failure", foregroundArgs, undefined, undefined, ctx);
     await tick();
     finish({ session, responseText: "partial before failure", aborted: false, steered: false, failure: "offline provider failure" });

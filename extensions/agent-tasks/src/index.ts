@@ -275,7 +275,8 @@ function renderSubagentResultBody(
     [supplied.cost, supplied.turnCount, supplied.maxTurns].some(value => value !== undefined && !nonnegative(value)) ||
     (supplied.spinnerFrame !== undefined && (!Number.isInteger(supplied.spinnerFrame) || supplied.spinnerFrame < 0 || supplied.spinnerFrame >= SPINNER.length)) ||
     (supplied.tags !== undefined && (!Array.isArray(supplied.tags) || supplied.tags.some(tag => typeof tag !== "string"))) ||
-    [supplied.modelName, supplied.activity, supplied.error].some(value => value !== undefined && typeof value !== "string")
+    [supplied.modelName, supplied.activity, supplied.error].some(value => value !== undefined && typeof value !== "string") ||
+    (supplied.detachReason !== undefined && supplied.detachReason !== "manual" && supplied.detachReason !== "timeout")
   )) return component(width => {
     const rows = wrap(resultText, width).map(row => theme.fg(renderContext.isError ? "error" : "toolOutput", row));
     return renderContext.expanded ? rows : compactRows(rows, width);
@@ -320,7 +321,11 @@ function renderSubagentResultBody(
       const frame = SPINNER[details.spinnerFrame ?? 0];
       return renderRunningAgentStatus(frame, stats(details), details.activity ?? "thinking…", theme);
     }
-    if (details.status === "background") return new Text(theme.fg("dim", `  ⎿  Target: running in background (ID: ${details.agentId})`), 0, 0);
+    if (details.status === "background") {
+      const s = details.detachReason ? stats(details) : "";
+      const target = details.detachReason === "manual" ? "manually backgrounded by user" : "running in background";
+      return new Text((s ? s + "\n" : "") + theme.fg("dim", `  ⎿  Target: ${target} (ID: ${details.agentId})`), 0, 0);
+    }
     if (details.status === "completed" || details.status === "steered") {
       const isSteered = details.status === "steered";
       const icon = isSteered ? theme.fg("warning", "✓") : theme.fg("success", "✓");
@@ -1707,8 +1712,10 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
         takeHeldForCall(toolCallId, run.identity);
         assertActive();
         if (outcome.kind === "detached") {
-          return textResult(`Agent resumed in background.\nAgent ID: ${id}\nThe same session continues; you will be notified when it completes.`,
-            { ...detailBaseFor(existing), status: "background" as const, agentId: id, toolUses: existing.toolUses, tokens: "", durationMs: 0 });
+          const manual = outcome.reason === "manual";
+          return textResult(`${manual ? "Agent resume was manually backgrounded by user." : "Agent resumed in background."}\nAgent ID: ${id}\nThe same session continues; you will be notified when it completes.`,
+            { ...detailBaseFor(existing), status: "background" as const, agentId: id, toolUses: state.toolUses, tokens: formatLifetimeTokens(existing),
+              cost: getLifetimeCost(existing.lifetimeUsage), turnCount: state.turnCount, maxTurns: state.maxTurns, durationMs: 0, detachReason: outcome.reason });
         }
         if (outcome.kind !== "completed") return errorResult(`Agent ${id} interrupted.`, buildDetails(detailBaseFor(existing), existing));
         const record = outcome.value;
@@ -1931,9 +1938,14 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
         takeHeldForCall(toolCallId, run.identity);
         assertActive();
         if (outcome.kind === "detached") {
-          return textResult(`${fallbackNote}Agent continuing in background.\nAgent ID: ${fgId}\n` +
+          const manual = outcome.reason === "manual";
+          return textResult(`${fallbackNote}${manual ? "Agent was manually backgrounded by user." : "Agent continuing in background."}\nAgent ID: ${fgId}\n` +
             (live.outputFile ? `Output file: ${live.outputFile}\n` : "") + "The same execution continues; you will be notified when it completes.",
-            { ...detailBaseFor(live), toolUses: live.toolUses, tokens: "", durationMs: 0, status: "background" as const, agentId: fgId });
+            // Progress observed at the moment of detach: the card keeps the
+            // counters the user saw instead of dropping to an empty stat row.
+            { ...detailBaseFor(live), toolUses: fgState.toolUses, tokens: formatLifetimeTokens(live), cost: getLifetimeCost(live.lifetimeUsage),
+              turnCount: fgState.turnCount, maxTurns: fgState.maxTurns, durationMs: Date.now() - startedAt,
+              status: "background" as const, agentId: fgId, detachReason: outcome.reason });
         }
         if (outcome.kind !== "completed") return errorResult(`Agent ${fgId} interrupted.`, buildDetails(detailBaseFor(live), live));
         record = outcome.value;

@@ -14,6 +14,8 @@ export interface AgentDetails {
   activity?: string; spinnerFrame?: number; modelName?: string; tags?: string[]; turnCount?: number; maxTurns?: number;
   executionConfig?: import("../../runtime-tasks/execution-config.ts").AgentExecutionConfig;
   cost?: number; agentId?: string; error?: string;
+  /** Present only when a foreground launch was detached; renders the detach provenance. */
+  detachReason?: "manual" | "timeout";
 }
 export function fgPreservingNestedStyles(theme: Theme, color: string, text: string): string {
   const styleStart = theme.fg(color, "").replace(/\u001b\[(?:0|39)m/g, "");

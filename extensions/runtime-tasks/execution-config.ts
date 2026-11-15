@@ -6,7 +6,7 @@ export interface AgentExecutionDifference {
   readonly field: AgentConfigField;
   readonly requested: ExecutionConfigValue;
   readonly actual: ExecutionConfigValue;
-  readonly reason?: "agent-configuration" | "session-adjustment" | "worktree-disabled";
+  readonly reason?: "agent-configuration" | "session-adjustment" | "worktree-disabled" | "manual-detach";
 }
 export interface AgentExecutionConfig {
   readonly kind: "agent";
@@ -42,7 +42,7 @@ export function isAgentExecutionConfig(value: unknown): value is AgentExecutionC
         !AGENT_CONFIG_FIELDS.includes(d.field as AgentConfigField) || seen.has(String(d.field))) return false;
       const field = d.field as AgentConfigField;
       if (!fieldValue(field, d.requested) || !fieldValue(field, d.actual) || d.requested === d.actual || d.actual !== value[field]) return false;
-      if (d.reason !== undefined && (typeof d.reason !== "string" || !["agent-configuration", "session-adjustment", "worktree-disabled"].includes(d.reason))) return false;
+      if (d.reason !== undefined && (typeof d.reason !== "string" || !["agent-configuration", "session-adjustment", "worktree-disabled", "manual-detach"].includes(d.reason))) return false;
       seen.add(field);
     }
   }

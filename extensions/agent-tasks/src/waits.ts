@@ -12,8 +12,8 @@ export function registerAgentWait(
 ): WaitLease<AgentRecord> {
   const lease = coordinator.registerWait<AgentRecord>({
     identity: run.identity, label: `Agent ${run.identity.taskId}`, kind, signal,
-    onDetach: () => {
-      if (!manager.detachRun(run.identity)) throw new Error("Agent launch lost its execution ownership");
+    onDetach: (reason) => {
+      if (!manager.detachRun(run.identity, reason)) throw new Error("Agent launch lost its execution ownership");
     },
     onInterrupt: () => { manager.stopRun(run.identity); },
     onDispose: kind === "launch" ? () => { manager.stopRun(run.identity); } : undefined,

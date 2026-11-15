@@ -23,7 +23,7 @@ import { createAgentManagement } from "./management.ts";
 import { createAgentTaskSource } from "./source.ts";
 import { getAgentConversation } from "./agent-runner.ts";
 import { allocatePersistentAgent, loadSubagentRegistry, markRunningAgentsInterrupted, registryLocatorForRootSession, updatePersistentAgent, type PersistentAgentEntry, type RootRegistryLocator } from "./subagent-registry.ts";
-import type { TaskIdentity, ToolCallState } from "../../task-ui/types.ts";
+import type { DetachReason, TaskIdentity, ToolCallState } from "../../task-ui/types.ts";
 import { existsSync, statSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import type { Model } from "@earendil-works/pi-ai";
@@ -562,7 +562,7 @@ export class AgentManager {
     if (run.pool === "background") this.runningBackground--;
     else if (run.pool === "foreground") this.runningForeground--;
   }
-  detachRun(identity: TaskIdentity): boolean {
+  detachRun(identity: TaskIdentity, reason?: DetachReason): boolean {
     const record = this.agents.get(identity.taskId);
     const run = this.runs.get(identity.taskId);
     if (!record || !run || identity.sourceId !== "agent" || run.identity.runId !== identity.runId) return false;
@@ -570,7 +570,16 @@ export class AgentManager {
     record.blocking = false;
     record.isBackground = true;
     if (record.invocation) record.invocation.runInBackground = true;
-    if (record.executionConfig) record.executionConfig = copyAgentExecutionConfig({ ...record.executionConfig, mode: "background", differences: record.executionConfig.differences?.filter(d => d.field !== "mode") });
+    if (record.executionConfig) {
+      // A user's manual detach is provenance the model must see; otherwise the
+      // effective `mode=background` reads as if configuration had chosen it.
+      const previousMode = record.executionConfig.mode;
+      const retained = record.executionConfig.differences?.filter(d => d.field !== "mode") ?? [];
+      const differences = reason === "manual" && previousMode !== undefined && previousMode !== "background"
+        ? [...retained, { field: "mode" as const, requested: previousMode, actual: "background", reason: "manual-detach" as const }]
+        : retained;
+      record.executionConfig = copyAgentExecutionConfig({ ...record.executionConfig, mode: "background", differences: differences.length ? differences : undefined });
+    }
     if (isTopLevelAgent(record)) {
       if (run.charged && run.pool !== "background") {
         if (run.pool === "foreground") this.runningForeground--;

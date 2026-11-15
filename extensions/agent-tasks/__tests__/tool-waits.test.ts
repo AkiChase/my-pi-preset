@@ -435,6 +435,42 @@ void it("actual background resume filesystem initialization failure cannot start
   } finally { await f.close(); }
 });
 
+void it("manual foreground detach is model-visible in text, execution config and later management results", async () => {
+  const f = await factory();
+  try {
+    const tool = f.start(false); await tick();
+    const id = f.calls[0]!.options.agentId!;
+    for (const name of ["read", "bash"]) {
+      f.calls[0]!.options.onToolActivity?.({ type: "start", toolName: name, toolCallId: `${name}-call` });
+      f.calls[0]!.options.onToolActivity?.({ type: "end", toolName: name, toolCallId: `${name}-call` });
+    }
+    f.calls[0]!.options.onTurnEnd?.(2);
+    f.coordinator.detachAll();
+    const detached = await tool;
+    const body = text(detached);
+    assert.match(body, /Agent was manually backgrounded by user\./);
+    assert.doesNotMatch(body, /Agent continuing in background/);
+    assert.match(body, /mode=background\. Differences: mode requested "foreground", effective "background" \(manual-detach\)\./);
+    const details = detached.details as import("../src/activity.ts").AgentDetails;
+    assert.equal(details.status, "background"); assert.equal(details.detachReason, "manual");
+    assert.equal(details.toolUses, 2, "detach keeps the progress observed by the foreground card");
+    assert.equal(details.turnCount, 2);
+    assert.deepEqual(f.registry.getRecord(id)?.executionConfig?.differences, [{ field: "mode", requested: "foreground", actual: "background", reason: "manual-detach" }]);
+    const status = await f.execute("agent_manage", { action: "status", agent_id: id });
+    assert.match(text(status), /\(manual-detach\)/);
+    f.calls[0]!.finish(); await tick();
+    const resume = f.start(false, { resume: id }); await tick();
+    f.resumes[0]!.options?.onToolActivity?.({ type: "start", toolName: "grep", toolCallId: "grep-call" });
+    f.resumes[0]!.options?.onToolActivity?.({ type: "end", toolName: "grep", toolCallId: "grep-call" });
+    f.coordinator.detachAll();
+    const resumed = await resume;
+    assert.match(text(resumed), /Agent resume was manually backgrounded by user\./);
+    assert.match(text(resumed), /\(manual-detach\)/);
+    assert.equal((resumed.details as import("../src/activity.ts").AgentDetails).toolUses, 1);
+    f.resumes[0]!.finish(); await tick();
+  } finally { await f.close(); }
+});
+
 void it("actual foreground detach notifications carry exact new/resume/mention call correlation and terminal per-run turn stats", async () => {
   const f = await factory({ defaultMaxTurns: 7 });
   try {
