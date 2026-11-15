@@ -397,3 +397,25 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 70: 手动转后台对 Agent 可见
+<!-- trellis-session: v=2 fp=f7838aec0a320a8b -->
+
+**Date**: 2026-11-15
+**Task**: 手动转后台对 Agent 可见
+**Branch**: `main`
+
+### Summary
+
+subagent_run 手动转后台（含前台 resume）在文本中注明用户操作，执行配置记录 mode difference（manual-detach），卡片保留转后台时进度并显示 manually backgrounded by user；四类等待手动释放文本/卡片标注 released by user（wait_outcome 不变）；bash 手动转后台卡片显示 manually backgrounded。pnpm check 1876/1876 通过。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cdae113` | feat(runtime-tasks,beautify): mark user-released waits and manual bash detach |
+
+### Status
+
+[OK] **Completed**
