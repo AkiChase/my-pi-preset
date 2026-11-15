@@ -12,11 +12,24 @@ Import `Type`, `Static` and `TSchema` from host-provided `typebox`; keep `String
 
 Keep schema JSON unchanged when changing its builder import. A validated tool boundary may accept `unknown` but must parse before capability effects; an SDK `StringEnum`/TypeBox inference mismatch is not permission to bypass validation.
 
+Model tool schemas never use the JSON `null` type, including nested objects, numbers and booleans. Some providers encode a model's `null` as the string `"null"`, which passes a string branch as a real value. Every field stays required with `additionalProperties: false`; controls use two string sentinels from `extensions/shared/tool-arguments.ts`:
+
+| Sentinel | Meaning | Builders |
+| --- | --- | --- |
+| `"null"` | Not applicable, nothing selected, unset | `sentinelString`, `nullableEnum`, `integerString(["null"])`, `nullableObject` |
+| `"default"` | Use the configured or built-in default | `defaultableEnum`, `integerString(["default"])`, `sentinelString` with a defaultable spec |
+
+Do not introduce per-field sentinels (`"none"`, `"all"`, `"tail"`, `"new"`) or use `""` as a sentinel. Former boolean controls are semantic enums whose field name is a dimension noun (`execution: foreground|background`), not a yes/no name with non-boolean values. Optional integers are decimal strings parsed with their original bounds; optional arrays use `[]`.
+
+`parseControls()` separates sentinels from real values; each tool then applies branch rules: a field that does not apply to the current mode/action accepts only `"null"` (`rejectInapplicable`); a defaultable field that applies treats `"null"` and `"default"` alike; a required field rejects sentinels as missing (`requireValue`). Sentinels mean something only on declared control fields; elsewhere `"null"` is literal text. pi coerces JSON `null` to `"null"` before validation; direct parser calls with JSON `null` reject with a field-specific hint.
+
+The convention covers model tool entry points only. Agent frontmatter, workflow `agent()` options, RPC and manager options and persisted configuration keep their own names; tool parsers map new fields to those contracts.
+
 `preserveHandoff` temporarily suppresses only redundant writes equal to the live editor's displayed `getText()` or optional `getExpandedText()` during synchronous same-instance handoff. Distinct text forwards, and descriptor restoration returns normal `setText` behavior.
 
 ## 4. Validation / Failure Matrix
 
-Required missing/undefined properties without defaults reject, including required-nullable controls; nullable means explicit `null` is allowed, not that omission supplies it. Caller envelopes remain unchanged and refusals have zero origin/job effects.
+Required missing/undefined properties without defaults reject, including sentinel controls; a sentinel must be written explicitly, omission never supplies it. JSON `null`, `""` in a control, `"default"` in a nullable-only enum or integer field and any non-`"null"` value in an inapplicable field reject with the field name and the expected sentinel. Caller envelopes remain unchanged and refusals have zero origin/job effects.
 
 SDK1.5.1 failed persistent appends roll back entries/index/leaf. Preserve conservative unconfirmed handling for a non-atomic tolerated host rather than assuming every host rolls back.
 
