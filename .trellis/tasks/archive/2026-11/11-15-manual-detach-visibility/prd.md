@@ -35,13 +35,13 @@
 
 ## Acceptance Criteria
 
-- [ ] 前台 `subagent_run` 被 `detachAll()` 释放后，结果文本包含 `manually backgrounded by user`，执行配置摘要带 `mode requested "foreground", effective "background" (manual-detach)`；之后 `agent_manage status` 结果同样带该 difference；`isAgentExecutionConfig` 接受 `manual-detach`。
-- [ ] 该结果的卡片：标记 `Completed`，有 `↻N · N tool uses` 统计（与转后台前一致），正文 `Target: manually backgrounded by user (ID: …)`，展开后 Differences 显示 mode 差异。
-- [ ] bash 手动转后台卡片显示 `manually backgrounded · ID: …`；超时转后台仍为 `background ID: …`；模型文本不变。
-- [ ] 四类等待被手动释放时文本含 `released by user`，卡片显示 `wait released by user · target unchanged`；`wait_outcome` 仍为 `released`；取消路径不变。
-- [ ] 后台启动（`execution: "background"`）卡片与文本不变。
-- [ ] `pnpm check`（隔离 `PI_CODING_AGENT_DIR`）通过；新增/更新测试覆盖 R1–R4。
-- [ ] 若 `docs/extensions/task-composition.md` 相关描述受影响，同步更新中文文档。
+- [x] 前台 `subagent_run` 被 `detachAll()` 释放后，结果文本包含 `manually backgrounded by user`，执行配置摘要带 `mode requested "foreground", effective "background" (manual-detach)`；之后 `agent_manage status` 结果同样带该 difference；`isAgentExecutionConfig` 接受 `manual-detach`。
+- [x] 该结果的卡片：标记 `Completed`，有 `↻N · N tool uses` 统计（与转后台前一致），正文 `Target: manually backgrounded by user (ID: …)`，展开后 Differences 显示 mode 差异。
+- [x] bash 手动转后台卡片显示 `manually backgrounded · ID: …`；超时转后台仍为 `background ID: …`；模型文本不变。
+- [x] 四类等待被手动释放时文本含 `released by user`，卡片显示 `wait released by user · target unchanged`；`wait_outcome` 仍为 `released`；取消路径不变。
+- [x] 后台启动（`execution: "background"`）卡片与文本不变。
+- [x] `pnpm check`（隔离 `PI_CODING_AGENT_DIR`）通过；新增/更新测试覆盖 R1–R4。
+- [x] 若 `docs/extensions/task-composition.md` 相关描述受影响，同步更新中文文档。
 
 ## Out of Scope
 

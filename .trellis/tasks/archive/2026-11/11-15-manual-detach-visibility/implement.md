@@ -4,18 +4,18 @@
 
 ## Stage 1 — subagent_run 手动转后台（R1、R2、R4 子 Agent 卡片）
 
-- [ ] `runtime-tasks/execution-config.ts` 新增 `manual-detach` reason
-- [ ] `agent-tasks/src/waits.ts`、`agent-manager.ts detachRun` 传递并记录 reason
-- [ ] `agent-tasks/src/index.ts` detached 分支文本与 details；卡片 background 分支
-- [ ] 测试：`extensions/agent-tasks/__tests__/backend-waits.test.ts`（或相邻文件）断言文本与 difference；`extensions/beautify/__tests__/registered-agent.test.ts` 增加前台 → `detachAll()` 的卡片断言（统计行、manual 正文、展开 Differences），后台启动卡片不变
+- [x] `runtime-tasks/execution-config.ts` 新增 `manual-detach` reason
+- [x] `agent-tasks/src/waits.ts`、`agent-manager.ts detachRun` 传递并记录 reason
+- [x] `agent-tasks/src/index.ts` detached 分支文本与 details；卡片 background 分支
+- [x] 测试：`extensions/agent-tasks/__tests__/backend-waits.test.ts`（或相邻文件）断言文本与 difference；`extensions/beautify/__tests__/registered-agent.test.ts` 增加前台 → `detachAll()` 的卡片断言（统计行、manual 正文、展开 Differences），后台启动卡片不变
 - 验证：`node --test extensions/agent-tasks/__tests__/*.test.ts extensions/beautify/__tests__/registered-agent.test.ts`，`pnpm typecheck`
 - 提交：`feat(agent-tasks): surface manual detach of foreground agents`
 
 ## Stage 2 — 等待释放与 bash 卡片（R3、R4 其余）
 
-- [ ] released 文本：`agent-tasks/src/management.ts`、`agent-tasks/src/workflow/management.ts`、`agent-tasks/src/index.ts`（subagent_message）、`process-tasks/management.ts`
-- [ ] beautify：`tools/management.ts`、`tools/task-manage.ts`、`tools/bash.ts`
-- [ ] 更新受影响断言：`beautify/__tests__/registered-agent.test.ts`、`beautify/__tests__/retrieval.test.ts`、`beautify/__tests__/shell-collapse.test.ts`、`process-tasks/__tests__/waits.test.ts`、`task-ui/__tests__/mixed-waits.test.ts`、`agent-tasks/__tests__/parent-delivery.test.ts` 等（以实际失败为准）
+- [x] released 文本：`agent-tasks/src/management.ts`、`agent-tasks/src/workflow/management.ts`、`agent-tasks/src/index.ts`（subagent_message）、`process-tasks/management.ts`
+- [x] beautify：`tools/management.ts`、`tools/task-manage.ts`、`tools/bash.ts`
+- [x] 更新受影响断言：`beautify/__tests__/registered-agent.test.ts`、`beautify/__tests__/retrieval.test.ts`、`beautify/__tests__/shell-collapse.test.ts`、`process-tasks/__tests__/waits.test.ts`、`task-ui/__tests__/mixed-waits.test.ts`、`agent-tasks/__tests__/parent-delivery.test.ts` 等（以实际失败为准）
 - 验证：聚焦测试 + `pnpm typecheck`
 - 提交：`feat(runtime-tasks,beautify): mark user-released waits and manual bash detach`
 
