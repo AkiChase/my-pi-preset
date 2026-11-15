@@ -96,9 +96,9 @@ Agent 行的 `↑/↓` 和详情的 `Last req` 显示该 Agent 自身最近一�
 | --- | --- |
 | list / stats | 可用 task_type 筛选 bash/monitor；分别查看任务或保留记录与累计统计 |
 | status / stop | task_id 必填；查看状态或请求停止 |
-| output | task_id 必填；offset/limit 指定日志字节页，默认尾页，offset:0 从头读 |
+| output | task_id 必填；offset/limit 指定日志字节页，默认尾页，offset "0" 从头读 |
 | wait | task_id 必填；等待整个任务结束，limit 可限定最后日志页 |
-| search | pattern 必填正则；可带 task_id/task_type、ignore_case、context |
+| search | pattern 必填正则；可带 task_id/task_type、case、context |
 
 参数只能用于对应动作。管理进程不需要 run_id，不接受 Agent 对话详情参数。日志失败明确报错，不会当作成功的空日志；搜索不消费结果。
 

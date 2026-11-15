@@ -29,7 +29,7 @@ function harness(activeTask = async () => undefined) {
 const hostValidate = (tool, arguments_) => validateToolArguments(tool, {
   id: 'schema-call', name: tool.name, arguments: complete(arguments_),
 });
-const complete = input => input && typeof input === "object" && !Array.isArray(input) ? { action: null, agent: null, task: null, prompt: null, ...input } : input;
+const complete = input => input && typeof input === "object" && !Array.isArray(input) ? { action: 'dispatch', agent: 'null', task: 'default', prompt: 'null', ...input } : input;
 const validateDispatchParams = input => rawValidateDispatchParams(complete(input));
 const valid = { agent: 'trellis-implement', prompt: 'Work on the approved scope' };
 
@@ -50,6 +50,11 @@ const invalidCases = [
   [{ ...valid, agent: 'generic' }, /agent.*trellis-implement/],
   [{ ...valid, agent: 42 }, /agent/],
   [{ ...valid, agent: null }, /agent/],
+  [{ ...valid, agent: 'default' }, /agent/],
+  [{ ...valid, action: '' }, /action/],
+  [{ ...valid, action: 'null' }, /action/],
+  [{ ...valid, action: null }, /action/],
+  [{ ...valid, task: '' }, /task.*empty.*"default"/],
   [{ ...valid, agent: [] }, /agent/],
   [{ agent: 'trellis-check' }, /prompt/],
   [{ ...valid, prompt: '' }, /prompt/],
@@ -64,11 +69,12 @@ const invalidCases = [
   [{ ...valid, task: 'task\x7f' }, /task/],
   [{ ...valid, task: 42 }, /task/],
   [{ ...valid, task: {} }, /task/],
-  [{ action: 'stop', agent: 'trellis-check' }, /agent.*dispatch-only/],
-  [{ action: 'stop', agent: '' }, /agent.*dispatch-only/],
+  [{ action: 'stop', agent: 'trellis-check' }, /agent.*does not apply to stop/],
+  [{ action: 'stop', agent: '' }, /agent/],
   [{ action: 'stop', agent: undefined }, /agent.*must be provided/],
-  [{ action: 'stop', prompt: 'ignored' }, /prompt.*dispatch-only/],
-  [{ action: 'stop', prompt: '' }, /prompt.*dispatch-only/],
+  [{ action: 'stop', prompt: 'ignored' }, /prompt.*does not apply to stop/],
+  [{ action: 'stop', prompt: '' }, /prompt/],
+  [{ action: 'stop', prompt: 'default' }, /prompt.*does not apply to stop/],
   [{ action: 'stop', prompt: undefined }, /prompt.*must be provided/],
   [{ action: 'stop', task: ' ' }, /task/],
   [{ action: 'stop', task: false }, /task/],
@@ -82,8 +88,9 @@ test('dispatch schema is a plain closed object accepted by real host strict conv
   assert.equal(schema.additionalProperties, false);
   assert.deepEqual(Object.keys(schema.properties).sort(), ['action', 'agent', 'prompt', 'task']);
   for (const key of ['anyOf', 'oneOf', 'if']) assert.equal(Object.hasOwn(schema, key), false);
-  assert.deepEqual(schema.properties.action.anyOf[1].enum, ['dispatch', 'stop', '']);
-  assert.deepEqual(schema.properties.agent.anyOf[1].enum, ['trellis-implement', 'trellis-check', 'trellis-research', '']);
+  assert.doesNotMatch(JSON.stringify(schema), /"type":"null"/);
+  assert.deepEqual(schema.properties.action.enum, ['dispatch', 'stop']);
+  assert.deepEqual(schema.properties.agent.enum, ['trellis-implement', 'trellis-check', 'trellis-research', 'null']);
   for (const property of Object.values(schema.properties)) assert.ok(property.description);
   const strict = makeStrictJsonSchema(schema);
   assert.equal(strict.additionalProperties, false);
@@ -91,34 +98,36 @@ test('dispatch schema is a plain closed object accepted by real host strict conv
   assert.deepEqual(schema.required, ['action', 'agent', 'task', 'prompt'], 'all exposed wire fields are required');
 });
 
-test('real host validation accepts legal legacy/stop shapes and rejects unknown fields/enums/types', () => {
+test('real host validation accepts dispatch/stop shapes and rejects unknown fields/enums/types', () => {
   const { tool } = harness();
-  for (const input of [valid, { ...valid, action: '' }, { ...valid, action: 'dispatch', task: '' }, { action: 'stop' }, { action: 'stop', task: '.trellis/tasks/test' }]) {
+  for (const input of [valid, { ...valid, task: 'null' }, { action: 'stop' }, { action: 'stop', task: '.trellis/tasks/test' }]) {
     assert.deepEqual(hostValidate(tool, input), complete(input));
   }
   for (const [input, pattern] of [
     [{ ...valid, promtp: 'work' }, /promtp/],
     [{ ...valid, action: 'launch' }, /action/],
+    [{ ...valid, action: '' }, /action/],
     [{ ...valid, agent: 'generic' }, /agent/],
     [{ ...valid, prompt: { text: 'work' } }, /prompt/],
     [{ ...valid, task: { path: 'test' } }, /task/],
   ]) assert.throws(() => hostValidate(tool, input), pattern);
-  // Host scalar coercion and optional null handling are not direct-helper semantics.
+  // Host scalar coercion is not direct-helper semantics; JSON null converges on the "null" sentinel.
   assert.equal(hostValidate(tool, { ...valid, prompt: 42 }).prompt, '42');
-  assert.deepEqual(hostValidate(tool, { action: 'stop', agent: null, prompt: null, task: null }), { action: 'stop', agent: null, prompt: null, task: null });
+  assert.deepEqual(hostValidate(tool, { action: 'stop', agent: null, prompt: null, task: null }), { action: 'stop', agent: 'null', prompt: 'null', task: 'null' });
+  assert.deepEqual(rawValidateDispatchParams(hostValidate(tool, { action: 'stop', agent: null, prompt: null, task: null })), { action: 'stop' });
 });
 
-test('pure dispatch validator normalizes only legacy action/task and preserves exact prose without mutation', () => {
+test('pure dispatch validator maps task sentinels and preserves exact prose without mutation', () => {
   for (const agent of ['trellis-implement', 'trellis-check', 'trellis-research']) {
-    for (const action of [null, '', 'dispatch']) {
-      const input = Object.freeze({ action, agent, prompt: ' First line\n\t第二行 ', task: '' });
+    for (const task of ['default', 'null']) {
+      const input = Object.freeze({ action: 'dispatch', agent, prompt: ' First line\n\t第二行 ', task });
       assert.deepEqual(validateDispatchParams(input), { action: 'dispatch', agent, prompt: input.prompt });
-      assert.equal(input.task, '');
-      assert.equal(input.action, action);
+      assert.equal(input.task, task);
     }
   }
   assert.deepEqual(validateDispatchParams({ ...valid, task: '.trellis/tasks/test' }), { action: 'dispatch', ...valid, task: '.trellis/tasks/test' });
-  assert.deepEqual(validateDispatchParams({ action: 'stop', task: '' }), { action: 'stop' });
+  // A sentinel in a required dispatch field is a missing value, never literal text.
+  assert.throws(() => validateDispatchParams({ ...valid, prompt: 'null' }), /prompt/);
   assert.deepEqual(validateDispatchParams({ action: 'stop' }), { action: 'stop' });
   assert.deepEqual(validateDispatchParams({ action: 'stop', task: '.trellis/tasks/test' }), { action: 'stop', task: '.trellis/tasks/test' });
 });
@@ -148,7 +157,7 @@ test('registered execute rejects bad direct/host inputs before cwd, query, files
     for (const [input, pattern] of invalidCases) {
       await assert.rejects(h.tool.execute('direct', complete(input), undefined, undefined, ctx), pattern);
     }
-    for (const input of [{ ...valid, prompt: '' }, { action: 'stop', agent: '' }, { action: 'stop', prompt: '' }]) {
+    for (const input of [{ ...valid, prompt: '' }, { action: 'stop', agent: 'trellis-check' }, { action: 'stop', prompt: '' }]) {
       await assert.rejects(h.tool.execute('host', hostValidate(h.tool, input), undefined, undefined, ctx), /agent|prompt/);
     }
     assert.equal(cwdReads, 0);
@@ -166,9 +175,9 @@ test('registered execute rejects bad direct/host inputs before cwd, query, files
   assert.deepEqual(fs.readdirSync(root), ['unchanged']);
 });
 
-test('required nullable wire fields survive host validation and missing fields fail before effects', async () => {
+test('required sentinel wire fields survive host validation and missing fields fail before effects', async () => {
   const { tool } = harness();
-  const input = Object.freeze(complete({ ...valid, action: null, task: null }));
+  const input = Object.freeze(complete({ ...valid, task: 'default' }));
   assert.deepEqual(hostValidate(tool, input), input);
   assert.deepEqual(rawValidateDispatchParams(input), { action: 'dispatch', ...valid });
   assert.deepEqual(rawValidateDispatchParams(complete({ action: 'stop' })), { action: 'stop' });
@@ -178,7 +187,7 @@ test('required nullable wire fields survive host validation and missing fields f
     assert.throws(() => rawValidateDispatchParams(missing), /must be provided/);
     await assert.rejects(tool.execute('missing', missing, undefined, undefined, { get cwd() { throw Error('must not query'); } }), /must be provided/);
   }
-  assert.equal(input.action, null);
+  assert.equal(input.task, 'default');
 });
 
 test('RPC timeout keeps execution uncertainty wording and removes its reply subscription', async () => {

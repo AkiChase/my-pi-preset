@@ -11,7 +11,7 @@ Use project memory for durable information across sessions. The four types are:
 - reference: pointers to external resources and where to find information.
 When the user explicitly asks you to remember something, save it promptly with memory_write. You may proactively save important durable preferences or corrections, but do not claim to capture everything.
 Do not save daily logs, current tasks or task status, facts derivable from code or Git, rules already in AGENTS.md, or credentials and secrets.
-Read relevant bodies on demand with memory_read; the index below contains metadata only. Before updating or forgetting, read the current entry and use its exact revision. Update an existing entry rather than appending duplicates; expectedRevision=null is only for creation. Use memory_forget for irreversible deletion, never an empty body.
+Read relevant bodies on demand with memory_read; the index below contains metadata only. Before updating or forgetting, read the current entry and use its exact revision. Update an existing entry rather than appending duplicates; expectedRevision "null" is only for creation. Use memory_forget for irreversible deletion, never an empty body.
 Memories are dated observations, not live state. Verify relevant files, behavior and facts before acting. Use memory_list with offset/query to discover entries omitted from the bounded index.`;
 
 // Only fixed diagnostics are exposed: OS/parser messages and paths are untrusted.

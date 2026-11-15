@@ -50,7 +50,7 @@ python3 .trellis/scripts/worktree.py status --task .trellis/tasks/<slug> --json
 
 ## 停止、恢复与清理
 
-starting/running/unknown 阻止同目录重复执行和管理写操作。`trellis_dispatch { "action": "stop", "task": "..." }` 仅请求停止，终态证据才释放占用。超时、关闭或不确定启动保留 unknown，需核查实际 provider/进程；不自动重试派发。
+starting/running/unknown 阻止同目录重复执行和管理写操作。`trellis_dispatch { "action": "stop", "agent": "null", "task": "...", "prompt": "null" }` 仅请求停止，终态证据才释放占用。超时、关闭或不确定启动保留 unknown，需核查实际 provider/进程；不自动重试派发。
 
 托管 `recover` 需证明 owner 已死，重置准备状态后再准备；不能修复任意身份、源引用或缺失运行时。共享源执行（未绑定任务的 `trellis_dispatch`）不适用此 recover。残留锁需人工检查，不猜 stale 删除。
 

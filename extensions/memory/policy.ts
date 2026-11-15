@@ -19,7 +19,7 @@ export function validName(name: unknown): asserts name is string {
     fail("name", "Invalid memory name: use a non-reserved lowercase ASCII slug of at most 80 characters.");
 }
 export function revision(value: unknown, nullable = false): void {
-  if (!(nullable && value === null) && (typeof value !== "string" || !/^[a-f0-9]{64}$/.test(value))) fail("revision", "An exact SHA256 expectedRevision is required; creation requires null.");
+  if (!(nullable && value === null) && (typeof value !== "string" || !/^[a-f0-9]{64}$/.test(value))) fail("revision", "An exact SHA256 expectedRevision is required; creation requires \"null\".");
 }
 const controls = /[\x00-\x1f\x7f-\x9f]/u;
 export function metadata(value: Metadata): void {

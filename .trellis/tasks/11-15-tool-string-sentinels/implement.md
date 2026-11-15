@@ -58,3 +58,6 @@ agent_dir="$(mktemp -d)"; PI_SDK_DIR="$sdk_dir" PI_CODING_AGENT_DIR="$agent_dir"
   - `subagent_workflow.args` 仍是任意 JSON 数据，不是控制字段；说明改为「无参数时用 `{}`」，避免模型写 null 后被部分渠道编码成字符串。
   - `process_manage.pattern` 只要求非空（不 trim），保持原有「空白正则合法」行为。
   - 测试 fixture（`completeToolCall`、`processInput`、`monitorInput`）把未给字段和 JSON null 填为 `"null"`、数字转为字符串，代表宿主强制转换后的模型调用；不做旧字段名映射。
+  - 提交 `019b59c`。聚焦套件（runtime/process/agent-tasks/beautify/task-ui/trellis）全部通过。
+- 阶段 4：`trellis_dispatch`（`action` 必填，去掉 `""`/null；`task` 用 `"default"`）、`memory_write`（`expectedRevision` 用 `"null"` 创建，直接调用传 JSON null 拒绝）、协议文档 stop 示例、用户文档字段名、删除 `nullableControl`/`parseControlArguments` 及其测试；新增 `extensions/__tests__/tool-schema-sentinels.test.ts`（加载全部入口 + 嵌套工具 + reply_to_parent + trellis_dispatch，断言无 JSON null）。
+  - `pnpm check`（隔离 `PI_CODING_AGENT_DIR`）：exit 0，1874/1874 通过。

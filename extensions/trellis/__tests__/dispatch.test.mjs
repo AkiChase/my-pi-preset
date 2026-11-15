@@ -132,7 +132,7 @@ function project(t,scope,root) {
  bus.on('subagents:rpc:ping',({requestId})=>bus.emit('subagents:rpc:ping:reply:'+requestId,{success:true,data:{version:3}}));
  let seq=0, spawnFailure;
  bus.on('subagents:rpc:spawn',params=>{replies.push(params);bus.emit('subagents:rpc:spawn:reply:'+params.requestId,spawnFailure ? {success:false,error:spawnFailure} : {success:true,data:{agent_id:'agent-'+(++seq)}});});
- const call=input=>tools.get('trellis_dispatch').execute('tool',{action:null,agent:null,task:null,prompt:null,...input},undefined,undefined,{cwd:root});
+ const call=input=>tools.get('trellis_dispatch').execute('tool',{action:'dispatch',agent:'null',task:'default',prompt:'null',...input},undefined,undefined,{cwd:root});
  const dispatch=(agent='trellis-implement')=>call({agent,prompt:'work'});
  return {root,task,put,run,dispatch,call,bus,replies,handlers,git,chdir,setActive:value=>{active=value;},failSpawn:error=>{spawnFailure=error;}};
 }
@@ -183,15 +183,15 @@ test('target pointer is not authoritative; incompatible custom role still reject
 });
 
 
-test('dispatch old call shape/optional empty task works; stop requires no agent/prompt and waits for terminal evidence',async t=>{
+test('dispatch with default task works; stop requires null agent/prompt and waits for terminal evidence',async t=>{
  const f=await stateFixture(t),c=f.prepared;
- const first=await f.call({action:'',task:'',agent:'trellis-implement',prompt:'old shape'});assert.equal(first.details.agentId,'agent-1');
+ const first=await f.call({action:'dispatch',task:'default',agent:'trellis-implement',prompt:'default task'});assert.equal(first.details.agentId,'agent-1');
  let stopped;
  f.bus.on('subagents:rpc:stop',params=>{stopped=params;f.bus.emit('subagents:rpc:stop:reply:'+params.requestId,{success:true});});
- for(const input of [{action:'stop',agent:'trellis-implement'},{action:'stop',prompt:'ignored prose'},{action:'stop',agent:''},{action:'stop',prompt:''},{action:'stop',task:'',agent:'',prompt:''}]){
-  stopped=undefined;await assert.rejects(f.call(input),/dispatch-only/);assert.equal(stopped,undefined);assert.equal(readExecution(c.binding).state,'running');
+ for(const input of [{action:'stop',agent:'trellis-implement'},{action:'stop',prompt:'ignored prose'},{action:'stop',agent:'default'},{action:'stop',prompt:'default'},{action:'stop',agent:''},{action:'stop',prompt:''}]){
+  stopped=undefined;await assert.rejects(f.call(input),/does not apply to stop|is empty/);assert.equal(stopped,undefined);assert.equal(readExecution(c.binding).state,'running');
  }
- const result=await f.call({action:'stop',task:''});assert.equal(stopped.agentId,'agent-1');assert.equal(result.details.agentId,'agent-1');assert.equal(readExecution(c.binding).state,'running');
+ const result=await f.call({action:'stop',task:'null'});assert.equal(stopped.agentId,'agent-1');assert.equal(result.details.agentId,'agent-1');assert.equal(readExecution(c.binding).state,'running');
  await assert.rejects(f.dispatch(),/running\/unknown/);
  f.bus.emit('subagents:completed',{id:'agent-1'});assert.equal(readExecution(c.binding).state,'completed');
  for(const input of [{agent:'trellis-implement',prompt:''},{agent:'trellis-implement',prompt:'   '},{action:'invalid'},{task:' ',agent:'trellis-implement',prompt:'work'},{agent:''}])await assert.rejects(f.call(input));
@@ -298,7 +298,7 @@ test('new host can request source stop and reconcile terminal evidence from disk
  const f=await stateFixture(t,false);await f.dispatch();f.handlers.get('session_shutdown')();assert.equal(sourceRecord(f).state,'unknown');
  const tools=new Map();registerDispatchTool({events:f.bus,on:()=>{},registerTool:tool=>tools.set(tool.name,tool)},async()=>f.task);
  f.bus.on('subagents:rpc:stop',({requestId,agentId})=>{assert.equal(agentId,'agent-1');f.bus.emit('subagents:rpc:stop:reply:'+requestId,{success:true});});
- await tools.get('trellis_dispatch').execute('new',{action:'stop',agent:null,task:null,prompt:null},undefined,undefined,{cwd:f.root});assert.equal(sourceRecord(f).state,'unknown');
+ await tools.get('trellis_dispatch').execute('new',{action:'stop',agent:'null',task:'default',prompt:'null'},undefined,undefined,{cwd:f.root});assert.equal(sourceRecord(f).state,'unknown');
  f.bus.emit('subagents:completed',{id:'agent-1'});assert.equal(sourceRecord(f).state,'completed');
 });
 test('source record reader interoperates with Python create preview and rejects malformed leases',async t=>{
@@ -327,9 +327,9 @@ test('terminal before new host first call reconciles cached evidence despite cor
  const tools=new Map();registerDispatchTool({events:f.bus,on:()=>{},registerTool:tool=>tools.set(tool.name,tool)},async()=>f.task);
  f.put('.trellis/.runtime/pi-trellis/source-executions/'+ '0'.repeat(64)+'.json','null');
  f.bus.emit('subagents:completed',{id:'agent-1'});
- await assert.rejects(tools.get('trellis_dispatch').execute('stop',{action:'stop',agent:null,task:null,prompt:null},undefined,undefined,{cwd:f.root}),/No known agent id/);
+ await assert.rejects(tools.get('trellis_dispatch').execute('stop',{action:'stop',agent:'null',task:'default',prompt:'null'},undefined,undefined,{cwd:f.root}),/No known agent id/);
  assert.equal(sourceRecord(f).state,'completed');
- const result=await tools.get('trellis_dispatch').execute('next',{action:null,task:null,agent:'trellis-check',prompt:'check'},undefined,undefined,{cwd:f.root});assert.equal(result.details.agentId,'agent-2');
+ const result=await tools.get('trellis_dispatch').execute('next',{action:'dispatch',task:'default',agent:'trellis-check',prompt:'check'},undefined,undefined,{cwd:f.root});assert.equal(result.details.agentId,'agent-2');
 });
 test('source terminal queues under reservation lock and cannot overwrite a newer request',async t=>{
  const f=await stateFixture(t,false);await f.dispatch();const record=sourceRecord(f);

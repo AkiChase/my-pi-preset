@@ -30,8 +30,11 @@ it("actual registration exposes four TypeBox tools, errors are isError, lifecycl
   assert.equal((await call("memory_list", listInput())).isError, true);
   await emit("session_start");
   assert.equal((await call("memory_list", listInput())).isError, undefined);
-  assert.equal((await call("memory_write", { name: "item", type: "user", description: "Preference", body: " " , expectedRevision: null })).isError, true);
-  const args = { name: "item", type: "user", description: "Preference", body: "Use concise explanations.", expectedRevision: null };
+  assert.equal((await call("memory_write", { name: "item", type: "user", description: "Preference", body: " " , expectedRevision: "null" })).isError, true);
+  const args = { name: "item", type: "user", description: "Preference", body: "Use concise explanations.", expectedRevision: "null" };
+  // JSON null reaches only direct callers (the host coerces it to "null"); it is rejected with the sentinel hint.
+  const jsonNull = await call("memory_write", { ...args, expectedRevision: null });
+  assert.equal(jsonNull.isError, true); assert.match(JSON.stringify(jsonNull.content), /use the string \\"null\\" for creation/);
   const saved = await call("memory_write", args); assert.equal(saved.isError, undefined);
   const read = await call("memory_read", { name: "item" }); const detail = read.details as { revision: string };
   assert.match(detail.revision, /^[a-f0-9]{64}$/); assert.equal((await call("memory_write", args)).isError, true);
@@ -75,7 +78,7 @@ it("startup config failure keeps all tools closed after config repair until a fr
   fs.writeFileSync(join(agentDir, "memory.json"), '{"enabled":true}');
   const calls: [string, Record<string, unknown>][] = [
     ["memory_read", { name: "item" }], ["memory_list", listInput()],
-    ["memory_write", { name: "item", type: "user", description: "Preference", body: "Never published", expectedRevision: null }],
+    ["memory_write", { name: "item", type: "user", description: "Preference", body: "Never published", expectedRevision: "null" }],
     ["memory_forget", { name: "item", expectedRevision: "a".repeat(64) }],
   ];
   const before = fs.readdirSync(join(agentDir, "memory", "projects"));

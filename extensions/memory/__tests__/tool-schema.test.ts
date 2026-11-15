@@ -68,7 +68,7 @@ void it("every memory tool rejects an unknown field instead of ignoring it", t =
     for (const [name, args] of [
         ["memory_read", { name: "item", body: "x" }],
         ["memory_list", listInput({ limitt: 5 })],
-        ["memory_write", { name: "item", type: "user", description: "d", body: "b", expectedRevision: null, extra: 1 }],
+        ["memory_write", { name: "item", type: "user", description: "d", body: "b", expectedRevision: "null", extra: 1 }],
         ["memory_forget", { name: "item", expectedRevision: REVISION, force: true }],
     ] as const) {
         const err = hostError(tools, name, args);
@@ -79,7 +79,7 @@ void it("every memory tool rejects an unknown field instead of ignoring it", t =
 void it("description is bounded at the policy limit, not above it", t => {
     const { tools } = registered(t);
     const write = (description: string) => hostError(tools, "memory_write",
-        { name: "item", type: "user", description, body: "content", expectedRevision: null });
+        { name: "item", type: "user", description, body: "content", expectedRevision: "null" });
     // The policy measures Unicode codepoints; this string is 160 of them.
     assert.equal(write("😀".repeat(160)), undefined, "160 astral codepoints must be accepted");
     const err = write("😀".repeat(161));

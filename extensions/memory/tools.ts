@@ -1,6 +1,6 @@
 import { Type } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { parseControlArguments } from "../shared/tool-arguments.ts";
+import { parseControls } from "../shared/tool-arguments.ts";
 import { MemoryError, TYPES, fail } from "./policy.ts";
 import type { MemoryStore } from "./store.ts";
 
@@ -18,7 +18,7 @@ function listArguments(value: unknown): { query: string; offset: number; limit: 
   const invalid = (): never => fail("list", "Invalid memory_list arguments: provide only query (control-free string, at most 160 Unicode codepoints), offset (non-negative safe integer), and limit (safe integer 1–50). Use query=\"\", offset=0, limit=20 for the first page.");
   let params: Record<string, unknown>;
   // Shape errors can include untrusted field names; expose only a fixed safe MemoryError.
-  try { params = parseControlArguments(value, ["query", "offset", "limit"], []); }
+  try { params = parseControls(value, ["query", "offset", "limit"], {}).values; }
   catch { return invalid(); }
   const { query, offset, limit } = params;
   if (typeof query !== "string" || [...query].length > 160 || /[\x00-\x1f\x7f-\x9f]/u.test(query)
@@ -66,11 +66,13 @@ export function registerMemoryTools(pi: ExtensionAPI, getOrigin: GetOrigin): voi
     }),
   });
   pi.registerTool({
-    name: "memory_write", label: "memory_write", description: "Create or conditionally update project memory. Explicit requests to remember should be saved promptly. Save durable preferences, corrections, non-obvious constraints or resource pointers; not daily logs, task status, code/Git/AGENTS facts or credentials. Read before updating; use expectedRevision=null only for creation. Nonblank body required. Feedback/project memories should explain why and how to apply.",
-    parameters: Type.Object({ name: Name, type: Type.Union(TYPES.map(value => Type.Literal(value))), description: Description, body: Type.String({ minLength: 1, maxLength: 16384 }), expectedRevision: Type.Union([Revision, Type.Null()]) }, { additionalProperties: false }),
+    name: "memory_write", label: "memory_write", description: "Create or conditionally update project memory. Explicit requests to remember should be saved promptly. Save durable preferences, corrections, non-obvious constraints or resource pointers; not daily logs, task status, code/Git/AGENTS facts or credentials. Read before updating; use expectedRevision \"null\" only for creation. Nonblank body required. Feedback/project memories should explain why and how to apply.",
+    parameters: Type.Object({ name: Name, type: Type.Union(TYPES.map(value => Type.Literal(value))), description: Description, body: Type.String({ minLength: 1, maxLength: 16384 }), expectedRevision: Type.String({ pattern: "^(null|[a-f0-9]{64})$", description: "Exact SHA256 revision from memory_read, or \"null\" only for creation." }) }, { additionalProperties: false }),
     execute: async (_id, params, signal, _update, ctx) => boundary(async () => {
+      // "null" is the model-facing creation sentinel; the store keeps its internal null.
+      if (params.expectedRevision === null) fail("revision", "expectedRevision must not be JSON null; use the string \"null\" for creation.");
       const origin = getOrigin(ctx.cwd, signal);
-      const saved = await origin.store.write(params, origin.assertActive);
+      const saved = await origin.store.write({ ...params, expectedRevision: params.expectedRevision === "null" ? null : params.expectedRevision }, origin.assertActive);
       if (saved.indexNeedsRepair) return result("Memory body saved, but the derived index needs repair. Refresh safely before retrying; do not repeat creation.", saved, true);
       origin.assertActive();
       return result(`Memory saved. Revision: ${saved.revision}`, saved);
