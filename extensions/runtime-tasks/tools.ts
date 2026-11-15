@@ -161,7 +161,8 @@ function parseManagement(group: ManagementGroup, value: unknown): ManagementPara
   if (v.agent_id !== undefined) params.agent_id = v.agent_id as string;
   if (v.execution_id !== undefined) params.execution_id = v.execution_id as string;
   if (v.kind !== undefined) params.kind = v.kind as "subagent" | "workflow";
-  if (v.detail !== undefined) params.verbose = v.detail === "full";
+  // "summary" equals the default; workflows have no detail option downstream, so only subagents carry it.
+  if (v.detail !== undefined && v.agent_id !== undefined) params.verbose = v.detail === "full";
   return params;
 }
 export function parseProcessManagementParams(value: unknown): ManagementParams { return parseManagement("process", value); }

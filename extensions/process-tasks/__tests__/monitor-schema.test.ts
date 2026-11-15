@@ -162,6 +162,9 @@ void describe("monitor parameter schema", () => {
             await assert.rejects(h.tool.execute("bad", params, undefined, undefined, h.ctx));
         }
         assert.equal(h.reg.jobs.size, 0); assert.equal(h.reg.totalStarted, 0);
+        for (const ws of [[], "default", 7]) {
+            await assert.rejects(h.tool.execute("bad-ws", monitorInput({ ws, description: "x" }), undefined, undefined, h.ctx), /`ws` must be an object with url and protocols, or "null"/);
+        }
     });
 
     it("host rejects non-integer and negative times and coerces numbers to decimal strings", () => {

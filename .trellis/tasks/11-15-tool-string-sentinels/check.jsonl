@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/development/sdk-compatibility.md", "reason": "Model tool string-sentinel contract (\"null\"/\"default\", branch rules, D10, internal contracts unchanged)"}
+{"file": ".trellis/spec/development/index.md", "reason": "Development constraints index"}
+{"file": ".trellis/spec/testing/index.md", "reason": "Test isolation, regression design and check selection"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Schema/parser/renderer/hook layers read the same tool arguments"}

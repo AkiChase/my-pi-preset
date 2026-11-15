@@ -41,6 +41,7 @@ export function parseMonitorArguments(input: unknown): MonitorParams {
     let ws: WsSpec | undefined;
     if (p.ws !== undefined) {
         // A separate fixed-object boundary. protocols is a plain array: [] means no preference.
+        if (!p.ws || typeof p.ws !== "object" || Array.isArray(p.ws)) throw new Error("`ws` must be an object with url and protocols, or \"null\" when using command.");
         const { values: nested } = parseControls(p.ws, ["url", "protocols"], {});
         if (typeof nested.url !== "string" || nested.url.length === 0) {
             throw new Error("`ws.url` must be a non-empty WebSocket URL (ws:// or wss://).");

@@ -38,6 +38,10 @@ test("Agent management requires all fields and treats only declared sentinels as
   // Both targets at once, and full detail for a workflow, are rejected at the parser.
   assert.match(validateManagementParams("agent", agentInput({ action: "status", agent_id: id, execution_id: wf }))!, /exactly one of agent_id/);
   assert.match(validateManagementParams("agent", agentInput({ action: "output", execution_id: wf, detail: "full" }))!, /applies only to subagents/);
+  // "summary" is the default; for a workflow it must not reach the backend as a subagent-only option.
+  for (const detail of ["summary", "default", "null"]) {
+    assert.deepEqual(parseAgentManagementParams(agentInput({ action: "output", execution_id: wf, detail })), { action: "output", execution_id: wf });
+  }
   assert.equal(validateManagementParams("process", processInput({ action: "list" })), undefined);
   assert.ok(validateManagementParams("process", { action: "list", task_type: "null" }));
   assert.equal(calls, 0);

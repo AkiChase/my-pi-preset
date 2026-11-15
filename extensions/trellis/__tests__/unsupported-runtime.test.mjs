@@ -73,5 +73,8 @@ test('fresh project has usable init help without runtime; supported full runtime
  const fresh=fixture(t);assert.ok(fresh.commands.has('trellis-init'));await fresh.commands.get('trellis-init').handler('--help',fresh.ctx);assert.ok(fresh.notices.some(s=>s.includes('/trellis-init')));assert.ok(!existsSync(join(fresh.root,'.trellis')));
  const f=fixture(t,true),key=__internals.contextKey(f.root,f.ctx);f.put(`.trellis/.runtime/sessions/${key}.json`,JSON.stringify({current_task:'.trellis/tasks/00-bootstrap-guidelines'}));
  const input={command:'python3 .trellis/scripts/task.py current --json'};assert.equal(await f.handlers.get('tool_call')({toolName:'bash',input},f.ctx),undefined);assert.ok(input.command.startsWith(`export TRELLIS_CONTEXT_ID=${key}\n`));
+ // A monitor's "null" command is the WebSocket-source sentinel, not a shell script to scope.
+ const ws={command:'null',ws:{url:'wss://example.invalid',protocols:[]},description:'events',timeout_ms:'null',wake_absent_ms:'null'};assert.equal(await f.handlers.get('tool_call')({toolName:'monitor',input:ws},f.ctx),undefined);assert.equal(ws.command,'null');
+ const shell={command:'null'};assert.equal(await f.handlers.get('tool_call')({toolName:'bash',input:shell},f.ctx),undefined);assert.ok(shell.command.startsWith(`export TRELLIS_CONTEXT_ID=${key}\n`));
  await f.handlers.get('before_agent_start')({prompt:'inspect',systemPromptOptions:{sections:{}}},f.ctx);assert.match(f.messages.at(-1).content,/Active task:/);assert.doesNotMatch(f.messages.at(-1).content,/task_error/);
 });

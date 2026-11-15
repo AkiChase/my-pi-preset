@@ -18,6 +18,7 @@
  */
 
 import { createWidgetClient } from "../shared/widget-display/client.ts";
+import { NULL_SENTINEL } from "../shared/tool-arguments.ts";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
@@ -1212,7 +1213,8 @@ export default function (pi: ExtensionAPI): void {
 
 			if (["bash", "monitor"].includes(event.toolName)) {
 				const input = event.input as { command?: unknown };
-				if (typeof input.command !== "string") return;
+				// A monitor's "null" command is the sentinel for a WebSocket source, not a shell script.
+				if (typeof input.command !== "string" || (event.toolName === "monitor" && input.command === NULL_SENTINEL)) return;
 				// Scope every shell, including indirect CLI invocations, without a process-global mutation.
 				const prefix = `export TRELLIS_CONTEXT_ID=${current.key}\n`;
 				let command = input.command.startsWith(prefix) ? input.command.slice(prefix.length) : input.command;

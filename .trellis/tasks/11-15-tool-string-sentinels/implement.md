@@ -61,3 +61,14 @@ agent_dir="$(mktemp -d)"; PI_SDK_DIR="$sdk_dir" PI_CODING_AGENT_DIR="$agent_dir"
   - 提交 `019b59c`。聚焦套件（runtime/process/agent-tasks/beautify/task-ui/trellis）全部通过。
 - 阶段 4：`trellis_dispatch`（`action` 必填，去掉 `""`/null；`task` 用 `"default"`）、`memory_write`（`expectedRevision` 用 `"null"` 创建，直接调用传 JSON null 拒绝）、协议文档 stop 示例、用户文档字段名、删除 `nullableControl`/`parseControlArguments` 及其测试；新增 `extensions/__tests__/tool-schema-sentinels.test.ts`（加载全部入口 + 嵌套工具 + reply_to_parent + trellis_dispatch，断言无 JSON null）。
   - `pnpm check`（隔离 `PI_CODING_AGENT_DIR`）：exit 0，1874/1874 通过。
+- 阶段 5 E2E（`pi -p -ne -e <工作区 extensions/*.ts> --mode json`，仓库外临时目录，只读工作区含 notes.txt）：
+  - 第一轮（未记录结果）：命令用了 macOS 不存在的 `timeout`，exit 127，未调用模型；去掉后重跑。
+  - 第二轮 `--no-session`：`mp-messages-2/claude-opus-5.5` 与 `mp-responses/gpt-6.1-sol-api` 均按新契约生成参数（`resume:"null"`、`limit:"default"`、`offset:"0"`、`ws:"null"` 等）；`process_manage` wait/output/stop、`agent_manage list`、monitor 启动均成功。`subagent_run` 返回「Subagents require a persisted parent session」——是 `--no-session` 的环境限制，参数已通过解析。
+  - 第三轮 `--session-dir <临时目录>`：两个渠道均成功新建前台 Explore 子代理并拿到 marker `sentinel e2e marker: blue-heron-42`；`agent_manage list`（`kind:"subagent"`）与 `output`（`detail:"full"`）成功。
+  - 验收 6、7 满足。未覆盖：其他 Chat Completions 渠道（glm/mimo 等）未复测。
+- 独立复审（`trellis-check`）发现并修复：
+  - trellis `tool_call` 钩子把 monitor 的 `command:"null"`（WebSocket 源哨兵）当作 shell 脚本加 `TRELLIS_CONTEXT_ID` 前缀，导致 ws monitor 被判为两个源同时给出；现跳过 monitor 的 `"null"`。
+  - `agent_manage` 对工作流 `detail:"summary"` 会向后端传 `verbose:false`；现只在子 Agent 目标时传递。
+  - monitor `ws` 为数组/非对象时给出明确字段错误。
+  - 复审后 `pnpm check`（隔离环境）：exit 0，1875/1875 通过。
+- 宿主侧注意：当前已安装的旧版 `agent_manage` 在本会话中仍把 `"null"` 当作真实 `execution_id`（即本任务修复的问题），新版需重新安装/加载后生效。

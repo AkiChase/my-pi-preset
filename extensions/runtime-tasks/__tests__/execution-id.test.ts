@@ -44,3 +44,21 @@ test("subagent agent IDs bind admitted waits to their internal execution while r
   assert.ok(!("execution_id" in management));
   assert.match(JSON.stringify(result.content), /original result/);
 });
+
+test("workflow output accepts detail \"summary\" as the default without a subagent-only backend option", async () => {
+  const wf = "wf_abcdef12";
+  const seen: unknown[] = [];
+  const view: TaskView = { sourceId: "agent", taskId: wf, runId: wf, key: wf, kind: "workflow", title: "workflow", status: "running", executionMode: "background", waitCount: 0, stats: {}, artifacts: [], capabilities: { stop: true, details: true } };
+  const { tool } = managementTool("agent", [{ list: () => [{ view, manageable: true, rawStatus: "running" }], execute: async (identity, params) => {
+    seen.push(params); return taskResult("workflow progress", { action: "output", task_type: "workflow", task_id: identity.taskId, run_id: identity.runId });
+  } }]);
+  for (const detail of ["summary", "default", "null"]) {
+    const result = await tool.execute("out", { action: "output", agent_id: "null", execution_id: wf, kind: "null", detail }, undefined, undefined, {} as never);
+    assert.notEqual(result.isError, true, detail);
+    assert.match(JSON.stringify(result.content), /workflow progress/);
+  }
+  assert.equal(seen.length, 3);
+  for (const params of seen) assert.equal((params as { verbose?: unknown }).verbose, undefined);
+  const full = await tool.execute("full", { action: "output", agent_id: "null", execution_id: wf, kind: "null", detail: "full" }, undefined, undefined, {} as never);
+  assert.equal(full.isError, true); assert.equal(seen.length, 3);
+});
