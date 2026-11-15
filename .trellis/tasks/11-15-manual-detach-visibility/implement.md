@@ -45,4 +45,13 @@ PI_SDK_DIR="$sdk_dir" PI_CODING_AGENT_DIR="$agent_dir" pnpm check; result=$?; rm
   - `registered-agent.test.ts` 新增手动转后台卡片断言 → pass。
   - agent-tasks、beautify、runtime-tasks、task-ui 测试（隔离 `PI_CODING_AGENT_DIR`）→ 616/616 pass。
 
-（后续阶段实现时填写）
+### Stage 2
+
+- released 文案：`agent-tasks/src/management.ts`、`agent-tasks/src/workflow/management.ts`、`agent-tasks/src/index.ts`（subagent_message wait）、`process-tasks/management.ts` → `Wait released by user; …`；`wait_outcome` 仍为 `released`。
+- 卡片：`beautify/tools/management.ts`、`beautify/tools/task-manage.ts` → `wait released by user · target unchanged`；`beautify/tools/bash.ts` 手动 → `manually backgrounded · ID: …`，非手动保持 `background ID: …`。
+- 测试：更新 6 处既有断言；`tool-waits.test.ts` workflow pause 用例新增手动释放断言。
+- 文档：`docs/extensions/task-composition.md` 补充手动解除后的可见性说明。
+- 验证：
+  - `pnpm typecheck` → exit 0。
+  - agent-tasks、beautify、runtime-tasks、task-ui、process-tasks 测试（隔离）→ 1009/1009 pass。
+  - 全量隔离 `pnpm check`（`PI_SDK_DIR` + 临时 `PI_CODING_AGENT_DIR`）→ exit 0，1876/1876 pass。

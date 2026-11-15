@@ -51,7 +51,7 @@ export function createWorkflowManagement(options: {
         if (!lease.settled) try { onUpdate?.(taskResult(`execution_id=${task.id}\nWaiting for workflow script return.`, { ...meta(), wait_outcome: "waiting" })); } catch { /* optional presentation sink */ }
         const outcome = await lease.result;
         if (!options.active() || tasks.get(task.id) !== task) return taskResult("Workflow activation is closed.", { ...meta(), error_code: "closed", wait_outcome: "cancelled" });
-        if (outcome.kind !== "completed") return taskResult(`execution_id=${task.id}\nWait ${outcome.kind === "detached" ? "released" : "cancelled"}; target unchanged.`, { ...meta(), wait_outcome: outcome.kind === "detached" ? "released" : "cancelled" });
+        if (outcome.kind !== "completed") return taskResult(`execution_id=${task.id}\nWait ${outcome.kind === "detached" ? "released by user" : "cancelled"}; target unchanged.`, { ...meta(), wait_outcome: outcome.kind === "detached" ? "released" : "cancelled" });
         return taskResult(`kind=workflow execution_id=${task.id}\nScript return/error:\n${outcome.value.text}\n\nProgress logs (last 100 entries):\n${progressPreview(outcome.value.logs)}`, { ...meta(), wait_outcome: "completed" });
       } finally { if (!lease.settled) lease.dispose(); }
     },

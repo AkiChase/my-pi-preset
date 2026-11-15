@@ -191,7 +191,7 @@ for (const winner of ["completion", "detach"] as const) {
                 assert.ok(results.every((result) => result.content[0]!.text!.includes("status=completed")));
                 assert.equal(h.messages.length, 0);
             } else {
-                assert.ok(results.every((result) => result.content[0]!.text!.includes("Wait released; target unchanged")));
+                assert.ok(results.every((result) => result.content[0]!.text!.includes("Wait released by user; target unchanged")));
                 assert.equal(h.messages.length, 1, "last cancelled wait must recheck suppressed terminal delivery");
             }
         } finally { await h.cleanup(); }

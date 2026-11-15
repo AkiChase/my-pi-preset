@@ -96,7 +96,7 @@ void it("one shared /task-detach releases mixed shell/agent launch and retrieval
         const shellResult = await shellLaunch;
         const retrievalResult = await shellRetrieval;
         assert.match(shellResult.content[0]?.type === "text" ? shellResult.content[0].text : "", new RegExp(job.id));
-        assert.match(retrievalResult.content[0]?.type === "text" ? retrievalResult.content[0].text : "", /Wait released; target unchanged/);
+        assert.match(retrievalResult.content[0]?.type === "text" ? retrievalResult.content[0].text : "", /Wait released by user; target unchanged/);
         assert.equal(coordinator.waitCount, 0);
         assert.equal(starts, 1);
         assert.equal(backendSignal?.aborted, false);

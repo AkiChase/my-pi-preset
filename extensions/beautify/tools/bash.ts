@@ -14,8 +14,10 @@ return renderers("bash", fallback, (result, ctx) => {
   const full = text(result);
   const valid = isLaunchMetadata(identity) && "task_type" in identity && identity.task_type === "bash" && full.startsWith(launchText(identity) + "\n");
   const raw = valid ? full.slice(full.indexOf("\n") + 1) : full;
-  const background = raw.match(/^Command (?:running in background|was manually backgrounded by user) with ID: ([^\s.]+)\. Output is being written to: [^\n]+$/);
-  if (background && valid && "task_id" in identity && identity.mode === "background" && background[1] === identity.task_id) return attachTime({ stats: `background ID: ${background[1]}` });
+  const background = raw.match(/^Command (running in background|was manually backgrounded by user) with ID: ([^\s.]+)\. Output is being written to: [^\n]+$/);
+  if (background && valid && "task_id" in identity && identity.mode === "background" && background[2] === identity.task_id) {
+    return attachTime({ stats: background[1] === "running in background" ? `background ID: ${background[2]}` : `manually backgrounded · ID: ${background[2]}` });
+  }
   const meta = genericMetadata(valid ? { ...result, content: [{ type: "text", text: raw }] } : result, ctx);
   if (!handling && typeof ctx.durationMs === "number" && Number.isFinite(ctx.durationMs) && ctx.durationMs >= 0) meta.secondary = `${ctx.durationMs}ms call`;
   return attachTime(meta);

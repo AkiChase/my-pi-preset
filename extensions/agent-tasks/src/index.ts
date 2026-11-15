@@ -2614,7 +2614,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       if (outcome.kind === "completed") takeHeldForCall(toolCallId, identity);
       assertActive();
       if (outcome.kind !== "completed") {
-        return textResult(`${head(phase)}\nWait ${outcome.kind === "detached" ? "released" : "cancelled"}; the question stays open and a later reply will be delivered to you.`);
+        return textResult(`${head(phase)}\nWait ${outcome.kind === "detached" ? "released by user" : "cancelled"}; the question stays open and a later reply will be delivered to you.`);
       }
       const value = outcome.value;
       if (value.kind === "replied") return textResult(`${head(phase)}\nReply:\n${value.message.text}`);

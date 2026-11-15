@@ -85,7 +85,7 @@ export function createProcessManagement(reg: BackgroundRegistry, source: TaskSou
         }
         const outcome = await lease.result;
         if (reg.closed || reg.jobs.get(job.id) !== job) return taskResult(monitorExecutionSummary(job.executionConfig) + "Process activation is closed.", { ...metadata(identity, params, job), error_code: "closed", wait_outcome: "cancelled" });
-        if (outcome.kind !== "completed") return taskResult(monitorExecutionSummary(job.executionConfig) + `task_id=${job.id}\nWait ${outcome.kind === "detached" ? "released" : "cancelled"}; target unchanged.`, { ...metadata(identity, params, job), wait_outcome: outcome.kind === "detached" ? "released" : "cancelled" });
+        if (outcome.kind !== "completed") return taskResult(monitorExecutionSummary(job.executionConfig) + `task_id=${job.id}\nWait ${outcome.kind === "detached" ? "released by user" : "cancelled"}; target unchanged.`, { ...metadata(identity, params, job), wait_outcome: outcome.kind === "detached" ? "released" : "cancelled" });
         const result = completedOutput ?? output(identity, params, true);
         return taskResult(result.content.filter(block => block.type === "text").map(block => block.text).join("\n"), { ...result.details.runtimeTask, wait_outcome: "completed" });
       } finally { poller?.stop(); if (!lease.settled) lease.dispose(); }

@@ -74,9 +74,9 @@ test("actual default shell mouse toggles body, partial/error/image/limited outpu
   read.updateResult({ content: [{ type: "text", text: "Read image file [image/png]" }], isError: false });
   assert.equal(effective(read.render(120)).length, 1); assert.match(plain(read.render(120).join("\n")), /image/);
   const bash = new ToolExecutionComponent("bash", "handle", { command: "run" }, {}, bashRenderers, screen, "/fixture");
-  for (const preface of ["running in background", "was manually backgrounded by user"]) {
+  for (const [preface, stat] of [["running in background", /background ID: abc/], ["was manually backgrounded by user", /manually backgrounded · ID: abc/]] as const) {
     bash.updateResult({ content: [{ type: "text", text: `${launchText(launchMetadata("bash", "abc", "abc", "background"))}\nCommand ${preface} with ID: abc. Output is being written to: /fixture/log` }], details: { runtimeLaunch: launchMetadata("bash", "abc", "abc", "background") }, isError: false });
-    assert.equal(effective(bash.render(120)).length, 1); assert.match(plain(bash.render(120).join("\n")), /background ID: abc/);
+    assert.equal(effective(bash.render(120)).length, 1); assert.match(plain(bash.render(120).join("\n")), stat);
     bash.setExpanded(true); assert.match(plain(bash.render(120).join("\n")), /fixture\/log/); bash.setExpanded(false);
   }
 });

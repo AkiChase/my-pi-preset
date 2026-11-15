@@ -133,7 +133,7 @@ test("actual registered Agent launch/manage renders config, lifecycle outcomes a
     partialComponent.updateResult({ ...released, isError: false });
     assert.doesNotMatch(plain(partialComponent.render(160).join("\n")), /old partial/);
     assert.match(plain(partialComponent.render(160).join("\n")), /target unchanged/);
-    assert.match(agentContract(waitingArgs, released, viewContext(waitingArgs))!.stats, /wait released.*unchanged/);
+    assert.match(agentContract(waitingArgs, released, viewContext(waitingArgs))!.stats, /wait released by user · target unchanged/);
     assert.equal(coordinator.list().find(view => view.taskId === id)?.status, "running");
     const controller = new AbortController(), cancel = execute(waitingArgs, controller.signal); await tick(); controller.abort();
     const cancelled = await cancel;

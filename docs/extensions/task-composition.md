@@ -18,6 +18,8 @@ Task Composition 把命令进程、Monitor、子 Agent 和 workflow 放进同一
 
 `/task-detach` 的作用是“现在不等了”，不是停止任务。前台命令或 Agent 转后台时继续原来的执行，ID、进程和会话不变；正在等待后台结果时，则只结束这次等待。它能同时解除多个等待，不只是当前面板选中的一项。
 
+手动解除后，模型收到的工具结果会注明是用户操作，不会当成配置或默认行为：命令和 Agent 写明 manually backgrounded by user，Agent 的执行配置里还会把 mode 差异标为 `manual-detach`；等待结果写明 Wait released by user。工具卡片会保留转后台那一刻的 Agent 进度统计，并显示 `manually backgrounded`、`wait released by user`。
+
 普通消息提交仍由 Pi 排队或作为 steering 处理，不会自动让命令转后台。
 
 ## Task Panel

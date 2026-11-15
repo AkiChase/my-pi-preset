@@ -1026,6 +1026,12 @@ void it("registered workflow pause owner -> wait/stop drains worker and host wit
     assert.ok(task?.control); assert.equal(task.id, id);
     assert.equal(pauseWorkflowTask(task), true, "same task/control used by workflow menu");
     assert.equal(f.source.list().find(row => row.taskId === id)?.status, "paused");
+    const releasing = f.execute("agent_manage", { action: "wait", execution_id: id});
+    for (let i = 0; i < 200 && !f.coordinator.waitCount; i++) await pause(5);
+    f.coordinator.detachAll();
+    const released = await releasing;
+    assert.match(text(released), new RegExp(`execution_id=${id}\nWait released by user; target unchanged\.`));
+    assert.equal((released.details as import("../../runtime-tasks/tools.ts").ManagementDetails).runtimeManagement.wait_outcome, "released");
     const waiting = f.execute("agent_manage", { action: "wait", execution_id: id});
     f.calls[1]!.finish("first done while paused");
     await pause(30);

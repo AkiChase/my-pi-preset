@@ -66,7 +66,7 @@ export function createAgentManagement(options: {
         if (!lease.settled) try { onUpdate?.(taskResult("Waiting for subagent final answer.", { ...meta(), wait_outcome: "waiting" })); } catch { /* optional presentation sink */ }
         const outcome = await lease.result;
         if (!options.active()) return taskResult("Subagent activation is closed.", { ...meta(), error_code: "closed", wait_outcome: "cancelled" });
-        if (outcome.kind !== "completed") return taskResult(`Wait ${outcome.kind === "detached" ? "released" : "cancelled"}; target unchanged.`, { ...meta(), wait_outcome: outcome.kind === "detached" ? "released" : "cancelled" });
+        if (outcome.kind !== "completed") return taskResult(`Wait ${outcome.kind === "detached" ? "released by user" : "cancelled"}; target unchanged.`, { ...meta(), wait_outcome: outcome.kind === "detached" ? "released" : "cancelled" });
         if (currentTarget()) options.cancelNotice(record.id);
         return taskResult(`kind=subagent agent_id=${record.id}\n${options.format(outcome.value, params.verbose)}`, { ...meta(outcome.value), wait_outcome: "completed" });
       } finally { if (!lease.settled) lease.dispose(); }

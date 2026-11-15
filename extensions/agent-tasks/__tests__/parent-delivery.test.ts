@@ -182,7 +182,7 @@ void it("released or ended reply waits leave the question open or report it clos
     // before this tool call resumes is late delivery, not a dropped wait reply.
     channel.send("late answer", requestId);
     const released = await waiting;
-    assert.match(text(released), /Wait released; the question stays open/);
+    assert.match(text(released), /Wait released by user; the question stays open/);
     assert.equal(f.registry.getRecord(id)!.status, "running", "releasing never stops the agent");
     await hold();
     assert.match(f.messages()[0]!.content, /late answer/);

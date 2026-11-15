@@ -18,7 +18,7 @@ export const taskManageContract: RetrievalContract = (args, result, ctx) => {
   if (meta.action === "search") stats = `${meta.count ?? 0} matches`;
   if (meta.action === "stats") stats = `${meta.count ?? 0} retained tasks`;
   if (meta.action === "stop" && !meta.error_code) stats = `stop · observed ${meta.raw_status ?? meta.status ?? "unknown"}`;
-  if (meta.wait_outcome) stats = meta.wait_outcome === "released" || meta.wait_outcome === "cancelled" ? `wait ${meta.wait_outcome} · target unchanged` : meta.wait_outcome === "waiting" ? "waiting" : stats;
+  if (meta.wait_outcome) stats = meta.wait_outcome === "released" || meta.wait_outcome === "cancelled" ? `wait ${meta.wait_outcome === "released" ? "released by user" : "cancelled"} · target unchanged` : meta.wait_outcome === "waiting" ? "waiting" : stats;
   const extra: string[] = [];
   if (meta.task_type) extra.push(meta.task_type);
   if (meta.task_id) extra.push(`${meta.action} ${meta.task_id} run ${meta.run_id}`);

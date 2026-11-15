@@ -97,7 +97,7 @@ test("actual host optional call/result sync, mouse/key expansion, pending/partia
   const final = "Wait released; target unchanged. Use task_manage action=output to check on it.";
   component.updateResult({ ...managed("wait", final, { wait_outcome: "released" }), isError: false });
   assert.doesNotMatch(rows(component).join("\n"), /old chunk/);
-  component.setExpanded(false); assert.match(rows(component).join("\n"), /wait released/); assert.doesNotMatch(rows(component).join("\n"), /killed/);
+  component.setExpanded(false); assert.match(rows(component).join("\n"), /wait released by user · target unchanged/); assert.doesNotMatch(rows(component).join("\n"), /killed/);
 });
 
 test("optional tool identity precedes long details in pending, terminal and expanded titles", () => {
@@ -215,7 +215,7 @@ test("actual registered process task_manage produces seven action envelopes with
     assert.equal(managementContract("process")(processInput({ action: "wait", task_id: id }), partial, context({ action: "wait", task_id: id }, { isPartial: true }))?.stats, "waiting");
     f.coordinator.detachAll();
     const final = await following;
-    assert.equal(managementContract("process")(processInput({ action: "wait", task_id: id }), final, context({ action: "wait", task_id: id }))?.stats, "wait released · target unchanged");
+    assert.equal(managementContract("process")(processInput({ action: "wait", task_id: id }), final, context({ action: "wait", task_id: id }))?.stats, "wait released by user · target unchanged");
     assert.equal(f.reg.jobs.get(id)?.status, "running");
     await validate({ action: "stop", task_id: id });
     await validate({ action: "wait", task_id: id });
