@@ -375,3 +375,25 @@
 ### Next Steps
 
 - 已初始化 Trellis 的仓库使用新版扩展后各执行一次 Update resources；未自动更新个人安装或其他仓库，未 push。
+
+
+## Session 69: 工具参数去除 null，改用字符串哨兵
+<!-- trellis-session: v=2 fp=d8dd949a021ecd36 -->
+
+**Date**: 2026-11-15
+**Task**: 工具参数去除 null，改用字符串哨兵
+**Branch**: `main`
+
+### Summary
+
+模型可见工具 schema 去除 JSON null：不适用/未设置用 "null"，跟随配置用 "default"；布尔控制改为语义枚举（execution/tools/context/case/detail），subagent_message.reply 改为 skip|wait|notify；修复 agent_manage 双目标与工作流 verbose；trellis_dispatch action 必填、memory_write 创建用 "null"；删除旧 nullable 辅助并新增全量 schema 无 null 测试。复审修复 trellis 钩子误给 ws monitor 的 "null" command 加前缀等问题。pnpm check 1875/1875；Claude 与 GPT Responses 实测通过，glm/mimo 等渠道未复测。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `eefae85` | fix(trellis,runtime-tasks,monitor): honor sentinels in hook and workflow detail |
+
+### Status
+
+[OK] **Completed**

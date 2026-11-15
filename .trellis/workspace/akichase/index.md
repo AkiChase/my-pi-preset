@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 68
-- **Last Active**: 2026-11-11
+- **Total Sessions**: 69
+- **Last Active**: 2026-11-15
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~377 | Active |
+| `journal-2.md` | ~399 | Active |
 | `journal-1.md` | ~1975 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 69 | 2026-11-15 | 工具参数去除 null，改用字符串哨兵 | `eefae85` | `main` |
 | 68 | 2026-11-11 | 清理 Trellis 资源权限指纹 | `95f93f6`, `1685395`, `17d003b` | `main` |
 | 67 | 2026-11-10 | Pi SDK 1.5.1 兼容修复与完整检查恢复 | `667327d`, `f4494fc`, `a61ed07`, `b1967c5` | `main` |
 | 66 | 2026-11-10 | 子 Agent 最近请求与累计用量展示 | `618353a` | `main` |
