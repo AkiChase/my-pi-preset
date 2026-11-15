@@ -45,10 +45,10 @@ test("split management schemas define each field once and defer combinations to 
     const schema = JSON.parse(JSON.stringify(tool.parameters));
     assert.equal(schema.type, "object"); assert.equal(schema.anyOf, undefined); assert.equal(schema.additionalProperties, false);
     assert.deepEqual(schema.required, Object.keys(schema.properties));
-    const bad = group === "process" ? processInput({ action: "status", task_id: "x", limit: 1 }) : { action: "status", agent_id: "x", execution_id: null, kind: null, verbose: false };
+    const bad = group === "process" ? processInput({ action: "status", task_id: "x", limit: 1 }) : { action: "status", agent_id: "x", execution_id: "null", kind: "null", detail: "summary" };
     const result = await tool.execute("bad", bad as never, undefined, undefined, ctx);
     assert.equal(result.isError, true);
-    assert.match(result.content[0]!.type === "text" ? result.content[0]!.text : "", /fields that do not apply to this action/);
+    assert.match(result.content[0]!.type === "text" ? result.content[0]!.text : "", /does not apply to status; set it to "null"/);
   }
   assert.equal(calls, 0);
 });
@@ -138,7 +138,7 @@ test("execution config is optional, closed, group-specific and deeply immutable 
   const capability: RuntimeTaskCapability = { list: () => [{ view: { ...view("x"), executionConfig: snapshot }, manageable: true, rawStatus: "completed" }],
     execute: async () => { backend++; return result; } };
   const { tool } = managementTool("agent", [capability]);
-  const status = await tool.execute("status", { action: "status", agent_id: publicMeta.agent_id, execution_id: null, kind: null, verbose: null }, undefined, undefined, ctx);
+  const status = await tool.execute("status", { action: "status", agent_id: publicMeta.agent_id, execution_id: "null", kind: "null", detail: "null" }, undefined, undefined, ctx);
   assert.ok(isManagementDetails(status.details));
   assert.deepEqual((status.details as import("../tools.ts").ManagementDetails).runtimeManagement.executionConfig, snapshot);
   assert.match(status.content[0]!.type === "text" ? status.content[0]!.text : "", /pending session confirmation.*thinking=off.*mode=foreground/);

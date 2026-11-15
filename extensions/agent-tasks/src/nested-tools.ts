@@ -1,5 +1,5 @@
 import { copyAgentExecutionConfig, agentExecutionSummary } from "../../runtime-tasks/execution-config.ts";
-import { nullableControl } from "../../shared/tool-arguments.ts";
+import { argText, sentinelString } from "../../shared/tool-arguments.ts";
 import { createToolCardRenderers } from "../../beautify/tool-card.ts";
 import { text } from "../../beautify/types.ts";
 import { launchMetadata, launchText } from "../../runtime-tasks/launch.ts";
@@ -21,10 +21,10 @@ import {
   resolveTypeIn,
 } from "./agent-types.ts";
 import { loadCustomAgents } from "./custom-agents.ts";
-import { isolationParam, resolveAgentInvocationConfig, thinkingParam } from "./invocation-config.ts";
+import { agentControlParams, isolationParam, resolveAgentInvocationConfig, thinkingParam } from "./invocation-config.ts";
 import { describeModel, resolveModel } from "./model-resolver.ts";
 import { runToolGuidance, messageToolGuidance } from "./tool-guidance.ts";
-import { parseAgentToolArguments, parseMessageToolArguments, type MessageToolParams, MESSAGE_REPLY_MODES } from "./tool-contract.ts";
+import { parseAgentToolArguments, parseMessageToolArguments, type MessageToolParams, MESSAGE_REPLY_CHOICES } from "./tool-contract.ts";
 import { formatHeldMessages, formatSubagentMessages, SUBAGENT_MESSAGE_TYPE } from "./parent-delivery.ts";
 import type { ChildMessage, ReplyWaitOutcome } from "./parent-messaging.ts";
 import { checkModelScope } from "./model-scope.ts";
@@ -257,7 +257,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
 
   const agentCardRenderers = createToolCardRenderers(NESTED_TOOL_NAMES[0], undefined, (args, result) => ({
     identity: NESTED_TOOL_NAMES[0],
-    summary: [String(args.subagent_type ?? ""), String(args.description ?? "")].filter(Boolean).join(" · "),
+    summary: [argText(args.subagent_type) ?? "", argText(args.description) ?? ""].filter(Boolean).join(" · "),
     bodyText: result ? text(result) : undefined,
   }));
   const messageCardRenderers = createToolCardRenderers(NESTED_TOOL_NAMES[1], undefined, (args, result) => ({
@@ -277,20 +277,16 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
     promptGuidelines: runToolGuidance({ nested: true, isolation: isWorktreeIsolationEnabled(), agentTypes: availableIn(loadRegistry()).join(", ") || "none" }),
     parameters: Type.Object({
       prompt: Type.String({ description: "Self-contained task for the nested agent." }),
-      description: nullableControl(Type.String({ description: "Required non-null for new agents; null with resume: short task description." })),
-      subagent_type: nullableControl(Type.String({ description: `Required non-null for new agents; null with resume. Allowed types: ${availableIn(loadRegistry()).join(", ") || "none"}.` })),
-      model: nullableControl(Type.String({ description: "Provider/model override; null uses agent configuration, otherwise the parent session model. Agent-file configuration takes precedence over calls." })),
+      description: sentinelString("Required for new agents: short task description; \"null\" with resume."),
+      subagent_type: sentinelString(`Required for new agents; "null" with resume. Allowed types: ${availableIn(loadRegistry()).join(", ") || "none"}.`),
+      model: sentinelString('Provider/model override; "default" uses agent configuration, otherwise the parent session model; "null" with resume. Agent-file configuration takes precedence over calls.'),
       // Same enum as the top-level tool, from the same source: a typo here would
       // otherwise be cast straight to a ThinkingLevel and quietly do nothing.
       ...thinkingParam(),
-      run_in_background: nullableControl(
-        Type.Boolean({
-          description: "Null uses agent configuration, otherwise nested new agents run foreground. Background requires an available owned agent_manage; collect results before finishing. With resume, set null; execution waits inline.",
-        }),
-      ),
-      resume: nullableControl(Type.String({ description: "Real agent_id of a finished owned child; set null for new agents, not an empty string. With resume, set all other control fields to null; execution waits inline." })),
-      isolated: nullableControl(Type.Boolean()),
-      inherit_context: nullableControl(Type.Boolean()),
+      execution: agentControlParams(true).execution,
+      resume: sentinelString('Real agent_id of a finished owned child, or "null" for a new agent; not an empty string. With resume, set all other control fields to "null"; execution waits inline.'),
+      tools: agentControlParams(true).tools,
+      context: agentControlParams(true).context,
       ...isolationParam(isWorktreeIsolationEnabled()),
     }, { additionalProperties: false }),
     execute: async (_toolCallId, input, signal, _onUpdate, ctx) => {
@@ -563,7 +559,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
     parameters: Type.Object({
       agent_id: Type.String(),
       message: Type.String({ minLength: 1, description: "Non-blank guidance or question for the running nested agent." }),
-      reply: nullableControl(StringEnum(MESSAGE_REPLY_MODES, { description: "null sends guidance; wait waits for a reply; notify delivers a reply later." })),
+      reply: StringEnum(MESSAGE_REPLY_CHOICES, { description: "\"skip\" sends guidance without a reply; \"wait\" waits for a reply; \"notify\" delivers a reply later." }),
     }, { additionalProperties: false }),
     execute: async (_toolCallId, input, signal) => {
       let params: MessageToolParams;

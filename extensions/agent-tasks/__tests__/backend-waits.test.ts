@@ -572,7 +572,7 @@ void it("nested background startup failure retains launch identity and resolved 
     writeFileSync(join(root, ".pi", "agents", "worktree-child.md"), "---\nname: worktree-child\ndescription: test\nisolation: worktree\n---\nPRIVATE_PROMPT\n");
     const tool = createNestedSubagentTools({ manager: f.manager, pi, parentAgentId, depth: 1,
       maxSubagentDepth: 2, allowedSubagents: "all", configCwd: root })[0]!;
-    const result = await tool.execute("failure", completeToolCall(tool.parameters, { subagent_type: "worktree-child", description: "test", prompt: "test", run_in_background: true }), undefined, undefined, f.ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext);
+    const result = await tool.execute("failure", completeToolCall(tool.parameters, { subagent_type: "worktree-child", description: "test", prompt: "test", execution: "background" }), undefined, undefined, f.ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext);
     assert.equal(result.isError, true);
     const details = result.details as { executionConfig?: import("../../runtime-tasks/execution-config.ts").AgentExecutionConfig; runtimeLaunch?: unknown };
     assert.equal(details.executionConfig?.phase, "resolved");

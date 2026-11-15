@@ -181,11 +181,11 @@ void describe("jobs — required parameters", () => {
         const { tool, ctx } = harness();
         for (const action of ["output", "stop", "wait"]) {
             const result = await tool.execute("t", processInput({ action }), undefined, undefined, ctx);
-            assert.match(result.content[0].text, new RegExp(`${action} requires task_id`));
+            assert.match(result.content[0].text, new RegExp(`\`task_id\` is required to ${action}`));
             assert.equal((result as { isError?: boolean }).isError, true);
         }
         const result = await tool.execute("t", processInput({ action: "search" }), undefined, undefined, ctx);
-        assert.match(result.content[0].text, /search requires pattern/);
+        assert.match(result.content[0].text, /`pattern` is required to search/);
         assert.equal((result as { isError?: boolean }).isError, true);
     });
 });
@@ -241,7 +241,7 @@ void describe("jobs search — scope, case, context", () => {
 
         const loose = await text(
             tool,
-            { action: "search", pattern: "warning", task_id: job.id, ignore_case: true },
+            { action: "search", pattern: "warning", task_id: job.id, case: "insensitive" },
             ctx
         );
         assert.match(loose, /Found 1 matches for \/warning\/i/);

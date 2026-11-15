@@ -1,6 +1,11 @@
-import type { ProcessManagementParams } from "../tools.ts";
-
-/** Complete valid model calls in tests; admission failure cases must use raw input. */
-export function processInput(input: { action: string; [key: string]: unknown }): ProcessManagementParams & Record<string, string | number | boolean | null> {
-  return { task_id: null, task_type: null, offset: null, limit: null, pattern: null, ignore_case: null, context: null, ...input } as ProcessManagementParams & Record<string, string | number | boolean | null>;
+/**
+ * Complete valid process_manage model calls in tests; admission failure cases must use raw input.
+ * Unset fields and JSON null become "null"; numbers become the decimal strings a model sends.
+ */
+export function processInput(input: { action: string; [key: string]: unknown }): Record<string, string> {
+  const call: Record<string, string> = { task_id: "null", task_type: "null", offset: "null", limit: "null", pattern: "null", case: "null", context: "null" };
+  for (const [key, value] of Object.entries(input)) {
+    call[key] = value === null ? "null" : String(value);
+  }
+  return call;
 }

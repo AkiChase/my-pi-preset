@@ -118,7 +118,7 @@ async function factory(settings: Record<string, unknown> = {}, extra: AgentManag
     repeatStart: () => handlers.get("session_start")![0]!(undefined, ctx),
     artifactDir: sessionTaskDir(cwd, "offline-test"),
     start(background = false, extra: Record<string, unknown> = {}, signal?: AbortSignal, call?: { id: string | undefined }) {
-      const defaults = Object.hasOwn(extra, "resume") ? { prompt: "test", run_in_background: background } : { subagent_type: "general-purpose", description: "offline", prompt: "test", run_in_background: background };
+      const defaults = Object.hasOwn(extra, "resume") ? { prompt: "test", execution: background ? "background" : "foreground" } : { subagent_type: "general-purpose", description: "offline", prompt: "test", execution: background ? "background" : "foreground" };
       return execute("subagent_run", { ...defaults, ...extra }, signal, call);
     },
     async close() {
@@ -1040,7 +1040,7 @@ for (const background of [false, true]) void it(`registered ${background ? "back
   try {
     const agentDir = join(f.root, "agent", "agents"); mkdirSync(agentDir, { recursive: true });
     writeFileSync(join(agentDir, "configured.md"), `---\nname: configured\ndescription: test\nmodel: offline/known\nrun_in_background: ${background}\nisolated: false\ninherit_context: false\nisolation: off\n---\nSECRET_PROMPT_DO_NOT_COPY\n`);
-    const pending = f.start(background, { subagent_type: "configured", model: "known", thinking: "high", isolated: true, inherit_context: true, isolation: "worktree" });
+    const pending = f.start(background, { subagent_type: "configured", model: "known", thinking: "high", tools: "builtin", context: "inherit", isolation: "worktree" });
     await tick();
     const id = f.calls[0]!.options.agentId!, record = f.registry.getRecord(id)!;
     // The stub reports unknown settings at creation; explicitly exercise the

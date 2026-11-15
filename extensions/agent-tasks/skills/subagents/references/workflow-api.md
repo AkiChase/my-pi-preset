@@ -4,9 +4,9 @@
 
 Run only after explicit user opt-in: the user's own request for workflow/multi-agent orchestration, a user-invoked skill/slash command explicitly requiring subagent_workflow, or a request for a specific named/saved workflow. Reading Subagents is not authorization; potential benefit is not opt-in. Otherwise delegate individually or explain the purpose and approximate cost and ask. The user can say "use a workflow" next time.
 
-Provide all top-level fields: script, scriptPath, name, args, resumeFromRunId. New execution requires exactly one non-null source; other sources and resumeFromRunId are null. Replay targets a finished run in the same session with at most one source; all sources null reuses the prior script. Empty strings are invalid. args is verbatim JSON data, including null, not an unspecified control; it does not inherit previous args. Title/description belong in meta, not tool parameters.
+Provide all top-level fields: script, scriptPath, name, args, resumeFromRunId. Control fields take a value or the string `"null"`, never JSON null. New execution requires exactly one source; other sources and resumeFromRunId are `"null"`. Replay targets a finished run in the same session with at most one source; all sources `"null"` reuses the prior script. Empty strings are invalid. args is verbatim JSON data, not a control field (use `{}` for none); it does not inherit previous args. Title/description belong in meta, not tool parameters.
 
-Pass the first script inline, not through Write first. Each invocation automatically saves the script in the session directory and returns its path. To iterate, edit that file and call with `{script: null, scriptPath: "<path>", name: null, args: null, resumeFromRunId: null}` instead of resending source. Reusable scripts belong in `.pi/workflows/<name>.js`, `.agents/workflows/`, or `<agent dir>/workflows/`; call via name with other sources/resumeFromRunId null and explicit args. File edits still require task authorization.
+Pass the first script inline, not through Write first. Each invocation automatically saves the script in the session directory and returns its path. To iterate, edit that file and call with `{"script": "null", "scriptPath": "<path>", "name": "null", "args": {}, "resumeFromRunId": "null"}` instead of resending source. Reusable scripts belong in `.pi/workflows/<name>.js`, `.agents/workflows/`, or `<agent dir>/workflows/`; call via name with other sources/resumeFromRunId `"null"` and explicit args. File edits still require task authorization.
 
 The tool runs in the background and immediately returns execution_id, not completion. Use agent_manage and /tasks for progress; completion is notified automatically. Do not sleep/poll solely to detect completion. Deterministic script control flow encodes fan-out, verification and synthesis.
 
@@ -48,7 +48,7 @@ agent(prompt: string, opts?: {label?: string, phase?: string, schema?: object, m
 - gate:'<command>' runs a shell command after completion and requires success. Nonzero exit fails the agent with command output as its error. Prefer gate:'npm test' over another model saying code looks right.
 - resume:'<label>' continues the finished child at that label, preserving context. Cannot combine with agentType/model/effort/isolation/gate/schema.
 - agentType uses a custom type instead of the workflow default, resolved from the same registry as subagent_run; it composes with schema. Read available types from the current tool/schema, not a fixed list here.
-- Unlisted options are rejected by name. These are optional JavaScript options; do not migrate them to the top-level JSON all-fields/null contract.
+- Unlisted options are rejected by name. These are optional JavaScript options; do not migrate them to the top-level JSON all-fields/sentinel contract.
 
 ### pipeline
 
@@ -65,7 +65,7 @@ agent(prompt: string, opts?: {label?: string, phase?: string, schema?: object, m
 
 ### args
 
-`args: any` is the tool input verbatim, including null; internal workflow() may pass undefined. Previous args are not automatically inherited. Pass actual JSON arrays/objects, not encoded strings: `args: ["a.ts", "b.ts"]`, not `args: "[\"a.ts\", ...]"`. The latter arrives as one string, so args.filter/map throw. Parameterize named workflows with questions, paths/config directly, not side-channel files.
+`args: any` is the tool input verbatim; internal workflow() may pass undefined. Previous args are not automatically inherited. Pass actual JSON arrays/objects, not encoded strings: `args: ["a.ts", "b.ts"]`, not `args: "[\"a.ts\", ...]"`. The latter arrives as one string, so args.filter/map throw. Parameterize named workflows with questions, paths/config directly, not side-channel files.
 
 ### budget
 
@@ -85,6 +85,6 @@ Concurrent agent() cap per workflow is `max(1, min(16, available CPUs - 2))`; ex
 
 ## Replay
 
-Results include execution_id. After pause, kill or script editing, relaunch a finished same-session run with scriptPath/resumeFromRunId, script/name null and explicit args. The longest unchanged agent() prefix returns recorded results instantly; the first edited/new call and everything after runs live. Same script + same args → 100% cache hit. This is a prefix, not a lookup: later matches are not reused after an earlier change. Journaled failure ends the prefix; failure at agent 5 retries from agent 5. The run must be finished in the same session; stop it first (agent_manage stop or x in /tasks). Replay gets a new execution_id.
+Results include execution_id. After pause, kill or script editing, relaunch a finished same-session run with scriptPath/resumeFromRunId, script/name `"null"` and explicit args. The longest unchanged agent() prefix returns recorded results instantly; the first edited/new call and everything after runs live. Same script + same args → 100% cache hit. This is a prefix, not a lookup: later matches are not reused after an earlier change. Journaled failure ends the prefix; failure at agent 5 retries from agent 5. The run must be finished in the same session; stop it first (agent_manage stop or x in /tasks). Replay gets a new execution_id.
 
 Before diagnosing an empty/unexpected completed result, read `<run id>.workflow.jsonl` beside the script: it records each agent's actual return. Do not assume cached results are non-empty. Time/random globals are unavailable; supply timestamps via args or stamp after return. These are the existing replay semantics, not a replacement for result verification.

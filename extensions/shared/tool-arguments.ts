@@ -139,3 +139,8 @@ export function requireValue(parsed: ParsedControls, field: string, context: str
   if (Object.hasOwn(parsed.values, field)) return parsed.values[field];
   throw new Error(`\`${field}\` is required ${context}; "${parsed.sentinels[field] ?? NULL_SENTINEL}" is not a value.`);
 }
+
+/** For renderers reading raw (possibly unparsed or historical) arguments: a real string value, or undefined for sentinels/JSON null/non-strings. */
+export function argText(value: unknown): string | undefined {
+  return typeof value === "string" && value !== NULL_SENTINEL && value !== DEFAULT_SENTINEL ? value : undefined;
+}

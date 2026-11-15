@@ -121,7 +121,7 @@ void it("mailbox retains a bounded number of executions", () => {
   assert.deepEqual([...new Set(mailbox.listMessages().map(message => message.runId))], ["3", "4", "5", "6", "7"]);
 });
 
-void it("reply_to_parent schema is fixed, nullable and validated before the channel", async () => {
+void it("reply_to_parent schema is fixed, uses the null sentinel and is validated before the channel", async () => {
   const sends: [string, string | null][] = [];
   const channel = { send: (text: string, requestId: string | null) => { sends.push([text, requestId]); return { ok: true as const, value: { message: { seq: 1, runId: "1", requestId, text, at: 0 }, deliveredToWaiter: false } }; } };
   const tool = createReplyToParentTool(channel);
@@ -134,23 +134,26 @@ void it("reply_to_parent schema is fixed, nullable and validated before the chan
   assert.deepEqual(Reflect.get(tool.parameters, "required"), ["message", "request_id"]);
   assert.equal(String(tool.promptGuidelines).split("\n")[0], "reply_to_parent usage:");
   const validate = (args: unknown) => validateToolArguments(tool as never, { type: "toolCall", id: "t", name: tool.name, arguments: args as never });
-  assert.deepEqual(validate({ message: "hi", request_id: null }), { message: "hi", request_id: null });
+  assert.doesNotMatch(JSON.stringify(tool.parameters), /"type":"null"/);
+  // JSON null converges on the "null" sentinel at the host.
+  assert.deepEqual(validate({ message: "hi", request_id: null }), { message: "hi", request_id: "null" });
+  assert.deepEqual(validate({ message: "hi", request_id: "null" }), { message: "hi", request_id: "null" });
   assert.throws(() => validate({ message: "hi" }));
-  assert.throws(() => validate({ message: "hi", request_id: null, kind: "blocked" }));
+  assert.throws(() => validate({ message: "hi", request_id: "null", kind: "blocked" }));
 
   const run = (args: unknown) => tool.execute("t", args as never, undefined, undefined, {} as never);
-  for (const bad of [{ message: "hi" }, { message: "   ", request_id: null }, { message: "hi", request_id: "  " }, { message: "hi", request_id: null, extra: null }]) {
+  for (const bad of [{ message: "hi" }, { message: "   ", request_id: "null" }, { message: "hi", request_id: "  " }, { message: "hi", request_id: "" }, { message: "hi", request_id: null }, { message: "hi", request_id: "null", extra: "null" }]) {
     const result = await run(bad);
     assert.equal(result.isError, true, JSON.stringify(bad));
   }
   assert.equal(sends.length, 0, "refused arguments never reach the channel");
-  const notice = await run({ message: "drift", request_id: null });
+  const notice = await run({ message: "drift", request_id: "null" });
   assert.notEqual(notice.isError, true);
   assert.match(String(notice.content[0]?.type === "text" && notice.content[0].text), /Notice accepted/);
   const reply = await run({ message: "yes", request_id: " req_1 " });
   assert.match(String(reply.content[0]?.type === "text" && reply.content[0].text), /Reply to req_1 accepted/);
   assert.deepEqual(sends, [["drift", null], ["yes", "req_1"]]);
-  const refused = await again.execute("t", { message: "x", request_id: null } as never, undefined, undefined, {} as never);
+  const refused = await again.execute("t", { message: "x", request_id: "null" } as never, undefined, undefined, {} as never);
   assert.equal(refused.isError, true);
 });
 

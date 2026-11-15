@@ -1233,7 +1233,7 @@ export default function (pi: ExtensionAPI): void {
 			}
 
 			if (event.toolName !== "subagent_run") return;
-			const input = event.input as { subagent_type?: unknown; prompt?: unknown; isolated?: unknown; isolation?: unknown };
+			const input = event.input as { subagent_type?: unknown; prompt?: unknown; isolation?: unknown };
 			if (!isTrellisRole(input.subagent_type) || typeof input.prompt !== "string") return;
 			// Ordinary subagent_run cannot promise task materials from a separately-created temporary tree.
 			if (input.isolation === "worktree") return { block: true, reason: "pi-trellis task agents need the current prepared checkout. Temporary worktree isolation cannot see its uncommitted task materials; no agent was started." };

@@ -1,47 +1,74 @@
-import { parseControlArguments } from "../../shared/tool-arguments.ts";
+import { parseControls, rejectInapplicable, requireValue, type ControlSpec } from "../../shared/tool-arguments.ts";
 import { assertNonEmptyString } from "./spawn-input.ts";
-import { THINKING_LEVELS } from "./invocation-config.ts";
+import { CONTEXT_MODES, EXECUTION_MODES, THINKING_LEVELS, TOOL_SCOPES } from "./invocation-config.ts";
 
 export interface AgentToolCapabilities { nested: boolean; isolation: boolean }
 
+/** Internal parameters produced by the model tool parser; manager/RPC contracts keep these names. */
 export interface AgentToolParams {
   prompt: string; description?: string; subagent_type?: string; model?: string;
   thinking?: typeof THINKING_LEVELS[number]; run_in_background?: boolean; resume?: string;
   isolated?: boolean; inherit_context?: boolean; isolation?: "off" | "worktree";
 }
+
+const NULLABLE: ControlSpec = { kind: "nullable" };
+const DEFAULTABLE: ControlSpec = { kind: "defaultable" };
+const AGENT_CONTROLS: Record<string, ControlSpec> = {
+  description: NULLABLE, subagent_type: NULLABLE, resume: NULLABLE,
+  model: DEFAULTABLE, thinking: DEFAULTABLE, execution: DEFAULTABLE, tools: DEFAULTABLE, context: DEFAULTABLE, isolation: DEFAULTABLE,
+};
+
+/** Model-facing subagent_run fields, in schema order. */
 export function agentToolFields(capabilities: AgentToolCapabilities): string[] {
-  return ["prompt", "description", "subagent_type", "model", "thinking", "run_in_background", "resume", "isolated", "inherit_context",
+  return ["prompt", "description", "subagent_type", "model", "thinking", "execution", "resume", "tools", "context",
     ...(capabilities.isolation ? ["isolation"] : [])];
+}
+
+function assertEnum(value: unknown, values: readonly string[], field: string): void {
+  if (value !== undefined && !values.includes(value as string)) {
+    throw new Error(`\`${field}\` must be one of ${values.map(v => `"${v}"`).join(", ")} or "default".`);
+  }
 }
 
 /** Tool-only admission; internal manager/RPC option contracts remain separate. */
 export function parseAgentToolArguments(value: unknown, capabilities: AgentToolCapabilities): AgentToolParams {
   const fields = agentToolFields(capabilities);
-  const params = parseControlArguments(value, fields, fields.filter(field => field !== "prompt"));
-  const resume = Object.hasOwn(params, "resume");
+  const parsed = parseControls(value, fields, AGENT_CONTROLS);
+  const v = parsed.values;
+  const resume = Object.hasOwn(v, "resume");
   if (resume) {
-    try { assertNonEmptyString(params.resume, "`resume`"); }
+    try { assertNonEmptyString(v.resume, "`resume`"); }
     catch (error) {
-      throw new Error(`${error instanceof Error ? error.message : String(error)} Set resume to null for a new agent; to resume, provide a real agent_id. No agent was resumed.`);
+      throw new Error(`${error instanceof Error ? error.message : String(error)} Set resume to "null" for a new agent; to resume, provide a real agent_id. No agent was resumed.`);
     }
+    const inapplicable = ["description", "subagent_type", "model", "thinking", "tools", "context",
+      ...(capabilities.isolation ? ["isolation"] : []), ...(capabilities.nested ? ["execution"] : [])];
+    try { rejectInapplicable(parsed, inapplicable, "when resuming"); }
+    catch (error) {
+      throw new Error(`${error instanceof Error ? error.message : String(error)} A resume value other than "null" selects resume mode; set resume to "null" to start a new agent. No agent was resumed.`);
+    }
+  } else {
+    assertNonEmptyString(requireValue(parsed, "description", "for a new agent"), "`description`");
+    assertNonEmptyString(requireValue(parsed, "subagent_type", "for a new agent"), "`subagent_type`");
   }
-  const allowed = resume
-    ? ["prompt", "resume", ...(capabilities.nested ? [] : ["run_in_background"])]
-    : ["prompt", "description", "subagent_type", "model", "thinking", "run_in_background", "isolated", "inherit_context",
-      ...(capabilities.isolation ? ["isolation"] : [])];
-  assertFields(params, allowed);
-  assertNonEmptyString(params.prompt, "`prompt`");
-  if (!resume) {
-    assertNonEmptyString(params.description, "`description`");
-    assertNonEmptyString(params.subagent_type, "`subagent_type`");
-  }
-  if (Object.hasOwn(params, "model")) assertNonEmptyString(params.model, "`model`");
-  for (const field of ["run_in_background", "isolated", "inherit_context"]) {
-    if (Object.hasOwn(params, field) && typeof params[field] !== "boolean") throw new Error(`${field} must be boolean.`);
-  }
-  if (Object.hasOwn(params, "thinking") && !THINKING_LEVELS.some(level => level === params.thinking)) throw new Error(`thinking must be one of ${THINKING_LEVELS.join(", ")}.`);
-  if (Object.hasOwn(params, "isolation") && params.isolation !== "off" && params.isolation !== "worktree") throw new Error("isolation must be off or worktree.");
-  return params as unknown as AgentToolParams;
+  assertNonEmptyString(v.prompt, "`prompt`");
+  if (Object.hasOwn(v, "model")) assertNonEmptyString(v.model, "`model`");
+  assertEnum(v.thinking, THINKING_LEVELS, "thinking");
+  assertEnum(v.execution, EXECUTION_MODES, "execution");
+  assertEnum(v.tools, TOOL_SCOPES, "tools");
+  assertEnum(v.context, CONTEXT_MODES, "context");
+  assertEnum(v.isolation, ["off", "worktree"], "isolation");
+  const params: AgentToolParams = { prompt: v.prompt as string };
+  if (v.description !== undefined) params.description = v.description as string;
+  if (v.subagent_type !== undefined) params.subagent_type = v.subagent_type as string;
+  if (v.model !== undefined) params.model = v.model as string;
+  if (v.thinking !== undefined) params.thinking = v.thinking as AgentToolParams["thinking"];
+  if (v.execution !== undefined) params.run_in_background = v.execution === "background";
+  if (v.resume !== undefined) params.resume = v.resume as string;
+  if (v.tools !== undefined) params.isolated = v.tools === "builtin";
+  if (v.context !== undefined) params.inherit_context = v.context === "inherit";
+  if (v.isolation !== undefined) params.isolation = v.isolation as "off" | "worktree";
+  return params;
 }
 export function assertAgentToolArguments(value: unknown, capabilities: AgentToolCapabilities): void {
   parseAgentToolArguments(value, capabilities);
@@ -49,48 +76,44 @@ export function assertAgentToolArguments(value: unknown, capabilities: AgentTool
 
 export interface WorkflowToolParams { script?: string; scriptPath?: string; name?: string; args: unknown; resumeFromRunId?: string }
 export function parseWorkflowToolArguments(value: unknown): WorkflowToolParams {
-  const params = parseControlArguments(value, ["script", "scriptPath", "name", "args", "resumeFromRunId"], ["script", "scriptPath", "name", "resumeFromRunId"]);
-  assertFields(params, ["script", "scriptPath", "name", "args", "resumeFromRunId"]);
-  const sources = ["script", "scriptPath", "name"].filter(field => Object.hasOwn(params, field));
-  for (const field of sources) assertNonEmptyString(params[field], `\`${field}\``);
-  if (Object.hasOwn(params, "resumeFromRunId")) {
-    assertNonEmptyString(params.resumeFromRunId, "`resumeFromRunId`");
-    if (!/^wf_[a-z0-9-]{6,}$/.test(String(params.resumeFromRunId))) throw new Error("resumeFromRunId must be a workflow execution ID.");
+  const { values } = parseControls(value, ["script", "scriptPath", "name", "args", "resumeFromRunId"],
+    { script: NULLABLE, scriptPath: NULLABLE, name: NULLABLE, resumeFromRunId: NULLABLE });
+  const sources = ["script", "scriptPath", "name"].filter(field => Object.hasOwn(values, field));
+  for (const field of sources) assertNonEmptyString(values[field], `\`${field}\``);
+  if (Object.hasOwn(values, "resumeFromRunId")) {
+    assertNonEmptyString(values.resumeFromRunId, "`resumeFromRunId`");
+    if (!/^wf_[a-z0-9-]{6,}$/.test(String(values.resumeFromRunId))) throw new Error("`resumeFromRunId` must be a workflow execution ID, or \"null\" for a new execution.");
   }
-  if (sources.length > 1 || (sources.length === 0 && !Object.hasOwn(params, "resumeFromRunId"))) throw new Error("Provide exactly one non-null source among script, scriptPath or name for a new execution; replay may use null for all sources. Set unused source fields to null rather than filling them with empty strings.");
-  return params as unknown as WorkflowToolParams;
+  if (sources.length > 1 || (sources.length === 0 && !Object.hasOwn(values, "resumeFromRunId"))) {
+    throw new Error("Provide exactly one source among script, scriptPath or name for a new execution and set the others to \"null\"; replay may set all sources to \"null\".");
+  }
+  return values as unknown as WorkflowToolParams;
 }
 export function assertWorkflowToolArguments(value: unknown): void {
   parseWorkflowToolArguments(value);
 }
 
 export function assertMessageToolArguments(value: unknown): asserts value is Record<string, unknown> {
-  const params = assertObject(value);
-  assertFields(params, ["agent_id", "message"]);
-  assertNonEmptyString(params.agent_id, "`agent_id`");
-  assertNonEmptyString(params.message, "`message`");
+  const { values } = parseControls(value, ["agent_id", "message"], {});
+  assertNonEmptyString(values.agent_id, "`agent_id`");
+  assertNonEmptyString(values.message, "`message`");
 }
 
+/** Internal reply modes; the model-facing `reply` field adds "skip" for plain guidance. */
 export const MESSAGE_REPLY_MODES = ["wait", "notify"] as const;
+export const MESSAGE_REPLY_CHOICES = ["skip", ...MESSAGE_REPLY_MODES] as const;
 export type MessageReplyMode = typeof MESSAGE_REPLY_MODES[number];
 export interface MessageToolParams { agent_id: string; message: string; reply?: MessageReplyMode }
 
-/** subagent_message with the nullable `reply` control; null keeps plain steering. */
+/** subagent_message; reply "skip" keeps plain steering. */
 export function parseMessageToolArguments(value: unknown): MessageToolParams {
-  const params = parseControlArguments(value, ["agent_id", "message", "reply"], ["reply"]);
-  assertNonEmptyString(params.agent_id, "`agent_id`");
-  assertNonEmptyString(params.message, "`message`");
-  if (Object.hasOwn(params, "reply") && !MESSAGE_REPLY_MODES.some(mode => mode === params.reply)) {
-    throw new Error("reply must be \"wait\", \"notify\" or null.");
+  const { values } = parseControls(value, ["agent_id", "message", "reply"], {});
+  assertNonEmptyString(values.agent_id, "`agent_id`");
+  assertNonEmptyString(values.message, "`message`");
+  if (!MESSAGE_REPLY_CHOICES.some(mode => mode === values.reply)) {
+    throw new Error("`reply` must be \"skip\", \"wait\" or \"notify\".");
   }
-  return params as unknown as MessageToolParams;
-}
-
-function assertObject(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Tool arguments must be an object.");
-  return value as Record<string, unknown>;
-}
-function assertFields(params: Record<string, unknown>, allowed: string[]): void {
-  const invalid = Object.keys(params).find(field => !allowed.includes(field));
-  if (invalid) throw new Error(`Field '${invalid}' is not accepted for this invocation. Accepted fields: ${allowed.join(", ")}.${Object.hasOwn(params, "resume") ? " Supplying a non-null resume selects resume mode. Set new-agent fields to null when resuming, or set resume to null to start a new agent. No agent was resumed." : " Set fields that do not apply to this invocation to null."}`);
+  const params: MessageToolParams = { agent_id: values.agent_id, message: values.message };
+  if (values.reply !== "skip") params.reply = values.reply as MessageReplyMode;
+  return params;
 }

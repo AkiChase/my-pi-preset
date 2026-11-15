@@ -57,11 +57,11 @@ test("registered process manager retains search counts/context, byte pages and c
     // Simulate an unconsumed terminal outcome to keep search's non-consuming
     // contract observable even though normal background completion now notifies.
     delete job.outcomeSurfaced;
-    const search = await f.execute("process_manage", processInput({ action: "search", task_id: id, pattern: "NEEDLE", ignore_case: true, context: 1 }));
+    const search = await f.execute("process_manage", processInput({ action: "search", task_id: id, pattern: "NEEDLE", case: "insensitive", context: 1 }));
     assert.equal(metadata(search).count, 30); assert.match(text(search), /and 10 more/); assert.match(text(search), /:1: needle 中文 0/);
     assert.match(text(search), /:2- needle 中文 1/); assert.notEqual(job.outcomeSurfaced, true, "search does not consume a terminal outcome");
     const defaultSearch = await f.execute("process_manage", processInput({ action: "search", task_id: id, pattern: "NEEDLE" }));
-    const explicitSearch = await f.execute("process_manage", processInput({ action: "search", task_id: id, pattern: "NEEDLE", ignore_case: false, context: 0 }));
+    const explicitSearch = await f.execute("process_manage", processInput({ action: "search", task_id: id, pattern: "NEEDLE", case: "sensitive", context: 0 }));
     assert.equal(metadata(defaultSearch).count, 0); assert.equal(metadata(explicitSearch).count, 0);
     const matching = await f.execute("process_manage", processInput({ action: "search", task_id: id, task_type: "bash", pattern: "needle" }));
     assert.equal(metadata(matching).count, 30);

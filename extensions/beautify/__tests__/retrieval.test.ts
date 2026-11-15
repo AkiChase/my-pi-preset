@@ -20,15 +20,16 @@ import { loadExtensions, resolver, ToolExecutionComponent, KeybindingsManager, t
 import { processActivation, until } from "../../process-tasks/__tests__/process-harness.ts";
 import { createRunningJob, add } from "../../process-tasks/registry.ts";
 import { registerManagementFixture } from "../../process-tasks/__tests__/management-fixture.ts";
-test("process renderer normalizes nullable IDs and preserves strict result/fallback guards", () => {
+test("process renderer normalizes sentinel IDs and preserves strict result/fallback guards", () => {
   const contract = managementContract("process");
   const args = Object.freeze(processInput({ action: "list" }));
   const result = { content: [{ type: "text" as const, text: "body" }], details: { runtimeManagement: { version: 2, group: "process", action: "list", count: 2 } } };
   assert.equal(contract(args, result, context(args))?.stats, "2 tasks");
-  assert.equal(args.task_id, null);
+  assert.equal(args.task_id, "null");
   assert.equal(contract({ action: "list" }, result, context({ action: "list" })), undefined);
-  assert.equal(contract({ ...args, typo: null }, result, context(args)), undefined);
-  assert.equal(contract({ ...args, offset: 0 }, result, context(args)), undefined);
+  assert.equal(contract({ ...args, typo: "null" }, result, context(args)), undefined);
+  assert.equal(contract({ ...args, offset: "0" }, result, context(args)), undefined);
+  assert.equal(contract({ ...args, task_id: null }, result, context(args)), undefined);
   const waiting = processInput({ action: "wait", task_id: "job" });
   const partial = { ...result, details: { runtimeManagement: { version: 2, group: "process", action: "wait", task_id: "job", wait_outcome: "waiting" } } };
   assert.equal(contract(waiting, partial, context(waiting, { isPartial: true }))?.stats, "waiting");

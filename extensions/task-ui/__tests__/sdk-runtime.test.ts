@@ -143,7 +143,7 @@ void it("actual SDK runtime new/resume/fork/import/quit creates fresh factories;
         const job = initial.backend.source.list().at(-1)!;
         const log = job.artifacts[0]!.path;
         await until(() => readFileSync(log, "utf8").includes("READY"));
-        await initial.execute("subagent_run", { subagent_type: "general-purpose", description: "old", prompt: "offline", run_in_background: true });
+        await initial.execute("subagent_run", { subagent_type: "general-purpose", description: "old", prompt: "offline", execution: "background" });
         assert.equal(initial.counts().agentRuns, 1);
         order.length = 0;
         assert.deepEqual(await runtime.newSession(), { cancelled: false });
@@ -158,7 +158,7 @@ void it("actual SDK runtime new/resume/fork/import/quit creates fresh factories;
         assert.equal((runtime.session === initial.session ? initial : current!).backend.source.list().length, 0);
         await current!.execute("bash", { command: "printf NEW_FACTORY" });
         assert.equal(current!.counts().agentRuns, 0);
-        await current!.execute("subagent_run", { subagent_type: "general-purpose", description: "new", prompt: "offline", run_in_background: true });
+        await current!.execute("subagent_run", { subagent_type: "general-purpose", description: "new", prompt: "offline", execution: "background" });
         assert.equal(current!.counts().agentRuns, 1);
         await runtime.switchSession(validFile);
         assert.equal(current!.lifecycle.active, true);
@@ -241,7 +241,7 @@ void it("actual SDK AgentSession.reload invokes old shutdown before activation r
     try {
         await old.execute("bash", { background_after_seconds: 0, command: "tail -f /dev/null" });
         const pid = [...old.reg.jobs.values()][0]!.pid;
-        await old.execute("subagent_run", completeToolCall((old.tools.get("subagent_run")! as unknown as { parameters: TSchema }).parameters, { subagent_type: "general-purpose", description: "reload", prompt: "offline", run_in_background: true }));
+        await old.execute("subagent_run", completeToolCall((old.tools.get("subagent_run")! as unknown as { parameters: TSchema }).parameters, { subagent_type: "general-purpose", description: "reload", prompt: "offline", execution: "background" }));
         await AgentSession.prototype.reload.call(seam as unknown as AgentSession);
         assert.deepEqual(order, ["reload", "invalidate", "create"]);
         assert.equal(processExists(pid), false); assert.equal(agentStops, 1);

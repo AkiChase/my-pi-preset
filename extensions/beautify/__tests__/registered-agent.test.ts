@@ -20,7 +20,7 @@ import { managementContract } from "../tools/management.ts";
 import { withToolCardTiming } from "../tool-card.ts";
 import { executionId } from "../../runtime-tasks/execution-id.ts";
 const rawAgentContract = managementContract("agent");
-const complete = (args: Record<string, unknown>) => ({ agent_id: null, execution_id: null, kind: null, verbose: null, ...args });
+const complete = (args: Record<string, unknown>) => ({ agent_id: "null", execution_id: "null", kind: "null", detail: "null", ...args });
 const agentContract: typeof rawAgentContract = (args, result, ctx) => rawAgentContract(complete(args), result, ctx);
 import { createRuntimeTaskFacade, type RuntimeTaskCapability } from "../../runtime-tasks/facade.ts";
 import type { RenderContext } from "../types.ts";
@@ -102,7 +102,7 @@ test("actual registered Agent launch/manage renders config, lifecycle outcomes a
     assert.match(plain(cooperative.render(160).join("\n")), /Completed.*execution 1\.2s/);
     await handlers.get("session_start")![0]!(undefined, ctx);
     const notFound = await execute({ action: "output", agent_id: "absent" }); assert.equal(agentContract({ action: "output", agent_id: "absent" }, notFound, viewContext({ action: "output", agent_id: "absent" }))?.stats, "stale");
-    const launchArgs = completeToolCall(tools.get("subagent_run")!.parameters, { subagent_type: "general-purpose", description: "Actual description", prompt: "offline", run_in_background: true });
+    const launchArgs = completeToolCall(tools.get("subagent_run")!.parameters, { subagent_type: "general-purpose", description: "Actual description", prompt: "offline", execution: "background" });
     const launched = await tools.get("subagent_run")!.execute("launch", launchArgs, undefined, undefined, ctx);
     const launchComponent = display("subagent_run", launchArgs, launched as Awaited<ReturnType<typeof execute>>);
     const launchCard = plain(launchComponent.render(160).join("\n"));
@@ -113,7 +113,7 @@ test("actual registered Agent launch/manage renders config, lifecycle outcomes a
     assert.match(plain(launchComponent.render(160).join("\n")), /inherit_context: false/);
     await tick();
     const id = coordinator.list().find(view => view.kind === "agent")!.taskId;
-    const args = complete({ action: "output", agent_id: id, verbose: true });
+    const args = complete({ action: "output", agent_id: id, detail: "full" });
     const running = await execute(args), copy = structuredClone(running);
     assert.equal(agentContract(args, running, viewContext(args))?.stats, "running");
     assert.equal(agentContract(args, running, viewContext(args))?.title, "output · Actual description");
@@ -167,7 +167,7 @@ test("actual registered Agent launch/manage renders config, lifecycle outcomes a
         assert.doesNotMatch(full, /\u001b/);
       }
     }
-    const foregroundArgs = completeToolCall(tools.get("subagent_run")!.parameters, { subagent_type: "general-purpose", description: "Foreground description", prompt: "offline", run_in_background: false });
+    const foregroundArgs = completeToolCall(tools.get("subagent_run")!.parameters, { subagent_type: "general-purpose", description: "Foreground description", prompt: "offline", execution: "foreground" });
     const partials: Awaited<ReturnType<typeof execute>>[] = [];
     const foreground = tools.get("subagent_run")!.execute("foreground", foregroundArgs, undefined, update => partials.push(update as Awaited<ReturnType<typeof execute>>), ctx);
     await tick();

@@ -81,7 +81,7 @@ async function factory() {
     tools, sent, entries, steers, runs, coordinator, execute, registry,
     manage: (params: Record<string, unknown>) => agentManage.tool.execute("manage", completeToolCall(agentManage.tool.parameters, params) as never, undefined, undefined, ctx),
     async background() {
-      await execute("subagent_run", { subagent_type: "general-purpose", description: "work", prompt: "work", run_in_background: true });
+      await execute("subagent_run", { subagent_type: "general-purpose", description: "work", prompt: "work", execution: "background" });
       await tick();
       const run = runs.at(-1)!;
       return { id: run.id, run, channel: run.options.parentChannel! };
@@ -96,7 +96,7 @@ async function factory() {
   };
 }
 
-void it("subagent_message schema: reply is required, nullable and enum-checked before effects", async () => {
+void it("subagent_message schema: reply is a required closed enum checked before effects", async () => {
   const f = await factory();
   try {
     const tool = f.tools.get("subagent_message")!;
@@ -104,9 +104,11 @@ void it("subagent_message schema: reply is required, nullable and enum-checked b
     const validate = (args: unknown) => validateToolArguments(tool as never, { type: "toolCall", id: "t", name: tool.name, arguments: args as never });
     assert.throws(() => validate({ agent_id: "a", message: "m" }));
     assert.throws(() => validate({ agent_id: "a", message: "m", reply: "later" }));
-    assert.doesNotThrow(() => validate({ agent_id: "a", message: "m", reply: null }));
+    assert.throws(() => validate({ agent_id: "a", message: "m", reply: null }), /reply/);
+    assert.doesNotThrow(() => validate({ agent_id: "a", message: "m", reply: "skip" }));
+    assert.doesNotMatch(JSON.stringify(tool.parameters), /"type":"null"/);
     const { id } = await f.background();
-    for (const bad of [{ agent_id: id, message: "q" }, { agent_id: id, message: "q", reply: "later" }]) {
+    for (const bad of [{ agent_id: id, message: "q" }, { agent_id: id, message: "q", reply: "later" }, { agent_id: id, message: "q", reply: "null" }, { agent_id: id, message: "q", reply: null }]) {
       const result = await tool.execute("t", bad as never, undefined, () => {}, {} as never);
       assert.equal(result.isError, true);
     }
@@ -115,11 +117,11 @@ void it("subagent_message schema: reply is required, nullable and enum-checked b
   } finally { await f.close(); }
 });
 
-void it("reply null keeps plain steering; notify sends the question then its marker and delivers the reply", async () => {
+void it("reply skip keeps plain steering; notify sends the question then its marker and delivers the reply", async () => {
   const f = await factory();
   try {
     const { id, channel } = await f.background();
-    const plain = await f.execute("subagent_message", { agent_id: id, message: "continue", reply: null });
+    const plain = await f.execute("subagent_message", { agent_id: id, message: "continue", reply: "skip" });
     assert.match(text(plain), /^Steering message sent to agent/);
     const asked = await f.execute("subagent_message", { agent_id: id, message: "Where is the schema?", reply: "notify" });
     const requestId = /Request ID: (req_\w+)/.exec(text(asked))![1]!;
@@ -221,7 +223,7 @@ void it("unwaited notices precede the completion notification", async () => {
 void it("foreground subagent_run appends messages received during its wait to the result", async () => {
   const f = await factory();
   try {
-    const launch = f.execute("subagent_run", { subagent_type: "general-purpose", description: "fg", prompt: "fg", run_in_background: false }, "fg-call");
+    const launch = f.execute("subagent_run", { subagent_type: "general-purpose", description: "fg", prompt: "fg", execution: "foreground" }, "fg-call");
     await tick();
     const run = f.runs.at(-1)!;
     run.options.parentChannel!.send("progress worth knowing", null);

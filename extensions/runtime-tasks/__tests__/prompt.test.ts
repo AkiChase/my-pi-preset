@@ -6,7 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { managementTool, parseProcessManagementParams } from "../tools.ts";
 import { registerBashTool } from "../../process-tasks/tools/bash.ts";
-import { registerMonitorTool } from "../../process-tasks/tools/monitor.ts";
+import { parseMonitorArguments, registerMonitorTool } from "../../process-tasks/tools/monitor.ts";
 import { BackgroundRegistry } from "../../process-tasks/state.ts";
 import { DEFAULTS } from "../../process-tasks/config.ts";
 const entry = fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"));
@@ -32,7 +32,9 @@ test("registered split tools and monitor contribute one group each through actua
     assert.match(prompt, /configured batch interval; startup results show the adopted batch configuration/);
     assert.doesNotMatch(toolGuidelines.monitor!.join("\n"), new RegExp(`${cadence}ms cadence`));
     assert.match(prompt, /process_manage manages both/); assert.match(prompt, /execution_id/);
-    assert.match(prompt, /set task_type to null in these targeted calls/);
+    assert.match(prompt, /set task_type to "null" in these targeted calls/);
+    // Model-facing examples never spell a control as JSON null.
+    for (const rules of Object.values(toolGuidelines)) assert.doesNotMatch(rules.join("\n"), /":null\b/);
     assert.doesNotMatch(prompt, /do not include task_type in these targeted calls/);
     const processRules = toolGuidelines.process_manage!.join("\n");
     assert.match(processRules, /Provide every exposed field/);
@@ -43,10 +45,10 @@ test("registered split tools and monitor contribute one group each through actua
       assert.deepEqual(Object.keys(args), Object.keys(JSON.parse(JSON.stringify(process.parameters)).properties));
       assert.doesNotThrow(() => validateToolArguments(process as never, { id: "example", name: process.name, arguments: args } as never));
       assert.doesNotThrow(() => parseProcessManagementParams(args));
-      if (args.action === "search") { assert.equal(args.ignore_case, false); assert.equal(args.context, 0); }
+      if (args.action === "search") { assert.equal(args.case, "insensitive"); assert.equal(args.context, "2"); }
     }
     assert.match(JSON.parse(JSON.stringify(tools.find(t => t.name === "process_manage")!.parameters)).properties.limit.description, /configured budget/);
-    assert.match(JSON.parse(JSON.stringify(tools.find(t => t.name === "agent_manage")!.parameters)).properties.verbose.description, /Additional conversation.*null is equivalent to false/);
+    assert.match(JSON.parse(JSON.stringify(tools.find(t => t.name === "agent_manage")!.parameters)).properties.detail.description, /"full" adds conversation; "default" is "summary"/);
     assert.match(toolGuidelines.agent_manage!.join("\n"), /requests additional conversation/);
     assert.doesNotMatch(processRules, /verbose/);
     const monitorRules = toolGuidelines.monitor!.join("\n");
@@ -58,7 +60,8 @@ test("registered split tools and monitor contribute one group each through actua
     for (const example of examples) {
       const args = JSON.parse(example[1]!);
       assert.deepEqual(Object.keys(args), Object.keys(JSON.parse(JSON.stringify(monitor.parameters)).properties));
-      if (args.ws) assert.deepEqual(Object.keys(args.ws), ["url", "protocols"]);
+      if (typeof args.ws === "object") assert.deepEqual(Object.keys(args.ws), ["url", "protocols"]);
+      assert.doesNotThrow(() => parseMonitorArguments(args));
       assert.doesNotThrow(() => validateToolArguments(monitor as never, { id: "example", name: "monitor", arguments: args } as never));
     }
     assert.match(prompt, /Peer index/); assert.match(prompt, /Peer guideline/);

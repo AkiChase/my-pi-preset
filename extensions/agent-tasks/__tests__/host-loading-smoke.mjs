@@ -129,7 +129,7 @@ try {
     assertChild(child, rootExt, "composite child");
     const ext = child.extensions[0], manage = ext.tools.get("agent_manage").definition;
     const ctx = { cwd, hasUI: false, ui: { setStatus() {}, setWidget() {}, notify() {}, theme: { fg: (_c, t) => t } } };
-    const call = (args) => manage.execute("probe", { agent_id: null, execution_id: null, kind: null, verbose: null, ...args }, undefined, undefined, ctx);
+    const call = (args) => manage.execute("probe", { agent_id: "null", execution_id: "null", kind: "null", detail: "null", ...args }, undefined, undefined, ctx);
     assert.match((await call({ action: "list" })).content[0].text, /agent_id=owned/);
     assert.equal((await call({ action: "output", agent_id: "root-or-sibling" })).details.runtimeManagement.error_code, "stale");
     const launch = await ext.tools.get("bash").definition.execute("local", bashInput({ command: "printf CHILD", background_after_seconds: 0 }), undefined, undefined, ctx);

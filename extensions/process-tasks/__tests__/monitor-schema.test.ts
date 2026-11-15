@@ -1,7 +1,7 @@
 import { monitorInput } from "./monitor-input.ts";
 /**
  * Monitor wire schema, actual host conversions and strict direct admission.
- * Fixed-object closure and required nullable controls are distinct from the
+ * Fixed-object closure and required string-sentinel controls are distinct from the
  * SDK scalar conversion step, which cannot establish raw input validity.
  */
 import { describe, it, after } from "node:test";
@@ -99,12 +99,14 @@ void describe("monitor parameter schema", () => {
     it("keeps command/ws mutual exclusion as a runtime check, not a schema anyOf", () => {
         const { tool } = harness();
         const schema = JSON.parse(JSON.stringify(tool.parameters)) as Record<string, unknown>;
+        assert.doesNotMatch(JSON.stringify(schema), /"type":"null"/);
         assert.equal(schema.additionalProperties, false);
         assert.deepEqual(schema.required, ["command", "ws", "description", "timeout_ms", "wake_absent_ms"]);
-        const properties = schema.properties as Record<string, { anyOf?: Record<string, unknown>[] }>;
+        const properties = schema.properties as Record<string, { anyOf?: Record<string, unknown>[]; type?: string; pattern?: string }>;
         for (const property of Object.values(properties)) assert.equal(Object.hasOwn(property, "default"), false);
-        for (const field of ["command", "ws", "timeout_ms", "wake_absent_ms"]) assert.ok(properties[field]!.anyOf!.some(variant => variant.type === "null"));
-        assert.equal(properties.description!.anyOf, undefined);
+        for (const field of ["timeout_ms", "wake_absent_ms"]) assert.equal(properties[field]!.pattern, "^(null|[0-9]+)$");
+        assert.equal(properties.command!.type, "string");
+        assert.ok(properties.ws!.anyOf!.some(variant => Array.isArray(variant.enum) && (variant.enum as string[]).includes("null")));
         const ws = properties.ws!.anyOf!.find(variant => variant.type === "object")!;
         assert.equal(ws.additionalProperties, false); assert.deepEqual(ws.required, ["url", "protocols"]);
         // The host's strict schema mode rejects object-level alternatives, so the
@@ -123,11 +125,11 @@ void describe("monitor parameter schema", () => {
         assert.equal(h.reg.totalStarted, 0);
     });
 
-    it("empty unused command still conflicts with ws and explains null", async () => {
+    it("an empty command is not a sentinel and points to \"null\"", async () => {
         const h = harness();
         await assert.rejects(
             h.tool.execute("placeholder", monitorInput({ command: "", ws: { url: "ws://x" }, description: "x" }), undefined, undefined, h.ctx),
-            /Set the unused source to null; an empty command still counts as supplied/
+            /`command` is empty; use "null"/
         );
         assert.equal(h.reg.jobs.size, 0);
         assert.equal(h.reg.totalStarted, 0);
@@ -155,32 +157,34 @@ void describe("monitor parameter schema", () => {
         for (const params of [null, [], monitorInput({ command: "true", description: "x", typo: 1 }),
             monitorInput({ command: 7, description: "x" }), monitorInput({ ws: [], description: "x" }),
             monitorInput({ ws: { url: "ws://x", typo: true }, description: "x" }),
-            monitorInput({ ws: { url: "ws://x", protocols: [7] }, description: "x" })]) {
+            monitorInput({ ws: { url: "ws://x", protocols: [7] }, description: "x" }),
+            monitorInput({ ws: { url: "ws://x", protocols: "null" }, description: "x" })]) {
             await assert.rejects(h.tool.execute("bad", params, undefined, undefined, h.ctx));
         }
         assert.equal(h.reg.jobs.size, 0); assert.equal(h.reg.totalStarted, 0);
     });
 
-    it("host rejects negative times, coerces zero to null and preserves valid fractions", () => {
+    it("host rejects non-integer and negative times and coerces numbers to decimal strings", () => {
         const { tool } = harness();
         for (const key of ["timeout_ms", "wake_absent_ms"]) {
-            for (const value of [-1]) assert.ok(hostError(tool, monitorInput({ command: "true", description: "x", [key]: value })));
-            assert.equal(hostError(tool, monitorInput({ command: "true", description: "x", [key]: 0 })), undefined, "host converts zero to nullable null");
-            assert.equal(hostError(tool, monitorInput({ command: "true", description: "x", [key]: 0.5 })), undefined);
+            for (const value of [-1, 0.5, "1e3", "default"]) assert.ok(hostError(tool, monitorInput({ command: "true", description: "x", [key]: value })), `${key}=${value}`);
+            assert.equal(hostError(tool, monitorInput({ command: "true", description: "x", [key]: 500 })), undefined);
         }
     });
 
-    it("quotes the offending value for an invalid wake/timeout", async () => {
+    it("names the field and the sentinel for an invalid wake/timeout", async () => {
         const h = harness();
-        await assert.rejects(
-            () => h.tool.execute("nan", monitorInput({ command: "true", description: "x", wake_absent_ms: Number.NaN }), undefined, undefined, h.ctx),
-            /`wake_absent_ms` must be a finite positive number, got NaN/
-        );
+        for (const value of ["0", "-1", "NaN", "0.5"]) {
+            await assert.rejects(
+                () => h.tool.execute("nan", monitorInput({ command: "true", description: "x", wake_absent_ms: value }), undefined, undefined, h.ctx),
+                /`wake_absent_ms` must be a positive integer string or "null"/
+            );
+        }
         assert.equal(h.reg.jobs.size, 0);
     });
 });
 
-void describe("required-nullable wire boundary", () => {
+void describe("required sentinel wire boundary", () => {
     it("rejects complete raw invalid inputs with zero effects and verifies actual host conversion", async t => {
         const h = harness();
         let opens = 0, publications = 0;
@@ -189,34 +193,34 @@ void describe("required-nullable wire boundary", () => {
         t.after(() => { globalThis.WebSocket = original; });
         t.mock.method(h.reg, "changed", () => { publications++; });
         const base = monitorInput({ command: "echo must-not-run" });
-        const invalid: unknown[] = [null, [], { ...base, typo: null }, { ...base, description: null },
-            { ...base, command: false }, { ...base, ws: [] }];
+        const invalid: unknown[] = [null, [], { ...base, typo: "null" }, { ...base, description: null },
+            { ...base, command: false }, { ...base, command: null }, { ...base, ws: [] }, { ...base, ws: null }];
         for (const field of Object.keys(base)) {
             const missing = { ...base }; delete missing[field];
             invalid.push(missing, { ...base, [field]: undefined });
         }
-        for (const ws of [{ protocols: null }, { url: "ws://x" }, { url: "ws://x", protocols: undefined },
-            { url: null, protocols: null }, { url: "ws://x", protocols: null, typo: null },
+        for (const ws of [{ protocols: [] }, { url: "ws://x" }, { url: "ws://x", protocols: undefined }, { url: "ws://x", protocols: null },
+            { url: null, protocols: [] }, { url: "ws://x", protocols: [], typo: null },
             { url: "ws://x", protocols: [null] }, { url: "ws://x", protocols: {} }]) {
-            invalid.push({ ...base, command: null, ws });
+            invalid.push({ ...base, command: "null", ws });
         }
         for (const key of ["timeout_ms", "wake_absent_ms"]) {
-            for (const value of [0, -1, NaN, Infinity, -Infinity]) invalid.push({ ...base, [key]: value });
+            for (const value of ["0", "-1", "NaN", "Infinity", "default", 0, null]) invalid.push({ ...base, [key]: value });
         }
         for (const args of invalid) {
             await assert.rejects(h.tool.execute("bad-wire", args, undefined, undefined, h.ctx));
         }
-        const hostInvalid: unknown[] = [null, [], { ...base, typo: null }, { ...base, ws: [] }];
+        const hostInvalid: unknown[] = [null, [], { ...base, typo: "null" }, { ...base, ws: [] }];
         for (const field of Object.keys(base)) {
             const missing = { ...base }; delete missing[field]; hostInvalid.push(missing, { ...base, [field]: undefined });
         }
-        for (const ws of [{ protocols: null }, { url: "ws://x" }, { url: "ws://x", protocols: undefined },
-            { url: undefined, protocols: null },
-            { url: "ws://x", protocols: null, typo: null }, { url: "ws://x", protocols: {} }]) {
-            hostInvalid.push({ ...base, command: null, ws });
+        for (const ws of [{ protocols: [] }, { url: "ws://x" }, { url: "ws://x", protocols: undefined },
+            { url: undefined, protocols: [] },
+            { url: "ws://x", protocols: [], typo: null }, { url: "ws://x", protocols: {} }]) {
+            hostInvalid.push({ ...base, command: "null", ws });
         }
         for (const key of ["timeout_ms", "wake_absent_ms"]) {
-            for (const value of [-1, NaN, Infinity, -Infinity]) hostInvalid.push({ ...base, [key]: value });
+            for (const value of [-1, NaN, Infinity, -Infinity, 0.5]) hostInvalid.push({ ...base, [key]: value });
         }
         for (const args of hostInvalid) {
             const before = structuredClone(args);
@@ -225,17 +229,17 @@ void describe("required-nullable wire boundary", () => {
         }
         // Host scalar coercion is not raw-type validation: direct calls still reject.
         for (const args of [{ ...base, description: 7 }, { ...base, command: 7 },
-            { ...base, command: null, ws: { url: 7, protocols: null } }, { ...base, timeout_ms: "0.5" }]) {
+            { ...base, command: "null", ws: { url: 7, protocols: [] } }]) {
             await assert.rejects(h.tool.execute("raw-type", args, undefined, undefined, h.ctx));
         }
         assert.equal(opens, 0); assert.equal(publications, 0);
         assert.equal(h.reg.jobs.size, 0); assert.equal(h.reg.totalStarted, 0);
     });
 
-    it("host preserves empty command as a supplied source for XOR admission", async () => {
+    it("host keeps a real command with ws a conflict for XOR admission", async () => {
         const h = harness();
-        for (const command of ["", " ", "true"]) {
-            const args = monitorInput({ command, ws: { url: "ws://x", protocols: null } });
+        for (const command of [" ", "true"]) {
+            const args = monitorInput({ command, ws: { url: "ws://x", protocols: [] } });
             const converted = validateToolArguments(h.tool as never,
                 { id: "xor", name: "monitor", arguments: args } as never) as Record<string, unknown>;
             assert.equal(converted.command, command);
@@ -244,12 +248,11 @@ void describe("required-nullable wire boundary", () => {
         assert.equal(h.reg.jobs.size, 0); assert.equal(h.reg.totalStarted, 0);
     });
 
-    it("documents SDK conversions without treating them as direct input acceptance", () => {
+    it("documents SDK conversions: JSON null and numbers converge on the string spellings", () => {
         const { tool, reg } = harness();
         const base = monitorInput({ command: "true" });
-        // Nullable means explicit null is accepted, not that required undefined is defaulted.
         for (const key of ["timeout_ms", "wake_absent_ms"]) {
-            for (const [input, expected] of [[null, null], [0, null], [false, null], ["", null], [0.5, 0.5], ["0.5", 0.5], [true, 1]] as const) {
+            for (const [input, expected] of [[null, "null"], ["null", "null"], [5, "5"], ["5", "5"]] as const) {
                 const args = Object.freeze({ ...base, [key]: input });
                 const converted = validateToolArguments(tool as never, { id: "coercion", name: "monitor", arguments: args } as never) as Record<string, unknown>;
                 assert.equal(converted[key], expected);
@@ -259,25 +262,23 @@ void describe("required-nullable wire boundary", () => {
             assert.match(hostError(tool, args)!.message, new RegExp(`- ${key}: missing`));
             assert.equal(args[key], undefined); assert.equal(Object.hasOwn(args, key), true);
         }
-        const args = { ...base, command: null, description: null, ws: { url: null, protocols: [null] } };
-        const before = structuredClone(args);
-        const converted = validateToolArguments(tool as never, { id: "strings", name: "monitor", arguments: args } as never) as { description: string; ws: { url: string; protocols: string[] } };
-        assert.equal(converted.description, "null"); assert.equal(converted.ws.url, "null"); assert.deepEqual(converted.ws.protocols, ["null"]);
-        assert.deepEqual(args, before);
+        const args = { ...base, command: null, ws: null };
+        const converted = validateToolArguments(tool as never, { id: "strings", name: "monitor", arguments: args } as never) as Record<string, unknown>;
+        assert.equal(converted.command, "null"); assert.equal(converted.ws, "null");
         assert.equal(reg.totalStarted, 0); assert.equal(reg.jobs.size, 0);
     });
 
-    it("shallow normalization preserves null/defaults, fractions, arrays and input identity", () => {
-        for (const protocols of [null, [], ["second", "first"]]) {
-            const ws = Object.freeze({ url: "ws://x", protocols: protocols === null ? null : Object.freeze(protocols) });
-            const input = Object.freeze({ command: null, ws, description: "socket", timeout_ms: null, wake_absent_ms: null });
+    it("shallow normalization maps sentinels, keeps arrays and input identity", () => {
+        for (const protocols of [[], ["second", "first"]]) {
+            const ws = Object.freeze({ url: "ws://x", protocols: Object.freeze(protocols) });
+            const input = Object.freeze({ command: "null", ws, description: "socket", timeout_ms: "null", wake_absent_ms: "null" });
             const parsed = parseMonitorArguments(input);
             assert.notEqual(parsed, input); assert.notEqual(parsed.ws, ws);
             assert.equal(parsed.command, undefined); assert.equal(parsed.timeout_ms, undefined); assert.equal(parsed.wake_absent_ms, undefined);
-            assert.equal(parsed.ws!.protocols, protocols === null ? undefined : protocols);
-            assert.deepEqual(input.ws, ws); assert.equal(input.command, null);
+            assert.deepEqual(parsed.ws!.protocols, protocols.length ? protocols : undefined);
+            assert.deepEqual(input.ws, ws); assert.equal(input.command, "null");
         }
-        const fractional = parseMonitorArguments(monitorInput({ command: "true", timeout_ms: 0.5, wake_absent_ms: 0.25 }));
-        assert.equal(fractional.timeout_ms, 0.5); assert.equal(fractional.wake_absent_ms, 0.25);
+        const timed = parseMonitorArguments(monitorInput({ command: "true", timeout_ms: "500", wake_absent_ms: "25" }));
+        assert.equal(timed.timeout_ms, 500); assert.equal(timed.wake_absent_ms, 25);
     });
 });

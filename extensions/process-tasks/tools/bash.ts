@@ -107,7 +107,7 @@ export function registerBashTool(
   - Set background_after_seconds=-1 to wait until completion or manual /task-detach. Set 0 to start in the background immediately. A finite positive value is an interactive waiting threshold in seconds, not a termination deadline; maximum 2147483.647. Use /task-detach to release a current wait without stopping execution.
   - Non-interactive mode supports -1 and 0 only; positive waiting thresholds are rejected. Background tasks remain session-owned and are stopped when the session closes.
   - Foreground completion returns a tool result; background completion sends a notification automatically unless its final result has already been delivered. Do not poll list/status merely to detect completion.
-  - A background launch result means started, not successfully completed. Keep the returned task_id. Use process_manage status/output/wait/stop to inspect, read, await, or stop the bash task; set task_type to null in these targeted calls. process_manage also manages monitor tasks; use agent_manage for subagent/workflow executions.
+  - A background launch result means started, not successfully completed. Keep the returned task_id. Use process_manage status/output/wait/stop to inspect, read, await, or stop the bash task; set task_type to "null" in these targeted calls. process_manage also manages monitor tasks; use agent_manage for subagent/workflow executions.
   - Never use sleep merely to wait for a task. Use process_manage action="wait", or a condition loop that exits when ready.
   - Examples:
     Foreground: {"command":"git status --short","background_after_seconds":-1,"description":"Inspect working tree"}

@@ -52,4 +52,9 @@ agent_dir="$(mktemp -d)"; PI_SDK_DIR="$sdk_dir" PI_CODING_AGENT_DIR="$agent_dir"
 
 ## 进度记录
 
-（实施时填写）
+- 阶段 1 完成：`07b22e1`。`node --test extensions/__tests__/tool-arguments.test.ts` 6/6；`pnpm typecheck` 通过。
+- 阶段 2 与 3 合并提交：agent-tasks 测试通过共享 fixture（`completeToolCall`）直接调用 `agent_manage`，两阶段无法单独变绿。实施中的决定：
+  - monitor 的 `timeout_ms`/`wake_absent_ms` 收窄为正整数字符串（原先接受小数毫秒），与「可选数字 = 十进制整数字符串」的统一约定一致；小数毫秒没有实际用途。
+  - `subagent_workflow.args` 仍是任意 JSON 数据，不是控制字段；说明改为「无参数时用 `{}`」，避免模型写 null 后被部分渠道编码成字符串。
+  - `process_manage.pattern` 只要求非空（不 trim），保持原有「空白正则合法」行为。
+  - 测试 fixture（`completeToolCall`、`processInput`、`monitorInput`）把未给字段和 JSON null 填为 `"null"`、数字转为字符串，代表宿主强制转换后的模型调用；不做旧字段名映射。

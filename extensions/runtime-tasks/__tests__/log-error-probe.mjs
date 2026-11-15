@@ -130,7 +130,7 @@ try {
       assert.match(text(result), /:1- before/);
       assert.match(text(result), /:3- after/);
     }
-    const next = await run({ action: "search", task_id: good.id, pattern: "NEEDLE", ignore_case: true, context: 1 });
+    const next = await run({ action: "search", task_id: good.id, pattern: "NEEDLE", case: "insensitive", context: 1 });
     closed();
     assert.notEqual(next.isError, true);
     assert.equal(next.details.runtimeManagement.count, 1);

@@ -15,7 +15,7 @@
 import { randomUUID } from "node:crypto";
 import { defineTool, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { nullableControl, parseControlArguments } from "../../shared/tool-arguments.ts";
+import { parseControls, sentinelString } from "../../shared/tool-arguments.ts";
 
 export const REPLY_TO_PARENT_TOOL_NAME = "reply_to_parent";
 
@@ -119,11 +119,11 @@ export class AgentMailbox {
     if (this.closed) return fail("The agent's message channel is closed.");
     const pending = [...this.requests.values()].filter(request => request.state === "pending").length;
     if (pending >= PARENT_MESSAGE_LIMITS.pendingRequests) {
-      return fail(`This agent already has ${pending} unanswered requests (limit ${PARENT_MESSAGE_LIMITS.pendingRequests}). Wait for replies or send a plain message with reply set to null.`);
+      return fail(`This agent already has ${pending} unanswered requests (limit ${PARENT_MESSAGE_LIMITS.pendingRequests}). Wait for replies or send a plain message with reply "skip".`);
     }
     const inRun = [...this.requests.values()].filter(request => request.runId === runId).length;
     if (inRun >= PARENT_MESSAGE_LIMITS.requestsPerRun) {
-      return fail(`This execution reached the limit of ${PARENT_MESSAGE_LIMITS.requestsPerRun} parent requests. Send a plain message with reply set to null.`);
+      return fail(`This execution reached the limit of ${PARENT_MESSAGE_LIMITS.requestsPerRun} parent requests. Send a plain message with reply "skip".`);
     }
     this.startRun(runId);
     let requestId = newRequestId();
@@ -156,7 +156,7 @@ export class AgentMailbox {
     let request: ParentRequest | undefined;
     if (requestId !== null) {
       request = this.requests.get(requestId);
-      if (!request || request.runId !== runId) return fail(`Unknown request_id "${requestId}" for this execution. Copy it from the latest <parent-request>, or set request_id to null for a notice.`);
+      if (!request || request.runId !== runId) return fail(`Unknown request_id "${requestId}" for this execution. Copy it from the latest <parent-request>, or set request_id to \"null\" for a notice.`);
       if (request.state === "replied") return fail(`Request ${requestId} was already answered; each request accepts one reply.`);
       if (request.state !== "pending") return fail(`Request ${requestId} is no longer open.`);
     }
@@ -259,22 +259,22 @@ const REPLY_TOOL_GUIDANCE = [
   `${REPLY_TO_PARENT_TOOL_NAME} usage:`,
   `  - The agent that started you may ask a question mid-task: its message is followed by <parent-request request_id="..." reply_tool="${REPLY_TO_PARENT_TOOL_NAME}" />. Answer by calling ${REPLY_TO_PARENT_TOOL_NAME} with that request_id; ordinary text in your conversation is not delivered to the parent.`,
   "  - Each request accepts one reply. Answer it promptly, then continue your task.",
-  "  - Set request_id to null to notify the parent of an important finding, risk or decision it should know about while you keep working. Do not wait for a response and do not send routine progress.",
+  "  - Set request_id to \"null\" to notify the parent of an important finding, risk or decision it should know about while you keep working. Do not wait for a response and do not send routine progress.",
   "  - When you cannot continue without a parent decision, stop and explain the blocker and the decision needed in your final response; the parent can resume you with an answer.",
   `  - Keep each message under ${PARENT_MESSAGE_LIMITS.messageBytes} bytes. Success means the host accepted the message, not that the parent has read it.`,
   "  Examples:",
   `    {"message":"Yes, the schema lives in src/schema.ts.","request_id":"req_0123456789"}`,
-  `    {"message":"Found config drift: production still uses v1 keys.","request_id":null}`,
+  `    {"message":"Found config drift: production still uses v1 keys.","request_id":"null"}`,
 ].join("\n");
 
 export interface ReplyToParentParams { message: string; request_id: string | null }
 
 export function parseReplyToParentArguments(value: unknown): { message: string; requestId: string | null } {
-  const params = parseControlArguments(value, ["message", "request_id"], ["request_id"]);
+  const { values: params } = parseControls(value, ["message", "request_id"], { request_id: { kind: "nullable" } });
   if (typeof params.message !== "string" || !params.message.trim()) throw new Error("message must be a non-empty string.");
   const requestId = Object.hasOwn(params, "request_id") ? params.request_id : null;
   if (requestId !== null && (typeof requestId !== "string" || !requestId.trim())) {
-    throw new Error("request_id must be a request id string from <parent-request>, or null for a notice.");
+    throw new Error("`request_id` must be a request id string from <parent-request>, or \"null\" for a notice.");
   }
   return { message: params.message, requestId: requestId === null ? null : (requestId as string).trim() };
 }
@@ -289,7 +289,7 @@ export function createReplyToParentTool(channel: ParentChannel): ToolDefinition 
     promptGuidelines: [REPLY_TOOL_GUIDANCE],
     parameters: Type.Object({
       message: Type.String({ minLength: 1, description: `Message text for the parent; non-blank, at most ${PARENT_MESSAGE_LIMITS.messageBytes} UTF-8 bytes.` }),
-      request_id: nullableControl(Type.String({ description: "request_id copied from <parent-request> when answering it; null for an unsolicited notice." })),
+      request_id: sentinelString("request_id copied from <parent-request> when answering it; \"null\" for an unsolicited notice."),
     }, { additionalProperties: false }),
     execute: async (_toolCallId, input) => {
       let parsed: { message: string; requestId: string | null };

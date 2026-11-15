@@ -191,11 +191,11 @@ after(() => {
 
 
 for (const key of ["timeout_ms", "wake_absent_ms"] as const) {
-    for (const value of [0, -1, NaN, Infinity]) {
+    for (const value of ["0", "-1", "NaN", "Infinity", "1.5"]) {
         test(`AC11: ${key}=${value} rejected before WS construction or registry insertion`, async () => {
             const h = makeHarness(); const before = FakeWS.instances.length;
             await assert.rejects(() => h.tool.execute("invalid", monitorInput({ command: "echo must-not-run", description: "invalid", [key]: value }),
-                undefined, undefined, h.ctx), /finite positive/);
+                undefined, undefined, h.ctx), new RegExp(`\`${key}\` must be a positive integer string or "null"`));
             assert.equal(h.reg.totalStarted, 0); assert.equal(h.reg.jobs.size, 0); assert.equal(FakeWS.instances.length, before);
         });
     }
@@ -275,18 +275,18 @@ test("AC18: tool startup wiring failure closes WS/log fd and rolls back all runt
     assert.equal(h.reg.completedCount + h.reg.failedCount + h.reg.killedCount, 0);
 });
 
-test("registered WS envelopes preserve null defaults, empty protocols and preference order", async t => {
+test("registered WS envelopes map \"null\" defaults, empty protocols and preference order", async t => {
     t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1000 });
     const original = globalThis.WebSocket; globalThis.WebSocket = FakeWS as unknown as typeof WebSocket;
     t.after(() => { globalThis.WebSocket = original; t.mock.timers.reset(); });
-    for (const protocols of [null, [], ["second", "first"]]) {
+    for (const protocols of [[], ["second", "first"]]) {
         const h = makeHarness();
         const input = monitorInput({ ws: { url: "ws://local.invalid", protocols }, description: "defaults" });
         const snapshot = structuredClone(input);
         const result = await h.tool.execute("defaults", input, undefined, undefined, h.ctx);
         const job = [...h.reg.jobs.values()][0]!;
         const ws = FakeWS.instances.at(-1)!;
-        assert.equal(ws.protocols, protocols === null ? undefined : protocols);
+        assert.equal(ws.protocols, protocols.length === 0 ? undefined : protocols);
         assert.deepEqual(input, snapshot);
         assert.match(result.content[0]!.text, /no deadline/);
         t.mock.timers.tick(36_000_000);
@@ -296,19 +296,19 @@ test("registered WS envelopes preserve null defaults, empty protocols and prefer
     }
 });
 
-test("registered fractional time controls retain exact deadline and silence values", async t => {
+test("registered integer time controls retain exact deadline and silence values", async t => {
     t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1000 });
     const original = globalThis.WebSocket; globalThis.WebSocket = FakeWS as unknown as typeof WebSocket;
     t.after(() => { globalThis.WebSocket = original; t.mock.timers.reset(); });
     const h = makeHarness();
     await h.tool.execute("fraction", monitorInput({ ws: { url: "ws://local.invalid" },
-        description: "fraction", timeout_ms: 10.5, wake_absent_ms: 2.5 }), undefined, undefined, h.ctx);
+        description: "fraction", timeout_ms: "10", wake_absent_ms: "2" }), undefined, undefined, h.ctx);
     const job = [...h.reg.jobs.values()][0]!;
     t.after(() => terminateJobSilently(h.reg, job));
     t.mock.timers.tick(3); t.mock.timers.tick(200);
     await Promise.resolve();
     assert.equal(job.status, "killed");
     const message = h.messages[0] as unknown as { content: string };
-    assert.match(message.content, /timeout after 10\.5ms/);
+    assert.match(message.content, /timeout after 10ms/);
     assert.equal(h.reg.jobAborts.size, 0);
 });

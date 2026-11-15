@@ -1,6 +1,4 @@
-import { nullableControl } from "../../shared/tool-arguments.ts";
-import { Type } from "typebox";
-import { StringEnum } from "@earendil-works/pi-ai";
+import { defaultableEnum } from "../../shared/tool-arguments.ts";
 import type { AgentConfig, AgentInvocation, IsolationMode, JoinMode, ThinkingLevel } from "./types.ts";
 
 /**
@@ -14,11 +12,8 @@ import type { AgentConfig, AgentInvocation, IsolationMode, JoinMode, ThinkingLev
 export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
 
 export const thinkingParamShape = {
-  thinking: nullableControl(
-    StringEnum(THINKING_LEVELS, {
-      description: `Thinking level: ${THINKING_LEVELS.join(", ")}. Null uses agent configuration, otherwise child session settings/defaults. Agent-file configuration takes precedence over calls.`,
-    }),
-  ),
+  thinking: defaultableEnum(THINKING_LEVELS,
+    `Thinking level: ${THINKING_LEVELS.join(", ")}. "default" uses agent configuration, otherwise child session settings/defaults; it is not "off". Agent-file configuration takes precedence over calls.`),
 };
 
 /**
@@ -58,12 +53,8 @@ export function thinkingParam(): Partial<typeof thinkingParamShape> {
  * a second legal value is what lets a model decline one, not being told to.
  */
 const isolationParamShape = {
-  isolation: nullableControl(
-    Type.Union([Type.Literal("off"), Type.Literal("worktree")], {
-      description:
-        'Isolation mode. Null uses configuration, otherwise "off". "off" runs the agent in the current checkout. "worktree" creates a temporary git worktree so the agent works on an isolated copy of the repo (a copy cannot see uncommitted or staged changes in the main checkout).',
-    }),
-  ),
+  isolation: defaultableEnum(["off", "worktree"] as const,
+    'Isolation mode. "default" uses configuration, otherwise "off". "off" runs the agent in the current checkout. "worktree" creates a temporary git worktree so the agent works on an isolated copy of the repo (a copy cannot see uncommitted or staged changes in the main checkout).'),
 };
 
 /**
@@ -83,6 +74,24 @@ const isolationParamShape = {
  */
 export function isolationParam(enabled: boolean): Partial<typeof isolationParamShape> {
   return enabled ? isolationParamShape : {};
+}
+
+/** Model-facing names of the former boolean controls; tool parsers map them to the internal booleans. */
+export const EXECUTION_MODES = ["foreground", "background"] as const;
+export const TOOL_SCOPES = ["full", "builtin"] as const;
+export const CONTEXT_MODES = ["fresh", "inherit"] as const;
+
+/** `execution`, `tools` and `context`, shared by the top-level and nested subagent_run tools. */
+export function agentControlParams(nested: boolean) {
+  return {
+    execution: defaultableEnum(EXECUTION_MODES, nested
+      ? '"default" uses agent configuration, otherwise nested new agents run foreground. "background" requires an available owned agent_manage; collect results before finishing. With resume, set "null"; execution waits inline.'
+      : 'Execution mode. "default" uses configuration. Agent-file configuration takes precedence over explicit requests. "background" returns an execution identity; "foreground" waits for results.'),
+    tools: defaultableEnum(TOOL_SCOPES,
+      'Tool scope. "default" uses configuration, otherwise "full". "builtin" gives the agent only built-in tools, no extension/MCP tools.'),
+    context: defaultableEnum(CONTEXT_MODES,
+      'Conversation context. "default" uses configuration, otherwise "fresh". "inherit" adds the parent conversation text to the prompt.'),
+  };
 }
 
 interface AgentInvocationParams {

@@ -13,7 +13,7 @@ import type { MonitorExecutionConfig } from "../../runtime-tasks/execution-confi
 const meta = (result: unknown) => (result as { details: ManagementDetails }).details.runtimeManagement;
 const snapshot = (result: unknown) => (result as { details: { executionConfig: MonitorExecutionConfig } }).details.executionConfig;
 
-for (const times of [{ timeout_ms: null, wake_absent_ms: null }, { timeout_ms: 10000.5, wake_absent_ms: 5000.5 }]) {
+for (const times of [{ timeout_ms: null, wake_absent_ms: null }, { timeout_ms: 10000, wake_absent_ms: 5000 }]) {
   test(`registered command snapshot persists across status/output/partial/final/error/release: ${JSON.stringify(times)}`, async () => {
     const dir = mkdtempSync(join(tmpdir(), "monitor-config-")), h = processActivation(dir, { monitorFlushMs: 3456 });
     let management!: Parameters<ExtensionAPI["registerTool"]>[0];

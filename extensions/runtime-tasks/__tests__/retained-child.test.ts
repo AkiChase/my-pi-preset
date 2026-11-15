@@ -100,13 +100,13 @@ for (const different of [false, true]) test(`actual retained child composite res
     f.calls[0]!.finish("initial answer"); await until(() => !f.manager.isRunActive(parent));
     assert.ok(f.manager.resumeRun(parent, "resumed")); await until(() => f.calls.length === 2);
     assert.equal(f.calls[1]!.session, session); assert.equal(session.getToolDefinition("agent_manage"), tool, "same retained facade/tool");
-    const a = launch(await f.call(session, "subagent_run", { subagent_type: "leaf", description: "owned", prompt: "child", run_in_background: true }));
+    const a = launch(await f.call(session, "subagent_run", { subagent_type: "leaf", description: "owned", prompt: "child", execution: "background" }));
     await until(() => f.calls.length === 3);
     assert.equal(f.manager.getRecord(a.agent_id)?.parentRunId, "2");
     assert.match(text(await f.call(session, "agent_manage", { action: "list" })), new RegExp(a.agent_id));
     const sibling = f.start(different ? f.cwd : f.other); await until(() => f.calls.length === 4);
     const siblingSession = f.calls[3]!.session;
-    const b = launch(await f.call(siblingSession, "subagent_run", { subagent_type: "leaf", description: "other owned", prompt: "sibling child", run_in_background: true }));
+    const b = launch(await f.call(siblingSession, "subagent_run", { subagent_type: "leaf", description: "other owned", prompt: "sibling child", execution: "background" }));
     await until(() => f.calls.length === 5);
     for (const forbidden of [parent, sibling, b.agent_id]) assert.equal(meta(await f.call(session, "agent_manage", { action: "output", agent_id: forbidden })).error_code, "stale");
     assert.equal(meta(await f.call(siblingSession, "agent_manage", { action: "stop", agent_id: a.agent_id })).error_code, "stale");
@@ -129,13 +129,13 @@ for (const different of [false, true]) test(`actual retained child composite res
     assert.equal(f.manager.getRecord(sibling)?.status, "running");
     // Freeze owner run 2 before asynchronous completion. New owner run 3 may
     // admit children through the same tool but cannot be consumed by this wait.
-    const oldChild = launch(await f.call(session, "subagent_run", { subagent_type: "leaf", description: "old waiter", prompt: "old waiter", run_in_background: true }));
+    const oldChild = launch(await f.call(session, "subagent_run", { subagent_type: "leaf", description: "old waiter", prompt: "old waiter", execution: "background" }));
     await until(() => f.calls.length === 7);
     const oldWait = f.call(session, "agent_manage", { action: "wait", agent_id: oldChild.agent_id });
     f.onComplete(record => { if (record.id === parent && record.runId === "2") f.manager.resumeRun(parent, "third"); });
     f.calls[1]!.finish("resume complete"); await until(() => f.calls.length === 8);
     f.onComplete(undefined);
-    const newer = launch(await f.call(session, "subagent_run", { subagent_type: "leaf", description: "new owner", prompt: "new child", run_in_background: true }));
+    const newer = launch(await f.call(session, "subagent_run", { subagent_type: "leaf", description: "new owner", prompt: "new child", execution: "background" }));
     await until(() => f.calls.length === 9);
     const stale = await oldWait;
     assert.equal(meta(stale).error_code, "closed", "operation captured owner run 2, not the resumed owner");
@@ -174,7 +174,7 @@ for (const mode of ["noExtensions", "excluded", "deny", "isolated", "nestedOff",
       }
       return;
     }
-    const result = await f.call(session, "subagent_run", { subagent_type: "leaf", description: "nested", prompt: "nested", run_in_background: true });
+    const result = await f.call(session, "subagent_run", { subagent_type: "leaf", description: "nested", prompt: "nested", execution: "background" });
     if (!manageable) {
       assert.equal(result.isError, true); assert.match(text(result), /requires.*agent_manage/); assert.equal(f.manager.listAgents().length, 1);
       const foreground = f.call(session, "subagent_run", { subagent_type: "leaf", description: "inline allowed", prompt: "inline allowed" });
@@ -189,11 +189,11 @@ for (const mode of ["noExtensions", "excluded", "deny", "isolated", "nestedOff",
     const localList = text(await f.call(session, "agent_manage", { action: "list" }));
     assert.doesNotMatch(localList, /task_type=bash|task_type=monitor/);
     if (mode === "noExtensions" || mode === "excluded") {
-      const next = launch(await f.call(session, "subagent_run", { subagent_type: "leaf", description: "stop owned only", prompt: "stop owned only", run_in_background: true }));
+      const next = launch(await f.call(session, "subagent_run", { subagent_type: "leaf", description: "stop owned only", prompt: "stop owned only", execution: "background" }));
       assert.match(text(await f.call(session, "agent_manage", { action: "stop", agent_id: next.agent_id })), /Stop requested/);
       const retainedTool = session.agent.state.tools.find(tool => tool.name === "agent_manage")!;
       await shutdownChildSession(session);
-      assert.equal(meta(await retainedTool.execute("late", { action: "list", agent_id: null, execution_id: null, kind: null, verbose: null }, undefined)).error_code, "closed", "closed owned-only facade cannot revive");
+      assert.equal(meta(await retainedTool.execute("late", { action: "list", agent_id: "null", execution_id: "null", kind: "null", detail: "null" }, undefined)).error_code, "closed", "closed owned-only facade cannot revive");
     }
   } finally { await f.close(); }
 });

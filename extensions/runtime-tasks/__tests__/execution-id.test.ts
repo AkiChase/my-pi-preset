@@ -31,10 +31,10 @@ test("subagent agent IDs bind admitted waits to their internal execution while r
   } }]);
   const agentId = "agent_general_purpose_0_12345678";
   const old = executionId({ taskId: agentId, runId: "1" }, "subagent");
-  const rejected = await tool.execute("old", { action: "wait", agent_id: null, execution_id: old, kind: null, verbose: null }, undefined, undefined, {} as never);
+  const rejected = await tool.execute("old", { action: "wait", agent_id: "null", execution_id: old, kind: "null", detail: "null" }, undefined, undefined, {} as never);
   assert.equal(rejected.isError, true); assert.equal(calls, 0);
   assert.match(rejected.content[0]?.type === "text" ? rejected.content[0].text : "", /wf_ execution_id.*Subagents require agent_id/);
-  const waiting = tool.execute("wait", { action: "wait", agent_id: agentId, execution_id: null, kind: null, verbose: null }, undefined, undefined, {} as never);
+  const waiting = tool.execute("wait", { action: "wait", agent_id: agentId, execution_id: "null", kind: "null", detail: "null" }, undefined, undefined, {} as never);
   run = "2";
   finish(); const result = await waiting;
   assert.equal(calls, 1);
