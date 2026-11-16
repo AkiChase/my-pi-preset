@@ -4,7 +4,7 @@ import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, w
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { readTasks, readDocument, readCurrentTaskIdentity, safeText, taskLabel } from "../lib/task-browser/reader.ts";
+import { pinCurrentTree, readTasks, readDocument, readCurrentTaskIdentity, safeText, taskLabel } from "../lib/task-browser/reader.ts";
 
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), "pi-trellis-browser-"));
@@ -204,6 +204,37 @@ test("nested tree ordering is deterministic and source records are never changed
   const value = f.read();
   assert.deepEqual(value.rows.map(row => [row.task.dir.split("/").at(-1), row.prefix]), [["a", ""], ["c", "├─ "], ["b", "└─ "], ["d", "   └─ "]]);
   assert.deepEqual(readFileSync(join(f.root, ".trellis/tasks/a/task.json")), before);
+});
+
+test("pinning moves a current subtask's whole tree to the front and keeps the cursor on that subtask", t => {
+  const f = fixture(t);
+  f.record("0-first", { status: "planning" });
+  f.record("a-parent", { status: "in_progress", children: ["c-one", "c-two"] });
+  f.record("c-one", { status: "planning", parent: "a-parent", children: ["e-deep"] });
+  f.record("c-two", { status: "planning", parent: "a-parent" });
+  f.record("e-deep", { status: "planning", parent: "c-one" });
+  f.record("z-other", { status: "planning" });
+  const names = rows => rows.map(row => [row.task.dir.split("/").at(-1), row.prefix]);
+  const { rows, tasks } = f.read();
+  assert.deepEqual(names(rows), [["z-other", ""], ["a-parent", ""], ["c-two", "├─ "], ["c-one", "└─ "], ["e-deep", "   └─ "], ["0-first", ""]]);
+  const identity = name => tasks.find(task => task.dir.endsWith(`/${name}`)).identity;
+  // The pinned tree root is the parent; the returned index must point at the current task itself.
+  assert.deepEqual(pinCurrentTree(rows, identity("c-two")), { rows: [rows[1], rows[2], rows[3], rows[4], rows[0], rows[5]], index: 1 });
+  assert.equal(pinCurrentTree(rows, identity("e-deep")).index, 3);
+  // A current top-level task that already leads the list keeps its position and index.
+  const topLevel = pinCurrentTree(rows, identity("z-other"));
+  assert.deepEqual([topLevel.index, names(topLevel.rows)], [0, names(rows)]);
+});
+
+test("pinning never invents a selection for a missing current task or an empty list", t => {
+  const f = fixture(t);
+  f.record("parent", { status: "planning", children: ["child"] });
+  f.record("child", { status: "planning", parent: "parent" });
+  const { rows } = f.read();
+  assert.deepEqual(pinCurrentTree(rows, undefined), { rows, index: -1 });
+  // An archived or unresolved pointer is absent from the visible rows.
+  assert.deepEqual(pinCurrentTree(rows, join(f.root, ".trellis/tasks/parent")), { rows, index: -1 });
+  assert.deepEqual(pinCurrentTree([], undefined), { rows: [], index: -1 });
 });
 
 test("dated directories descend at every tree level with deterministic same-day ties", t => {

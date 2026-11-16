@@ -257,6 +257,21 @@ function projectTree(tasks: BrowserTask[], aliases: Map<string, BrowserTask>, is
 	return rows;
 }
 
+/** Project a list with the complete top-level tree containing `current` moved to the front.
+ * The tree is never detached from its ancestors; the returned index is the current row's
+ * position in the projected rows (-1 when the current task is not listed).
+ */
+export function pinCurrentTree(rows: TaskRow[], current: string | undefined): { rows: TaskRow[]; index: number } {
+	const index = current === undefined ? -1 : rows.findIndex(row => row.task.identity === current);
+	if (index < 0) return { rows, index: -1 };
+	let start = index;
+	while (start > 0 && rows[start].prefix) start--;
+	let end = index + 1;
+	while (end < rows.length && rows[end].prefix) end++;
+	if (start === 0) return { rows, index };
+	return { rows: rows.slice(start, end).concat(rows.slice(0, start), rows.slice(end)), index: index - start };
+}
+
 export function readDocument(root: string, task: BrowserTask, section: DocumentSection): TaskDocument {
 	let directory: string;
 	try {

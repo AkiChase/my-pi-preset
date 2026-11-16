@@ -4,7 +4,7 @@ import * as hostTui from "@earendil-works/pi-tui";
 import { Markdown, Text, matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi, type TUI, type TuiMouseEvent, type TuiMouseEventResult } from "@earendil-works/pi-tui";
 import { type NativeFrame, type NativeLayout, type NativeLayoutError, layoutError } from "../../../shared/scroll-panel/native-layout.ts";
 import { consumeWheel } from "../../../shared/scroll-panel/wheel.ts";
-import { displayValue, readDocument, readTasks, safeText, taskLabel, type BrowserTask, type TaskBrowseRange, type TaskDocument, type TaskSnapshot } from "./reader.ts";
+import { displayValue, pinCurrentTree, readDocument, readTasks, safeText, taskLabel, type BrowserTask, type TaskBrowseRange, type TaskDocument, type TaskSnapshot } from "./reader.ts";
 
 const { ScrollView, VStack } = hostTui;
 type ScrollView = hostTui.ScrollView;
@@ -137,20 +137,19 @@ export class TaskBrowser {
 		this.listScroll = this.scrollView(width => this.listBody(width));
 		this.detailScrolls = this.createDetailScrolls();
 		this.snapshot = readTasks(root, this.range);
-		this.refreshCurrent();
+		this.selectCurrent(this.refreshCurrent());
 	}
 	private get theme(): Theme { return typeof this.themeSource === "function" ? this.themeSource() : this.themeSource; }
-	private refreshCurrent(): void {
+	/** Pinning must leave the cursor on the current task, not on its pinned tree root. */
+	private selectCurrent(index: number): void {
+		if (index <= 0) return;
+		this.selected = index; this.ensureSelected = true;
+	}
+	private refreshCurrent(): number {
 		try { this.current = this.readCurrent(); } catch { this.current = undefined; }
-		// Move the complete top-level tree, never detach a child from its ancestors.
-		const rows = this.snapshot.rows;
-		const index = rows.findIndex(row => row.task.identity === this.current);
-		if (index < 0) return;
-		let start = index;
-		while (start > 0 && rows[start].prefix) start--;
-		let end = index + 1;
-		while (end < rows.length && rows[end].prefix) end++;
-		if (start > 0) this.snapshot.rows = rows.slice(start, end).concat(rows.slice(0, start), rows.slice(end));
+		const pinned = pinCurrentTree(this.snapshot.rows, this.current);
+		this.snapshot.rows = pinned.rows;
+		return pinned.index;
 	}
 	dispose(): void { this.closed = true; this.frame = undefined; }
 	invalidate(): void { this.cachedBody = undefined; this.cachedListLayout = undefined; this.frame = undefined; }
@@ -172,8 +171,9 @@ export class TaskBrowser {
 	private hasArchiveEntry(): boolean { return this.range === "active"; }
 	private listTotal(snapshot = this.snapshot): number { return snapshot.rows.length + snapshot.months.length + snapshot.diagnostics.length + (this.hasArchiveEntry() ? 1 : 0); }
 	private setRange(range: TaskBrowseRange): void {
-		this.range = range; this.snapshot = readTasks(this.root, range); this.refreshCurrent();
-		this.selected = 0; this.documents.clear(); this.invalidate(); this.ensureSelected = true;
+		this.range = range; this.snapshot = readTasks(this.root, range); this.selected = 0;
+		this.selectCurrent(this.refreshCurrent());
+		this.documents.clear(); this.invalidate(); this.ensureSelected = true;
 	}
 	private scrollView(render: (width: number) => string[]): ScrollView {
 		return new ScrollView({ render, invalidate: () => this.invalidate() }, {
