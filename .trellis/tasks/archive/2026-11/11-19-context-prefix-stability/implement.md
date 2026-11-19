@@ -2,7 +2,9 @@
 
 ## 当前状态
 
-**已获实施批准，任务 in_progress。** 用户已确认 `design.md` 第 9 节全部 12 项分类并明确“可以，开工吧”：1/7 按需，4/5 尾部更新，其余首轮一次；保留 B 类现有内容，不缩成入口或改为全部按需。阶段 1 委派 `trellis-implement` 独立实现 Memory/启动生命周期，主会话核对验收；后续可主会话直接实施。最终拟使用 `trellis-check` 独立审查，不运行多 Agent workflow。
+**五个实施阶段已完成并通过验收，用户已授权收尾与 push。** 用户此前确认 `design.md` 第 9 节全部 12 项分类并明确“可以，开工吧”；随后批准第 5 阶段 pnpm 项目升级。阶段提交为 `80e9910`、`e1be11e`、`7d26d56`、`09e6975`、`2e1d9f0`、`42cfb0c`。最终 pnpm 12.21.0 typecheck 和全套 1917/1917（0 fail/skip）通过，检查前后依赖状态指纹一致。前四阶段包含独立角色审查；阶段 5 主会话自查，未使用多 Agent workflow。
+
+收尾授权：用户明确“那收尾吧，然后push”。本任务在 main 直接实施，branch=base_branch=main，未建立独立 PR 分支；按 CLI 为 never-PR-backed 任务提供的 `archive --skip-branch-validation` 路径归档，不伪造分支元数据、改写历史或强制推送。随后记录会话并正常推送 `origin/main`。临时缓存仍被 `.modules.yaml` storeDir 与本次固定 pnpm 入口引用，保留 `/tmp/context-prefix-stability.d4JPI5`，不清理仍有引用的缓存。归档/日志/push 实际结果以执行和 Git 核对为准。
 
 ## 变更范围总览
 
