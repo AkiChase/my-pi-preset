@@ -28,6 +28,8 @@ import { detectEnv } from "./env.ts";
 import { buildMemoryBlock, buildReadOnlyMemoryBlock } from "./memory.ts";
 import { createNestedSubagentTools, getMaxSubagentDepth, type NestedAgentManager } from "./nested-tools.ts";
 import { buildAgentPrompt, type PromptExtras } from "./prompts.ts";
+import { hasStartup } from "../../shared/model-context/startup.ts";
+import { AGENT_STARTUP, AGENT_STARTUP_OWNER, agentStartupMessage, inheritAgentSystem } from "./system-inheritance.ts";
 import { preloadSkills } from "./skill-loader.ts";
 import { createStructuredCapture, createStructuredOutputTool, structuredRetryPrompt } from "./structured-output.ts";
 import { createReplyToParentTool, type ParentChannel } from "./parent-messaging.ts";
@@ -693,11 +695,13 @@ export async function runAgent(
   // They differ only for SpawnOptions.cwd spawns (config stays with the parent).
   const configCwd = options.configCwd ?? effectiveCwd;
 
-  const env = await (dependencies.detectEnv ?? detectEnv)(options.pi, effectiveCwd);
+  // Resume revalidates live loadout/authority, but never rereads startup bodies.
+  const env = options.resumeSessionFile ? undefined : await (dependencies.detectEnv ?? detectEnv)(options.pi, effectiveCwd);
   checkCancelled(options.signal);
 
   // Get parent system prompt for append-mode agents
-  const parentSystemPrompt = ctx.getSystemPrompt();
+  const parent = config.promptMode === "append" ? inheritAgentSystem(ctx) : undefined;
+  const parentSystemPrompt = parent?.systemPrompt;
 
   // Build prompt extras (memory, skill preloading)
   const extras: PromptExtras = {};
@@ -712,7 +716,7 @@ export async function runAgent(
   const skills = options.isolated ? false : config.skills;
 
   // Skill preloading: when skills is string[], preload their content into prompt
-  if (Array.isArray(skills)) {
+  if (!options.resumeSessionFile && Array.isArray(skills)) {
     const loaded = preloadSkills(skills, configCwd);
     if (loaded.length > 0) {
       extras.skillBlocks = loaded;
@@ -733,25 +737,25 @@ export async function runAgent(
       // Read-write memory: add any missing memory tool names (read/write/edit)
       const extraNames = getMemoryToolNames(existingNames);
       if (extraNames.length > 0) toolNames = [...toolNames, ...extraNames];
-      extras.memoryBlock = buildMemoryBlock(agentConfig.name, agentConfig.memory, configCwd);
+      extras.memoryBlock = buildMemoryBlock(agentConfig.name, agentConfig.memory, configCwd, !options.resumeSessionFile);
     } else {
       // Read-only memory: only add read tool name, use read-only prompt
       const extraNames = getReadOnlyMemoryToolNames(existingNames);
       if (extraNames.length > 0) toolNames = [...toolNames, ...extraNames];
-      extras.memoryBlock = buildReadOnlyMemoryBlock(agentConfig.name, agentConfig.memory, configCwd);
+      extras.memoryBlock = buildReadOnlyMemoryBlock(agentConfig.name, agentConfig.memory, configCwd, !options.resumeSessionFile);
     }
   }
 
   // Build system prompt from agent config
-  let systemPrompt: string;
+  let builtPrompt: ReturnType<typeof buildAgentPrompt>;
   if (agentConfig) {
-    systemPrompt = buildAgentPrompt(agentConfig, effectiveCwd, env, parentSystemPrompt, extras);
+    builtPrompt = buildAgentPrompt(agentConfig, effectiveCwd, env, parentSystemPrompt, extras);
   } else {
     // Unknown type fallback: spread the canonical general-purpose config (defensive —
     // unreachable in practice since index.ts resolves unknown types before calling runAgent).
     const fallback = DEFAULT_AGENTS.get("general-purpose");
     if (!fallback) throw new Error(`No fallback config available for unknown type "${type}"`);
-    systemPrompt = buildAgentPrompt({ ...fallback, name: type }, effectiveCwd, env, parentSystemPrompt, extras);
+    builtPrompt = buildAgentPrompt({ ...fallback, name: type }, effectiveCwd, env, parentSystemPrompt, extras);
   }
 
   // When skills is string[], we've already preloaded them into the prompt.
@@ -826,7 +830,7 @@ export async function runAgent(
     noPromptTemplates: true,
     noThemes: true,
     noContextFiles: true,
-    systemPromptOverride: () => systemPrompt,
+    systemPromptOverride: () => builtPrompt.systemPrompt,
     appendSystemPromptOverride: () => [],
   });
   const childManagementFactory = agentConfig?.allowedSubagents && !options.isolated &&
@@ -1224,6 +1228,38 @@ export async function runAgent(
       const parentContext = buildParentContext(ctx);
       if (parentContext) {
         effectivePrompt = parentContext + prompt;
+      }
+    }
+
+    // A public non-streaming append is the ONLY delivery of startup materials.
+    // Confirmation comes from the persistent current branch, never this draft.
+    // Disk resumes (including old transcripts) intentionally do not catch up.
+    const startupOrigin = `${resolve(configCwd)}:${agentConfig?.name ?? type}`;
+    if (!options.resumeSessionFile && !hasStartup(session.sessionManager.getBranch(), AGENT_STARTUP, AGENT_STARTUP_OWNER, startupOrigin, "materials")) {
+      checkCancelled(options.signal);
+      if (isChildSessionClosed(session)) throw new Error("Agent startup cancelled");
+      for (const part of parent?.startup ?? []) {
+        const record = "startup" in part.details ? part.details.startup : undefined;
+        const confirmed = () => {
+          const branch = session.sessionManager.getBranch();
+          if (record) return hasStartup(branch, part.customType, record.owner, record.origin, record.parts[0]!);
+          return branch.some(entry => {
+            if (entry.type !== "custom_message" || entry.customType !== part.customType || entry.content !== part.content) return false;
+            const details = entry.details as { inherited?: { version?: unknown; key?: unknown } } | undefined;
+            return details?.inherited?.version === 1 && details.inherited.key === part.key;
+          });
+        };
+        if (confirmed()) continue;
+        await session.sendCustomMessage({ customType: part.customType, content: part.content, display: false, details: part.details }, { triggerTurn: false });
+        checkCancelled(options.signal);
+        if (!confirmed()) {
+          throw new Error("Inherited Agent startup persistence was not confirmed on the current branch.");
+        }
+      }
+      await session.sendCustomMessage(agentStartupMessage(startupOrigin, builtPrompt.startupContext), { triggerTurn: false });
+      checkCancelled(options.signal);
+      if (!hasStartup(session.sessionManager.getBranch(), AGENT_STARTUP, AGENT_STARTUP_OWNER, startupOrigin, "materials")) {
+        throw new Error("Agent startup persistence was not confirmed on the current branch.");
       }
     }
 

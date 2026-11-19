@@ -1,6 +1,6 @@
-{"file":".trellis/spec/development/index.md","reason":"Implement fixed system rules and branch-persistent ordinary startup messages without context rewrites; preserve Memory storage and lifecycle safety."}
-{"file":".trellis/spec/development/sdk-compatibility.md","reason":"Use public SDK APIs and confirm persisted appends without weakening rollback, identity or tool schema contracts."}
-{"file":".trellis/spec/testing/index.md","reason":"Test actual isolated SDK requests, startup/resume/compaction, scan counts and natural-exit fixtures."}
-{"file":".trellis/spec/guides/index.md","reason":"Read shared ownership and cross-layer checklists before adding a narrow startup helper."}
-{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Keep a small common startup-history helper rather than a general context synchronization framework."}
-{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace session origins, persistence, filesystem accesses, failure handling and cancellations."}
+{"file":".trellis/spec/development/index.md","reason":"Preserve Agent execution/config/authority/output contracts while separating stable rules from once-only startup data."}
+{"file":".trellis/spec/development/sdk-compatibility.md","reason":"Use public structured system/session APIs, persistent ordinary appends and actual isolated SDK/provider evidence; no SDK edits."}
+{"file":".trellis/spec/testing/index.md","reason":"Verify real SDK/loader and child fresh/resume/cancellation without personal resources or forced-exit acceptance."}
+{"file":".trellis/spec/guides/index.md","reason":"Read common ownership and cross-layer checklists before changing Agent prompt assembly."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse narrow branch startup helper; no generalized synchronizer or regex prompt cleansing."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace parent rules/data, append/replace/isolated, child prompt persistence and authorization across fresh/resume."}

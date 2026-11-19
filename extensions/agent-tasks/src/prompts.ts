@@ -4,11 +4,11 @@
 
 import type { AgentConfig, EnvInfo } from "./types.ts";
 
-/** Extra sections to inject into the system prompt (memory, skills, etc.). */
+/** Rule contracts and ordinary first-run materials; never an opaque system suffix. */
 export interface PromptExtras {
-  /** Persistent memory content to inject (first 200 lines of MEMORY.md + instructions). */
-  memoryBlock?: string;
-  /** Preloaded skill contents to inject. */
+  /** Fixed memory rules and optional first-200-line snapshot. */
+  memoryBlock?: { rules: string; startupContext?: string };
+  /** Explicit skill full texts for ordinary startup. */
   skillBlocks?: { name: string; content: string }[];
   /**
    * Parent directory the worktree copy was created from. Set only for
@@ -35,36 +35,23 @@ export interface PromptExtras {
   workflowChild?: boolean;
 }
 
-/**
- * Build the system prompt for an agent from its config.
- *
- * - "replace" mode: env header + config.systemPrompt (full control, no parent identity)
- * - "append" mode: parent system prompt + sub-agent context + env header + config.systemPrompt
- * - "append" with empty systemPrompt: pure parent clone
- *
- * Both modes include an `<active_agent name="${config.name}"/>` tag so downstream
- * extensions (e.g. permission/policy systems) can resolve per-agent policy
- * inside the child session by parsing the system prompt. In replace mode the tag
- * is prepended; in append mode it follows the shared inherited content so the
- * parent prompt forms an identical, cacheable byte prefix with the parent
- * session (the LLM's KV cache can then reuse those tokens across every spawn).
- *
- * @param parentSystemPrompt  The parent agent's effective system prompt (for append mode).
- * @param extras  Optional extra sections to inject (memory, preloaded skills).
+/** Build fixed role/identity/authority rules and the original ordinary startup
+ * substance separately. Append inherits parent rules; replace keeps full custom
+ * role control without inheriting parent identity. Explicit skills retain full text.
  */
 export function buildAgentPrompt(
   config: AgentConfig,
   cwd: string,
-  env: EnvInfo,
+  env: EnvInfo | undefined,
   parentSystemPrompt?: string,
   extras?: PromptExtras,
-): string {
+): { systemPrompt: string; startupContext: string } {
   const activeAgentTag = `<active_agent name="${config.name}"/>\n\n`;
 
-  const envBlock = `# Environment
+  const envBlock = env ? `# Environment
 Working directory: ${cwd}
 ${env.isGitRepo ? `Git repository: yes\nBranch: ${env.branch}` : "Not a git repository"}
-Platform: ${env.platform}`;
+Platform: ${env.platform}` : "";
 
   // A worktree agent is told its cwd twice: by the env block above (the copy)
   // and by whatever names the main checkout — the inherited parent prompt in
@@ -89,14 +76,14 @@ Return only the answer, in exactly the shape the prompt asks for — no preamble
   // Build optional extras suffix
   const extraSections: string[] = [];
   if (extras?.memoryBlock) {
-    extraSections.push(extras.memoryBlock);
-  }
-  if (extras?.skillBlocks?.length) {
-    for (const skill of extras.skillBlocks) {
-      extraSections.push(`\n# Preloaded Skill: ${skill.name}\n${skill.content}`);
-    }
+    extraSections.push(extras.memoryBlock.rules);
   }
   const extrasSuffix = extraSections.length > 0 ? "\n\n" + extraSections.join("\n") : "";
+  const startupContext = [envBlock, extras?.memoryBlock?.startupContext,
+    ...(extras?.skillBlocks ?? []).map(skill => `\n# Preloaded Skill: ${skill.name}\n${skill.content}`),
+  ].filter(Boolean).join("\n\n");
+  // cwd is execution authority, unlike the once-only environment/Git snapshot.
+  const executionBlock = `# Execution directory\nWorking directory: ${cwd}`;
 
   if (config.promptMode === "append") {
     const identity = parentSystemPrompt || genericBase;
@@ -118,21 +105,17 @@ You are operating as a sub-agent invoked to handle a specific task.
       ? `\n\n<agent_instructions>\n${config.systemPrompt}\n</agent_instructions>`
       : "";
 
-    // Place shared/stable content first so the LLM's KV cache can reuse the
-    // inherited prefix across all subagent invocations. The parent prompt is
-    // placed verbatim (no wrapper tag) so it forms an identical byte prefix
-    // with the parent session, maximising KV cache hits. The <active_agent>
-    // tag and env block vary per call and are placed after the cached prefix.
-    return identity + "\n\n" + bridge + "\n\n" + activeAgentTag + envBlock + worktreeBlock + workflowBlock + customSection + extrasSuffix;
+    // Keep shared rules first, without promising cross-tool/provider cache reuse.
+    return { systemPrompt: identity + "\n\n" + bridge + "\n\n" + activeAgentTag + executionBlock + worktreeBlock + workflowBlock + customSection + extrasSuffix, startupContext };
   }
 
-  // "replace" mode — env header + the config's full system prompt
+  // "replace" mode — fixed child identity + the config's full system prompt
   const replaceHeader = `You are a pi coding agent sub-agent.
 You have been invoked to handle a specific task autonomously.
 
-${envBlock}`;
+${executionBlock}`;
 
-  return activeAgentTag + replaceHeader + worktreeBlock + workflowBlock + "\n\n" + config.systemPrompt + extrasSuffix;
+  return { systemPrompt: activeAgentTag + replaceHeader + worktreeBlock + workflowBlock + "\n\n" + config.systemPrompt + extrasSuffix, startupContext };
 }
 
 /** Fallback base prompt when parent system prompt is unavailable in append mode. */

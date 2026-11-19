@@ -117,15 +117,15 @@ export function readMemoryIndex(memoryDir: string): string | undefined {
 }
 
 /**
- * Build the memory block to inject into the agent's system prompt.
+ * Separate fixed memory rules from the ordinary startup snapshot.
  * Also ensures the memory directory exists (creates it if needed).
  */
-export function buildMemoryBlock(agentName: string, scope: MemoryScope, cwd: string): string {
+export function buildMemoryBlock(agentName: string, scope: MemoryScope, cwd: string, startup = true): { rules: string; startupContext?: string } {
   const memoryDir = resolveMemoryDir(agentName, scope, cwd);
   // Create the memory directory so the agent can immediately write to it
   ensureMemoryDir(memoryDir);
 
-  const existingMemory = readMemoryIndex(memoryDir);
+  const existingMemory = startup ? readMemoryIndex(memoryDir) : undefined;
 
   const header = `# Agent Memory
 
@@ -155,16 +155,16 @@ This memory persists across sessions. Use it to build up knowledge over time.`;
 - Update or remove memories that become outdated. Check for existing memories before creating duplicates.
 - You have Read, Write, and Edit tools available for managing memory files.`;
 
-  return header + memoryContent + instructions;
+  return { rules: header + instructions, ...(startup ? { startupContext: header + memoryContent } : {}) };
 }
 
 /**
  * Build a read-only memory block for agents that lack write/edit tools.
  * Does NOT create the memory directory — agents can only consume existing memory.
  */
-export function buildReadOnlyMemoryBlock(agentName: string, scope: MemoryScope, cwd: string): string {
+export function buildReadOnlyMemoryBlock(agentName: string, scope: MemoryScope, cwd: string, startup = true): { rules: string; startupContext?: string } {
   const memoryDir = resolveMemoryDir(agentName, scope, cwd);
-  const existingMemory = readMemoryIndex(memoryDir);
+  const existingMemory = startup ? readMemoryIndex(memoryDir) : undefined;
 
   const header = `# Agent Memory (read-only)
 
@@ -175,5 +175,5 @@ You have read-only access to memory. You can reference existing memories but can
     ? `\n\n## Current MEMORY.md\n${existingMemory}`
     : `\n\nNo memory is available yet. Other agents or sessions with write access can create memories for you to consume.`;
 
-  return header + memoryContent;
+  return { rules: header + `\nMemory directory: ${memoryDir}/`, ...(startup ? { startupContext: header + `\nMemory directory: ${memoryDir}/` + memoryContent } : {}) };
 }

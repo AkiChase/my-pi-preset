@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { it } from "node:test";
 import type { AgentSession, AgentSessionEvent, DefaultResourceLoader, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import "./source-loader.mjs";
+import { SessionManager } from "@earendil-works/pi-coding-agent";
 import type { AgentRunnerDependencies, RunOptions } from "../src/agent-runner.ts";
 const { runAgent, resumeAgent, shutdownChildSession, setDefaultMaxTurns, getDefaultMaxTurns } = await import("../src/agent-runner.ts");
 const { AgentManager } = await import("../src/agent-manager.ts");
@@ -33,8 +34,10 @@ function fixture(boundary?: Boundary) {
   const childSessionFile = join(root, "child.jsonl");
   writeFileSync(rootSessionFile, "{}\n");
   writeFileSync(childSessionFile, "{}\n");
+  const startupManager = SessionManager.inMemory(root);
   const session = {
-    messages: [], setSessionName() {}, sessionManager: { getSessionFile: () => childSessionFile },
+    messages: [], setSessionName() {}, sessionManager: { getSessionFile: () => childSessionFile, getBranch: () => startupManager.getBranch() },
+    sendCustomMessage: async (message: Parameters<AgentSession["sendCustomMessage"]>[0]) => { startupManager.appendCustomMessageEntry(message.customType, message.content, message.display, message.details); },
     bindExtensions: async () => { calls.bind++; await delay("bind"); },
     subscribe(listener: (event: AgentSessionEvent) => void) {
       listeners.add(listener);
@@ -84,6 +87,24 @@ for (const boundary of ["env", "reload", "create", "bind", "callback", "prompt"]
   });
 }
 
+void it("unconfirmed inert parent startup cannot be hidden by a later local startup marker", async () => {
+  const f = fixture();
+  try {
+    const { agentStartupMessage, INHERITED_STARTUP } = await import("../src/system-inheritance.ts");
+    const parent = SessionManager.inMemory(f.ctx.cwd);
+    const message = agentStartupMessage("parent-origin", "Original parent environment and skill material");
+    parent.appendCustomMessageEntry(message.customType, message.content, message.display, message.details);
+    Object.assign(f.ctx.sessionManager, { getBranch: () => parent.getBranch() });
+    const send = f.session.sendCustomMessage.bind(f.session);
+    f.session.sendCustomMessage = async (message, options) => {
+      if (message.customType !== INHERITED_STARTUP) await send(message, options);
+    };
+    await assert.rejects(runAgent(f.ctx, "general-purpose", "must not prompt", f.options, f.deps), /Inherited Agent startup persistence was not confirmed/);
+    assert.equal(f.calls.prompt, 0); assert.equal(f.calls.dispose, 1); assert.equal(f.listeners.size, 0);
+    assert.equal(f.session.sessionManager.getBranch().some(entry => entry.type === "custom_message"), false);
+  } finally { await f.close(); }
+});
+
 void it("actual runner already-aborted launch/resume do no startup, subscriptions or prompt", async () => {
   const f = fixture();
   try {
@@ -96,9 +117,9 @@ void it("actual runner already-aborted launch/resume do no startup, subscription
 
 void it("actual manager/runner delayed startup stays starting; Esc/x cancels and releases the admission for a replacement", async () => {
   for (const stop of ["parent", "backend"] as const) {
-    const f = fixture("bind");
+    const f = fixture("bind"), replacement = fixture();
     const manager = new AgentManager(undefined, 1, undefined, undefined, undefined, {
-      runAgent: (ctx, type, prompt, options) => runAgent(ctx, type, prompt, options, f.deps),
+      runAgent: (ctx, type, prompt, options) => runAgent(ctx, type, prompt, options, prompt === "replacement" ? replacement.deps : f.deps),
     });
     try {
       const parent = new AbortController();
@@ -111,8 +132,8 @@ void it("actual manager/runner delayed startup stays starting; Esc/x cancels and
       assert.equal(manager.getRecord(id)?.status, "stopped");
       assert.equal(f.calls.dispose, 1);
       manager.spawn(f.pi, f.ctx, "general-purpose", "replacement", { description: "replacement", isBackground: true, isolated: true });
-      await tick(); assert.equal(f.calls.prompt, 1, "cancelled startup cannot retain pool capacity");
-    } finally { await manager.dispose(); await f.close(); }
+      await manager.waitForAll(); assert.equal(replacement.calls.prompt, 1, "cancelled startup cannot retain pool capacity");
+    } finally { await manager.dispose(); await replacement.close(); await f.close(); }
   }
 });
 

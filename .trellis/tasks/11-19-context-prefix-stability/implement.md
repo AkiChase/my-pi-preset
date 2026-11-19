@@ -71,12 +71,12 @@ pnpm typecheck
 
 ### 实施
 
-- [ ] `buildAgentPrompt`/runner 形成规则 system 与普通启动材料两个内部输出；同步必要类型与直接调用点。
-- [ ] 结构化分开父规则与原 append 模式启动材料：已知 B 类移到普通消息而不静默删除；保留 opaque 规则与第三方契约，不用 regex 全文清洗或 Pi 私有 assembler。
-- [ ] 环境/Git、per-agent `MEMORY.md`、显式技能预加载改到首次任务输入；固定 Memory 能力/角色/identity/worktree/output 契约留在规则层。
-- [ ] 新 child 初次提供材料，普通 resume 不重读/广播；不扩大 `inherit_context` 或工具权限。
-- [ ] 覆盖 append/replace、isolated、noSkills、memory scope/只读、缺文件/非法名称、父 context 有无、nested/workflow child 与 StructuredOutput 的负回归。
-- [ ] 同阶段更新 `docs/extensions/task-composition.md` 的子 Agent 行为说明。
+- [x] `buildAgentPrompt`/runner 形成规则 system 与普通启动材料两个内部输出；同步必要类型与直接调用点。
+- [x] 结构化分开父规则与原 append 模式启动材料：已知 B 类移到普通消息而不静默删除；保留 opaque 规则与第三方契约，不用 regex 全文清洗或 Pi 私有 assembler。
+- [x] 环境/Git、per-agent `MEMORY.md`、显式技能预加载改到首次任务输入；固定 Memory 能力/角色/identity/worktree/output 契约留在规则层。
+- [x] 新 child 初次提供材料，普通 resume 不重读/广播；不扩大 `inherit_context` 或工具权限。
+- [x] 覆盖 append/replace、isolated、noSkills、memory scope/只读、缺文件/非法名称、父 context 有无、nested/workflow child 与 StructuredOutput 的负回归。
+- [x] 同阶段更新 `docs/extensions/task-composition.md` 的子 Agent 行为说明。
 
 ### 验证命令
 
@@ -151,7 +151,7 @@ export PI_SDK_DIR="$sdk_dir" PI_CODING_AGENT_DIR="$run_dir/agent"
 - raw logs：本次 owned `/tmp/context-prefix-stability.d4JPI5/stage1.BhAIVl`、`stage1-main.log`、`stage1-main-typecheck.log`，主会话已核对最终日志；保留待集成复查。
 - Trellis 改动前基线：隔离 `agent-context-integration`、`project-activation`、`unsupported-runtime` 三组，exit 0、37/37；仅为阶段 2 改动前基线，不作改动后验收。
 
-### 阶段 2：已自查验证，等待检查点提交
+### 阶段 2：已自查验证并提交 `e1be11e`
 
 主会话直接实现。复查 `renderOverview` diff 仅删除 Git/开发者块，原 Journal、任务列表/状态/children、根目录/context/CLI/protocol 等渲染不变；workflow renderer/filter/14,000 字符预算不变。启动/当前状态合并为一次 returned message，后续读取当前完整分支的最后 state，未确认草稿重试。CLI 清除 context/task/UI 缓存但不清除持久化启动/状态记录；native authority、角色、worktree 门禁均保留。包源只改 `trellis-start` 的承载位置说明及它的 adapted hash，未改 source hashes、workflow 模板或生成副本。
 
@@ -162,7 +162,20 @@ export PI_SDK_DIR="$sdk_dir" PI_CODING_AGENT_DIR="$run_dir/agent"
 - Python 首次 discovery 错选父目录：exit 5，0 tests，**不是 PASS**。按计划实际 `__tests__/python` 目录重跑 `python3 -B -m unittest discover -s extensions/trellis/__tests__/python -p 'test_*.py'`：exit 0，42 tests OK；argparse 的非法 refresh/collect stderr 为预期负例。
 - 最终 `pnpm typecheck`：通过；`git diff --check` 通过。隔离 agent dir 和 raw logs 均在 `/tmp/context-prefix-stability.d4JPI5`（`stage2-*`），未安装/下载或个人 reload。
 
-阶段 3/4、完整 `pnpm check`、provider 序列化集成和最终独立审查 **NOT_RUN**。
+### 阶段 3：已实现、自查验证，等待检查点提交
+
+由独立 `trellis-implement` 实现，主会话完整复核最终 runner、prompt、Memory、继承 helper、SDK 驱动/断言和相关 fixture 改动。内部接口拆分为 `{ systemPrompt, startupContext }` 与 Memory `{ rules, startupContext? }`，配置/schema、`context.ts` 的历史选择、readonly/worktree/output 执行门禁未改。
+
+- 原 append 已继承的父 Agent env/MEMORY/显式技能及 Trellis B 材料仍普通继承，带 parent/non-authority framing。Trellis 父 marker 不转交为 child 已初始化，以免跳过不同 child 执行根、CLI key/角色入口；仅有明确同源 Project Memory 索引保留窄 owner 去重。不同来源仍有自己的启动机会。
+- 普通 tool ctx 无 command-only `getSystemPromptOptions()`；它只给 base 输入。实现使用公开 branch/system replay，并真实验证与生效 prompt 一致。有可识别数据却不一致时明确拒绝启动；未知 opaque 内容保留，不猜测/清洗。旧 Agent extras 若嵌在未结构化 opaque customPrompt 内，不承诺猜测分离；这不是偷偷丢掉材料。
+- Agent focused-1：exit 1，312/313；replacement fixture 复用已关闭 session，改用独立 replacement session并等待实际执行结束后断言。focused-2/3：exit 0，319/319、自然退出。
+- Agent typecheck-1、3、4：exit 0；typecheck-2：exit 2，fixture compaction 参数/类型错误，修复后通过。SDK-1–4 fixture 发现/active tools、section 双重包装、isolated preload 断言错误已在临时日志保留；SDK-5/6 与最终 affected SDK/prompt 6/6 通过。
+- 主会话自查发现 inert inherited parts 只依赖 append 完成，缺少每条当前分支确认；补上 key/content/version 确认和去重，新增未保存惯性材料不能被后续 local marker 掩盖的零执行负例。
+- 主会话独立同计划 full Agent/reminder 命令：exit 0，320/320、自然退出，无 skipped；最终 `pnpm typecheck`：exit 0，`git diff --check` 通过。HOME、agent dir、raw 输出均隔离于 `/tmp/context-prefix-stability.d4JPI5/stage3-main.ViW0Hc`。
+- unshimmed Pi loader + SDK：主会话复核实际驱动、report 和 24 请求/6 child 请求断言；首轮原 Git/environment、MEMORY200、显式技能全文和错误提示均持久普通提供，live/disk 历史前缀相同，命令 base 与 effective 结构区别得到验证，forced source 拒绝且无 child 请求，取消释放 session，EISDIR 原子 rollback。尚非 dual-provider 序列化验收。
+- Agent raw：`/tmp/context-prefix-stability.d4JPI5/stage3.xmKaby`；主会话 raw SDK：`stage3-main.ViW0Hc/agent-inheritance-sdk-6s0ZZ6/{requests,report}.json`。失败与最终重跑均保留待集成复核，未安装/部署或修改 SDK。
+
+阶段 4、完整 `pnpm check`、provider 序列化集成和最终独立审查 **NOT_RUN**。阶段 4 准备只读 probe 已确认公开 OpenAI Responses/Anthropic `onPayload` 可截取真实 payload、再受控抛错，额外 `fetch` 防护计数为零；初次 probe 遗漏 SystemMessage.content 失败（exit 1），补全 fixture 后四个 API/capability 组合通过（exit 0），不作为产品集成 PASS。
 
 ### 规划阶段历史材料检查（不代表当前执行状态）
 

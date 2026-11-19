@@ -6,6 +6,7 @@ import { it } from "node:test";
 import { validateToolArguments } from "@earendil-works/pi-ai";
 import type { AgentSession, DefaultResourceLoader, ExtensionAPI, ExtensionContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import "./source-loader.mjs";
+import { SessionManager } from "@earendil-works/pi-coding-agent";
 import type { AgentManagerDependencies } from "../src/agent-manager.ts";
 import type { AgentRunnerDependencies, RunOptions, RunResult } from "../src/agent-runner.ts";
 const { AgentMailbox, PARENT_MESSAGE_LIMITS, REPLY_TO_PARENT_TOOL_NAME, createReplyToParentTool } = await import("../src/parent-messaging.ts");
@@ -164,8 +165,10 @@ function runnerFixture() {
   process.env.PI_CODING_AGENT_DIR = root;
   const sessionOptions: Parameters<NonNullable<AgentRunnerDependencies["createAgentSession"]>>[0][] = [];
   let active: string[] = [];
+  const startupManager = SessionManager.inMemory(root);
   const session = {
-    messages: [], setSessionName() {}, sessionManager: { getSessionFile: () => undefined },
+    messages: [], setSessionName() {}, sessionManager: { getSessionFile: () => undefined, getBranch: () => startupManager.getBranch() },
+    sendCustomMessage: async (message: Parameters<AgentSession["sendCustomMessage"]>[0]) => { startupManager.appendCustomMessageEntry(message.customType, message.content, message.display, message.details); },
     bindExtensions: async () => {}, subscribe: () => () => {},
     prompt: async () => {}, abort: async () => {}, steer: async () => {},
     getAllTools: () => ["read", REPLY_TO_PARENT_TOOL_NAME].map(name => ({ name })),
