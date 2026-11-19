@@ -70,8 +70,21 @@
 - 其余 rules/skills/project_context 等主要是规则、目录或能力契约，不等于每轮动态事实。全部 11 个 preset 入口未发现其他主会话滚动事实 system owner；第三方包 hook 不在完整性声明内。
 - 安装 Pi 1.5.2 的只读序列化复现：section patch 在不支持中途 system 的路径被合并回头部，追加普通消息则头部不变。未取得用户原始五次事件的线上载荷、兼容配置和缓存证据，不能把缓存完全归零都判为本任务原因。
 
+## 第 5 阶段扩展：项目级 pnpm 12.21.0
+
+用户在前四阶段交付后选择“扩展当前任务”，随后明确“你直接去做吧”，批准此前展示的项目级升级方案：固定 pnpm 12.21.0、兼容配置与锁文件整理、SDK 仍由 Pi 提供、check 只执行检查；不改全局默认版本或 Pi 安装目录。这是新增阶段的实施授权，不追认前一次未授权自动安装。
+
+### R5 与验收
+
+- `package.json` 明确固定 `pnpm@12.21.0`；保持现有 runtime/dev dependencies 的版本范围和 SDK peer 声明，不升级其他依赖。
+- 迁移 pnpm 已不读取的 `.npmrc` 非认证设置至 root-only `pnpm-workspace.yaml`，明确 `autoInstallPeers: false` 和 `verifyDepsBeforeRun: false`；不把单仓库改成多 package，也不允许 pnpm 接管 Trellis 技能目录。
+- 由实际 pnpm 12 生成/验证锁文件，清除自动安装引入的 SDK peer/transitive 锁项；SDK peer 继续由已安装 Pi 的公开 SDK 链接提供，不下载或修改 Pi SDK。
+- 使用已缓存 pnpm 二进制、隔离 HOME/store 和离线模式整理依赖安装状态；不运行未批准依赖 build scripts。离线缓存不足时报告，不自动扩大为其他依赖升级或联网安装。
+- 实际 pnpm 配置读取验证版本/设置；在缺少 node_modules 的隔离 fixture 中 `pnpm run` 仍只运行指定脚本、不下载/安装或新建 lock/node_modules；项目 `pnpm check` 前后 lock/hash 与依赖状态不变，类型/全套测试通过。
+- 前四阶段范围、A/B/C 选择和已有验证结论不变；不 push、改全局 pnpm/Corepack、部署/reload、归档或清理其他 session。
+
 ## 授权与材料状态
 
-用户已逐项确认 12 项上下文的 A/B/C 行为，要求一起处理子 Agent，并已明确“可以，开工吧”，批准本文和 design/implement 中已收敛的实施范围。允许按计划实施、验证和主会话分阶段本地提交，不包括安装、个人部署/reload、push 或归档。
+前四阶段用户已逐项确认 12 项上下文的 A/B/C 行为，要求一起处理子 Agent，并已明确“可以，开工吧”，批准其 design/implement 中已收敛的实施范围，允许验证和主会话分阶段本地提交，不包括安装、个人部署/reload、push 或归档。第 5 阶段的项目 pnpm 配置、离线安装整理和 lockfile 授权见 R5；仍不允许更改全局版本、Pi 安装或其他依赖范围。
 
 当前任务为 `in_progress`。阶段 1 因独立的 Memory/启动生命周期工作适合委派，已策划 `implement.jsonl`；主会话核对实际结果和阶段验收后提交。后续阶段可主会话直接实施，最终独立审查使用 `check.jsonl`。执行器调整不改变已批准的产品行为和范围。

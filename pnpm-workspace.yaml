@@ -1,0 +1,11 @@
+# Keep SDK peers host-provided and script execution free of implicit installs.
+autoInstallPeers: false
+verifyDepsBeforeRun: false
+
+# Corepack (or an explicitly selected binary) owns the pinned manager version.
+# Avoid pnpm resolving/downloading a second manager during install or run.
+pmOnFail: ignore
+
+# Trellis owns project skill resources; pnpm must not manage these directories.
+skills:
+  dirs: []

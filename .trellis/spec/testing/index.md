@@ -21,6 +21,8 @@ Dependency setup (`pnpm install`) is not a test and requires authorization. Miss
 
 An isolated HOME also changes Corepack/package-manager version and cache selection. Do not invoke a floating Corepack-managed package manager from a cold HOME: it can download a manager and auto-install dependencies before a check/run script. Use an explicitly pinned already-installed entry with setup disabled, or direct installed Node test/TypeScript entry points. A script exit zero does not waive preceding setup failures or downloads; stop package-manager reuse and report unexpected lockfile/node_modules mutations without silently repairing or deleting dependency state.
 
+The project pins pnpm 12.21.0 and disables both implicit dependency installation before run/check and pnpm's own manager installation. Corepack itself remains a separate bootstrap boundary: use a selected, already available 12.21.0 entry for isolated checks, not a cold Corepack shim. Verify actual loaded settings and lock/node_modules stability; do not infer this from script text. `scripts/package-manager.test.mjs` uses `PNPM_TEST_BIN` or the selected `npm_execpath`, never a PATH search/bootstrap; direct Node execution without either explicitly skips native CLI cases. Its cold-HOME fixture checks real configuration, zero local registry requests and no lock/node_modules creation when a check has missing dependencies, plus engine refusal before an incompatible install. Run native cases with the existing pinned entry for package-manager changes.
+
 Some tests invoke default config loaders: isolate the entire invocation, not only known fixtures. With an existing linked SDK:
 
 ```sh

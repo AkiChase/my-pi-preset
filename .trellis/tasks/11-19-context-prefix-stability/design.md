@@ -163,5 +163,19 @@ A = 按需读取；B = 首轮普通上下文一次，后续不自动更新；C =
 | 11 | 子 Agent 配置启用的 per-agent MEMORY.md 内容 | B | child 首轮提供原有前 200 行内容，保持 scope/读写限制，resume 不重读/广播 |
 | 12 | 子 Agent 显式预加载技能全文 | B | child 首轮按原配置提供全文，不改为只有路径或主动读；resume 不重新加载 |
 
-以上选择及本文实施范围已由用户批准。其余固定角色、工具 schema、权限、执行目录和身份契约不按此表移走；范围扩大需重新审阅。
+以上选择及前四阶段实施范围已由用户批准。其余固定角色、工具 schema、权限、执行目录和身份契约不按此表移走；范围扩大需重新审阅。
+
+## 10. 新增阶段设计：项目 pnpm 12.21.0
+
+用户已批准扩展当前任务并直接实施项目级升级。该授权只覆盖本节，不更改前四阶段既有边界。
+
+官方当前配置文档 `https://pnpm.io/settings` 确认：`.npmrc` 只读 auth/registry/TLS/proxy/local-address；其余设置转至 `pnpm-workspace.yaml`。因此旧 `.npmrc` 的 `auto-install-peers=false` 在 pnpm 12 下不生效。`settings/build` 文档确认 `verifyDepsBeforeRun` 默认 install，并且前置安装失败也可继续 script；选 false 恢复原有“显式 install、run/check 不安装”合同。`settings/peer-dependencies` 确认 autoInstallPeers 默认 true，本仓库保持 false。workspace `packages` 缺省只含 root，不新增 monorepo。新 pnpm skill linking 不接管已有 `.pi/skills`，用空 `skills.dirs` 关闭其目录管理。
+
+- packageManager 与 engines.pnpm 同时固定 `pnpm@12.21.0` / `12.21.0`；仅迁移 project config，不改 global config、SDK peers 或其他依赖范围。`pmOnFail: ignore` 将版本选择交给 Corepack/明确已安装入口，并阻止 pnpm 另行解析/安装自身。官方 `package_json` 文档确认非 ignore 的 legacy packageManager 会向 lock 写 boot document，实测同版本 error 仍需 pnpm mirror metadata；不通过伪造缓存或放宽 supply-chain policy 解决。engines pin 在 install 拒绝不兼容版本；Corepack 的 bootstrap 风险仍单独保留。
+- 创建 root `pnpm-workspace.yaml` 放 autoInstallPeers/verifyDepsBeforeRun/skills；删除已完整核对只含旧 peer 设置的 `.npmrc`，不处理个人 registry/auth 文件。
+- 使用本次已经缓存的 12.21.0 native binary 明确执行，不依赖冷 HOME 的浮动 Corepack。先备份意外 lock/config 状态到 owned temp；生成离线 lock-only，再验证 SDK entries 去除与原有依赖版本保留。
+- 显式离线安装只用于本次获准的依赖状态整理，禁用 build scripts；随后原 offline `link-pi-sdk` 恢复 host SDK peer 链接。不手工删除未知依赖目录、不修补 SDK 文件；缓存不足停止而不联网猜测。
+- 检查配置合同 + 实际 native pnpm fixture 行为，最后调用固定版本 `pnpm check` 并比较执行前后的 lockfile/config/node_modules 元数据，防止把“前置安装失败但脚本成功”当成 PASS。
+
+预计 owning files：`package.json`、`pnpm-workspace.yaml`、`.npmrc`、`pnpm-lock.yaml`，小型 `scripts/package-manager.test.mjs`；确需更新 development/testing 标准中的版本和入口说明，不改 installer/sync 语义或 user plugin 文档。主会话直接实施并自查，验证后提交独立第 5 阶段检查点。
 

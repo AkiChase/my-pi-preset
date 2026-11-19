@@ -114,6 +114,21 @@ git diff --check
 
 **提交检查点：** 独立审查与最终集成验证完成后提交剩余合同测试、必要 specs 和耦合修复；不把前三阶段累积成唯一最后提交。默认实施授权包含主会话分阶段本地提交，若用户另行要求不提交则记录并遵守。无 push、个人部署、archive/journal 授权。
 
+## 阶段 5：项目级 pnpm 12.21.0（新增已批准范围）
+
+用户选择扩展当前任务并明确“你直接去做吧”。主会话直接实施，检查独立于实施选择：配置/锁文件自查 + 真实 native pnpm smoke + typecheck/完整测试，不需要为小型配置变更再次配对派发。
+
+- [x] 创建 owned `stage5.*` 临时目录，备份当前意外 lock 状态和关键安装元数据；固定使用已缓存 12.21.0 native binary。
+- [x] `package.json` 加 packageManager/engines 固定版本；把唯一 `.npmrc` peer 设置迁移到 `pnpm-workspace.yaml`（root-only），明确 autoInstallPeers false、verifyDepsBeforeRun false、pmOnFail ignore、禁用 pnpm skills 目录接管。
+- [x] 离线 lock-only 生成并确认依赖版本不升级、SDK peer/transitive 自动锁项清除；显式离线/ignore-scripts 安装整理本仓库状态，未下载 SDK/放开 build scripts。
+- [x] offline link-pi-sdk 链接原已安装 Pi SDK；实际 pnpm config/version 核对；不修改 global Corepack/pnpm 或 Pi 目录。
+- [x] 新配置合同测试 + 缺 node_modules fixture 的真实 run smoke，确认 no fetch/install/lock/node_modules 生成；真实固定 pnpm check 前后 hash/安装元数据不变。
+- [x] Typecheck、全套测试、diff/schema/manifest 门禁通过，将项目配置、规范测试和正式锁文件整理记录纳入独立第 5 阶段提交检查点；native 生成的 lock 与 baseline 一致，无 lock Git delta。原自动安装失败事实保留，不当成获准成功安装。
+
+计划命令：明确的已缓存 binary `pnpm-native --version/config get`；`pnpm-native install --lockfile-only --offline --ignore-scripts --no-frozen-lockfile`；同版本显式 `install --offline --ignore-scripts --frozen-lockfile`；`node scripts/link-pi-sdk.mjs`；`node --test scripts/package-manager.test.mjs`；固定入口 `pnpm check`。HOME/PNPM machine state 与 stdout/stderr 放 owned run；缓存与原 SDK 只按明确路径引用。首次执行前核查 native binary/命令选项，不能在原 `.npmrc` 失效状态下再隐式 run install。
+
+第 5 阶段已完成代码/依赖配置、真实 check、最终材料与 Git 自查，进入独立本地提交检查点。详细结果见下文；前四阶段代码与既有测试完成记录不变。
+
 ## 执行环境与原始材料
 
 - 每次验证前创建本次拥有的仓库外临时运行目录；使用已安装 SDK，`PI_CODING_AGENT_DIR` 指向临时子目录。工具/安装缺失为 blocker，不自动 `pnpm install`。
@@ -197,13 +212,28 @@ export PI_SDK_DIR="$sdk_dir" PI_CODING_AGENT_DIR="$run_dir/agent"
 - 独立角色复审三个改动文件及 producer/确认边界：P2 和 evidence gap 均 resolved，无剩余 scoped defect；直接 Node focused 12/12、3 exact preservation/inert/nested + 4 invalid-record refusal probe、tsc/diff-check 均 exit 0。Raw `/tmp/context-prefix-stability.d4JPI5/check-repair.nqrUZ0`。
 - active role manifests `task.py validate` 通过（implement 6、check 5真实引用）；spec discovery development/testing 正常。最终仍不宣称线上 cache hits、native Trellis host/TUI、物理终端或任意 opaque 第三方数据清除。
 
-### 验证入口意外副作用（未解决，不纳入实现提交）
+### 验证入口意外副作用（阶段 4 交付时未解决，不纳入其实现提交）
 
 `pnpm check` 的测试本身 exit 0、1911/1911，但该数字在上述修复前，不作为最终 scoped acceptance。其执行入口在脚本之前发生了未授权自动安装：临时 HOME 没有原 Corepack 的版本状态，Corepack 下载 pnpm 12.21.0，运行前 verifyDeps/autoInstallPeers 自动安装依赖，改写 `pnpm-lock.yaml`（autoInstallPeers false → true，新增 SDK/transitives）和仓库 node_modules。安装阶段还报 `ERR_PNPM_IGNORED_BUILDS`，然后继续运行 check；所以总 exit 0 不表示安装/环境安全成功。
 
-主会话已向用户解释该副作用来自隔离 HOME 的调用方式而非 check 脚本新增安装；停止后续所有 pnpm/npm 调用，改用直接 Node/tsc 复验。长期 testing 规范已补充 cold HOME/Corepack 入口风险：只使用固定已安装且禁用 setup 的入口或直接 Node，脚本 exit 0 不能覆盖前置下载/安装失败；异常依赖变更报告而不擅自清理。观察到原安装 SDK 目录/包仍为 11-11 时间，8 SDK peer 链接指向该原安装；没有完整旧 node_modules 快照，不擅称目录已恢复。锁文件/依赖目录未提交、未还原、未删除或重装；用户尚未选择恢复方式。Root raw `stage4.nD5f9i/check-first.log` 保留完整安装失败/下载事实，不能把测试 PASS 擦去副作用。
+主会话已向用户解释该副作用来自隔离 HOME 的调用方式而非 check 脚本新增安装；停止后续所有 pnpm/npm 调用，改用直接 Node/tsc 复验。长期 testing 规范已补充 cold HOME/Corepack 入口风险：只使用固定已安装且禁用 setup 的入口或直接 Node，脚本 exit 0 不能覆盖前置下载/安装失败；异常依赖变更报告而不擅自清理。观察到原安装 SDK 目录/包仍为 11-11 时间，8 SDK peer 链接指向该原安装；没有完整旧 node_modules 快照，不擅称目录已恢复。截至阶段 4 交付时，锁文件/依赖目录未提交、未还原、未删除或重装，用户尚未选择处理方式。随后用户批准阶段 5 项目级升级及离线整理；正式处理见新增记录，不追认原下载/安装。Root raw `stage4.nD5f9i/check-first.log` 保留完整安装失败/下载事实，不能把测试 PASS 擦去副作用。
 
 本次 owned `/tmp/context-prefix-stability.d4JPI5` 暂不清理：依赖恢复决策尚未解决，需保留原始日志、临时 HOME/Corepack 缓存及复现材料；所有本次检查/子角色已终止后也不把未决诊断材料删掉。未 push、改历史、个人 reload、archive/journal 或清除任务绑定；task 保持 in_progress 待验收/后续明确处理。
+
+### 阶段 5：pnpm 12 项目配置和显式离线整理已验证
+
+主会话直接实施并自查。官方 settings / settings/cli / package_json 与实际 native CLI 相互核对；未依赖浮动 Corepack、伪造缓存、绕过 supply-chain checks 或修改 SDK/全局版本。
+
+- owned run：`/tmp/context-prefix-stability.d4JPI5/stage5.jY8rSR`。已有 cached 12.21.0 arm64 native binary 显式入口；HOME/agent dir 为本次临时目录；store/metadata cache 明确使用原 owned stage4 HOME 已下载的 v11/v12 路径。原意外 lock 与 `.modules.yaml` 已备份供核对。
+- lock-first 与 lock-second：exit 1，`ERR_PNPM_BAD_CONFIG_DEP`。packageManager 默认 download 以及 `pmOnFail: error` 都会在 install/lock-only 解析 pnpm 自身 config dependency，冷 HOME 没有对应 pnpm mirror metadata。未联网补齐；依据官方文档改为 Corepack/明确入口负责版本，`pmOnFail: ignore`，加 engines.pnpm 安装版本门禁。
+- lock-third：exit 1，`ERR_PNPM_NO_OFFLINE_META`；store 和 metadata cache 是不同设置，只有 store flag 不足以复用已有 supply-chain metadata。补充准确的原 metadata cache 路径，不使用 `trust-lockfile`/解除策略。
+- lock-fourth：exit 0，实际 `install --lockfile-only --offline --ignore-scripts --no-frozen-lockfile`；native 使用已有 supply-chain verification cache，通过后整理为 53 packages。生成 lock 与本任务提交前原 baseline **字节完全一致**（autoInstallPeers false；无 Earendil SDK/新增 transitive 项），所以本阶段无 lockfile Git delta；不是人工还原 lock 或接受 1118 行意外增长。
+- 显式 `install --offline --ignore-scripts --frozen-lockfile`（相同 cached store/cache）exit 0，移除 119 个自动添加 package；未下载任何新 dependency/SDK 或运行 build scripts。随后 `PI_SDK_DIR=<原 Pi 1.5.2 node_modules> node scripts/link-pi-sdk.mjs` exit 0，补回 4/8 SDK peer 链接；8 个 SDK 包继续指向原安装。此处 53 指当前 lock 中的 active package graph；`.modules.yaml` hoisted graph 已无 Earendil SDK（47 hoisted entries）。pnpm 保留了脱离 active graph 的 virtual-store cache，`.pnpm` 仍有 174 个目录/元数据项；没有手工清除这些缓存，也不把 graph 移除描述为完整物理目录清理。当前是正式整理后的 declared-dependency 状态，不宣称恢复未知旧 node_modules 的完整拓扑/快照。
+- 新 `scripts/package-manager.test.mjs` 单独直接 Node + 明确 PNPM_TEST_BIN：exit 0、5/5、无 skipped、自然退出。实际冷 HOME 配置读取：autoInstallPeers/verifyDepsBeforeRun false、pmOnFail ignore、skills.dirs []、packages undefined；缺失 dependencies 的 run/check fixture 脚本成功且 registry 请求 0、无 lock/node_modules 创建；不兼容 engines 的 offline install 在副作用前拒绝。
+- 固定 native 12.21.0（PATH 同版本，临时 HOME/agent + 原 PI_SDK_DIR）实际 `pnpm check`：exit 0，typecheck 通过，全套 **1917/1917、0 fail、0 skipped**。此全套保留原 forced-exit 合同，不作为生命周期自然退出证据。完整日志无前置安装/下载/ignored-build failure；package/config/lock/module metadata、virtual-store 目录集合和 8 SDK link/package.json 指纹在 check 前后完全一致。
+- 自查后加强新测试的部分初始化清理：HTTP server 在 listen 前注册 close/error owner，所有连接一并释放。相同固定入口最终重跑：focused exit 0、5/5、0 skipped、自然退出；真实 `pnpm check` exit 0、typecheck 通过、1917/1917、0 fail/skip。第二次 check 前后指纹完全一致，仍无前置安装/下载/ignored-build failure；Node Buffer 再核对 native-generated lock 与 HEAD baseline 字节完全相同。完整日志 `config-tests-second.log` / `check-second.log` 与 before/after-second 指纹留在上述 owned run。
+- 最终 `task.py validate` implement 6/check 5 引用通过；spec discovery 仍为 single-repo、development/testing 两层；JSON/config/新文件 whitespace 与 `git diff --check` 通过。主会话自查不是独立角色审查；本阶段按批准的检查路径直接完成。
+- 原 stage4 `ERR_PNPM_IGNORED_BUILDS` 与未授权下载记录保留，不因这次正式整理成功而抹除。临时 run/cache 暂留：仓库 `.modules.yaml` 仍明确引用该已有 store，且 cached manager 是本次验证入口；不在本阶段清理仍有引用的 cache 或其他 session。未 push、改全局配置/版本、个人 sync/reload、归档/journal 或任务解绑。
 
 ### 规划阶段历史材料检查（不代表当前执行状态）
 
