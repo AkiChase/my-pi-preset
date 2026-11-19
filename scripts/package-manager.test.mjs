@@ -25,8 +25,6 @@ function fixture(t, packageOverrides = {}) {
   writeFileSync(join(cwd, "package.json"), JSON.stringify({
     name: "preset-package-manager-fixture",
     private: true,
-    packageManager: manifest.packageManager,
-    engines: manifest.engines,
     ...packageOverrides,
   }));
   // Clear inherited package-manager options before isolating machine state.
@@ -41,9 +39,16 @@ function invoke(args, options) {
     : execute(manager, args, options);
 }
 
-test("pins the project manager and keeps SDK peers out of installed dependencies", () => {
-  assert.equal(manifest.packageManager, "pnpm@12.21.0");
-  assert.equal(manifest.engines.pnpm, "12.21.0");
+test("declares no project package-manager pin", () => {
+  // A packageManager or engines.pnpm pin is resolved from the working directory by Corepack and
+  // by pnpm itself, so it also applies to pnpm commands that merely inherit this checkout as their
+  // cwd. pi spawns `pnpm install --prefix ~/.pi/agent/npm` without a cwd, which would then use this
+  // project's pnpm version against the user's global store and fail with ERR_PNPM_UNEXPECTED_STORE.
+  assert.equal(Object.hasOwn(manifest, "packageManager"), false);
+  assert.equal(manifest.engines?.pnpm, undefined);
+});
+
+test("keeps SDK peers host-provided and peer installation disabled", () => {
   for (const name of Object.keys(manifest.peerDependencies).filter(name => name.startsWith("@earendil-works/"))) {
     assert.equal(manifest.peerDependencies[name], "*");
     assert.equal(Object.hasOwn(manifest.dependencies, name), false);
@@ -52,22 +57,19 @@ test("pins the project manager and keeps SDK peers out of installed dependencies
   const lock = readFileSync(join(root, "pnpm-lock.yaml"), "utf8");
   assert.match(lock, /autoInstallPeers: false/);
   assert.doesNotMatch(lock, /@earendil-works\//);
+  assert.doesNotMatch(existsSync(join(root, ".npmrc")) ? readFileSync(join(root, ".npmrc"), "utf8") : "", /auto-install-peers/);
 });
 
 test("check retains only the explicit typecheck and test sequence", () => {
   assert.equal(manifest.scripts.check, "pnpm run typecheck && pnpm run test");
   assert.match(manifest.scripts.typecheck, /^node scripts\/link-pi-sdk\.mjs && tsc /);
   assert.match(manifest.scripts.test, /^node scripts\/link-pi-sdk\.mjs && node --test /);
-  assert.doesNotMatch(existsSync(join(root, ".npmrc")) ? readFileSync(join(root, ".npmrc"), "utf8") : "", /auto-install-peers/);
 });
 
-test("selected pnpm reads the actual root-only configuration under a cold HOME", nativeOptions, async t => {
+test("the selected pnpm reads the actual root-only configuration under a cold HOME", nativeOptions, async t => {
   const options = fixture(t);
-  assert.equal((await invoke(["--version"], options)).stdout.trim(), "12.21.0");
-  for (const [key, expected] of [["autoInstallPeers", false], ["verifyDepsBeforeRun", false], ["skills.dirs", []]]) {
-    assert.deepEqual(JSON.parse((await invoke(["config", "get", key], options)).stdout), expected);
-  }
-  assert.equal((await invoke(["config", "get", "pmOnFail"], options)).stdout.trim(), "ignore");
+  assert.deepEqual(JSON.parse((await invoke(["config", "get", "autoInstallPeers"], options)).stdout), false);
+  assert.deepEqual(JSON.parse((await invoke(["config", "get", "verifyDepsBeforeRun"], options)).stdout), false);
   assert.equal((await invoke(["config", "get", "packages"], options)).stdout.trim(), "undefined");
 });
 
@@ -100,14 +102,4 @@ test("run executes a check with missing dependencies without fetching or install
   assert.equal(readFileSync(join(options.cwd, "package.json"), "utf8"), packageBefore);
   assert.equal(readFileSync(join(options.cwd, "pnpm-workspace.yaml"), "utf8"), configBefore);
   assert.doesNotMatch(result.stdout + result.stderr, /install that runs before scripts|ERR_PNPM_IGNORED_BUILDS/);
-});
-
-test("an incompatible manager engine refuses offline install before creating dependencies", nativeOptions, async t => {
-  const options = fixture(t, { engines: { pnpm: "0.0.0" } });
-  await assert.rejects(invoke(["install", "--offline", "--ignore-scripts"], options), error => {
-    assert.match(error.stdout + error.stderr, /ERR_PNPM_UNSUPPORTED_ENGINE/);
-    return true;
-  });
-  assert.equal(existsSync(join(options.cwd, "node_modules")), false);
-  assert.equal(existsSync(join(options.cwd, "pnpm-lock.yaml")), false);
 });
