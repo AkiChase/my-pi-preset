@@ -1,0 +1,5 @@
+{"file":".trellis/spec/development/index.md","reason":"Review append-only model context ownership, fixed system rules, lifecycle and direct implementation boundaries."}
+{"file":".trellis/spec/development/sdk-compatibility.md","reason":"Review public SDK imports, persistent append confirmation, rollback and unchanged tool schemas."}
+{"file":".trellis/spec/development/trellis-resource-provenance.md","reason":"Review package-source instruction updates and adapted resource hashes without generated-copy edits."}
+{"file":".trellis/spec/testing/index.md","reason":"Review isolated actual-SDK prefix tests, fake-pi Trellis tests, natural exit and evidence reporting."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace rule/data, parent/child, persistence and authorization boundaries and their negative regressions."}

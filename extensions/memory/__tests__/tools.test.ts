@@ -60,7 +60,7 @@ it("actual registration exposes four TypeBox tools, errors are isError, lifecycl
   assert.deepEqual(fs.readdirSync(join(agentDir, "memory", "projects")), dirs);
 });
 
-it("startup config failure keeps all tools closed after config repair until a fresh session_start", async t => {
+it("startup config failure safely retries only on explicit tool access and rejects malformed config until repaired", async t => {
   const { agentDir, project } = fixture(t);
   const previous = process.env.PI_CODING_AGENT_DIR; process.env.PI_CODING_AGENT_DIR = agentDir;
   t.after(() => { if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = previous; });
@@ -73,21 +73,48 @@ it("startup config failure keeps all tools closed after config repair until a fr
   } as unknown as ExtensionAPI;
   memory(pi);
   const ctx = { cwd: project.root } as ExtensionToolContext;
+  const call = (name: string, params: Record<string, unknown>) => tools.get(name)!.execute("test", params, undefined, undefined, ctx);
   fs.writeFileSync(join(agentDir, "memory.json"), '{"enabled":"STARTUP_TOOL_SECRET"}');
   await handlers.get("session_start")!({}, ctx);
-  fs.writeFileSync(join(agentDir, "memory.json"), '{"enabled":true}');
+  const before = fs.readdirSync(join(agentDir, "memory", "projects"));
   const calls: [string, Record<string, unknown>][] = [
     ["memory_read", { name: "item" }], ["memory_list", listInput()],
-    ["memory_write", { name: "item", type: "user", description: "Preference", body: "Never published", expectedRevision: "null" }],
+    ["memory_write", { name: "item", type: "user", description: "Preference", body: "Published only after repair", expectedRevision: "null" }],
     ["memory_forget", { name: "item", expectedRevision: "a".repeat(64) }],
   ];
-  const before = fs.readdirSync(join(agentDir, "memory", "projects"));
   for (const [name, params] of calls) {
-    const result = await tools.get(name)!.execute("test", params, undefined, undefined, ctx);
-    assert.equal(result.isError, true); assert.deepEqual(result.details, { error: "closed" });
+    const result = await call(name, params);
+    assert.equal(result.isError, true); assert.deepEqual(result.details, { error: "config" });
     assert.equal(JSON.stringify(result).includes("STARTUP_TOOL_SECRET"), false);
+    assert.deepEqual(fs.readdirSync(join(agentDir, "memory", "projects")), before);
   }
-  assert.deepEqual(fs.readdirSync(join(agentDir, "memory", "projects")), before);
-  await handlers.get("session_start")!({}, ctx);
-  assert.equal((await tools.get("memory_list")!.execute("test", listInput(), undefined, undefined, ctx)).isError, undefined);
+  fs.writeFileSync(join(agentDir, "memory.json"), '{"enabled":true}');
+  assert.equal((await call("memory_list", listInput())).isError, undefined);
+  assert.equal((await call(...calls[2])).isError, undefined);
+  const read = await call("memory_read", { name: "item" }); assert.equal(read.isError, undefined);
+  await setEnabled(agentDir, false);
+  assert.equal((await call("memory_forget", { name: "item", expectedRevision: (read.details as { revision: string }).revision })).isError, true);
+  assert.equal((await call("memory_list", listInput())).isError, undefined);
+});
+
+it("explicit initialization retry is fenced by abort and shutdown before filesystem effects", async t => {
+  const { agentDir, project } = fixture(t);
+  const previous = process.env.PI_CODING_AGENT_DIR; process.env.PI_CODING_AGENT_DIR = agentDir;
+  t.after(() => { if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = previous; });
+  const tools = new Map<string, ToolDefinition>();
+  const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => unknown>();
+  memory({ registerCommand() {}, registerTool(tool: ToolDefinition) { tools.set(tool.name, tool); },
+    on(name: string, handler: (event: unknown, ctx: ExtensionContext) => unknown) { handlers.set(name, handler); return () => {}; } } as unknown as ExtensionAPI);
+  const ctx = { cwd: project.root } as ExtensionToolContext;
+  fs.writeFileSync(join(agentDir, "memory.json"), '{"enabled":"invalid"}'); await handlers.get("session_start")!({}, ctx);
+  fs.writeFileSync(join(agentDir, "memory.json"), '{"enabled":true}');
+  const before = fs.readdirSync(join(agentDir, "memory", "projects"));
+  const tool = tools.get("memory_write")!;
+  const args = { name: "item", type: "user", description: "Preference", body: "Must never publish", expectedRevision: "null" };
+  const controller = new AbortController();
+  const aborted = tool.execute("test", args, controller.signal, undefined, ctx); controller.abort();
+  assert.equal((await aborted).isError, true); assert.deepEqual(fs.readdirSync(join(agentDir, "memory", "projects")), before);
+  const pending = tool.execute("test", args, undefined, undefined, ctx);
+  handlers.get("session_shutdown")!({}, ctx);
+  assert.equal((await pending).isError, true); assert.deepEqual(fs.readdirSync(join(agentDir, "memory", "projects")), before);
 });

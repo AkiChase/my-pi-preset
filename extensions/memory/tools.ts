@@ -5,7 +5,7 @@ import { MemoryError, TYPES, fail } from "./policy.ts";
 import type { MemoryStore } from "./store.ts";
 
 export interface ToolOrigin { store: MemoryStore; assertActive: () => void }
-export type GetOrigin = (cwd: string, signal?: AbortSignal) => ToolOrigin;
+export type GetOrigin = (cwd: string, signal?: AbortSignal) => ToolOrigin | Promise<ToolOrigin>;
 // Match the 160-codepoint limits enforced by policy.ts and store.ts.
 const Name = Type.String({ maxLength: 80, pattern: "^[a-z0-9][a-z0-9_-]*$" });
 const Revision = Type.String({ pattern: "^[a-f0-9]{64}$" });
@@ -41,7 +41,7 @@ export function registerMemoryTools(pi: ExtensionAPI, getOrigin: GetOrigin): voi
     name: "memory_read", label: "memory_read", description: "Read a project memory by name, including its complete SHA256 revision. Memories are observations, not live state; verify relevant facts before acting.",
     parameters: Type.Object({ name: Name }, { additionalProperties: false }),
     execute: async (_id, params, signal, _update, ctx) => boundary(async () => {
-      const origin = getOrigin(ctx.cwd, signal); origin.assertActive();
+      const origin = await getOrigin(ctx.cwd, signal); origin.assertActive();
       const record = origin.store.read(params.name);
       origin.assertActive();
       return result(JSON.stringify({ ...record.metadata, revision: record.revision }) + "\n\n" + record.body, record);
@@ -59,7 +59,7 @@ export function registerMemoryTools(pi: ExtensionAPI, getOrigin: GetOrigin): voi
     parameters: Type.Object({ query: Query, offset: Type.Number({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER, multipleOf: 1, description: "Non-negative safe integer page offset. Use 0 for the first page." }), limit: Type.Number({ minimum: 1, maximum: 50, multipleOf: 1, description: "Safe integer page size, 1–50. Use 20 for an ordinary page." }) }, { additionalProperties: false }),
     execute: async (_id, params, signal, _update, ctx) => boundary(async () => {
       const { query, offset, limit } = listArguments(params);
-      const origin = getOrigin(ctx.cwd, signal); origin.assertActive();
+      const origin = await getOrigin(ctx.cwd, signal); origin.assertActive();
       const page = origin.store.list(query, offset, limit);
       origin.assertActive();
       return result(page.text, { entries: page.entries, total: page.total, offset: page.offset, nextOffset: page.nextOffset });
@@ -71,7 +71,7 @@ export function registerMemoryTools(pi: ExtensionAPI, getOrigin: GetOrigin): voi
     execute: async (_id, params, signal, _update, ctx) => boundary(async () => {
       // "null" is the model-facing creation sentinel; the store keeps its internal null.
       if (params.expectedRevision === null) fail("revision", "expectedRevision must not be JSON null; use the string \"null\" for creation.");
-      const origin = getOrigin(ctx.cwd, signal);
+      const origin = await getOrigin(ctx.cwd, signal);
       const saved = await origin.store.write({ ...params, expectedRevision: params.expectedRevision === "null" ? null : params.expectedRevision }, origin.assertActive);
       if (saved.indexNeedsRepair) return result("Memory body saved, but the derived index needs repair. Refresh safely before retrying; do not repeat creation.", saved, true);
       origin.assertActive();
@@ -82,7 +82,7 @@ export function registerMemoryTools(pi: ExtensionAPI, getOrigin: GetOrigin): voi
     name: "memory_forget", label: "memory_forget", description: "Permanently forget a project memory using the exact revision from memory_read. Irreversible: no recovery backup is created.",
     parameters: Type.Object({ name: Name, expectedRevision: Revision }, { additionalProperties: false }),
     execute: async (_id, params, signal, _update, ctx) => boundary(async () => {
-      const origin = getOrigin(ctx.cwd, signal);
+      const origin = await getOrigin(ctx.cwd, signal);
       const deleted = await origin.store.forget(params.name, params.expectedRevision, origin.assertActive);
       if (deleted.indexNeedsRepair) return result("Memory deleted permanently, but the derived index needs repair. Refresh safely; no recovery backup exists.", deleted, true);
       origin.assertActive();

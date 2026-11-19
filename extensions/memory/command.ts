@@ -21,7 +21,7 @@ const HELP = "Memory: /memory opens the read-only project browser in TUI; /memor
  * Activation-owned command. The browser is read-only: no editor/input/select/confirm dialogs,
  * no store mutation, index publication or model call. Only `/memory on|off` writes configuration.
  */
-export function registerMemoryCommand(pi: ExtensionAPI, getOrigin: (cwd: string) => CommandOrigin, options: MemoryCommandOptions = {}): { close: () => void } {
+export function registerMemoryCommand(pi: ExtensionAPI, getOrigin: (cwd: string) => CommandOrigin | Promise<CommandOrigin>, options: MemoryCommandOptions = {}): { close: () => void } {
   const loadLayout = options.loadLayout ?? loadNativeLayout;
   let operation: object | undefined;
   let closePanel: (() => void) | undefined;
@@ -40,7 +40,8 @@ export function registerMemoryCommand(pi: ExtensionAPI, getOrigin: (cwd: string)
       const check = () => { if (operation !== token || ctx.cwd !== cwd) fail("closed", "Memory interaction is closed."); origin!.assertActive(); };
       const notify = (message: string, type: "info" | "warning" | "error" = "info") => { check(); ctx.ui.notify(displayText(message), type); check(); };
       try {
-        origin = getOrigin(ctx.cwd); check();
+        const supplied = getOrigin(ctx.cwd);
+        origin = supplied instanceof Promise ? await supplied : supplied; check();
         const text = args.trim();
         if (text === "help") { notify(HELP); return; }
         if (text === "on" || text === "off") {

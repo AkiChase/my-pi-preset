@@ -1,0 +1,6 @@
+{"file":".trellis/spec/development/index.md","reason":"Implement fixed system rules and branch-persistent ordinary startup messages without context rewrites; preserve Memory storage and lifecycle safety."}
+{"file":".trellis/spec/development/sdk-compatibility.md","reason":"Use public SDK APIs and confirm persisted appends without weakening rollback, identity or tool schema contracts."}
+{"file":".trellis/spec/testing/index.md","reason":"Test actual isolated SDK requests, startup/resume/compaction, scan counts and natural-exit fixtures."}
+{"file":".trellis/spec/guides/index.md","reason":"Read shared ownership and cross-layer checklists before adding a narrow startup helper."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Keep a small common startup-history helper rather than a general context synchronization framework."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace session origins, persistence, filesystem accesses, failure handling and cancellations."}
