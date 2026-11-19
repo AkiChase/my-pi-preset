@@ -419,3 +419,44 @@ subagent_run 手动转后台（含前台 resume）在文本中注明用户操作
 ### Status
 
 [OK] **Completed**
+
+
+## Session 71: 上下文前缀稳定与 pnpm 12 项目升级收尾
+<!-- trellis-session: v=2 fp=34771bf2c9cfe425 -->
+
+**Date**: 2026-11-19
+**Task**: 上下文前缀稳定与 pnpm 12 项目升级收尾
+**Branch**: `main`
+
+### Summary
+
+完成 Memory/Trellis/子 Agent 固定规则与一次性启动材料分离，保留原启动内容及分支确认语义，真实离线 SDK/provider 相邻请求前缀验证通过；项目固定 pnpm 12.21.0 并关闭隐式安装，正式离线整理意外依赖图，SDK 继续由 Pi 提供。用户已验收并授权收尾和 push，任务已归档至 archive/2026-11；main 直接实施无独立 PR 分支，使用支持的归档分支校验豁免。
+
+### Main Changes
+
+- 五个实施阶段及六个工作提交已完成；任务归档提交 8d5b193，当前任务绑定已清除。
+- 未授权安装的首次失败事实与后续获准离线整理结果均保留；临时 /tmp/context-prefix-stability.d4JPI5 因仍有 store/固定 pnpm 入口引用而保留，未改全局版本或 Pi 安装。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `80e9910` | fix(memory): append a branch startup snapshot instead of refreshing system |
+| `e1be11e` | fix(trellis): persist startup context and append deduplicated task state |
+| `7d26d56` | fix(agents): separate inherited rules from persistent startup materials |
+| `09e6975` | fix(context): preserve startup composites and verify provider prefixes |
+| `2e1d9f0` | docs(testing): guard isolated checks from automatic package setup |
+| `42cfb0c` | chore(deps): pin pnpm 12.21.0 and disable implicit installs |
+
+### Testing
+
+- [OK] 固定 pnpm 12.21.0 typecheck 和全套 1917/1917（0 fail/skip）；新 CLI 配置/零 registry 请求/无隐式安装回归 5/5 自然退出，check 前后依赖状态指纹一致。
+- [OK] 真实 OpenAI Responses/Anthropic payload 离线比较；不宣称线上缓存命中或真实 Trellis host/TUI 验收。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 将已验证实现及归档/日志提交正常推送 origin/main，不 force push、不改写历史。
