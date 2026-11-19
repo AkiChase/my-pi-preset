@@ -2,7 +2,7 @@
  * pi-trellis — a user-level Pi extension activated within supported Trellis projects.
  *
  * Scope (see design doc §2):
- *   M1  session / task context injection via systemPrompt sections + per-turn state message
+ *   M1  once-only ordinary startup context + stable system rules + task-state appends
  *   M2  active-task status in the footer
  *   M3  role-specific JSONL/artifact material handed to trellis-* subagents
  *   M4  explicit initialization and manifest-managed project resources
@@ -38,6 +38,7 @@ import { readCurrentTaskIdentity } from "./lib/task-browser/reader.ts";
 import { checkedPath } from "./lib/initialization/engine.ts";
 import { resourceRoot } from "./lib/paths.ts";
 import { findProjectRoot, requireProjectRuntime } from "./lib/project-state.ts";
+import { hasTrellisStartup, latestTrellisState, trellisContextDetails, TRELLIS_CONTEXT_MESSAGE, TRELLIS_RULE_SECTION, TRELLIS_RULES } from "./lib/model-context.ts";
 
 /** The slice of pi's Theme this extension uses. Narrow on purpose: `ctx.ui.theme` is always present, even in the no-op UI. */
 type ThemeColorToken = "accent" | "success" | "warning" | "error" | "muted" | "dim" | "text";
@@ -61,7 +62,7 @@ const CONTEXT_TTL_MS = 1500;
  */
 const TASK_TTL_MS = 10000;
 
-/** Hard cap on the workflow excerpt that enters the system prompt. */
+/** Hard cap on the workflow excerpt supplied in ordinary startup context. */
 const WORKFLOW_MAX_CHARS = 14000;
 
 /** Compact footer budget in visible terminal columns, measured before theming. */
@@ -88,7 +89,7 @@ const CONTEXT_MODE = process.env.TRELLIS_PI_CONTEXT?.trim().toLowerCase();
 
 const SECTION_OVERVIEW = "session-overview";
 const SECTION_WORKFLOW = "trellis-workflow";
-const STATE_MESSAGE_TYPE = "trellis-task-state";
+const STATE_MESSAGE_TYPE = TRELLIS_CONTEXT_MESSAGE;
 const STATUS_KEY = "trellis";
 const AGENT_PREFIX = "trellis-";
 const ACTIVE_TASK_MARKER = "Active task:";
@@ -111,10 +112,6 @@ const bindingBySession = new Map<string, WorktreeBinding | null>();
 const sourceRootBySession = new Map<string, string>();
 const authorityErrors = new Map<string, string>();
 
-/** cacheKey -> memoized prompt sections. Must stay byte-stable for the process lifetime. */
-const sectionCache = new Map<string, { overview?: string; workflow?: string }>();
-/** cacheKey -> last state text handed to the model, for dedup. */
-const lastStateSent = new Map<string, string>();
 /** session/root/context -> cached `get_context.py --mode default` payload. */
 const contextCache = new Map<string, { at: number; value: Promise<TrellisContext | undefined> }>();
 /** cacheKey -> cached active task, including cached absence. */
@@ -595,17 +592,6 @@ function renderOverview(root: string, key: string, context: TrellisContext | und
 		`Trellis context id: ${key}`,
 	];
 
-	if (context?.developer) lines.push(`Developer: ${context.developer}`);
-
-	const git = context?.git;
-	if (git?.isRepo) {
-		const bits = [git.branch || "unknown branch"];
-		if (git.isClean === false && typeof git.uncommittedChanges === "number") {
-			bits.push(`${git.uncommittedChanges} uncommitted`);
-		}
-		lines.push(`${executionRoot === root ? "Git" : "Source Git (not execution checkout)"}: ${bits.join(", ")}`);
-	}
-
 	const journal = context?.journal;
 	if (journal?.file) {
 		const near = journal.nearLimit ? ", near line limit — consider rotating" : "";
@@ -932,7 +918,6 @@ export default function (pi: ExtensionAPI): void {
 	const cancelCheck = () => { checkGeneration++; checkController?.abort(); checkController = undefined; };
 	registerInitCommand(pi, async (ctx, root) => {
 		contextCache.clear(); taskCache.clear(); taskErrors.clear(); workflowCache.delete(root);
-		sectionCache.clear(); lastStateSent.clear();
 		await refreshProjectDisplay(ctx);
 	}, async (_ctx, scope, options) => {
 		if (checkClosed) return undefined;
@@ -1090,16 +1075,33 @@ export default function (pi: ExtensionAPI): void {
 		await refreshProjectDisplay(ctx, current);
 	});
 
-	// ---- M1: prompt sections -----------------------------------------------
+	// ---- M1: ordinary startup context and persisted task-state appends -------
+
+	const stateMessage = (ctx: ExtensionContext, origin: string, state: string, content = state, parts?: string[]) => {
+		if (!parts && latestTrellisState(ctx.sessionManager.getBranch(), origin) === state) return;
+		return { message: { customType: STATE_MESSAGE_TYPE, content, display: false, details: trellisContextDetails(origin, state, parts) } };
+	};
 
 	pi.on("before_agent_start", async (event, ctx) => {
+		const manager = ctx.sessionManager, id = manager.getSessionId(), cwd = ctx.cwd, generation = displayGeneration;
+		const valid = () => !displayClosed && generation === displayGeneration && manager.getSessionId() === id && ctx.cwd === cwd;
+		const sections = event.systemPromptOptions?.sections;
+		if (sections) {
+			delete sections[SECTION_OVERVIEW];
+			delete sections[SECTION_WORKFLOW];
+			delete sections[TRELLIS_RULE_SECTION];
+		}
+		if (!valid()) return;
 		let initial: Session | undefined;
 		try { initial = session(ctx, true); }
 		catch (error) {
 			let identity: string | undefined;
 			try { const root = findRoot(ctx.cwd); if (root) identity = sessionIdentity(root, ctx); } catch { /* unsafe discovery grants no context */ }
-			if (identity && (authorityBySession.has(identity) || sourceRootBySession.has(identity))) pi.sendMessage({ customType: STATE_MESSAGE_TYPE, content: `Status: task_error\nTrellis context diagnostic: ${runtimeDiagnostic(error)}`, display: false });
-			clearProjectDisplay(ctx); return;
+			clearProjectDisplay(ctx);
+			if (identity && (authorityBySession.has(identity) || sourceRootBySession.has(identity))) {
+				return stateMessage(ctx, cwd, `Status: task_error\nTrellis context diagnostic: ${runtimeDiagnostic(error)}`);
+			}
+			return;
 		}
 		try {
 			let current = initial;
@@ -1117,65 +1119,43 @@ export default function (pi: ExtensionAPI): void {
 			if (authorityErrors.has(current.identity) && priorAuthority) throw new Error(authorityErrors.get(current.identity));
 			if (facts && (taskBySession.get(current.identity) !== facts.taskDir || roleBySession.get(current.identity) !== facts.role)) {
 				await inheritDispatchTask(current, facts);
+				if (!valid()) return;
 				taskBySession.set(current.identity, facts.taskDir);
 				roleBySession.set(current.identity, facts.role);
-				sectionCache.delete(current.cacheKey);
 				current = session(ctx)!;
 			}
 			if (authorityErrors.has(current.identity)) throw new Error(authorityErrors.get(current.identity));
 			await requireChildAuthority(current);
+			if (!valid() || !sections) return;
 
-			const sections = event.systemPromptOptions?.sections;
-			if (!sections) return;
-
-			// Headless sessions (subagents, `pi -p`) get the compact payload: the
-			// workflow excerpt is the largest block and the least useful to a
-			// single-purpose agent. TRELLIS_PI_CONTEXT overrides the guess.
+			// Keep the original full/compact payload, but supply it only once as
+			// ordinary context. CLI/UI invalidation never invalidates this history.
 			const compact = CONTEXT_MODE === "compact" || (CONTEXT_MODE !== "full" && !ctx.hasUI);
-
-			let cached = sectionCache.get(current.cacheKey);
-			if (!cached) {
-				cached = {};
-				sectionCache.set(current.cacheKey, cached);
-			}
-
-			if (cached.overview === undefined) {
+			const startup: string[] = [], parts: string[] = [];
+			if (!hasTrellisStartup(manager.getBranch(), current.root)) {
 				const context = await loadContext(current.root, current.key);
-				cached.overview = renderOverview(current.root, current.key, context, roleBySession.get(current.identity), undefined, current.executionRoot);
-			}
-			sections[SECTION_OVERVIEW] = cached.overview;
-
-			if (!compact) {
-				if (cached.workflow === undefined) {
+				if (!valid()) return;
+				startup.push(`<${SECTION_OVERVIEW}>\n${renderOverview(current.root, current.key, context, roleBySession.get(current.identity), undefined, current.executionRoot)}\n</${SECTION_OVERVIEW}>`);
+				parts.push("overview");
+				if (!compact) {
 					const workflow = loadWorkflow(current.root);
-					cached.workflow = workflow ? renderWorkflowSection(workflow.head) : "";
+					if (workflow?.head) {
+						startup.push(`<${SECTION_WORKFLOW}>\n${renderWorkflowSection(workflow.head)}\n</${SECTION_WORKFLOW}>`);
+						parts.push("workflow");
+					}
 				}
-				if (cached.workflow) sections[SECTION_WORKFLOW] = cached.workflow;
 			}
-
-			// Volatile state never enters the prompt: a section that changes every
-			// turn invalidates the provider's prefix cache from byte zero.
 			const task = await sessionTask(current);
+			if (!valid()) return;
 			const state = renderState(current.root, task, loadWorkflow(current.root)?.states, taskErrors.get(cacheKeyFor(current.root, current.key)));
-			if (lastStateSent.get(current.cacheKey) !== state) {
-				lastStateSent.set(current.cacheKey, state);
-				pi.sendMessage({
-					customType: STATE_MESSAGE_TYPE,
-					content: state,
-					display: false,
-				});
-			}
+			sections[TRELLIS_RULE_SECTION] = TRELLIS_RULES;
+			return stateMessage(ctx, current.root, state, [...startup, state].join("\n\n"), parts.length ? parts : undefined);
 		} catch (error) {
+			if (!valid()) return;
 			if (initial && (authorityBySession.has(initial.identity) || sourceRootBySession.has(initial.identity))) authorityErrors.set(initial.identity, String(error));
-			delete event.systemPromptOptions?.sections?.[SECTION_OVERVIEW];
-			delete event.systemPromptOptions?.sections?.[SECTION_WORKFLOW];
-			const content = `Status: task_error\nTrellis context diagnostic: ${runtimeDiagnostic(error)}`;
-			const identity = `${ctx.cwd}::${ctx.sessionManager.getSessionId()}::error`;
-			if (lastStateSent.get(identity) !== content) {
-				lastStateSent.set(identity, content);
-				pi.sendMessage({ customType: STATE_MESSAGE_TYPE, content, display: false });
-			}
+			if (sections) delete sections[TRELLIS_RULE_SECTION];
 			clearProjectDisplay(ctx);
+			return stateMessage(ctx, initial?.root ?? cwd, `Status: task_error\nTrellis context diagnostic: ${runtimeDiagnostic(error)}`);
 		}
 	});
 
@@ -1285,7 +1265,6 @@ export default function (pi: ExtensionAPI): void {
 			if (current) {
 				invalidateTask(current.root, current.key);
 				contextCache.delete(cacheKeyFor(current.root, current.key));
-				sectionCache.delete(current.cacheKey); lastStateSent.delete(current.cacheKey);
 			}
 			await refreshProjectDisplay(ctx, current);
 		} catch {
@@ -1317,10 +1296,7 @@ export default function (pi: ExtensionAPI): void {
 		authorityBySession.delete(identity); bindingBySession.delete(identity); authorityErrors.delete(identity);
 		roleBySession.delete(identity);
 		if (key) {
-			const cacheKey = `${identity}::${materialRoot}::${key}`;
 			contextCache.delete(cacheKeyFor(materialRoot, key)); taskCache.delete(cacheKeyFor(materialRoot, key)); taskErrors.delete(cacheKeyFor(materialRoot, key));
-			sectionCache.delete(cacheKey);
-			lastStateSent.delete(cacheKey);
 		}
 	});
 }

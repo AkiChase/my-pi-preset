@@ -12,6 +12,7 @@ import { describe, it, after } from "node:test";
 // Cases run serially; the root test runner owns file-level concurrency.
 const cases = [];
 const test = (name, fn) => cases.push({ name, fn });
+import { captureModelContext } from './model-context-fixture.mjs';
 import trellis, { __internals } from "../index.ts";
 import { copyRuntimeFixture, mockPython, rehomeOperationRecord } from "./runtime-fixture.mjs";
 import { readBinding } from '../lib/bindings.ts';
@@ -27,7 +28,7 @@ function setup(t, root = copyRuntimeFixture(t, { git: true })) {
     put(`${dir}/implement.jsonl`, JSON.stringify({ file: `${dir}/prd.md` }));
   }
   const handlers = new Map(), messages = [], tools = new Map();
-  const pi = { registerMessageRenderer: () => {}, events: { on: () => () => {}, emit: (name,request) => { if(name === "preset:widget-display:connect:v1") request.accept({set: content => { request.ctx.ui.setWidget?.("fixture",content); return true; }, dispose: () => {}}); } }, registerCommand: () => {}, registerTool: (tool) => tools.set(tool.name, tool), on: (name, handler) => { const previous=handlers.get(name); handlers.set(name, previous ? (...args) => { const old=previous(...args); const next=handler(...args); return Promise.all([old,next]).then(results=>results[1]); } : handler); return ()=>{}; }, sendMessage: (message) => messages.push(message), getAllTools: () => [{ name: "subagent_run" }] };
+  const pi = { registerMessageRenderer: () => {}, events: { on: () => () => {}, emit: (name,request) => { if(name === "preset:widget-display:connect:v1") request.accept({set: content => { request.ctx.ui.setWidget?.("fixture",content); return true; }, dispose: () => {}}); } }, registerCommand: () => {}, registerTool: (tool) => tools.set(tool.name, tool), on: (name, handler) => { handler=captureModelContext(name,handler,messages); const previous=handlers.get(name); handlers.set(name, previous ? (...args) => { const old=previous(...args); const next=handler(...args); return Promise.all([old,next]).then(results=>results[1]); } : handler); return ()=>{}; }, sendMessage: (message) => messages.push(message), getAllTools: () => [{ name: "subagent_run" }] };
   trellis(pi);
   const ctx = (name) => ({ cwd: root, hasUI: false, mode: "print", sessionManager: { getSessionId: () => name, getSessionFile: () => undefined }, ui: {} });
   const pointer = (context, task) => put(`.trellis/.runtime/sessions/${__internals.contextKey(root, context)}.json`, JSON.stringify({ current_task: `.trellis/tasks/${task}` }));
@@ -202,8 +203,8 @@ test('managed startup registers execution checkout, then source-only child point
  const material=requireMaterials(await queryWorktree(target,task,true,undefined,true,'implement'));
  const prompt=assembleDispatchPrompt({prompt:'edit code only',contextId:created.binding.contextId,role:'trellis-implement',materials:material,executionRoot:target});
  const sections={};await f.handlers.get('before_agent_start')({prompt,systemPromptOptions:{sections}},child);
- assert.match(sections['session-overview'],new RegExp('Execution root.*'+target.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
- assert.match(sections['session-overview'],/Source Git \(not execution checkout\)/);assert.match(f.messages.at(-1).content,/Active task: .trellis\/tasks\/a/);
+ assert.equal(sections['session-overview'],undefined);assert.match(f.messages.at(-1).content,new RegExp('Execution root.*'+target.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
+ assert.doesNotMatch(f.messages.at(-1).content,/Source Git \(not execution checkout\)|Developer:/);assert.match(f.messages.at(-1).content,/Active task: .trellis\/tasks\/a/);
  assert.doesNotMatch(f.messages.at(-1).content,/OLD target material|another-task/);
  const key=__internals.contextKey(target,child);assert.equal(JSON.parse(readFileSync(join(f.root,`.trellis/.runtime/sessions/${key}.json`))).current_task,task);
  assert.equal(existsSync(join(target,`.trellis/.runtime/sessions/${key}.json`)),false);
@@ -300,7 +301,7 @@ test('live source content/lifecycle changes do not cancel child authority or res
  const f=setup(t),parent=f.ctx('live-owner'),child=f.ctx('live-child');f.pointer(parent,'a');const input={subagent_type:'trellis-implement',prompt:'work'};await f.call(parent,input);
  await f.handlers.get('before_agent_start')({prompt:input.prompt,systemPromptOptions:{sections:{}}},child);
  f.put('.trellis/tasks/a/prd.md','changed live requirements');f.put('.trellis/tasks/a/task.json','{"status":"planning","title":"changed live"}');
- const sections={};await f.handlers.get('before_agent_start')({prompt:'continue',systemPromptOptions:{sections}},child);assert.ok(sections['session-overview']);assert.doesNotMatch(f.messages.at(-1).content,/task_error/);
+ const sections={};await f.handlers.get('before_agent_start')({prompt:'continue',systemPromptOptions:{sections}},child);assert.equal(sections['session-overview'],undefined);assert.ok(sections['trellis-rules']);assert.doesNotMatch(f.messages.at(-1).content,/task_error/);
  assert.equal(await f.call(child,{command:'python3 .trellis/scripts/task.py current --json'},'bash'),undefined);
 });
 
@@ -378,7 +379,7 @@ test('planning research child startup verifies source materials without starting
   const materials=requireMaterials(await queryWorktree(executionRoot,task,false,undefined,false,'research'));
   const prompt=assembleDispatchPrompt({prompt:'Research only; do not edit products',contextId:binding?.contextId??'planning-research',role:'trellis-research',materials,executionRoot});
   const sections={};await f.handlers.get('before_agent_start')({prompt,systemPromptOptions:{sections}},child);
-  assert.ok(sections['session-overview']);assert.doesNotMatch(f.messages.at(-1).content,/task_error/);
+  assert.equal(sections['session-overview'],undefined);assert.ok(sections['trellis-rules']);assert.doesNotMatch(f.messages.at(-1).content,/task_error/);
   const key=__internals.contextKey(executionRoot,child);
   assert.equal(JSON.parse(readFileSync(join(f.root,`.trellis/.runtime/sessions/${key}.json`))).current_task,task);
   assert.deepEqual(readFileSync(join(f.root,task,'task.json')),record);assert.deepEqual(readFileSync(parentFile),parentBytes);

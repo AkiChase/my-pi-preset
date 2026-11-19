@@ -18,18 +18,18 @@
 | 长期合同 | `.trellis/spec/development/index.md`、`.trellis/spec/testing/index.md`，确需时相关 SDK/资源文档 | 保存可执行的“数据不提升 system、启动一次、实际输入验证”合同 | 不把 task 临时过程、工具调用教学复制进 specs |
 | 测试 | Memory、Trellis、Agent-tasks 现有测试；新增 shared/model-context 合同测试 | 字符串正确不等于请求前缀/生命周期正确 | 全部隔离、离线，不访问个人配置/记忆/会话，不以 forced exit 证明自然退出 |
 
-预计为十余个产品源/资源文件，加对应测试、文档与少量规范；不是只修改 `sectionCache.delete` 的小修。表中新增文件尚不存在；列为有明确用途的计划路径，不是已实现结果。具体局部文件分拆可在同一行为/owner 边界内调整，若扩大公共配置或执行权限则重新审阅。
+预计为十余个产品源/资源文件，加对应测试、文档与少量规范；不是只修改 `sectionCache.delete` 的小修。新增路径为计划名，实际落地与验收见各阶段记录；具体局部文件分拆可在同一行为/owner 边界内调整，若扩大公共配置或执行权限则重新审阅。
 
 ## 阶段 1：共享启动一次语义 + Project Memory
 
 ### 实施
 
-- [ ] 建立小型 current-branch startup 记录识别/确认 helper；成功快照用自身 custom message 作为记录，skip 用非模型小记录；保存失败不提前确认。
-- [ ] 固定 Memory system 规则不带索引/诊断/实时开关状态，启动索引为一次普通消息。
-- [ ] 停止普通 `before_agent_start` 元数据扫描；write/forget 无自动索引通知。
-- [ ] 真实 list/read、命令与 mutation 保留实时性；初始 store 失败在明确操作时可受原安全边界重试。
-- [ ] 完成新会话、恢复/reload、fork/tree、压缩、启停、空库、错误和 stale epoch/persistence 负例。
-- [ ] 同阶段更新 `docs/extensions/memory.md` 和受影响固定规则测试。
+- [x] 建立小型 current-branch startup 记录识别/确认 helper；成功快照用自身 custom message 作为记录，skip 用非模型小记录；保存失败不提前确认。
+- [x] 固定 Memory system 规则不带索引/诊断/实时开关状态，启动索引为一次普通消息。
+- [x] 停止普通 `before_agent_start` 元数据扫描；write/forget 无自动索引通知。
+- [x] 真实 list/read、命令与 mutation 保留实时性；初始 store 失败在明确操作时可受原安全边界重试。
+- [x] 完成新会话、恢复/reload、fork/tree、压缩、启停、空库、错误和 stale epoch/persistence 负例。
+- [x] 同阶段更新 `docs/extensions/memory.md` 和受影响固定规则测试。
 
 ### 验证命令
 
@@ -48,12 +48,12 @@ pnpm typecheck
 
 ### 实施
 
-- [ ] 保留原模式下 overview 的 B 类首轮内容（Journal、任务列表、项目/执行/CLI 信息等），只排除 A 类主会话 Git 和开发者身份；作为普通启动消息提供一次。
-- [ ] 原 `trellis-workflow` section 保留内容与 full/compact/headless 过滤/预算，首轮普通消息提供，不改为只有路径或主动读取才提供。
-- [ ] 当前任务身份/状态/材料/task_error 与阶段 breadcrumb 按 C 类尾部更新，保留提示内容；真实内容变化才发送，恢复/reload 从分支历史恢复去重。
-- [ ] CLI 结果只刷新 task/UI 缓存，不重建/补发 B 类启动消息，也不强制重复 C 类状态；校验错误仍阻断。
-- [ ] 包源指引如需改变承载位置表述，仅改相关文字并更新 adapted hashes；不为了精简首轮内容修改流程，未改 bytes 不改 hash。
-- [ ] 同阶段更新 `docs/extensions/trellis.md` 和相关测试。
+- [x] 保留原模式下 overview 的 B 类首轮内容（Journal、任务列表、项目/执行/CLI 信息等），只排除 A 类主会话 Git 和开发者身份；作为普通启动消息提供一次。
+- [x] 原 `trellis-workflow` section 保留内容与 full/compact/headless 过滤/预算，首轮普通消息提供，不改为只有路径或主动读取才提供。
+- [x] 当前任务身份/状态/材料/task_error 与阶段 breadcrumb 按 C 类尾部更新，保留提示内容；真实内容变化才发送，恢复/reload 从分支历史恢复去重。
+- [x] CLI 结果只刷新 task/UI 缓存，不重建/补发 B 类启动消息，也不强制重复 C 类状态；校验错误仍阻断。
+- [x] 包源指引如需改变承载位置表述，仅改相关文字并更新 adapted hashes；不为了精简首轮内容修改流程，未改 bytes 不改 hash。
+- [x] 同阶段更新 `docs/extensions/trellis.md` 和相关测试。
 
 ### 验证命令
 
@@ -132,14 +132,14 @@ export PI_SDK_DIR="$sdk_dir" PI_CODING_AGENT_DIR="$run_dir/agent"
 ## 开始前门禁
 
 - [x] 用户审阅 PRD/design/implement 的文件级计划并授权实施。
-- [ ] 再核对 Git/当前任务与完整 owning source/callers/tests，不覆盖并行改动。
+- [x] 再核对 Git/当前任务与完整 owning source/callers/tests，不覆盖并行改动。
 - [x] 阶段 1 委派实现的 `implement.jsonl` 已策划真实 specs；最终独立 review 的 `check.jsonl` 已策划，派发前再校验。
 - [x] 已在有意空 manifest 的直接实施规划基础上执行批准后的 `task.py start <task> --allow-empty-context`，随后为阶段 1 委派补齐 implement manifest。启动时提示记录 branch=base_branch=main；当前不做分支/归档操作，不将提示当作产品验证结果。
-- [ ] 实施前按 Pi 文档要求完整读取相关 extensions/SDK 文档及直接关联示例；本轮规划的 API 定位不替代该要求。
+- [x] 实施前已完整读取相关 extensions/SDK 文档及直接关联示例。
 
 ## 验证记录
 
-### 阶段 1：已验证，等待检查点提交
+### 阶段 1：已验证并提交 `80e9910`
 
 实现者：`trellis-implement`；主会话独立读取全部阶段改动、共享 helper/测试、实际 SDK Memory 测试和命令/工具调用点后复核。仅改 Memory、共享 startup helper/测试、Memory 用户文档，未改存储算法或工具 schema。
 
@@ -151,7 +151,20 @@ export PI_SDK_DIR="$sdk_dir" PI_CODING_AGENT_DIR="$run_dir/agent"
 - raw logs：本次 owned `/tmp/context-prefix-stability.d4JPI5/stage1.BhAIVl`、`stage1-main.log`、`stage1-main-typecheck.log`，主会话已核对最终日志；保留待集成复查。
 - Trellis 改动前基线：隔离 `agent-context-integration`、`project-activation`、`unsupported-runtime` 三组，exit 0、37/37；仅为阶段 2 改动前基线，不作改动后验收。
 
-后续阶段、完整 `pnpm check`、provider 序列化集成和最终独立审查 **NOT_RUN**。
+### 阶段 2：已自查验证，等待检查点提交
+
+主会话直接实现。复查 `renderOverview` diff 仅删除 Git/开发者块，原 Journal、任务列表/状态/children、根目录/context/CLI/protocol 等渲染不变；workflow renderer/filter/14,000 字符预算不变。启动/当前状态合并为一次 returned message，后续读取当前完整分支的最后 state，未确认草稿重试。CLI 清除 context/task/UI 缓存但不清除持久化启动/状态记录；native authority、角色、worktree 门禁均保留。包源只改 `trellis-start` 的承载位置说明及它的 adapted hash，未改 source hashes、workflow 模板或生成副本。
+
+- 原三个 context 回归组，阶段 2 第一次 focused：exit 0，37/37。
+- 第一次完整 `.test.mjs`：exit 1，409/463；主会话在测试尚运行时修改 skill bytes，直到 adapted hash 更新前形成暂时不一致，造成大量 package hash mismatch（含关联断言失败），不能作有效完整验收。另有三个新增 fixture 失败：空任务列表被断言为非空、将原预算误写为 12K（实际 14K）、fake `on` 缺少卸载函数。保留失败日志并修复这三项 fixture，不放宽原产品预算/安全断言。
+- 资源静止且 hash 耦合后 focused-2：exit 0，10/10。
+- 同样静止条件下完整 `node --test extensions/trellis/__tests__/*.test.mjs`：exit 0，473/473、自然退出，无 skipped。包括新 startup/persistence/branch/compaction/phase/error/cancellation 测试及现有源权威、worktree、资源/UI 回归；仍未挂载真实 Trellis host/TUI。
+- Python 首次 discovery 错选父目录：exit 5，0 tests，**不是 PASS**。按计划实际 `__tests__/python` 目录重跑 `python3 -B -m unittest discover -s extensions/trellis/__tests__/python -p 'test_*.py'`：exit 0，42 tests OK；argparse 的非法 refresh/collect stderr 为预期负例。
+- 最终 `pnpm typecheck`：通过；`git diff --check` 通过。隔离 agent dir 和 raw logs 均在 `/tmp/context-prefix-stability.d4JPI5`（`stage2-*`），未安装/下载或个人 reload。
+
+阶段 3/4、完整 `pnpm check`、provider 序列化集成和最终独立审查 **NOT_RUN**。
+
+### 规划阶段历史材料检查（不代表当前执行状态）
 
 规划材料检查已完成：三份 Markdown 无占位项/尾随空白，task.json 为有效 planning，check.jsonl 的 5 个引用均存在且无重复，`git diff --check` 无报告（新文件另行检查了空白）。`task.py validate` 报告 1 个已知诊断：direct implementation 的 implement.jsonl 有意为空；check.jsonl 通过。该结果不是完整 context validation PASS，不为通过校验填入无用引用。
 

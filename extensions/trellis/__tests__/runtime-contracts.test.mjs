@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import { captureModelContext } from './model-context-fixture.mjs';
 import trellis, { __internals } from '../index.ts';
 import {assembleDispatchPrompt} from '../lib/task-context.ts';
 import {queryWorktree,requireMaterials} from '../lib/worktree-query.ts';
@@ -188,7 +189,7 @@ test('supported entrypoints run without trellis and suppress all bytecode/update
 
 test('real runtime child binding/deactivate cannot resurrect from repeated dispatch header; failed binding never borrows parent',async t=>{
  const f=fixture(t,{supported:true});const path=f.task('own',{status:'in_progress'});f.put(path+'/implement.jsonl','{"file":"'+path+'/prd.md"}');const handlers=new Map(),messages=[];
- trellis({registerMessageRenderer:()=>{},events:{on:()=>()=>{},emit:()=>{}},registerCommand: () => {}, registerTool:()=>{},on:(name,fn)=>handlers.set(name,fn),sendMessage:m=>messages.push(m),getAllTools:()=>[]});
+ trellis({registerMessageRenderer:()=>{},events:{on:()=>()=>{},emit:()=>{}},registerCommand: () => {}, registerTool:()=>{},on:(name,fn)=>handlers.set(name,captureModelContext(name,fn,messages)),sendMessage:m=>messages.push(m),getAllTools:()=>[]});
  const ctx=name=>({cwd:f.root,hasUI:false,sessionManager:{getSessionId:()=>name,getSessionFile:()=>undefined},ui:{}});
  const parent=ctx('runtime-parent'),child=ctx('runtime-child'),parentKey=__internals.contextKey(f.root,parent);f.pointer(parentKey,path);
  const prompt=assembleDispatchPrompt({prompt:'Implement',contextId:'runtime-child',role:'trellis-implement',executionRoot:f.root,materials:requireMaterials(await queryWorktree(f.root,path,false,undefined,false,'implement'))});

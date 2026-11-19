@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, symlinkSyn
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
+import { captureModelContext } from './model-context-fixture.mjs';
 import trellis from '../index.ts';
 import { discoverProject, initializationRoot, requireProjectRuntime } from '../lib/project-state.ts';
 import { copyRuntimeFixture, mockPython } from './runtime-fixture.mjs';
@@ -15,7 +16,7 @@ function fixture(t,runtime=false) {
 }
 function harness(root) {
  const commands=new Map(),tools=new Map(),handlers=new Map(),messages=[],notices=[],display={},publications=[],rawInputs=new Set();let subscriptions=0;
- trellis({registerMessageRenderer:()=>{},registerCommand:(n,c)=>commands.set(n,c),registerTool:t=>tools.set(t.name,t),events:{on:()=>{subscriptions++;return()=>{};},emit:(name,request)=>{if(name==='preset:widget-display:connect:v1')request.accept({set:content=>{publications.push(request.ctx);display.widget=content;return true;},dispose:()=>{display.widget=undefined;}});}},on:(n,h)=>{const previous=handlers.get(n);handlers.set(n,previous?async(...args)=>{await previous(...args);await h(...args);}:h);return()=>{};},getAllTools:()=>[{name:'subagent_run'}],sendMessage:m=>messages.push(m)});
+ trellis({registerMessageRenderer:()=>{},registerCommand:(n,c)=>commands.set(n,c),registerTool:t=>tools.set(t.name,t),events:{on:()=>{subscriptions++;return()=>{};},emit:(name,request)=>{if(name==='preset:widget-display:connect:v1')request.accept({set:content=>{publications.push(request.ctx);display.widget=content;return true;},dispose:()=>{display.widget=undefined;}});}},on:(n,h)=>{h=captureModelContext(n,h,messages);const previous=handlers.get(n);handlers.set(n,previous?async(...args)=>{await previous(...args);await h(...args);}:h);return()=>{};},getAllTools:()=>[{name:'subagent_run'}],sendMessage:m=>messages.push(m)});
  const ctx={cwd:root,hasUI:true,mode:"tui",sessionManager:{getSessionId:()=>root,getSessionFile:()=>undefined},ui:{theme:{fg:(_c,t)=>t,bold:t=>t},notify:t=>notices.push(t),onTerminalInput:listener=>{rawInputs.add(listener);return()=>rawInputs.delete(listener);},setWidget:(_k,v)=>display.widget=v,setStatus:(_k,v)=>display.status=v}};
  return {commands,tools,handlers,messages,notices,display,publications,rawInputs,ctx,get subscriptions(){return subscriptions;}};
 }

@@ -10,7 +10,7 @@
       "adapted": true
     },
     "trellis-start/SKILL.md": {
-      "sha256": "5672e38b65266c0b748e2a4e2f8c1101b69874a4b2bfe515bc10d74555afe12c",
+      "sha256": "0d9941d0a8d472139be55fcd0461a340c3b9ef1042768f1251a7c11220a3274a",
       "sourcePath": ".agents/skills/trellis-start/SKILL.md",
       "sourceSha256": "79a5ba7a2aff3c72e06d7f4cd6942dc4f4f4092dd40f9c8e94f1838024a81e4d",
       "license": "AGPL-3.0-only",

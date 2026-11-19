@@ -5,7 +5,7 @@ description: "Initializes an AI development session by reading workflow guides, 
 
 # Start Session
 
-Initialize a Trellis-managed development session. Pi supplies a session overview. Reuse it and refresh missing or stale context on demand.
+Initialize a Trellis-managed development session. Pi supplies the original mode-specific overview and workflow as ordinary first-turn context once, not a live system snapshot. Reuse them; read missing or stale facts on demand. Main-session Git state and developer identity are not included in startup context. Current task and phase changes arrive as ordinary tail messages; neither binding nor a startup snapshot is execution approval.
 
 ## Dispatched Role: Source Materials, Execution Code
 
