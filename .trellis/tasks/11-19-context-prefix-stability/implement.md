@@ -201,7 +201,7 @@ export PI_SDK_DIR="$sdk_dir" PI_CODING_AGENT_DIR="$run_dir/agent"
 
 `pnpm check` 的测试本身 exit 0、1911/1911，但该数字在上述修复前，不作为最终 scoped acceptance。其执行入口在脚本之前发生了未授权自动安装：临时 HOME 没有原 Corepack 的版本状态，Corepack 下载 pnpm 12.21.0，运行前 verifyDeps/autoInstallPeers 自动安装依赖，改写 `pnpm-lock.yaml`（autoInstallPeers false → true，新增 SDK/transitives）和仓库 node_modules。安装阶段还报 `ERR_PNPM_IGNORED_BUILDS`，然后继续运行 check；所以总 exit 0 不表示安装/环境安全成功。
 
-主会话已向用户解释该副作用来自隔离 HOME 的调用方式而非 check 脚本新增安装；停止后续所有 pnpm/npm 调用，改用直接 Node/tsc 复验。观察到原安装 SDK 目录/包仍为 11-11 时间，8 SDK peer 链接指向该原安装；没有完整旧 node_modules 快照，不擅称目录已恢复。锁文件/依赖目录未提交、未还原、未删除或重装；用户尚未选择恢复方式。Root raw `stage4.nD5f9i/check-first.log` 保留完整安装失败/下载事实，不能把测试 PASS 擦去副作用。
+主会话已向用户解释该副作用来自隔离 HOME 的调用方式而非 check 脚本新增安装；停止后续所有 pnpm/npm 调用，改用直接 Node/tsc 复验。长期 testing 规范已补充 cold HOME/Corepack 入口风险：只使用固定已安装且禁用 setup 的入口或直接 Node，脚本 exit 0 不能覆盖前置下载/安装失败；异常依赖变更报告而不擅自清理。观察到原安装 SDK 目录/包仍为 11-11 时间，8 SDK peer 链接指向该原安装；没有完整旧 node_modules 快照，不擅称目录已恢复。锁文件/依赖目录未提交、未还原、未删除或重装；用户尚未选择恢复方式。Root raw `stage4.nD5f9i/check-first.log` 保留完整安装失败/下载事实，不能把测试 PASS 擦去副作用。
 
 本次 owned `/tmp/context-prefix-stability.d4JPI5` 暂不清理：依赖恢复决策尚未解决，需保留原始日志、临时 HOME/Corepack 缓存及复现材料；所有本次检查/子角色已终止后也不把未决诊断材料删掉。未 push、改历史、个人 reload、archive/journal 或清除任务绑定；task 保持 in_progress 待验收/后续明确处理。
 

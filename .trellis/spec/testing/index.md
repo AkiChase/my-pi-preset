@@ -19,6 +19,8 @@ Use `node:test` and `node:assert/strict`. Tests live in `extensions/<name>/__tes
 
 Dependency setup (`pnpm install`) is not a test and requires authorization. Missing tools/SDK mean an environment blocker, not permission to download replacements. Tests are offline and cannot read/write personal config, credentials, memory or sessions. Use temporary agent/config/cwd/log directories and fake package commands; owned local processes must be isolated and cleaned up.
 
+An isolated HOME also changes Corepack/package-manager version and cache selection. Do not invoke a floating Corepack-managed package manager from a cold HOME: it can download a manager and auto-install dependencies before a check/run script. Use an explicitly pinned already-installed entry with setup disabled, or direct installed Node test/TypeScript entry points. A script exit zero does not waive preceding setup failures or downloads; stop package-manager reuse and report unexpected lockfile/node_modules mutations without silently repairing or deleting dependency state.
+
 Some tests invoke default config loaders: isolate the entire invocation, not only known fixtures. With an existing linked SDK:
 
 ```sh
