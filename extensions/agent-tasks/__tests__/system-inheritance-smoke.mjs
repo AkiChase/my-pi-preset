@@ -27,6 +27,7 @@ import { MEMORY_RULES } from ${JSON.stringify(join(root, 'extensions/memory/prom
 import { startupDetails } from ${JSON.stringify(join(root, 'extensions/shared/model-context/startup.ts'))};
 export default function(pi) {
   let child, childFile, capturedPartial, mode = 'append';
+  const ownedSessions = new Set();
   const report = { agreement: [], runs: [], refused: false, baseDiffers: false, cancelledClosed: false, saveFailureRollback: false };
   const configure = () => registerAgents(new Map([['prefix-child', { name: 'prefix-child', description: 'fixture',
     promptMode: mode === 'replace' ? 'replace' : 'append', systemPrompt: 'CHILD_ROLE_CONTRACT',
@@ -55,7 +56,7 @@ export default function(pi) {
           if (mode === 'disk-resume') await shutdownChildSession(child);
           const controller = new AbortController();
           const result = await runAgent(ctx, 'prefix-child', 'child-task', { pi, isolated: mode === 'isolated', inheritContext: mode === 'context',
-            signal: controller.signal,
+            signal: controller.signal, onSessionOwned: session => { ownedSessions.add(session); },
             onSessionCreated: session => {
               if (mode === 'cancelled') { capturedPartial = session; controller.abort(); }
               if (mode === 'save-failure') {
@@ -85,7 +86,7 @@ export default function(pi) {
     }
   });
   function assertUnsupported(message) { if (!message.includes('Unsupported parent system source')) throw Error(message); }
-  pi.on('session_shutdown', async () => { await shutdownChildSession(child); registerAgents(new Map()); });
+  pi.on('session_shutdown', async () => { for (const session of ownedSessions) await shutdownChildSession(session); registerAgents(new Map()); });
 }
 `);
 const runtime = await ModelRuntime.create({ authPath: join(agentDir, 'auth.json'), modelsPath: null, modelsStorePath: join(agentDir, 'models-store.json'), refreshOnCreate: false, allowModelNetwork: false });

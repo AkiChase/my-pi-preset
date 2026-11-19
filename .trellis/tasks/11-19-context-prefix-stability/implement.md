@@ -93,12 +93,12 @@ pnpm typecheck
 
 ### 实施/审查
 
-- [ ] 新增 shared 层 `prefix-sdk.test.ts`：捕获实际离线 SDK requests，并经两种 system 能力的 provider 序列化路径比较头部/历史前缀。
-- [ ] 对照 12 项选择集成验证：A 类无首轮自动注入；B 类首轮完整提供且后续无广播；C 类任务/阶段内容变化尾部追加并去重；子 Agent 原材料未丢失且不进 system。
-- [ ] 旧格式会话接入区分一次性规则转换与后续普通更新，不编辑 fixture 以外的真实历史。
-- [ ] 复查固定规则是否保留完整授权入口，检查 docs/spec 与实际能力一致。
-- [ ] 使用预先策划的 `trellis-check` 独立审查；任务须已 in_progress 且上下文有效。子角色不提交、安装或归档。
-- [ ] 故障修复回到 owning stage 验证；真实失败与修复后 rerun 均记录，不只保留最后 PASS。
+- [x] 新增 shared 层 `prefix-sdk.test.ts`：捕获实际离线 SDK requests，并经两种 system 能力的 provider 序列化路径比较头部/历史前缀。
+- [x] 对照 12 项选择集成验证：A 类无首轮自动注入；B 类首轮完整提供且后续无广播；C 类任务/阶段内容变化尾部追加并去重；子 Agent 原材料未丢失且不进 system。
+- [x] 旧格式会话接入区分一次性规则转换与后续普通更新，不编辑 fixture 以外的真实历史。
+- [x] 复查固定规则是否保留完整授权入口，检查 docs/spec 与实际能力一致。
+- [x] 使用预先策划的 `trellis-check` 独立审查；任务须已 in_progress 且上下文有效。子角色不提交、安装或归档。
+- [x] 故障修复回到 owning stage 验证；真实失败与修复后 rerun 均记录，不只保留最后 PASS。
 
 ### 最终验证命令
 
@@ -162,7 +162,7 @@ export PI_SDK_DIR="$sdk_dir" PI_CODING_AGENT_DIR="$run_dir/agent"
 - Python 首次 discovery 错选父目录：exit 5，0 tests，**不是 PASS**。按计划实际 `__tests__/python` 目录重跑 `python3 -B -m unittest discover -s extensions/trellis/__tests__/python -p 'test_*.py'`：exit 0，42 tests OK；argparse 的非法 refresh/collect stderr 为预期负例。
 - 最终 `pnpm typecheck`：通过；`git diff --check` 通过。隔离 agent dir 和 raw logs 均在 `/tmp/context-prefix-stability.d4JPI5`（`stage2-*`），未安装/下载或个人 reload。
 
-### 阶段 3：已实现、自查验证，等待检查点提交
+### 阶段 3：已实现、自查验证并提交 `7d26d56`
 
 由独立 `trellis-implement` 实现，主会话完整复核最终 runner、prompt、Memory、继承 helper、SDK 驱动/断言和相关 fixture 改动。内部接口拆分为 `{ systemPrompt, startupContext }` 与 Memory `{ rules, startupContext? }`，配置/schema、`context.ts` 的历史选择、readonly/worktree/output 执行门禁未改。
 
@@ -175,7 +175,35 @@ export PI_SDK_DIR="$sdk_dir" PI_CODING_AGENT_DIR="$run_dir/agent"
 - unshimmed Pi loader + SDK：主会话复核实际驱动、report 和 24 请求/6 child 请求断言；首轮原 Git/environment、MEMORY200、显式技能全文和错误提示均持久普通提供，live/disk 历史前缀相同，命令 base 与 effective 结构区别得到验证，forced source 拒绝且无 child 请求，取消释放 session，EISDIR 原子 rollback。尚非 dual-provider 序列化验收。
 - Agent raw：`/tmp/context-prefix-stability.d4JPI5/stage3.xmKaby`；主会话 raw SDK：`stage3-main.ViW0Hc/agent-inheritance-sdk-6s0ZZ6/{requests,report}.json`。失败与最终重跑均保留待集成复核，未安装/部署或修改 SDK。
 
-阶段 4、完整 `pnpm check`、provider 序列化集成和最终独立审查 **NOT_RUN**。阶段 4 准备只读 probe 已确认公开 OpenAI Responses/Anthropic `onPayload` 可截取真实 payload、再受控抛错，额外 `fetch` 防护计数为零；初次 probe 遗漏 SystemMessage.content 失败（exit 1），补全 fixture 后四个 API/capability 组合通过（exit 0），不作为产品集成 PASS。
+### 阶段 4：最终输入合同、独立审查和直接 Node 验证完成
+
+新增 shared `prefix-sdk.test.ts`，实际 Memory factory 与 fake-pi Trellis 的原始 returned drafts 经真实 SDK 持久 append；没有挂载 native Trellis host/TUI。OpenAI Responses/Anthropic 的公开 `onPayload` 截获真实序列化 payload，受控错误阻止发送，另加 rejecting `fetch` 且计数为零。四个 API/capability 组合分别验证普通 B 首轮原内容、C 状态尾部变化/去重、explicit list 实时、无普通 Memory scan、旧 SDK/序列化消息前缀保持；复用 unshimmed child SDK fixture，比较 fresh/live/disk 的两种 API/两种 capability 序列化前缀。
+
+- prefix-first：exit 1，1/5；错误 spy 指向不存在的 `scanMetadata`，实际 owner 是同步 `scan()`。没有下调扫描断言，改用真实方法后 prefix-second：exit 0，5/5、自然退出。
+- typecheck-first：exit 2，fixture init plan 可为 undefined；改为显式断言非空后 typecheck-second：exit 0。
+- 保留首轮正文/预算且数据不提升 system；缓存关闭时比较精确历史 payload 前缀，另验缓存开启时 leading rules/declarations。这样不把 vendor 移动的 cache_control anchors 当成 preset 历史改写，也不宣称线上命中率。
+- 复用 child fixture 时补上全部 owned sessions 的 shutdown（包含已替换/completed 的实例），不仅关闭最后一个；当前 prefix 子 fixture 通过，但 owning Agent/reminder 全组仍待最终重跑。
+- 更新 development/testing/SDK 边界长期合同；task/source instruction、tool schema/权限或依赖未扩大。
+- raw：`/tmp/context-prefix-stability.d4JPI5/stage4.nD5f9i/prefix-{first,second}.log`、`typecheck-{first,second}.log`、`prefix-sdk-*/capture.json` 及复用 child `{requests,report}.json`。此前只读 probe 的不完整 SystemMessage fixture 失败与修复记录保留在 owned 主目录，不当成产品 PASS。
+
+### 最终独立审查与修复
+
+- 首轮 `trellis-check` 只读审查确认 P2：Trellis startup 的 `tagged()` 按首个字面 closing tag 截取，合法正文中的 tag 示例会丢后续 B 内容或误取 overview 内的 workflow 示例。只读复现 exit 0；不是测试通过就忽略的问题。
+- 主会话采用审查建议的小修：校验已持久化 `details.state` 精确尾部 C suffix，剥离该 suffix，完整 B composite 作为一份 inert parent material 继承；不解析标签、不复制 state/authority、不改变 producer/schema 或删 B 正文。缺失/空/不匹配 state 或空 B 显式拒绝。新增 literal tags（B 与 C）、missing/mismatching metadata 和 nested 惯性继承回归。
+- 同时将 prefix 测试从“只对比首个请求”加强为相邻完整 SDK/序列化请求前缀，覆盖后来的 C 与 tool result 历史；live/disk child 的 wire 前缀也相邻比较。
+- 首轮独立直接 Node 验证：focused 16/16、Memory/Agent/reminder 401/401、Trellis/manifest 484/484，均 exit 0、自然退出；typed tsc 与 diff-check exit 0。Raw `/tmp/context-prefix-stability.d4JPI5/check-readonly.V6B6Ts`。
+- 修复后主会话 `node --test extensions/shared/model-context/__tests__/*.test.ts extensions/memory/__tests__/*.test.ts extensions/agent-tasks/__tests__/*.test.ts extensions/runtime-tasks/__tests__/reminder-sdk.test.ts`：exit 0，412/412、自然退出；直接 `node node_modules/typescript/bin/tsc -p tsconfig.json`：exit 0。
+- 修复后直接运行 package test 的同一 Node 全套命令（`--test-concurrency=8 --test-force-exit` 与原三个 discovery globs，不通过 pnpm/Corepack）：exit 0，1912/1912，无 skipped。全套 forced exit 不是自然关闭证据；上述 focused 是自然退出证据。Raw `stage4.nD5f9i/{owners-final-first,all-node-final,tsc-final-first}.log`。
+- 独立角色复审三个改动文件及 producer/确认边界：P2 和 evidence gap 均 resolved，无剩余 scoped defect；直接 Node focused 12/12、3 exact preservation/inert/nested + 4 invalid-record refusal probe、tsc/diff-check 均 exit 0。Raw `/tmp/context-prefix-stability.d4JPI5/check-repair.nqrUZ0`。
+- active role manifests `task.py validate` 通过（implement 6、check 5真实引用）；spec discovery development/testing 正常。最终仍不宣称线上 cache hits、native Trellis host/TUI、物理终端或任意 opaque 第三方数据清除。
+
+### 验证入口意外副作用（未解决，不纳入实现提交）
+
+`pnpm check` 的测试本身 exit 0、1911/1911，但该数字在上述修复前，不作为最终 scoped acceptance。其执行入口在脚本之前发生了未授权自动安装：临时 HOME 没有原 Corepack 的版本状态，Corepack 下载 pnpm 12.21.0，运行前 verifyDeps/autoInstallPeers 自动安装依赖，改写 `pnpm-lock.yaml`（autoInstallPeers false → true，新增 SDK/transitives）和仓库 node_modules。安装阶段还报 `ERR_PNPM_IGNORED_BUILDS`，然后继续运行 check；所以总 exit 0 不表示安装/环境安全成功。
+
+主会话已向用户解释该副作用来自隔离 HOME 的调用方式而非 check 脚本新增安装；停止后续所有 pnpm/npm 调用，改用直接 Node/tsc 复验。观察到原安装 SDK 目录/包仍为 11-11 时间，8 SDK peer 链接指向该原安装；没有完整旧 node_modules 快照，不擅称目录已恢复。锁文件/依赖目录未提交、未还原、未删除或重装；用户尚未选择恢复方式。Root raw `stage4.nD5f9i/check-first.log` 保留完整安装失败/下载事实，不能把测试 PASS 擦去副作用。
+
+本次 owned `/tmp/context-prefix-stability.d4JPI5` 暂不清理：依赖恢复决策尚未解决，需保留原始日志、临时 HOME/Corepack 缓存及复现材料；所有本次检查/子角色已终止后也不把未决诊断材料删掉。未 push、改历史、个人 reload、archive/journal 或清除任务绑定；task 保持 in_progress 待验收/后续明确处理。
 
 ### 规划阶段历史材料检查（不代表当前执行状态）
 

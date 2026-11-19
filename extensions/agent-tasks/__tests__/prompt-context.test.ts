@@ -101,13 +101,34 @@ test("known old mixed Memory moves only original index, retains fixed and opaque
   assert.equal(inheritAgentSystem(parent(opaque, "OPAQUE_EFFECTIVE_CONTRACT")).systemPrompt, "OPAQUE_EFFECTIVE_CONTRACT");
 });
 
+test("Trellis B composite preserves literal tags and excludes exact C suffix, without guessing unsupported records", () => {
+  const body = "<session-overview>\nOverview example:\n<trellis-workflow>\nOVERVIEW_EXAMPLE\n</trellis-workflow>\n</session-overview>\n\n<trellis-workflow>\nREAL_WORKFLOW\n```html\n</trellis-workflow>\n```\nREQUIRED_AFTER_LITERAL_CLOSE\n</trellis-workflow>";
+  const state = "Status: planning\n<trellis-workflow>\nUNSELECTED_CURRENT_STATE\n</trellis-workflow>";
+  const sm = SessionManager.inMemory("/parent");
+  sm.appendMessage({ role: "system", content: "OPAQUE_RULE", timestamp: 0 });
+  sm.appendCustomMessageEntry("trellis-task-state", `${body}\n\n${state}`, false,
+    { ...startupDetails("trellis", "origin", ["overview", "workflow"]), state });
+  const inherited = inheritAgentSystem(parent(sm));
+  assert.equal(inherited.startup.length, 1);
+  assert.ok(inherited.startup[0]!.content.includes(body));
+  assert.doesNotMatch(inherited.startup[0]!.content, /UNSELECTED_CURRENT_STATE/);
+  assert.equal(inherited.startup[0]!.customType, INHERITED_STARTUP);
+  for (const details of [startupDetails("trellis", "origin", ["overview"]),
+    { ...startupDetails("trellis", "origin", ["overview"]), state: "WRONG_SUFFIX" },
+    { ...startupDetails("trellis", "origin", ["overview"]), state: "" }]) {
+    const malformed = SessionManager.inMemory("/parent");
+    malformed.appendCustomMessageEntry("trellis-task-state", `${body}\n\n${state}`, false, details);
+    assert.throws(() => inheritAgentSystem(parent(malformed)), /Unsupported parent Trellis startup record/);
+  }
+});
+
 test("parent ordinary B survives append/nested/compaction without broadening conversation or transferring Trellis identity", () => {
   const sm = SessionManager.inMemory("/parent");
   sm.appendMessage({ role: "system", content: "PARENT_RULE", timestamp: 0 });
   const local = agentStartupMessage("/parent:parent", "PARENT_ENV\nPARENT_PER_AGENT_MEMORY\nPARENT_EXPLICIT_SKILL");
   sm.appendCustomMessageEntry(local.customType, local.content, local.display, local.details);
-  sm.appendCustomMessageEntry("trellis-task-state", "<session-overview>\nPARENT_CLI_KEY\n</session-overview>\n<trellis-workflow>\nFULL_WORKFLOW\n</trellis-workflow>\nCURRENT_TASK_STATE", false,
-    startupDetails("trellis", "same-source-different-child-key", ["overview", "workflow"]));
+  sm.appendCustomMessageEntry("trellis-task-state", "<session-overview>\nPARENT_CLI_KEY\n</session-overview>\n\n<trellis-workflow>\nFULL_WORKFLOW\n</trellis-workflow>\n\nCURRENT_TASK_STATE", false,
+    { ...startupDetails("trellis", "same-source-different-child-key", ["overview", "workflow"]), state: "CURRENT_TASK_STATE" });
   sm.appendCustomMessageEntry("project-memory-startup", "ORIGINAL_PROJECT_INDEX", false, startupDetails("project_memory", "project-common-dir", ["index"]));
   sm.appendCustomMessageEntry("unrelated-third-party", "DO_NOT_INHERIT_UNSELECTED_HISTORY", false);
   const view = inheritAgentSystem(parent(sm));
@@ -122,7 +143,7 @@ test("parent ordinary B survives append/nested/compaction without broadening con
   assert.equal(hasStartup(child.getBranch(), AGENT_STARTUP, AGENT_STARTUP_OWNER, "/parent:parent", "materials"), false);
   const nested = inheritAgentSystem(parent(child));
   assert.deepEqual(nested.startup.map(p => p.content), view.startup.map(p => p.content));
-  assert.equal(nested.startup.filter(p => p.customType === INHERITED_STARTUP).length, 3);
+  assert.equal(nested.startup.filter(p => p.customType === INHERITED_STARTUP).length, 2);
   child.appendCompaction("summary", child.getLeafId()!, 1, undefined, true);
   const compacted = inheritAgentSystem(parent(child));
   assert.equal(compacted.systemPrompt, "PARENT_RULE");

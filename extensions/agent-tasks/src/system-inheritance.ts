@@ -29,13 +29,6 @@ function record(entry: SessionEntry, owner: string, customType: string): boolean
 function text(entry: SessionEntry): string {
   return entry.type === "custom_message" && typeof entry.content === "string" ? entry.content : "";
 }
-function tagged(content: string, tag: string): string | undefined {
-  const open = `<${tag}>\n`, close = `\n</${tag}>`;
-  const start = content.indexOf(open);
-  if (start < 0) return undefined;
-  const end = content.indexOf(close, start + open.length);
-  return end < 0 ? undefined : content.slice(start, end + close.length);
-}
 
 // This is the exact legacy owner rule, not a heuristic for arbitrary custom text.
 const legacyMemoryRules = MEMORY_RULES.replace(
@@ -141,13 +134,16 @@ export function inheritAgentSystem(ctx: ExtensionContext): { systemPrompt: strin
     }
     if (details?.startup?.outcome !== "provided") continue;
     if (record(entry, "trellis", "trellis-task-state")) {
-      for (const tag of ["session-overview", "trellis-workflow"]) {
-        const part = tag === "session-overview" ? "overview" : "workflow";
-        const value = tagged(text(entry), tag);
-        if (value !== undefined && hasStartup([entry], entry.customType, "trellis", origin, part)) {
-          add("trellis", origin, part, entry.customType, value);
-        }
+      // The producer appends an exact persisted state suffix to its B
+      // composite. Tag-like text inside either B or C is arbitrary content,
+      // not a delimiter: parsing it would lose approved startup substance.
+      const state = (entry.details as { state?: unknown } | undefined)?.state;
+      const content = text(entry);
+      const suffix = typeof state === "string" && state.length > 0 ? `\n\n${state}` : undefined;
+      if (!suffix || !content.endsWith(suffix) || !content.slice(0, -suffix.length).trim()) {
+        throw new Error("Unsupported parent Trellis startup record: cannot separate startup material from current state.");
       }
+      add("trellis", origin, "materials", entry.customType, content.slice(0, -suffix.length));
     } else if (entry.customType === AGENT_STARTUP
       && hasStartup([entry], entry.customType, AGENT_STARTUP_OWNER, origin, "materials")) {
       add(AGENT_STARTUP_OWNER, origin, "materials", entry.customType, text(entry));

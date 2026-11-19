@@ -27,6 +27,12 @@ The convention covers model tool entry points only. Agent frontmatter, workflow 
 
 `preserveHandoff` temporarily suppresses only redundant writes equal to the live editor's displayed `getText()` or optional `getExpandedText()` during synchronous same-instance handoff. Distinct text forwards, and descriptor restoration returns normal `setText` behavior.
 
+## Persisted System / Startup Boundary
+
+Use public `sessionManager.getBranch()` and `pi-ai` system replay for structurally identified preset sections/startup records. Replay from the latest public compaction system checkpoint when present: appending its already accumulated opaque content to the entire pre-compaction system history duplicates contracts. This observation does not authorize history reconstruction or mutation.
+
+`ExtensionCommandContext.getSystemPromptOptions()` supplies base construction inputs, not the effective per-turn tool context. Compare public replay text with `ctx.getSystemPrompt()` before removing identifiable owned data; a disagreement must explicitly refuse unsafe extraction, not trigger regex cleansing, private assembler access or silent loss of opaque instructions. Unknown/unstructured source content remains opaque. New child startup uses public non-streaming ordinary appends and verifies each part on the selected branch before execution; metadata is delivery evidence only. Resume keeps startup snapshots without rereading bodies, while current rules/loadout and execution authority retain their existing live checks.
+
 ## 4. Validation / Failure Matrix
 
 Required missing/undefined properties without defaults reject, including sentinel controls; a sentinel must be written explicitly, omission never supplies it. JSON `null`, `""` in a control, `"default"` in a nullable-only enum or integer field and any non-`"null"` value in an inapplicable field reject with the field name and the expected sentinel. Caller envelopes remain unchanged and refusals have zero origin/job effects.
