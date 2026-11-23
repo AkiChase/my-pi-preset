@@ -29,7 +29,7 @@ function harness(activeTask = async () => undefined) {
 const hostValidate = (tool, arguments_) => validateToolArguments(tool, {
   id: 'schema-call', name: tool.name, arguments: complete(arguments_),
 });
-const complete = input => input && typeof input === "object" && !Array.isArray(input) ? { action: 'dispatch', agent: 'null', task: 'default', prompt: 'null', ...input } : input;
+const complete = input => input && typeof input === "object" && !Array.isArray(input) ? { action: 'dispatch', agent: 'null', task: 'default', prompt: 'null', model: input.action === 'stop' ? 'null' : 'default', ...input } : input;
 const validateDispatchParams = input => rawValidateDispatchParams(complete(input));
 const valid = { agent: 'trellis-implement', prompt: 'Work on the approved scope' };
 
@@ -69,6 +69,15 @@ const invalidCases = [
   [{ ...valid, task: 'task\x7f' }, /task/],
   [{ ...valid, task: 42 }, /task/],
   [{ ...valid, task: {} }, /task/],
+  [{ ...valid, model: '' }, /model.*empty/],
+  [{ ...valid, model: ' \t' }, /model/],
+  [{ ...valid, model: 'other\0model' }, /model.*NUL/],
+  [{ ...valid, model: undefined }, /model.*must be provided/],
+  [{ ...valid, model: null }, /model.*JSON null/],
+  [{ ...valid, model: 42 }, /model/],
+  [{ ...valid, model: {} }, /model/],
+  [{ action: 'stop', model: 'default' }, /model.*does not apply to stop/],
+  [{ action: 'stop', model: 'offline/other' }, /model.*does not apply to stop/],
   [{ action: 'stop', agent: 'trellis-check' }, /agent.*does not apply to stop/],
   [{ action: 'stop', agent: '' }, /agent/],
   [{ action: 'stop', agent: undefined }, /agent.*must be provided/],
@@ -86,16 +95,19 @@ test('dispatch schema is a plain closed object accepted by real host strict conv
   const schema = tool.parameters;
   assert.equal(schema.type, 'object');
   assert.equal(schema.additionalProperties, false);
-  assert.deepEqual(Object.keys(schema.properties).sort(), ['action', 'agent', 'prompt', 'task']);
+  assert.deepEqual(Object.keys(schema.properties).sort(), ['action', 'agent', 'model', 'prompt', 'task']);
   for (const key of ['anyOf', 'oneOf', 'if']) assert.equal(Object.hasOwn(schema, key), false);
   assert.doesNotMatch(JSON.stringify(schema), /"type":"null"/);
   assert.deepEqual(schema.properties.action.enum, ['dispatch', 'stop']);
   assert.deepEqual(schema.properties.agent.enum, ['trellis-implement', 'trellis-check', 'trellis-research', 'null']);
   for (const property of Object.values(schema.properties)) assert.ok(property.description);
+  assert.equal(schema.properties.model.type, 'string');
+  assert.equal(Object.hasOwn(schema.properties.model, 'default'), false);
+  assert.match(schema.properties.model.description, /explicit model takes precedence/);
   const strict = makeStrictJsonSchema(schema);
   assert.equal(strict.additionalProperties, false);
-  assert.deepEqual(strict.required.sort(), ['action', 'agent', 'prompt', 'task']);
-  assert.deepEqual(schema.required, ['action', 'agent', 'task', 'prompt'], 'all exposed wire fields are required');
+  assert.deepEqual(strict.required.sort(), ['action', 'agent', 'model', 'prompt', 'task']);
+  assert.deepEqual(schema.required, ['action', 'agent', 'task', 'prompt', 'model'], 'all exposed wire fields are required');
 });
 
 test('real host validation accepts dispatch/stop shapes and rejects unknown fields/enums/types', () => {
@@ -113,7 +125,7 @@ test('real host validation accepts dispatch/stop shapes and rejects unknown fiel
   ]) assert.throws(() => hostValidate(tool, input), pattern);
   // Host scalar coercion is not direct-helper semantics; JSON null converges on the "null" sentinel.
   assert.equal(hostValidate(tool, { ...valid, prompt: 42 }).prompt, '42');
-  assert.deepEqual(hostValidate(tool, { action: 'stop', agent: null, prompt: null, task: null }), { action: 'stop', agent: 'null', prompt: 'null', task: 'null' });
+  assert.deepEqual(hostValidate(tool, { action: 'stop', agent: null, prompt: null, task: null }), { action: 'stop', agent: 'null', prompt: 'null', task: 'null', model: 'null' });
   assert.deepEqual(rawValidateDispatchParams(hostValidate(tool, { action: 'stop', agent: null, prompt: null, task: null })), { action: 'stop' });
 });
 
@@ -130,6 +142,21 @@ test('pure dispatch validator maps task sentinels and preserves exact prose with
   assert.throws(() => validateDispatchParams({ ...valid, prompt: 'null' }), /prompt/);
   assert.deepEqual(validateDispatchParams({ action: 'stop' }), { action: 'stop' });
   assert.deepEqual(validateDispatchParams({ action: 'stop', task: '.trellis/tasks/test' }), { action: 'stop', task: '.trellis/tasks/test' });
+});
+
+test('model sentinels omit overrides and real model strings survive direct and host admission', () => {
+  const { tool } = harness();
+  for (const model of ['default', 'null']) {
+    assert.deepEqual(validateDispatchParams({ ...valid, model }), { action: 'dispatch', ...valid });
+  }
+  for (const model of ['offline/other', 'sonnet']) {
+    const input = Object.freeze(complete({ ...valid, model }));
+    assert.deepEqual(rawValidateDispatchParams(input), { action: 'dispatch', ...valid, model });
+    assert.deepEqual(rawValidateDispatchParams(hostValidate(tool, input)), { action: 'dispatch', ...valid, model });
+    assert.equal(input.model, model);
+  }
+  assert.equal(hostValidate(tool, { ...valid, model: null }).model, 'null');
+  assert.deepEqual(rawValidateDispatchParams(hostValidate(tool, { ...valid, model: null })), { action: 'dispatch', ...valid });
 });
 
 test('pure dispatch validator rejects invalid arguments and identifies the offending field', () => {

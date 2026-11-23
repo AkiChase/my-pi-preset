@@ -279,7 +279,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
       prompt: Type.String({ description: "Self-contained task for the nested agent." }),
       description: sentinelString("Required for new agents: short task description; \"null\" with resume."),
       subagent_type: sentinelString(`Required for new agents; "null" with resume. Allowed types: ${availableIn(loadRegistry()).join(", ") || "none"}.`),
-      model: sentinelString('Provider/model override; "default" uses agent configuration, otherwise the parent session model; "null" with resume. Agent-file configuration takes precedence over calls.'),
+      model: sentinelString('Provider/model override. An explicit model takes precedence over agent configuration; "default" uses agent configuration, otherwise the parent session model; "null" with resume.'),
       // Same enum as the top-level tool, from the same source: a typo here would
       // otherwise be cast straight to a ThinkingLevel and quietly do nothing.
       ...thinkingParam(),
@@ -386,19 +386,12 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
       const registryLocator = context.manager.getRecord(context.parentAgentId)?.registryLocator;
       const childDepth = context.depth + 1;
       const modelIdentity = model ? describeModel(model) : {};
-      // Fuzzy aliases of the same effective model are not an override.
-      const requestedModel = invocation.overridden?.model;
-      const resolvedAsked = requestedModel === undefined ? undefined : resolveModel(requestedModel, ctx.modelRegistry);
-      const askedModel = resolvedAsked !== undefined && (typeof resolvedAsked === "string"
-        || resolvedAsked.provider !== model?.provider || resolvedAsked.id !== model?.id)
-        ? requestedModel : undefined;
       const agentInvocation: AgentInvocation = {
         ...modelIdentity,
         thinking: invocation.thinking,
         requestedThinking: invocation.overridden?.thinking,
-        requestedModel: askedModel,
         sessionRequestedThinking: params.thinking,
-        sessionRequestedModel: params.model !== undefined && askedModel === undefined && model ? `${model.provider}/${model.id}` : undefined,
+        sessionRequestedModel: params.model !== undefined && model ? `${model.provider}/${model.id}` : undefined,
         requestedRunInBackground: invocation.overridden?.runInBackground,
         requestedInheritContext: invocation.overridden?.inheritContext,
         requestedIsolated: invocation.overridden?.isolated,

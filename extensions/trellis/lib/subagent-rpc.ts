@@ -14,17 +14,17 @@ import { adapterConfigured } from "./adapter-resources.ts";
 import { verifyRuntime } from "./initialization/engine.ts";
 
 export type DispatchParams =
-	| { action: "dispatch"; agent: TrellisRole; prompt: string; task?: string }
+	| { action: "dispatch"; agent: TrellisRole; prompt: string; task?: string; model?: string }
 	| { action: "stop"; task?: string };
 
 /** Validate direct callers as well as host-normalized arguments before any query or RPC. */
 export function validateDispatchParams(input: unknown): DispatchParams {
-	if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("trellis_dispatch input must be an object with action, agent, task and prompt fields only");
-	const parsed = parseControls(input, ["action", "agent", "task", "prompt"], { agent: { kind: "nullable" }, task: { kind: "defaultable" }, prompt: { kind: "nullable" } });
+	if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("trellis_dispatch input must be an object with action, agent, task, prompt and model fields only");
+	const parsed = parseControls(input, ["action", "agent", "task", "prompt", "model"], { agent: { kind: "nullable" }, task: { kind: "defaultable" }, prompt: { kind: "nullable" }, model: { kind: "defaultable" } });
 	const args = parsed.values;
 	const action = args.action;
 	if (action !== "dispatch" && action !== "stop") throw new Error("`action` must be \"dispatch\" or \"stop\"");
-	if (action === "stop") rejectInapplicable(parsed, ["agent", "prompt"], "to stop (stop uses action and task only)");
+	if (action === "stop") rejectInapplicable(parsed, ["agent", "prompt", "model"], "to stop (stop uses action and task only)");
 	const task = args.task;
 	if (task !== undefined) validateText(task, "task");
 	const optionalTask = task === undefined ? {} : { task: task as string };
@@ -32,7 +32,9 @@ export function validateDispatchParams(input: unknown): DispatchParams {
 	if (!isTrellisRole(args.agent)) throw new Error("`agent` must be trellis-implement, trellis-check or trellis-research for dispatch");
 	// Prompt is prose, not a CLI identifier: preserve newlines/tabs and spacing.
 	if (typeof args.prompt !== "string" || !args.prompt.trim() || args.prompt.includes("\0")) throw new Error("`prompt` must be non-empty text without NUL for dispatch");
-	return { action, agent: args.agent, prompt: args.prompt, ...optionalTask };
+	const model = args.model;
+	if (model !== undefined && (typeof model !== "string" || !model.trim() || model.includes("\0"))) throw new Error("`model` must be non-empty text without NUL for dispatch; use \"default\" for configuration/defaults");
+	return { action, agent: args.agent, prompt: args.prompt, ...optionalTask, ...(model === undefined ? {} : { model }) };
 }
 
 interface RpcReply { success: boolean; data?: { agent_id?: string; version?: number }; error?: string }
@@ -116,7 +118,8 @@ export function registerDispatchTool(pi: ExtensionAPI, activeTask: (ctx: Extensi
 			agent: { type: "string", enum: ["trellis-implement", "trellis-check", "trellis-research", "null"], description: "Trellis role for dispatch; \"null\" for stop" },
 			task: { type: "string", description: "Approved task reference; \"default\" uses the local/active task" },
 			prompt: { type: "string", description: "Non-empty text for dispatch; newlines/tabs are preserved, NUL is forbidden; \"null\" for stop" },
-		}, required: ["action", "agent", "task", "prompt"], additionalProperties: false } as unknown as Parameters<ExtensionAPI["registerTool"]>[0]["parameters"],
+			model: { type: "string", description: "Model override for dispatch. Accepts provider/modelId or a fuzzy name. An explicit model takes precedence over role configuration; \"default\" uses role configuration, otherwise the parent session model. \"null\" for stop." },
+		}, required: ["action", "agent", "task", "prompt", "model"], additionalProperties: false } as unknown as Parameters<ExtensionAPI["registerTool"]>[0]["parameters"],
 		executionMode: "sequential",
 		async execute(_id, input, signal, _update, ctx) {
 			if (shuttingDown) throw new Error("Host session shut down; reload before execution");
@@ -183,7 +186,7 @@ export function registerDispatchTool(pi: ExtensionAPI, activeTask: (ctx: Extensi
 					const record: SourceExecution = { ...identity, version: 1, mode: "source", requestId: randomUUID(), role: args.agent, state: "starting", ownerPid: process.pid, ownerToken: processToken, createdAt: new Date().toISOString() };
 					writeSourceExecution(record);
 					try {
-						const reply = await rpc(pi, "spawn", { requestId: record.requestId, type: args.agent, prompt, options: { cwd: source.root, isolation: "off" } });
+						const reply = await rpc(pi, "spawn", { requestId: record.requestId, type: args.agent, prompt, options: { cwd: source.root, isolation: "off", ...(args.model === undefined ? {} : { model: args.model }) } });
 						if (!reply.success || typeof reply.data?.agent_id !== "string" || !reply.data.agent_id) throw new Error(reply.error || "Spawn returned no valid agent id");
 						record.agentId = reply.data.agent_id;
 						if (shuttingDown) throw new Error("Host session shut down during spawn; execution may already exist");
@@ -213,7 +216,7 @@ export function registerDispatchTool(pi: ExtensionAPI, activeTask: (ctx: Extensi
 				writeExecution(binding, record);
 				try {
 					// No call-time abort forwarded: cancellation of waiting cannot prove the detached child stopped.
-					const reply = await rpc(pi, "spawn", { requestId: record.requestId, type: args.agent, prompt, options: { cwd: binding.worktreePath, isolation: "off" } });
+					const reply = await rpc(pi, "spawn", { requestId: record.requestId, type: args.agent, prompt, options: { cwd: binding.worktreePath, isolation: "off", ...(args.model === undefined ? {} : { model: args.model }) } });
 					if (!reply.success || typeof reply.data?.agent_id !== "string" || !reply.data.agent_id) throw new Error(reply.error || "Spawn returned no valid agent id");
 					record.agentId = reply.data.agent_id;
 					if (shuttingDown) throw new Error("Host session shut down during spawn; execution may already exist");

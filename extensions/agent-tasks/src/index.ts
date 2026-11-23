@@ -1424,7 +1424,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       description: sentinelString("Required for new agents: a short, specific task description. Set \"null\" with resume."),
       subagent_type: sentinelString(`Required for new agents; "null" with resume. Available types: ${getAvailableTypes().join(", ")}.`),
       model: sentinelString(
-        'Model override. Accepts "provider/modelId" or fuzzy name (e.g. "haiku", "sonnet"). "default" uses agent configuration, otherwise the parent session model; "null" with resume. Agent-file configuration takes precedence over calls.',
+        'Model override. Accepts "provider/modelId" or fuzzy name (e.g. "haiku", "sonnet"). An explicit model takes precedence over agent configuration. "default" uses agent configuration, otherwise the parent session model; "null" with resume.',
       ),
       ...thinkingParam(),
       execution: agentControlParams(false).execution,
@@ -1473,7 +1473,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
         defaultRunInBackground: getBackgroundByDefault(),
       });
 
-      // Resolve model from agent config first; tool-call params only fill gaps.
+      // Resolve an explicit model first, then the agent default, then the parent.
       let model = ctx.model;
       if (!resumeTarget && resolvedConfig.modelInput) {
         const resolved = resolveModel(resolvedConfig.modelInput, ctx.modelRegistry);
@@ -1523,17 +1523,6 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       // This is the pre-session snapshot — agent-manager overwrites it with the
       // effective values the moment a session reports them.
       const { modelName, modelId } = model ? describeModel(model) : { modelName: undefined, modelId: undefined };
-      // What the caller SPELLED, kept only if it names a different model than the
-      // one that won. Model input is fuzzy — `"haiku"` and
-      // `"anthropic/claude-haiku-4-5"` are the same model — so comparing the two
-      // strings would disclose an override that never happened. A spelling that
-      // resolves to nothing is still worth disclosing: it cannot have taken effect.
-      const askedModel = ((asked: string | undefined) => {
-        if (!asked) return undefined;
-        const resolvedAsked = resolveModel(asked, ctx.modelRegistry);
-        if (typeof resolvedAsked === "string") return asked;
-        return resolvedAsked.provider === model?.provider && resolvedAsked.id === model?.id ? undefined : asked;
-      })(resolvedConfig.overridden?.model);
       // Resume uses the stored type, not the required but ignored model type argument.
       const effectiveMaxTurns = params.resume
         ? resolveEffectiveMaxTurns(manager.getRecord(params.resume)?.type ?? subagentType)
@@ -1545,9 +1534,8 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
         // Only set where the agent file outranked the caller, so the surfaces can
         // disclose a parameter that was accepted but could not take effect (#182).
         requestedThinking: resolvedConfig.overridden?.thinking,
-        requestedModel: askedModel,
         sessionRequestedThinking: params.thinking,
-        sessionRequestedModel: params.model !== undefined && askedModel === undefined ? modelId : undefined,
+        sessionRequestedModel: params.model !== undefined ? modelId : undefined,
         requestedRunInBackground: resolvedConfig.overridden?.runInBackground,
         requestedInheritContext: resolvedConfig.overridden?.inheritContext,
         requestedIsolated: resolvedConfig.overridden?.isolated,

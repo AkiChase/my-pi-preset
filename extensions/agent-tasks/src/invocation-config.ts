@@ -160,7 +160,7 @@ export function resolveAgentInvocationConfig(
    *
    * Turn budgets are user/internal configuration, never model arguments.
    */
-  overridden?: { thinking?: ThinkingLevel; model?: string; runInBackground?: boolean; inheritContext?: boolean; isolated?: boolean; isolation?: IsolationMode };
+  overridden?: { thinking?: ThinkingLevel; runInBackground?: boolean; inheritContext?: boolean; isolated?: boolean; isolation?: IsolationMode };
 } {
   // Precedence first, collapse second — reversing these loses the veto, since
   // an agent file's "off" only outranks a caller's "worktree" while it is still
@@ -172,13 +172,9 @@ export function resolveAgentInvocationConfig(
     && agentConfig.thinking !== params.thinking
     ? params.thinking as ThinkingLevel
     : undefined;
-  const overriddenModel = agentConfig?.model != null && params.model != null
-    && agentConfig.model !== params.model
-    ? params.model
-    : undefined;
 
   const overrides: NonNullable<ReturnType<typeof resolveAgentInvocationConfig>["overridden"]> = {
-    thinking: overriddenThinking, model: overriddenModel,
+    thinking: overriddenThinking,
     runInBackground: agentConfig?.runInBackground !== undefined && params.run_in_background !== undefined && agentConfig.runInBackground !== params.run_in_background ? params.run_in_background : undefined,
     inheritContext: agentConfig?.inheritContext !== undefined && params.inherit_context !== undefined && agentConfig.inheritContext !== params.inherit_context ? params.inherit_context : undefined,
     isolated: agentConfig?.isolated !== undefined && params.isolated !== undefined && agentConfig.isolated !== params.isolated ? params.isolated : undefined,
@@ -187,8 +183,9 @@ export function resolveAgentInvocationConfig(
   for (const key of Object.keys(overrides) as (keyof typeof overrides)[]) if (overrides[key] === undefined) delete overrides[key];
 
   return {
-    modelInput: agentConfig?.model ?? params.model,
-    modelFromParams: agentConfig?.model == null && params.model != null,
+    // Model configuration is a default, unlike the other frontmatter controls.
+    modelInput: params.model ?? agentConfig?.model,
+    modelFromParams: params.model != null,
     thinking: (agentConfig?.thinking ?? params.thinking) as ThinkingLevel | undefined,
     maxTurns: agentConfig?.maxTurns,
     inheritContext: agentConfig?.inheritContext ?? params.inherit_context ?? false,

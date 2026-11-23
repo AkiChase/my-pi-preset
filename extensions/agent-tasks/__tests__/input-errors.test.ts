@@ -220,7 +220,8 @@ void it("short root/nested rules preserve feature gates, modes, owned lifecycle 
                 const refused = await tool.execute("legacy", completeToolCall(tool.parameters, legacy) as never, undefined, undefined, f.ctx);
                 assert.equal(refused.isError, true); assert.match(text(refused), /schedule/);
                 assert.equal(f.calls.length, 0);
-                assert.match(rules, /takes precedence over applicable call parameters/);
+                assert.match(rules, /An explicit model takes precedence over agent configuration/);
+                assert.match(rules, /Other applicable call parameters remain subordinate to agent-file configuration/);
                 assert.match(rules, /agent_id/);
                 assert.doesNotMatch(rules, /execution_id/);
                 if (nested) {
@@ -411,14 +412,18 @@ void it("thinkingParam is the single source shared by the root, nested and wizar
     for (const level of THINKING_LEVELS) assert.match(schema.description ?? "", new RegExp(level));
 });
 
-void it("a frontmatter override keeps the caller's own value visible in the effective config", () => {
+void it("explicit models override frontmatter defaults while thinking keeps configuration precedence", () => {
     const config = { name: "pinned", description: "x", thinking: "high", model: "anthropic/claude-haiku-4-5" } as never;
     const resolved = resolveAgentInvocationConfig(config, { thinking: "minimal", model: "sonnet" });
-    // Effective value wins; `overridden` carries what the caller asked for, which
-    // is what the surfaces render as "(asked X)".
+    // Model is caller-selected; thinking still discloses the frontmatter override.
     assert.equal(resolved.thinking, "high");
-    assert.equal(resolved.modelInput, "anthropic/claude-haiku-4-5");
-    assert.deepEqual(resolved.overridden, { thinking: "minimal", model: "sonnet" });
+    assert.equal(resolved.modelInput, "sonnet");
+    assert.equal(resolved.modelFromParams, true);
+    assert.deepEqual(resolved.overridden, { thinking: "minimal" });
+    const configured = resolveAgentInvocationConfig(config, {});
+    assert.equal(configured.modelInput, "anthropic/claude-haiku-4-5");
+    assert.equal(configured.modelFromParams, false);
+    assert.equal(resolveAgentInvocationConfig(undefined, {}).modelInput, undefined);
     // Asked-for-what-they-got is not an override.
     assert.equal(resolveAgentInvocationConfig({ name: "pinned", description: "x", thinking: "high" } as never, { thinking: "high" }).overridden, undefined);
 });
@@ -546,6 +551,75 @@ void it("nested steering blanks and resume conflicts are refused before any mana
     } finally { await f.close(); }
 });
 
+void it("model defaults and explicit error/scope admission agree for root and nested tools", async () => {
+    for (const nested of [false, true]) {
+        for (const background of [false, true]) {
+            const selected: string[] = [];
+            const f = await factory({ customAgent: pinnedAgent, scopeModels: true }, {
+                async runAgent(_ctx, _type, _prompt, options) {
+                    selected.push(options.model!.id);
+                    const session = { model: options.model, thinkingLevel: "high", messages: [], subscribe: () => () => {},
+                        dispose() {}, sessionManager: { getSessionFile: () => join(f.root, "default-child.jsonl") } } as unknown as AgentSession;
+                    options.onSessionCreated?.(session);
+                    return { session, responseText: "answer", aborted: false, steered: false };
+                },
+            });
+            const records = new Map<string, AgentRecord>();
+            const manager: import("../src/nested-tools.ts").NestedAgentManager = {
+                getRecord: id => records.get(id), async resume(id) { return records.get(id); }, async awaitStartup() {},
+                spawn(_pi, _ctx, _type, _prompt, options) {
+                    selected.push(options.model!.id);
+                    const id = `child-${records.size}`;
+                    records.set(id, { id, runId: "1", parentAgentId: "parent", status: "completed", result: "answer",
+                        executionConfig: sessionExecutionConfig(resolvedExecutionConfig({ ...options.invocation, isolation: "off" }),
+                            { model: options.model, thinkingLevel: "high" }),
+                    } as AgentRecord);
+                    return id;
+                },
+                async spawnAndWait(pi, ctx, type, prompt, options, onSpawned) {
+                    const id = this.spawn(pi, ctx, type, prompt, options); onSpawned?.(id);
+                    return { id, record: records.get(id)! };
+                },
+            };
+            try {
+                modelRegistry(f.ctx);
+                const tool = nested ? createNestedSubagentTools({ manager, pi: {} as ExtensionAPI, parentAgentId: "parent", depth: 1,
+                    maxSubagentDepth: 2, allowedSubagents: "all", configCwd: f.cwd })[0]! : f.tools.get("subagent_run")!;
+                const run = (model: string, subagent_type = "custom") => tool.execute("model-matrix", completeToolCall(tool.parameters,
+                    { subagent_type, description: "work", prompt: "work", model, execution: background ? "background" : "foreground" }),
+                    undefined, undefined, f.ctx);
+                for (const model of ["default", "null", "other", "offline/other", "pinned"]) {
+                    const result = await run(model);
+                    const expected = model === "other" || model === "offline/other" ? "other" : "pinned";
+                    assert.notEqual(result.isError, true, `${nested ? "nested" : "root"}: ${model}`);
+                    assert.equal(selected.at(-1), expected);
+                    assert.equal(Reflect.get(result.details!, 'executionConfig').model, `offline/${expected}`);
+                    assert.doesNotMatch(text(result), /model requested/);
+                }
+                // Removing the role model exposes the parent model, including nested calls.
+                const agentFile = join(f.config, "agents", "custom.md");
+                writeFileSync(agentFile, pinnedAgent.replace("model: offline/pinned\n", ""));
+                const inherited = await run("default");
+                assert.notEqual(inherited.isError, true);
+                assert.equal(selected.at(-1), "other");
+                writeFileSync(agentFile, pinnedAgent);
+                const before = selected.length;
+                const unknown = await run("missing-model");
+                assert.equal(unknown.isError, true); assert.match(text(unknown), /Model not found/);
+                assert.equal(selected.length, before, "invalid explicit model must not start with the role default");
+                mkdirSync(join(f.cwd, ".pi"), { recursive: true });
+                writeFileSync(join(f.cwd, ".pi", "settings.json"), JSON.stringify({ enabledModels: ["offline/pinned"] }));
+                const refused = await run("other");
+                assert.equal(refused.isError, true); assert.match(text(refused), /Model not in scope/);
+                assert.equal(selected.length, before, "role model must not hide an out-of-scope explicit request");
+                const allowed = await run("pinned");
+                assert.notEqual(allowed.isError, true); assert.equal(selected.at(-1), "pinned");
+                assert.equal(selected.length, before + 1);
+            } finally { await f.close(); }
+        }
+    }
+});
+
 const pinnedModel = { provider: "offline", id: "pinned", name: "Pinned" };
 const otherModel = { provider: "offline", id: "other", name: "Other" };
 function modelRegistry(ctx: ExtensionToolContext) {
@@ -557,16 +631,17 @@ function modelRegistry(ctx: ExtensionToolContext) {
 }
 const pinnedAgent = "---\nname: custom\ndescription: Pinned offline agent\nmodel: offline/pinned\nthinking: high\noutput_transcript: false\n---\nDo work.\n";
 function assertOverride(textValue: string, thinking = "high") {
-    assert.match(textValue, /model requested "other", effective "offline\/pinned"/);
+    assert.doesNotMatch(textValue, /model requested/);
     assert.match(textValue, new RegExp(`thinking requested "minimal", effective "${thinking}"`));
 }
 
-for (const background of [false, true]) void it(`root ${background ? "background" : "foreground"} returns model-visible requested/effective overrides`, async () => {
+for (const background of [false, true]) void it(`root ${background ? "background" : "foreground"} honors explicit models and retains thinking disclosure`, async () => {
+    let runs = 0;
     const f = await factory({ customAgent: pinnedAgent }, {
         async runAgent(_ctx, _type, _prompt, options) {
-            assert.equal(options.model?.id, "pinned");
+            assert.equal(options.model?.id, ['other', 'pinned'][runs++]);
             assert.equal(options.thinkingLevel, "high", "frontmatter precedence is unchanged");
-            const session = { model: pinnedModel, thinkingLevel: "low", messages: [], subscribe: () => () => {},
+            const session = { model: options.model, thinkingLevel: "low", messages: [], subscribe: () => () => {},
                 dispose() {}, sessionManager: { getSessionFile: () => join(f.root, "pinned-child.jsonl") } } as unknown as AgentSession;
             options.onSessionCreated?.(session);
             return { session, responseText: "visible answer", aborted: false, steered: false };
@@ -577,6 +652,7 @@ for (const background of [false, true]) void it(`root ${background ? "background
         const result = await f.execute("subagent_run", { subagent_type: "custom", description: "work", prompt: "work",
             model: "other", thinking: "minimal", execution: background ? "background" : "foreground" });
         assertOverride(text(result), "low");
+        assert.equal(Reflect.get(result.details!, 'executionConfig').model, 'offline/other');
         if (!background) assert.match(text(result), /visible answer/);
         const same = await f.execute("subagent_run", { subagent_type: "custom", description: "work", prompt: "work",
             model: "pinned", thinking: "low", execution: background ? "background" : "foreground" });
@@ -585,17 +661,17 @@ for (const background of [false, true]) void it(`root ${background ? "background
     } finally { await f.close(); }
 });
 
-for (const background of [false, true]) void it(`nested ${background ? "background" : "foreground"} returns overrides from actual invocation metadata`, async () => {
+for (const background of [false, true]) void it(`nested ${background ? "background" : "foreground"} honors explicit models and retains thinking disclosure`, async () => {
     const f = await factory({ customAgent: pinnedAgent });
     const records = new Map<string, AgentRecord>();
     const manager: import("../src/nested-tools.ts").NestedAgentManager = {
         getRecord: id => records.get(id), async resume(id) { return records.get(id); }, async awaitStartup() {},
         spawn(_pi, _ctx, _type, _prompt, options) {
-            assert.equal(options.model?.id, "pinned"); assert.equal(options.thinkingLevel, "high");
+            assert.equal(options.model?.id, options.invocation?.sessionRequestedModel?.split('/')[1]); assert.equal(options.thinkingLevel, "high");
             const id = `child-${records.size}`;
             records.set(id, { id, runId: "1", status: "completed", result: "nested answer", parentAgentId: "parent",
                 invocation: { ...options.invocation, thinking: "low" },
-                executionConfig: sessionExecutionConfig(resolvedExecutionConfig({ ...options.invocation, isolation: options.isolation ?? "off" }), { model: pinnedModel, thinkingLevel: "low" }),
+                executionConfig: sessionExecutionConfig(resolvedExecutionConfig({ ...options.invocation, isolation: options.isolation ?? "off" }), { model: options.model, thinkingLevel: "low" }),
             } as AgentRecord);
             return id;
         },
@@ -611,6 +687,7 @@ for (const background of [false, true]) void it(`nested ${background ? "backgrou
         const result = await run.execute("call", completeToolCall(run.parameters, { subagent_type: "custom", description: "work", prompt: "work",
             model: "other", thinking: "minimal", execution: background ? "background" : "foreground" }), undefined, undefined, f.ctx);
         assertOverride(text(result), "low");
+        assert.equal(Reflect.get(result.details!, 'executionConfig').model, 'offline/other');
         if (!background) assert.match(text(result), /nested answer/);
         const same = await run.execute("call", completeToolCall(run.parameters, { subagent_type: "custom", description: "work", prompt: "work",
             model: "pinned", thinking: "low", execution: background ? "background" : "foreground" }), undefined, undefined, f.ctx);

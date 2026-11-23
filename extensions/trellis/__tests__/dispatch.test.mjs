@@ -132,10 +132,25 @@ function project(t,scope,root) {
  bus.on('subagents:rpc:ping',({requestId})=>bus.emit('subagents:rpc:ping:reply:'+requestId,{success:true,data:{version:3}}));
  let seq=0, spawnFailure;
  bus.on('subagents:rpc:spawn',params=>{replies.push(params);bus.emit('subagents:rpc:spawn:reply:'+params.requestId,spawnFailure ? {success:false,error:spawnFailure} : {success:true,data:{agent_id:'agent-'+(++seq)}});});
- const call=input=>tools.get('trellis_dispatch').execute('tool',{action:'dispatch',agent:'null',task:'default',prompt:'null',...input},undefined,undefined,{cwd:root});
+ const call=input=>tools.get('trellis_dispatch').execute('tool',{action:'dispatch',agent:'null',task:'default',prompt:'null',model:input.action==='stop'?'null':'default',...input},undefined,undefined,{cwd:root});
  const dispatch=(agent='trellis-implement')=>call({agent,prompt:'work'});
  return {root,task,put,run,dispatch,call,bus,replies,handlers,git,chdir,setActive:value=>{active=value;},failSpawn:error=>{spawnFailure=error;}};
 }
+
+test('shared and managed dispatch forward explicit models but omit default overrides',async t=>{
+ for(const managed of [false,true]) await t.test(managed?'managed':'shared',async child=>{
+  const f=await stateFixture(child,managed);
+  f.put('.pi/agents/trellis-implement.md','---\nname: trellis-implement\ntools: read, write, edit, bash, find, grep\nextensions: true\nisolation: off\nmodel: offline/pinned\n---\nRole\n');
+  const cwd=managed?f.prepared.binding.worktreePath:f.root;
+  for(const model of ['offline/other','sonnet','default','null']) {
+   const result=await f.call({agent:'trellis-implement',prompt:'work',model});
+   const options=f.replies.at(-1).options;
+   assert.deepEqual(options,{cwd,isolation:'off',...(['default','null'].includes(model)?{}:{model})});
+   assert.equal(parseDispatchFacts(f.replies.at(-1).prompt).executionRoot,cwd);
+   f.bus.emit('subagents:completed',{id:result.details.agentId});
+  }
+ });
+});
 
 test('dispatch requires ready, uses target cwd/off, returns real id and prevents same-dir overlap',async t=>{
  const f=await fixture(t);const c=await f.run();
@@ -298,7 +313,7 @@ test('new host can request source stop and reconcile terminal evidence from disk
  const f=await stateFixture(t,false);await f.dispatch();f.handlers.get('session_shutdown')();assert.equal(sourceRecord(f).state,'unknown');
  const tools=new Map();registerDispatchTool({events:f.bus,on:()=>{},registerTool:tool=>tools.set(tool.name,tool)},async()=>f.task);
  f.bus.on('subagents:rpc:stop',({requestId,agentId})=>{assert.equal(agentId,'agent-1');f.bus.emit('subagents:rpc:stop:reply:'+requestId,{success:true});});
- await tools.get('trellis_dispatch').execute('new',{action:'stop',agent:'null',task:'default',prompt:'null'},undefined,undefined,{cwd:f.root});assert.equal(sourceRecord(f).state,'unknown');
+ await tools.get('trellis_dispatch').execute('new',{action:'stop',agent:'null',task:'default',prompt:'null',model:'null'},undefined,undefined,{cwd:f.root});assert.equal(sourceRecord(f).state,'unknown');
  f.bus.emit('subagents:completed',{id:'agent-1'});assert.equal(sourceRecord(f).state,'completed');
 });
 test('source record reader interoperates with Python create preview and rejects malformed leases',async t=>{
@@ -327,9 +342,9 @@ test('terminal before new host first call reconciles cached evidence despite cor
  const tools=new Map();registerDispatchTool({events:f.bus,on:()=>{},registerTool:tool=>tools.set(tool.name,tool)},async()=>f.task);
  f.put('.trellis/.runtime/pi-trellis/source-executions/'+ '0'.repeat(64)+'.json','null');
  f.bus.emit('subagents:completed',{id:'agent-1'});
- await assert.rejects(tools.get('trellis_dispatch').execute('stop',{action:'stop',agent:'null',task:'default',prompt:'null'},undefined,undefined,{cwd:f.root}),/No known agent id/);
+ await assert.rejects(tools.get('trellis_dispatch').execute('stop',{action:'stop',agent:'null',task:'default',prompt:'null',model:'null'},undefined,undefined,{cwd:f.root}),/No known agent id/);
  assert.equal(sourceRecord(f).state,'completed');
- const result=await tools.get('trellis_dispatch').execute('next',{action:'dispatch',task:'default',agent:'trellis-check',prompt:'check'},undefined,undefined,{cwd:f.root});assert.equal(result.details.agentId,'agent-2');
+ const result=await tools.get('trellis_dispatch').execute('next',{action:'dispatch',task:'default',agent:'trellis-check',prompt:'check',model:'default'},undefined,undefined,{cwd:f.root});assert.equal(result.details.agentId,'agent-2');
 });
 test('source terminal queues under reservation lock and cannot overwrite a newer request',async t=>{
  const f=await stateFixture(t,false);await f.dispatch();const record=sourceRecord(f);
@@ -445,6 +460,7 @@ test('planning research keeps task and prepared binding requirements',async t=>{
 
 const scoped=fn=>t=>cwdScope.run({},()=>fn(t));
 const smoke=new Set([
+ 'shared and managed dispatch forward explicit models but omit default overrides',
  'dispatch old call shape/optional empty task works; stop requires no agent/prompt and waits for terminal evidence',
  'shutdown retains unknown lease instead of claiming a running child stopped',
  'source early terminal, stop and shutdown preserve lifecycle truth',

@@ -55,7 +55,17 @@ Official Agent guidance has one mode only: remove alternate full/compact/custom 
 
 ### Agent tool invocation modes
 
-`subagent_run` uses a flat closed schema with mode-specific admission: new agents require prompt/description/subagent_type; resume uses prompt/resume and top-level run_in_background only. Nested resume is foreground and rejects the mode field even when false. Validate raw shape, unknown/disabled fields and mode dependencies before execution effects. Internal spawn/RPC contracts are not model-tool contracts. `subagent_message` uses real agent IDs only; explicit `@agent:create:<type>` and `@agent:resume:<type>_<index>` input routing remains independent. A refused resume is an error, while queued/sent messaging is successful admission, not acknowledgment of processing. Agent-file settings remain authoritative; disclose overridden explicit model/thinking/mode/context/tool-isolation/worktree requests without changing ownership or model-scope policy.
+`subagent_run` uses a flat closed schema with mode-specific admission: new agents require prompt/description/subagent_type; resume uses prompt/resume and top-level run_in_background only. Nested resume is foreground and rejects the mode field even when false. Validate raw shape, unknown/disabled fields and mode dependencies before execution effects. Internal spawn/RPC contracts are not model-tool contracts. `subagent_message` uses real agent IDs only; explicit `@agent:create:<type>` and `@agent:resume:<type>_<index>` input routing remains independent. A refused resume is an error, while queued/sent messaging is successful admission, not acknowledgment of processing. Model selection follows the contract below. Other agent-file settings remain authoritative; disclose overridden explicit thinking/mode/context/tool-isolation/worktree requests without changing ownership or model-scope policy.
+
+### Model selection contract
+
+1. **Scope/trigger:** Model selection crosses Trellis dispatch, top-level/nested agent admission, RPC and runner execution. Role models are defaults, not permission locks.
+2. **Signatures:** `resolveAgentInvocationConfig(agentConfig, params, opts)` returns `modelInput?: string` and `modelFromParams: boolean`; RPC spawn accepts `options.model` and the runner consumes the resolved model.
+3. **Contract:** Resolve explicit model → role model → parent model. A default selection forwards no RPC override. Preserve actual session-model snapshots and other configuration precedence; resume retains its session settings.
+4. **Validation/errors:** Explicit unresolved or out-of-scope models are errors, even when a valid role default exists. Keep `modelFromParams` true for every explicit request; configured/inherited choices retain their existing scope policy. Shape validation precedes dispatch effects; provider rejection retains the existing conservative execution lease policy.
+5. **Cases:** Role A + request B → B; role A + default selection → A; no role model + default selection → parent; role A + invalid explicit request → error, not A.
+6. **Tests:** `input-errors.test.ts` covers root/nested, foreground/background, defaults, scope and accurate requested/effective snapshots. Trellis `dispatch-params.test.mjs` and `dispatch.test.mjs` cover admission before effects and explicit/default forwarding in shared/managed directories.
+7. **Wrong vs correct:** Wrong: `modelInput = agentConfig?.model ?? params.model` or marking explicit requests as configured merely because a role model exists. Correct: `modelInput = params.model ?? agentConfig?.model`, `modelFromParams = params.model != null`, with the parent fallback at the existing execution owner.
 
 ## Split Runtime Management
 

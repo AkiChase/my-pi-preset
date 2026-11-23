@@ -24,7 +24,7 @@ export function runToolGuidance(options: RunGuidanceOptions): string[] {
   - Available permitted agent types:
 ${options.agentTypes.split("\n").map(line => `    ${line}`).join("\n")}
   - Resume uses a finished, resumable ${options.nested ? "owned child's " : "agent's "}real agent_id; retain type and session settings. ${options.nested ? "Nested resume waits inline; execution must be \"null\"." : "This execution mode is resolved again."} Set resume to \"null\" for a new agent; an empty string is invalid. Use subagent_message for a running agent.
-  - Agent-file configuration takes precedence over applicable call parameters; inspect effective/overridden requests in results. ${modeRule}
+  - An explicit model takes precedence over agent configuration; model "default" uses agent configuration, otherwise the parent session model. Other applicable call parameters remain subordinate to agent-file configuration; inspect effective/overridden requests in results. ${modeRule}
   - Background launch is accepted/queued, not completed. Copy agent_id for messaging, resume, and agent_manage; never substitute IDs. Foreground returns inline; releasing wait does not stop execution.
   - ${options.nested ? "Collect owned background results before finishing; do not rely on top-level completion notifications." : "Background completion is notified automatically."} Do not poll/sleep solely to detect completion or invent results.
 ${options.isolation ? '  - isolation selects Git working-directory isolation: off uses the current checkout, worktree uses a temporary copy that cannot see uncommitted changes. Follow project worktree authorization. tools \"builtin\" is different: it disables extension/MCP tools.\n' : ""}  - Examples:
