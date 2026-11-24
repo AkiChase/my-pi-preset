@@ -460,3 +460,40 @@ subagent_run 手动转后台（含前台 resume）在文本中注明用户操作
 ### Next Steps
 
 - 将已验证实现及归档/日志提交正常推送 origin/main，不 force push、不改写历史。
+
+
+## Session 72: Trellis 派发指定模型与优先级统一收尾
+<!-- trellis-session: v=2 fp=7945a9524def3e9c -->
+
+**Date**: 2026-11-24
+**Task**: Trellis 派发指定模型与优先级统一收尾
+**Branch**: `main`
+
+### Summary
+
+完成 trellis_dispatch 的逐次 model 选择，顶层与嵌套 subagent_run 统一调用参数优先；主会话自审和离线验证通过，用户验收后归档、清绑定。
+
+### Main Changes
+
+- 模型优先级统一为调用参数 > 角色配置 > 父会话；default 沿用默认链，其他配置优先级与权限保持不变。
+- 任务归档至 .trellis/tasks/archive/2026-11/11-23-dispatch-model，实际 main 直接提交、从未 PR-backed，使用支持的归档选项；仅保留需求、设计和自包含验证记录。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c6a641d` | feat(agents): support per-dispatch model overrides |
+| `fb0ecc0` | chore(task): archive 11-23-dispatch-model |
+
+### Testing
+
+- [OK] 相关 Trellis/Agent 回归 796/796 自然退出；strict typecheck 与完整 suite 最终 1922/1922 通过。首轮 fixture 字段断言错误与 pnpm 10 CLI 兼容失败已保留原因和复跑关系。
+- [OK] 完整复跑为包管理器 fixture 指定已安装的 pnpm 12.21.0 原生入口，未安装或下载依赖；owned 临时目录已核对并清理，历史材料未动。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 无待实施项；未 push、更新个人安装、部署资源或 reload。真实在线模型、managed-provider 端到端与 TUI 为 NOT_RUN，无独立审查。

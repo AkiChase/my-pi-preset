@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 71
-- **Last Active**: 2026-11-19
+- **Total Sessions**: 72
+- **Last Active**: 2026-11-24
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~462 | Active |
+| `journal-2.md` | ~499 | Active |
 | `journal-1.md` | ~1975 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 72 | 2026-11-24 | Trellis 派发指定模型与优先级统一收尾 | `c6a641d`, `fb0ecc0` | `main` |
 | 71 | 2026-11-19 | 上下文前缀稳定与 pnpm 12 项目升级收尾 | `80e9910`, `e1be11e`, `7d26d56`, `09e6975`, `2e1d9f0`, `42cfb0c` | `main` |
 | 70 | 2026-11-15 | 手动转后台对 Agent 可见 | `cdae113` | `main` |
 | 69 | 2026-11-15 | 工具参数去除 null，改用字符串哨兵 | `eefae85` | `main` |
