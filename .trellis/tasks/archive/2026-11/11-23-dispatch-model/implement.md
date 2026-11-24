@@ -34,8 +34,7 @@
 | 受影响 owner 自然退出重跑 | `PI_CODING_AGENT_DIR=<run>/agent node --test extensions/trellis/__tests__/*.test.mjs extensions/agent-tasks/__tests__/*.test.ts` | 0 / PASS，796 tests，796 pass，0 fail/cancelled/skipped，91.674 秒。包含修复后的定向用例，未用 force-exit。 |
 | 首轮完整检查 | `COREPACK_ENABLE_NETWORK=0 PI_SDK_DIR=<installed-sdk-node_modules> PI_CODING_AGENT_DIR=<run>/agent pnpm check` | 1 / FAIL；strict typecheck PASS，完整 suite 1922 tests，1921 pass，1 fail。唯一失败是无关的 `scripts/package-manager.test.mjs`：当前选择的 pnpm 10.33.0 不接受 fixture 的 `--registry ... run check` 组合，未改该测试或生产包管理配置。 |
 | 兼容入口初次尝试 | 尝试缓存 pnpm 12.21.0 的 `bin/pnpm.cjs`，并作为 `PNPM_TEST_BIN` 跑 package-manager.test.mjs | 1 / FAIL；该缓存版本没有 .cjs 入口，MODULE_NOT_FOUND，5 tests 中3 pass/2 fail；未进行安装。随后实际列目录找到已安装的 `pnpm-native`。 |
-| 兼容入口验证 | 已安装 `pnpm-native --version` 返回 12.21.0；`PNPM_TEST_BIN=<cached-12.21.0>/pnpm-native PI_CODING_AGENT_DIR=<run>/agent node --test scripts/package-manager.test.mjs` | 0 / PASS，5 tests，5 pass，0 fail；真实 CLI cold-HOME 用例零 registry 请求、没有安装。 |
-
+| 兼容入口验证 | 已安装 `pnpm-native --version` 返回 12.21.0；`PNPM_TEST_BIN=<cached-12.21.0>/pnpm-native PI_CODING_AGENT_DIR=<run>/agent node --test scripts/package-manager.test.mjs` | 0 / PASS，5 tests，5 pass，0 fail，自然退出；真实 CLI cold-HOME 用例零 registry 请求、没有安装。 |
 | 完整检查最终重跑 | `COREPACK_ENABLE_NETWORK=0 PNPM_TEST_BIN=<cached-12.21.0>/pnpm-native PI_SDK_DIR=<installed-sdk-node_modules> PI_CODING_AGENT_DIR=<run>/agent pnpm check` | 0 / PASS；strict typecheck PASS，完整 suite 1922 tests，1922 pass，0 fail/cancelled/skipped，74.240 秒。仅为无关 fixture 指定已验证的本地原生入口；配置 full suite 仍使用 force-exit，不作为自然退出证据。 |
 
 ## 最终自审与限制
@@ -44,5 +43,12 @@
 - 工具字段、官方指导、Skill、用户说明与开发规范均同步；规范记录内部模型选择契约与回归 owner，不新增面向用户的 tool 参数调用教程。
 - `git diff --check` 通过；首次 staged 检查发现新建 implement.md 末尾多一个空行（exit 2），已移除后重跑。任务材料仅 PRD/design/implement/task metadata 与空角色 JSONL，没有 raw logs/research/evidence 写入。Git 未出现锁文件、package manifest 或部署资源变更，SDK link 为 0 new；没有安装、下载或个人配置修改。
 - 无独立审查，结论来自主会话自审。线上模型、真实 managed-provider 端到端、真实 TUI、个人安装/sync/reload：NOT_RUN，本次未授权；fake RPC/离线 runner seam 不能替代这些层级。
-- task.py start 的 main/base_branch 提示仍保留；本次只本地提交，不创建 PR、不改历史、不归档或清绑定。
-- 本阶段提交检查点：`feat(agents): support per-dispatch model overrides`。提交包含上述耦合源码、测试、指导/规范和任务材料；提交后用 Git 状态核实。
+- 实施阶段保留 task.py start 的 main/base_branch 提示，只本地提交、不创建 PR 或改历史；归档与清绑定在下节新增收尾授权中处理。
+- 本阶段提交：`c6a641d`（`feat(agents): support per-dispatch model overrides`），包含上述耦合源码、测试、指导/规范和任务材料；提交后工作区干净。
+
+## 验收与收尾
+用户在交付后明确说“收尾吧”，接受上述范围与 NOT_RUN 限制，授权任务归档、清绑定、journal 和相应本地提交，不含 push、个人安装更新或 reload。
+
+本任务实际直接实施并提交在 main，没有独立工作分支，task.json 的 pr_url 为 null；按 CLI 明示的非 PR 任务入口使用 `archive --skip-branch-validation`，不伪造 branch/base_branch 或修改 Git 历史。归档前已检查任务材料、原/目标路径和 journal 范围，无并行未提交改动；session_auto_commit 使用默认 true。只保留最终需求/设计/执行记录与任务元数据，无原始日志附件。
+
+执行阶段自有临时目录 `/tmp/pi-dispatch-model.3ZVY3y` 已在结果核对、全部相关进程终止后清理，本轮再次确认不存在；历史任务的临时材料未动。原失败、修复和重跑事实已保留在本文件中。

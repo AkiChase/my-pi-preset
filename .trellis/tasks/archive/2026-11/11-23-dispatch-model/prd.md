@@ -24,7 +24,7 @@ model 为闭合 schema 中的必填字符串控制字段。dispatch 接受 defau
 同步模型字段描述、官方工具指导、subagents Skill 的委派说明、相关规范与用户可见说明。工具参数教学只进入 Agent 指导，不复制到用户 docs 或长期 spec。用户 docs 只说明临时模型选择优先于角色默认、其他设置仍按现有政策。
 
 ## 排除
-不增加 thinking 等 Trellis 参数；不统一其他配置的优先级；不更改 workflow/RPC 已有模型优先级或失败租约策略；不新增配置锁或权限绕过；不安装、不请求线上模型、不更新个人安装/配置、不 reload、不手改部署资源、不 push、不归档。
+不增加 thinking 等 Trellis 参数；不统一其他配置的优先级；不更改 workflow/RPC 已有模型优先级或失败租约策略；不新增配置锁或权限绕过；不安装、不请求线上模型、不更新个人安装/配置、不 reload、不手改部署资源、不 push；归档与 journal 属于后续单独授权的收尾操作。
 
 ## 验收标准
 - AC1（R1）：实际注册 schema 与直接 admission 覆盖 model 必填、default/null、真实字符串、非法输入和 stop 排斥；非法形状在查询/RPC/写入前拒绝。
@@ -34,4 +34,4 @@ model 为闭合 schema 中的必填字符串控制字段。dispatch 接受 defau
 - AC5（R4）：指导与行为一致，定向自然退出测试、strict typecheck、配置的完整 suite 与 diff 检查通过；记录 FAIL/NOT_RUN 和测试层级限制，不将 fake RPC 称真实 provider 验证。
 
 ## 授权与状态
-用户已批准创建任务、将 subagent_run 的 model 优先级调整纳入范围，并在最终方案审阅后明确说“开工吧”。授权覆盖上述单阶段实施、自审、离线验证及验证后的本地提交。任务已通过 `start --allow-empty-context` 进入 in_progress，两个未使用角色 JSONL 保持空置；没有派发子 Agent，不把空 manifest 称为完整 validate 成功。
+用户已批准创建任务、将 subagent_run 的 model 优先级调整纳入范围，并在最终方案审阅后明确说“开工吧”。实施提交为 `c6a641d`，AC1–AC5 已通过记录中的主自审与离线验证。用户随后说“收尾吧”，验收并授权归档、清除绑定、journal 与相应本地提交；不授权 push、安装、资源部署或 reload。两个未使用角色 JSONL 保持空置；没有派发子 Agent，不把空 manifest 称为完整 validate 成功。
