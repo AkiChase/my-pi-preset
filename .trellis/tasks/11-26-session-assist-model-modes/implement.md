@@ -8,7 +8,7 @@
 - [x] 回归覆盖模式解释、非法配置、支持等级/文本/auth、菜单取消和新鲜补丁、切换保留独立值、请求参数快照、无主模型的独立请求。
 - [x] 更新两个中文用户文档、维护范围及已有英文开发/测试契约。
 - [x] 主会话 diff 自审与独立 `trellis-check` 只读审查完成；产品功能无实质问题。专项及类型检查通过，全量两个无关失败已单独复现并记录，不标为全量 PASS。
-- [ ] 验证完成后仅提交本阶段必要代码/测试/文档和任务材料，排除用户已有 lockfile 修改；建议提交 `feat(session-assist): support follow and custom model modes`。
+- [x] 阶段已本地提交：`65d10a76ced1dec8f966eaac2ecf2d5f6d493a28`（`feat(session-assist): support follow and custom model modes`）。仅本任务代码/测试/文档/必要任务材料，未包含 `pnpm-lock.yaml`。功能阶段后仅更新本实施记录的提交证据。
 
 ## 命令与隔离
 执行前在仓库外 `mktemp -d` 建立本次 owned run directory，agent-dir 和原始日志都置于其中。仅使用已安装 SDK/工具，不做依赖安装或 fetching。执行全部默认配置相关测试时设置 `PI_CODING_AGENT_DIR=<owned-run>/agent`，按 testing spec 从现有链接解析 `PI_SDK_DIR`。
