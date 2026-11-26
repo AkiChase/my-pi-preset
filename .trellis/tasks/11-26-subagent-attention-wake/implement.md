@@ -40,7 +40,7 @@
 ### 阶段 2（嵌套）
 - `AgentManager.spawnAndWait` / `resume` 支持 `wake` 信号：信号先于结束时调用 `detachRun(identity, "message")` 并返回未消费的记录；若执行已结束则按普通结果返回。
 - 嵌套 delivery 新增一次性 waker 注册：消息先暂存，再调用 waker。前台 launch 与 live-session resume 只在 `canCollectBackground() !== false` 时注册；reply wait 始终注册。嵌套 agent_manage wait 通过 `wakeOnAttention` 订阅 attention 并 detach lease，消息仍按 steer 送达。
-- 行为调整：嵌套 live-session 前台 resume 现在与前台 launch 一样，在等待期间暂存消息并在结果中返回（此前是立即 steer）。
+- 行为调整：嵌套 live-session 前台 resume 现在与前台 launch 一样，等待期间收到的消息先暂存，结束时并入结果。此前这些消息会立即 steer 进父会话，但父会话在调用返回前同样看不到。因此改动只影响消息出现的位置（工具结果内，或结果之后的独立消息），送达时机和内容都不变。
 - 同一组受影响套件（隔离、无 force-exit）：1032 条，1031 通过，1 失败。失败仍是阶段 1 已记录的 `bash-schema` 用例，未出现新的失败。
 
 ### 阶段 3（guidance 与全量验证）
