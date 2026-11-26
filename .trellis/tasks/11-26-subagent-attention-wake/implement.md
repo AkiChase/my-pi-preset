@@ -42,3 +42,9 @@
 - 嵌套 delivery 新增一次性 waker 注册：消息先暂存，再调用 waker。前台 launch 与 live-session resume 只在 `canCollectBackground() !== false` 时注册；reply wait 始终注册。嵌套 agent_manage wait 通过 `wakeOnAttention` 订阅 attention 并 detach lease，消息仍按 steer 送达。
 - 行为调整：嵌套 live-session 前台 resume 现在与前台 launch 一样，在等待期间暂存消息并在结果中返回（此前是立即 steer）。
 - 同一组受影响套件（隔离、无 force-exit）：1032 条，1031 通过，1 失败。失败仍是阶段 1 已记录的 `bash-schema` 用例，未出现新的失败。
+
+### 阶段 3（guidance 与全量验证）
+- 父侧 guidance：`subagent_run`（顶层/嵌套）说明前台等待可被 attention 提前结束；`subagent_message` 说明 reply wait 会因 attention 结束，并说明 attention 标记；`agent_manage` 说明 `wait_outcome: "message"`。
+- `pnpm run typecheck`：共 11 个错误，与 HEAD 基线相同，均为既有错误。
+- `pnpm run test`（隔离 `PI_SDK_DIR`、`PI_CODING_AGENT_DIR`，配置为 force-exit）：1958 条，1957 通过，1 失败。失败仍是既有的 `bash-schema` outputSchema 用例。
+- 自然退出（不使用 force-exit）的受影响套件结果见阶段 1、2。

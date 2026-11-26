@@ -70,7 +70,7 @@ const agentGuidance = `Agent_manage usage:
     output/wait: agent_id or execution_id as above; detail "default", or "full" for subagents only; kind "null".
   - Copy the complete agent_id for subagents from launch/list. Workflow keeps its execution_id contract. Subagent execution identities are internal: do not construct or provide execution_id for a subagent.
   - Resuming an agent keeps its agent_id while replacing its internal execution; an admitted wait stays bound to the execution present at admission. Workflow replay creates a separate execution with a new ID.
-  - output returns current output/progress or a final result; wait awaits the whole execution. detail "full" is only for subagent output/wait and requests additional conversation, not an unlimited trace.
+  - output returns current output/progress or a final result; wait awaits the whole execution, but a subagent's attention message ends it early with wait_outcome "message" while the agent keeps running. detail "full" is only for subagent output/wait and requests additional conversation, not an unlimited trace.
   - /task-detach or cancellation releases a wait without stopping execution. stop requests cancellation; it may still be draining. Stopping a workflow also stops its owned agents, not independent siblings. Visible owned children cannot necessarily be managed directly by another owner.
   - Successful terminal output/wait delivery reports that execution's result and avoids duplicate completion notifications; list/status do not consume it. Completion is notified automatically; do not poll solely to detect completion.
   - Examples:
