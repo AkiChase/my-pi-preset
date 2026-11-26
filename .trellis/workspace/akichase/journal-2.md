@@ -526,7 +526,7 @@ subagent_run 手动转后台（含前台 resume）在文本中注明用户操作
 ### Testing
 
 - [OK] 专项自然退出 156/156 PASS，最终类型检查 PASS，独立只读审查无实质功能问题；文档示例/链接及 git diff --check PASS。
-- [OK] 全量 1943 项中 1941 PASS、2 FAIL，均为 scripts/package-manager.test.mjs：既有 lockfile 的 SDK peers 断言及缓存 pnpm 10.33.0 不支持 fixture 的 --registry 参数；单独复现 3 PASS、2 FAIL，未掩盖失败。首次类型检查夹具遗漏必需 model 字段，修复后通过。
+- [FAIL] 全量 1943 项中 1941 PASS、2 FAIL，均为 scripts/package-manager.test.mjs：既有 lockfile 的 SDK peers 断言及缓存 pnpm 10.33.0 不支持 fixture 的 --registry 参数；单独复现 3 PASS、2 FAIL，未掩盖失败。首次类型检查夹具遗漏必需 model 字段，修复后通过。
 
 ### Status
 
