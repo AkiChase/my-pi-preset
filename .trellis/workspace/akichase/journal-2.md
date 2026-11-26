@@ -535,3 +535,25 @@ subagent_run 手动转后台（含前台 resume）在文本中注明用户操作
 ### Next Steps
 
 - 既有 pnpm-lock.yaml 修改保持未提交；两个无关全量失败留待单独处理，诊断日志保留 /tmp/session-assist-model-modes.4RSQ8K。未 push，未安装依赖，未验证在线生成质量或真实终端外观。
+
+
+## Session 74: Subagent attention notices wake parent waits
+<!-- trellis-session: v=2 fp=d03ea798ca1e0bc0 -->
+
+**Date**: 2026-11-26
+**Task**: Subagent attention notices wake parent waits
+**Branch**: `main`
+
+### Summary
+
+reply_to_parent 增加 urgency（info/attention）。attention 会立即结束父 agent 对该执行的等待：顶层前台 launch/resume 转入后台，agent_manage wait 返回 wait_outcome message，reply wait 保留问题；嵌套等待同样支持，前台 launch 仅在父 agent 拥有 agent_manage 时打断。trellis-check 独立审查无阻塞问题，提出的 2 点已修复。全量测试仅剩既有的 bash-schema 失败；typecheck 的 11 个错误也均为基线已有。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `54d81c1` | fix(agent-tasks): scope nested attention guidance and use detach result on resume |
+
+### Status
+
+[OK] **Completed**
