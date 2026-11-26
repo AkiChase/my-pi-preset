@@ -122,9 +122,22 @@ void it("mailbox retains a bounded number of executions", () => {
   assert.deepEqual([...new Set(mailbox.listMessages().map(message => message.runId))], ["3", "4", "5", "6", "7"]);
 });
 
+void it("mailbox records attention urgency only on notices", () => {
+  const mailbox = new AgentMailbox();
+  mailbox.startRun("1");
+  const info = expectOk(mailbox.accept("1", "info", null));
+  assert.equal(Object.hasOwn(info.message, "urgency"), false, "info keeps the historical message shape");
+  const attention = expectOk(mailbox.accept("1", "look", null, "attention"));
+  assert.equal(attention.message.urgency, "attention");
+  const request = expectOk(mailbox.createRequest("1", "q"));
+  expectError(mailbox.accept("1", "answer", request.requestId, "attention"), /applies only to notices/);
+  assert.equal(mailbox.getRequest(request.requestId)?.state, "pending", "a refused reply leaves the request open");
+});
+
 void it("reply_to_parent schema is fixed, uses the null sentinel and is validated before the channel", async () => {
-  const sends: [string, string | null][] = [];
-  const channel = { send: (text: string, requestId: string | null) => { sends.push([text, requestId]); return { ok: true as const, value: { message: { seq: 1, runId: "1", requestId, text, at: 0 }, deliveredToWaiter: false } }; } };
+  const sends: [string, string | null, string | undefined][] = [];
+  let woke = false;
+  const channel = { send: (text: string, requestId: string | null, urgency?: "info" | "attention") => { sends.push([text, requestId, urgency]); return { ok: true as const, value: { message: { seq: 1, runId: "1", requestId, text, at: 0 }, deliveredToWaiter: false, woke } }; } };
   const tool = createReplyToParentTool(channel);
   const again = createReplyToParentTool({ send: () => ({ ok: false, error: "closed" }) });
   // The declaration never depends on the channel or on runtime state.
@@ -132,29 +145,39 @@ void it("reply_to_parent schema is fixed, uses the null sentinel and is validate
     assert.deepEqual(JSON.stringify(tool[field]), JSON.stringify(again[field]));
   }
   assert.equal(tool.name, REPLY_TO_PARENT_TOOL_NAME);
-  assert.deepEqual(Reflect.get(tool.parameters, "required"), ["message", "request_id"]);
+  assert.deepEqual(Reflect.get(tool.parameters, "required"), ["message", "request_id", "urgency"]);
   assert.equal(String(tool.promptGuidelines).split("\n")[0], "reply_to_parent usage:");
   const validate = (args: unknown) => validateToolArguments(tool as never, { type: "toolCall", id: "t", name: tool.name, arguments: args as never });
   assert.doesNotMatch(JSON.stringify(tool.parameters), /"type":"null"/);
   // JSON null converges on the "null" sentinel at the host.
-  assert.deepEqual(validate({ message: "hi", request_id: null }), { message: "hi", request_id: "null" });
-  assert.deepEqual(validate({ message: "hi", request_id: "null" }), { message: "hi", request_id: "null" });
-  assert.throws(() => validate({ message: "hi" }));
-  assert.throws(() => validate({ message: "hi", request_id: "null", kind: "blocked" }));
+  assert.deepEqual(validate({ message: "hi", request_id: null, urgency: "info" }), { message: "hi", request_id: "null", urgency: "info" });
+  assert.deepEqual(validate({ message: "hi", request_id: "req_1", urgency: null }), { message: "hi", request_id: "req_1", urgency: "null" });
+  assert.throws(() => validate({ message: "hi", request_id: "null" }));
+  assert.throws(() => validate({ message: "hi", request_id: "null", urgency: "urgent" }));
+  assert.throws(() => validate({ message: "hi", request_id: "null", urgency: "info", kind: "blocked" }));
 
   const run = (args: unknown) => tool.execute("t", args as never, undefined, undefined, {} as never);
-  for (const bad of [{ message: "hi" }, { message: "   ", request_id: "null" }, { message: "hi", request_id: "  " }, { message: "hi", request_id: "" }, { message: "hi", request_id: null }, { message: "hi", request_id: "null", extra: "null" }]) {
+  for (const bad of [{ message: "hi" }, { message: "hi", request_id: "null" }, { message: "   ", request_id: "null", urgency: "info" }, { message: "hi", request_id: "  ", urgency: "null" },
+    { message: "hi", request_id: "", urgency: "null" }, { message: "hi", request_id: null, urgency: "info" }, { message: "hi", request_id: "null", urgency: "info", extra: "null" },
+    { message: "hi", request_id: "null", urgency: "null" }, { message: "hi", request_id: "req_1", urgency: "attention" }, { message: "hi", request_id: "req_1", urgency: "info" },
+    { message: "hi", request_id: "null", urgency: "urgent" }]) {
     const result = await run(bad);
     assert.equal(result.isError, true, JSON.stringify(bad));
   }
   assert.equal(sends.length, 0, "refused arguments never reach the channel");
-  const notice = await run({ message: "drift", request_id: "null" });
+  const body = (result: Awaited<ReturnType<typeof run>>) => String(result.content[0]?.type === "text" && result.content[0].text);
+  const notice = await run({ message: "drift", request_id: "null", urgency: "info" });
   assert.notEqual(notice.isError, true);
-  assert.match(String(notice.content[0]?.type === "text" && notice.content[0].text), /Notice accepted/);
-  const reply = await run({ message: "yes", request_id: " req_1 " });
-  assert.match(String(reply.content[0]?.type === "text" && reply.content[0].text), /Reply to req_1 accepted/);
-  assert.deepEqual(sends, [["drift", null], ["yes", "req_1"]]);
-  const refused = await again.execute("t", { message: "x", request_id: "null" } as never, undefined, undefined, {} as never);
+  assert.match(body(notice), /Notice accepted/);
+  const quiet = await run({ message: "look", request_id: "null", urgency: "attention" });
+  assert.match(body(quiet), /no parent wait was interrupted/);
+  woke = true;
+  const loud = await run({ message: "look again", request_id: "null", urgency: "attention" });
+  assert.match(body(loud), /wait on you was interrupted/);
+  const reply = await run({ message: "yes", request_id: " req_1 ", urgency: "null" });
+  assert.match(body(reply), /Reply to req_1 accepted/);
+  assert.deepEqual(sends, [["drift", null, "info"], ["look", null, "attention"], ["look again", null, "attention"], ["yes", "req_1", "info"]]);
+  const refused = await again.execute("t", { message: "x", request_id: "null", urgency: "info" } as never, undefined, undefined, {} as never);
   assert.equal(refused.isError, true);
 });
 
@@ -283,7 +306,7 @@ void it("manager channel binds the current execution across resume and refuses s
     await tick();
     const channel = f.calls[0]!.options.parentChannel!;
     const seen: string[] = [];
-    const off = f.manager.subscribeParentMessages((record, accepted) => seen.push(`${record.id}:${accepted.message.runId}:${accepted.message.text}`));
+    const off = f.manager.subscribeParentMessages((record, accepted) => { seen.push(`${record.id}:${accepted.message.runId}:${accepted.message.text}`); });
 
     const { request, identity } = expectOk(f.manager.createParentRequest(id, "q1"));
     assert.equal(identity.runId, "1");
@@ -308,6 +331,25 @@ void it("manager channel binds the current execution across resume and refuses s
     off();
     f.resumes[0]!.finish();
     await tick();
+  } finally { await f.close(); }
+});
+
+void it("manager channel forwards urgency and reports whether any listener ended a wait", async () => {
+  const f = managerFixture();
+  try {
+    f.spawn();
+    await tick();
+    const channel = f.calls[0]!.options.parentChannel!;
+    const urgencies: (string | undefined)[] = [];
+    let wake = false;
+    f.manager.subscribeParentMessages((_record, accepted) => { urgencies.push(accepted.message.urgency); });
+    f.manager.subscribeParentMessages(() => { throw new Error("sink failure"); });
+    f.manager.subscribeParentMessages(() => wake);
+    assert.equal(expectOk(channel.send("info", null)).woke, false);
+    assert.equal(expectOk(channel.send("quiet attention", null, "attention")).woke, false);
+    wake = true;
+    assert.equal(expectOk(channel.send("loud attention", null, "attention")).woke, true);
+    assert.deepEqual(urgencies, [undefined, "attention", "attention"]);
   } finally { await f.close(); }
 });
 

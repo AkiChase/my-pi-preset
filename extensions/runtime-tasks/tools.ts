@@ -25,7 +25,7 @@ export function isManagementDetails(value: unknown): value is ManagementDetails 
   if (v.execution_id !== undefined && !parseExecutionId(v.execution_id)) return false;
   if (v.task_type !== undefined && !TASK_LOG_TYPES.includes(v.task_type as "bash")) return false;
   if (v.kind !== undefined && v.kind !== "subagent" && v.kind !== "workflow") return false;
-  if (v.wait_outcome !== undefined && (v.action !== "wait" || !["waiting", "completed", "released", "cancelled"].includes(String(v.wait_outcome)))) return false;
+  if (v.wait_outcome !== undefined && (v.action !== "wait" || !["waiting", "completed", "released", "cancelled", "message"].includes(String(v.wait_outcome)))) return false;
   if (v.status !== undefined && !["starting", "queued", "running", "paused", "completed", "failed", "stopped"].includes(String(v.status))) return false;
   if (v.count !== undefined && (!Number.isSafeInteger(v.count) || Number(v.count) < 0)) return false;
   if (v.error_code === undefined && ["status", "output", "wait", "stop"].includes(v.action) && v[v.group === "process" ? "task_id" : "agent_id"] === undefined && v.execution_id === undefined) return false;

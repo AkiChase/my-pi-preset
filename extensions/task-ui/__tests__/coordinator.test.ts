@@ -133,3 +133,21 @@ for (const phase of ["before", "after"] as const) void it(`detail fences source.
     assert.equal(reads, phase === "before" ? 0 : 1);
     coordinator.dispose();
 });
+
+void it("detachWaits ends only the waits of one execution and passes the reason", async () => {
+    const coordinator = new TaskCoordinator();
+    const reasons: string[] = [];
+    const other = { ...identity, runId: "other" };
+    const launch = coordinator.registerWait<number>({ identity, label: "a", kind: "launch", onDetach: reason => { reasons.push(reason); } });
+    const retrieval = coordinator.registerWait<number>({ identity, label: "b", kind: "retrieval" });
+    const unrelated = coordinator.registerWait<number>({ identity: other, label: "c", kind: "retrieval" });
+    assert.equal(coordinator.detachWaits(identity, "message"), 2);
+    assert.deepEqual(await launch.result, { kind: "detached", reason: "message" });
+    assert.deepEqual(await retrieval.result, { kind: "detached", reason: "message" });
+    assert.deepEqual(reasons, ["message"]);
+    assert.equal(unrelated.settled, false);
+    assert.equal(coordinator.detachWaits(identity, "message"), 0);
+    assert.equal(coordinator.countWaits(other), 1);
+    unrelated.dispose();
+    coordinator.dispose();
+});

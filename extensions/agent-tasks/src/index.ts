@@ -276,7 +276,7 @@ function renderSubagentResultBody(
     (supplied.spinnerFrame !== undefined && (!Number.isInteger(supplied.spinnerFrame) || supplied.spinnerFrame < 0 || supplied.spinnerFrame >= SPINNER.length)) ||
     (supplied.tags !== undefined && (!Array.isArray(supplied.tags) || supplied.tags.some(tag => typeof tag !== "string"))) ||
     [supplied.modelName, supplied.activity, supplied.error].some(value => value !== undefined && typeof value !== "string") ||
-    (supplied.detachReason !== undefined && supplied.detachReason !== "manual" && supplied.detachReason !== "timeout")
+    (supplied.detachReason !== undefined && supplied.detachReason !== "manual" && supplied.detachReason !== "timeout" && supplied.detachReason !== "message")
   )) return component(width => {
     const rows = wrap(resultText, width).map(row => theme.fg(renderContext.isError ? "error" : "toolOutput", row));
     return renderContext.expanded ? rows : compactRows(rows, width);
@@ -323,7 +323,7 @@ function renderSubagentResultBody(
     }
     if (details.status === "background") {
       const s = details.detachReason ? stats(details) : "";
-      const target = details.detachReason === "manual" ? "manually backgrounded by user" : "running in background";
+      const target = details.detachReason === "manual" ? "manually backgrounded by user" : details.detachReason === "message" ? "backgrounded after an attention message" : "running in background";
       return new Text((s ? s + "\n" : "") + theme.fg("dim", `  ⎿  Target: ${target} (ID: ${details.agentId})`), 0, 0);
     }
     if (details.status === "completed" || details.status === "steered") {
@@ -450,6 +450,10 @@ export function formatToolsSuffix(cfg: AgentConfig | undefined): string {
 
 /** CLI flag that runs a workflow script at session start. */
 export const WORKFLOW_FILE_FLAG = "subagents-workflow-file";
+
+/** Result head of a foreground launch that an attention notice moved to the background. */
+const ATTENTION_DETACH_HEAD = "The agent sent an attention message, so this wait ended early and the agent continues in the background. " +
+  "Read the message below and decide whether to steer it with subagent_message, stop it with agent_manage, or wait again with agent_manage.";
 
 /**
  * Re-exported from where they now live, because this is where they were
@@ -1701,7 +1705,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
         assertActive();
         if (outcome.kind === "detached") {
           const manual = outcome.reason === "manual";
-          return textResult(`${manual ? "Agent resume was manually backgrounded by user." : "Agent resumed in background."}\nAgent ID: ${id}\nThe same session continues; you will be notified when it completes.`,
+          return textResult(`${manual ? "Agent resume was manually backgrounded by user." : outcome.reason === "message" ? ATTENTION_DETACH_HEAD : "Agent resumed in background."}\nAgent ID: ${id}\nThe same session continues; you will be notified when it completes.`,
             { ...detailBaseFor(existing), status: "background" as const, agentId: id, toolUses: state.toolUses, tokens: formatLifetimeTokens(existing),
               cost: getLifetimeCost(existing.lifetimeUsage), turnCount: state.turnCount, maxTurns: state.maxTurns, durationMs: 0, detachReason: outcome.reason });
         }
@@ -1927,7 +1931,7 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
         assertActive();
         if (outcome.kind === "detached") {
           const manual = outcome.reason === "manual";
-          return textResult(`${fallbackNote}${manual ? "Agent was manually backgrounded by user." : "Agent continuing in background."}\nAgent ID: ${fgId}\n` +
+          return textResult(`${fallbackNote}${manual ? "Agent was manually backgrounded by user." : outcome.reason === "message" ? ATTENTION_DETACH_HEAD : "Agent continuing in background."}\nAgent ID: ${fgId}\n` +
             (live.outputFile ? `Output file: ${live.outputFile}\n` : "") + "The same execution continues; you will be notified when it completes.",
             // Progress observed at the moment of detach: the card keeps the
             // counters the user saw instead of dropping to an empty stat row.
@@ -2598,9 +2602,13 @@ export default function (pi: ExtensionAPI, options: AgentTasksOptions = {}) {
       const outcome = await lease.result;
       replyWait.cancel();
       // A released/cancelled wait must return held messages to ordinary delivery.
-      // Only a completed wait owns messages in its tool result.
-      if (outcome.kind === "completed") takeHeldForCall(toolCallId, identity);
+      // A completed wait, or one ended by an attention message, owns them.
+      const byMessage = outcome.kind === "detached" && outcome.reason === "message";
+      if (outcome.kind === "completed" || byMessage) takeHeldForCall(toolCallId, identity);
       assertActive();
+      if (byMessage) {
+        return textResult(`${head(phase)}\nWait ended early by an attention message from the agent; it is still running. The question stays open and a later reply will be delivered to you.`);
+      }
       if (outcome.kind !== "completed") {
         return textResult(`${head(phase)}\nWait ${outcome.kind === "detached" ? "released by user" : "cancelled"}; the question stays open and a later reply will be delivered to you.`);
       }

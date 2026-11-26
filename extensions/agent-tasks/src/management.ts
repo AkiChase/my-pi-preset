@@ -66,6 +66,9 @@ export function createAgentManagement(options: {
         if (!lease.settled) try { onUpdate?.(taskResult("Waiting for subagent final answer.", { ...meta(), wait_outcome: "waiting" })); } catch { /* optional presentation sink */ }
         const outcome = await lease.result;
         if (!options.active()) return taskResult("Subagent activation is closed.", { ...meta(), error_code: "closed", wait_outcome: "cancelled" });
+        if (outcome.kind === "detached" && outcome.reason === "message") {
+          return taskResult(`kind=subagent agent_id=${record.id}\nWait ended early by an attention message from the agent; it is still running. Decide whether to steer it with subagent_message, stop it, or wait again.`, { ...meta({ ...record }), wait_outcome: "message" });
+        }
         if (outcome.kind !== "completed") return taskResult(`Wait ${outcome.kind === "detached" ? "released by user" : "cancelled"}; target unchanged.`, { ...meta(), wait_outcome: outcome.kind === "detached" ? "released" : "cancelled" });
         if (currentTarget()) options.cancelNotice(record.id);
         return taskResult(`kind=subagent agent_id=${record.id}\n${options.format(outcome.value, params.verbose)}`, { ...meta(outcome.value), wait_outcome: "completed" });

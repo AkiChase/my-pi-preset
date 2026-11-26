@@ -29,7 +29,7 @@ export interface RuntimeTaskMetadata {
   readonly title?: string;
   readonly status?: TaskView["status"];
   readonly raw_status?: string;
-  readonly wait_outcome?: "waiting" | "completed" | "released" | "cancelled";
+  readonly wait_outcome?: "waiting" | "completed" | "released" | "cancelled" | "message";
   readonly executionConfig?: ExecutionConfig;
   readonly stats?: Readonly<Record<string, number>>;
   readonly range?: Readonly<{ start: number; end: number; size: number; omitted_before: number; omitted_after: number }>;
@@ -40,7 +40,7 @@ export interface RuntimeTaskDetails { readonly runtimeTask: RuntimeTaskMetadata 
 export type RuntimeTaskResult = AgentToolResult<RuntimeTaskDetails>;
 
 const statuses = ["starting", "queued", "running", "paused", "completed", "failed", "stopped"];
-const outcomes = ["waiting", "completed", "released", "cancelled"];
+const outcomes = ["waiting", "completed", "released", "cancelled", "message"];
 const errors = ["invalid_arguments", "not_found", "stale", "ambiguous", "forbidden", "unsupported", "closed", "log_error"];
 const keys = ["version", "action", "task_type", "task_id", "run_id", "title", "status", "raw_status", "wait_outcome", "stats", "range", "count", "error_code", "executionConfig"];
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);

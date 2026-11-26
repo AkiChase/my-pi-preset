@@ -169,7 +169,8 @@ export interface TaskSourceView {
 }
 
 export type WaitKind = "launch" | "retrieval";
-export type DetachReason = "manual" | "timeout";
+/** `message`: a child's attention notice ended the wait early. */
+export type DetachReason = "manual" | "timeout" | "message";
 export type WaitOutcome<T> =
     | Readonly<{ kind: "completed"; value: T }>
     | Readonly<{ kind: "detached"; reason: DetachReason }>

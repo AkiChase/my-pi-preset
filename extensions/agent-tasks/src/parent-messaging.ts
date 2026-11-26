@@ -15,7 +15,7 @@
 import { randomUUID } from "node:crypto";
 import { defineTool, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { parseControls, sentinelString } from "../../shared/tool-arguments.ts";
+import { nullableEnum, parseControls, sentinelString } from "../../shared/tool-arguments.ts";
 
 export const REPLY_TO_PARENT_TOOL_NAME = "reply_to_parent";
 
@@ -59,7 +59,12 @@ export interface ChildMessage {
   readonly requestId: string | null;
   readonly text: string;
   readonly at: number;
+  /** Present only for attention notices; absent means an ordinary (info) message. */
+  readonly urgency?: "attention";
 }
+
+/** Notice urgency. `attention` ends a parent's wait on the sending execution. */
+export type NoticeUrgency = "info" | "attention";
 
 export type ReplyWaitOutcome =
   | { readonly kind: "replied"; readonly message: ChildMessage }
@@ -74,9 +79,14 @@ export interface AcceptedChildMessage {
   readonly deliveredToWaiter: boolean;
 }
 
+/** Channel result: whether an attention notice ended at least one parent wait. */
+export interface SentChildMessage extends AcceptedChildMessage {
+  readonly woke: boolean;
+}
+
 /** What the child-side tool can do: send, and nothing else. */
 export interface ParentChannel {
-  send(text: string, requestId: string | null): MailboxResult<AcceptedChildMessage>;
+  send(text: string, requestId: string | null, urgency?: NoticeUrgency): MailboxResult<SentChildMessage>;
 }
 
 function ok<T>(value: T): MailboxResult<T> { return { ok: true, value }; }
@@ -141,8 +151,9 @@ export class AgentMailbox {
     this.settleWaiters(requestId, { kind: "failed" });
   }
 
-  accept(runId: string, rawText: string, requestId: string | null): MailboxResult<AcceptedChildMessage> {
+  accept(runId: string, rawText: string, requestId: string | null, urgency: NoticeUrgency = "info"): MailboxResult<AcceptedChildMessage> {
     if (this.closed) return fail("The parent channel is closed.");
+    if (requestId !== null && urgency === "attention") return fail("urgency \"attention\" applies only to notices; a reply already ends the parent's wait for it.");
     const text = rawText.trim();
     if (!text) return fail("message must contain non-whitespace text.");
     const bytes = Buffer.byteLength(text, "utf8");
@@ -161,7 +172,7 @@ export class AgentMailbox {
       if (request.state !== "pending") return fail(`Request ${requestId} is no longer open.`);
     }
     this.startRun(runId);
-    const message: ChildMessage = Object.freeze({ seq: ++this.seq, runId, requestId, text, at: this.now() });
+    const message: ChildMessage = Object.freeze({ seq: ++this.seq, runId, requestId, text, at: this.now(), ...(urgency === "attention" ? { urgency } : {}) });
     this.messages.push(message);
     let deliveredToWaiter = false;
     if (request) {
@@ -260,23 +271,31 @@ const REPLY_TOOL_GUIDANCE = [
   `  - The agent that started you may ask a question mid-task: its message is followed by <parent-request request_id="..." reply_tool="${REPLY_TO_PARENT_TOOL_NAME}" />. Answer by calling ${REPLY_TO_PARENT_TOOL_NAME} with that request_id; ordinary text in your conversation is not delivered to the parent.`,
   "  - Each request accepts one reply. Answer it promptly, then continue your task.",
   "  - Set request_id to \"null\" to notify the parent of an important finding, risk or decision it should know about while you keep working. Do not wait for a response and do not send routine progress.",
+  "  - A notice sets urgency: \"info\" is delivered when the parent is next free, possibly only after you finish if it is waiting on you. \"attention\" interrupts a parent waiting on you; use it only when the parent likely needs to change your instructions (wrong direction, scope much larger than expected, a decision you can proceed without but it should weigh in on). A reply sets urgency to \"null\".",
   "  - When you cannot continue without a parent decision, stop and explain the blocker and the decision needed in your final response; the parent can resume you with an answer.",
   `  - Keep each message under ${PARENT_MESSAGE_LIMITS.messageBytes} bytes. Success means the host accepted the message, not that the parent has read it.`,
   "  Examples:",
-  `    {"message":"Yes, the schema lives in src/schema.ts.","request_id":"req_0123456789"}`,
-  `    {"message":"Found config drift: production still uses v1 keys.","request_id":"null"}`,
+  `    {"message":"Yes, the schema lives in src/schema.ts.","request_id":"req_0123456789","urgency":"null"}`,
+  `    {"message":"Found config drift: production still uses v1 keys.","request_id":"null","urgency":"info"}`,
+  `    {"message":"The bug is in the shared parser, not the CLI you asked me to change. Continuing in the CLI unless told otherwise.","request_id":"null","urgency":"attention"}`,
 ].join("\n");
 
-export interface ReplyToParentParams { message: string; request_id: string | null }
+export interface ReplyToParentParams { message: string; request_id: string | null; urgency: NoticeUrgency | null }
 
-export function parseReplyToParentArguments(value: unknown): { message: string; requestId: string | null } {
-  const { values: params } = parseControls(value, ["message", "request_id"], { request_id: { kind: "nullable" } });
+const NOTICE_URGENCIES = ["info", "attention"] as const;
+
+export function parseReplyToParentArguments(value: unknown): { message: string; requestId: string | null; urgency: NoticeUrgency } {
+  const { values: params } = parseControls(value, ["message", "request_id", "urgency"], { request_id: { kind: "nullable" }, urgency: { kind: "nullable" } });
   if (typeof params.message !== "string" || !params.message.trim()) throw new Error("message must be a non-empty string.");
   const requestId = Object.hasOwn(params, "request_id") ? params.request_id : null;
   if (requestId !== null && (typeof requestId !== "string" || !requestId.trim())) {
     throw new Error("`request_id` must be a request id string from <parent-request>, or \"null\" for a notice.");
   }
-  return { message: params.message, requestId: requestId === null ? null : (requestId as string).trim() };
+  const urgency = Object.hasOwn(params, "urgency") ? params.urgency : null;
+  if (urgency !== null && !NOTICE_URGENCIES.includes(urgency as NoticeUrgency)) throw new Error("`urgency` must be \"info\", \"attention\" or \"null\".");
+  if (requestId !== null && urgency !== null) throw new Error("`urgency` does not apply to a reply; set it to \"null\".");
+  if (requestId === null && urgency === null) throw new Error("`urgency` is required for a notice: \"info\" or \"attention\".");
+  return { message: params.message, requestId: requestId === null ? null : (requestId as string).trim(), urgency: (urgency ?? "info") as NoticeUrgency };
 }
 
 /** The fixed child-side tool. Its definition never depends on runtime state. */
@@ -290,18 +309,23 @@ export function createReplyToParentTool(channel: ParentChannel): ToolDefinition 
     parameters: Type.Object({
       message: Type.String({ minLength: 1, description: `Message text for the parent; non-blank, at most ${PARENT_MESSAGE_LIMITS.messageBytes} UTF-8 bytes.` }),
       request_id: sentinelString("request_id copied from <parent-request> when answering it; \"null\" for an unsolicited notice."),
+      urgency: nullableEnum(NOTICE_URGENCIES, "Notice urgency: \"info\" or \"attention\" (interrupts a parent waiting on you). \"null\" for a reply."),
     }, { additionalProperties: false }),
     execute: async (_toolCallId, input) => {
-      let parsed: { message: string; requestId: string | null };
+      let parsed: { message: string; requestId: string | null; urgency: NoticeUrgency };
       try { parsed = parseReplyToParentArguments(input); }
       catch (error) { return errorResult(error instanceof Error ? error.message : String(error)); }
-      let result: MailboxResult<AcceptedChildMessage>;
-      try { result = channel.send(parsed.message, parsed.requestId); }
+      let result: MailboxResult<SentChildMessage>;
+      try { result = channel.send(parsed.message, parsed.requestId, parsed.urgency); }
       catch (error) { return errorResult(`The parent channel failed: ${error instanceof Error ? error.message : String(error)}`); }
       if (!result.ok) return errorResult(result.error);
       const text = parsed.requestId
         ? `Reply to ${parsed.requestId} accepted. This does not confirm the parent has read it; continue your task.`
-        : "Notice accepted. This does not confirm the parent has read it; continue your task without waiting.";
+        : parsed.urgency === "attention"
+          ? result.value.woke
+            ? "Attention notice accepted and the parent's wait on you was interrupted; it has not necessarily read it yet. Continue your task without waiting; it may steer or stop you."
+            : "Attention notice accepted, but no parent wait was interrupted; the parent receives it like an ordinary notice once it is free. Continue your task without waiting."
+          : "Notice accepted. This does not confirm the parent has read it; continue your task without waiting.";
       return { content: [{ type: "text" as const, text }], details: {} };
     },
   }) as ToolDefinition;

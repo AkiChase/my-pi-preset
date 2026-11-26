@@ -345,7 +345,8 @@ interface ResumeOptions {
 }
 
 /** Observes accepted child messages; delivery belongs to the record's owner. */
-export type ParentMessageListener = (record: AgentRecord, accepted: AcceptedChildMessage) => void;
+/** Returns true when the listener ended a parent wait because of an attention notice. */
+export type ParentMessageListener = (record: AgentRecord, accepted: AcceptedChildMessage) => boolean | void;
 
 export class AgentManager {
   private agents = new Map<string, AgentRecord>();
@@ -571,12 +572,14 @@ export class AgentManager {
     record.isBackground = true;
     if (record.invocation) record.invocation.runInBackground = true;
     if (record.executionConfig) {
-      // A user's manual detach is provenance the model must see; otherwise the
-      // effective `mode=background` reads as if configuration had chosen it.
+      // A user's manual detach (or an attention message ending the wait) is
+      // provenance the model must see; otherwise the effective
+      // `mode=background` reads as if configuration had chosen it.
       const previousMode = record.executionConfig.mode;
       const retained = record.executionConfig.differences?.filter(d => d.field !== "mode") ?? [];
-      const differences = reason === "manual" && previousMode !== undefined && previousMode !== "background"
-        ? [...retained, { field: "mode" as const, requested: previousMode, actual: "background", reason: "manual-detach" as const }]
+      const provenance = reason === "manual" ? "manual-detach" as const : reason === "message" ? "attention-detach" as const : undefined;
+      const differences = provenance && previousMode !== undefined && previousMode !== "background"
+        ? [...retained, { field: "mode" as const, requested: previousMode, actual: "background", reason: provenance }]
         : retained;
       record.executionConfig = copyAgentExecutionConfig({ ...record.executionConfig, mode: "background", differences: differences.length ? differences : undefined });
     }
@@ -1484,20 +1487,22 @@ export class AgentManager {
    */
   private parentChannel(record: AgentRecord): ParentChannel {
     return {
-      send: (text, requestId) => {
+      send: (text, requestId, urgency) => {
         const run = this.runs.get(record.id);
         const mailbox = record.mailbox;
         if (!mailbox || !run || run.settled || run.terminalResolved || !this.current(record, run)
           || record.status !== "running" || record.abortController?.signal.aborted) {
           return { ok: false, error: "The parent channel is closed for this execution." };
         }
-        const result = mailbox.accept(run.identity.runId, text, requestId);
+        const result = mailbox.accept(run.identity.runId, text, requestId, urgency);
         if (!result.ok) return result;
+        // A listener returns true when it ended a parent wait on this execution.
+        let woke = false;
         for (const listener of [...this.parentMessageListeners]) {
-          try { listener(record, result.value); } catch { /* delivery failures belong to the owner */ }
+          try { if (listener(record, result.value) === true) woke = true; } catch { /* delivery failures belong to the owner */ }
         }
         this.notifyChanged();
-        return result;
+        return { ok: true, value: { ...result.value, woke } };
       },
     };
   }

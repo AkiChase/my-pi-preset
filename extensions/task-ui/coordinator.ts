@@ -97,6 +97,20 @@ export class TaskCoordinator {
         return count;
     }
 
+    /** Detach every wait on one execution; execution itself is never stopped by a retrieval detach. */
+    detachWaits(identity: TaskIdentity, reason: DetachReason): number {
+        const key = taskKey(identity);
+        let count = 0;
+        for (const wait of [...this.waits]) {
+            if (wait.key !== key) continue;
+            try { if (wait.detach(reason)) count++; } catch (error) {
+                count++;
+                console.error("[task-ui] detach callback failed:", error);
+            }
+        }
+        return count;
+    }
+
     /** Stage 3 can release old-epoch waits without destroying the composition instance. */
     cancelWaits(): void {
         for (const wait of [...this.waits]) {

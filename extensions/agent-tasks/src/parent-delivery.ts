@@ -12,6 +12,10 @@
  * `agent_manage wait`, `subagent_message` with reply "wait") the model-facing
  * part is held and handed to that wait's result via {@link ParentDelivery.take}.
  * A held message nobody takes is delivered normally once the wait is gone.
+ *
+ * An attention notice does not wait for the execution to end: it detaches every
+ * wait on the sending execution at once (reason "message"), so the waiting tool
+ * call returns with the held messages while the child keeps running.
  */
 
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
@@ -35,6 +39,8 @@ export interface SubagentMessageEntryData {
   readonly requestId: string | null;
   readonly text: string;
   readonly at: number;
+  /** Absent in entries written before urgency existed, and for info notices. */
+  readonly urgency?: "attention";
 }
 
 export interface SubagentMessageDetails {
@@ -46,7 +52,7 @@ export interface SubagentMessageDetails {
 export function formatSubagentMessages(agentId: string, messages: readonly ChildMessage[]): string {
   const body = messages.map(message => message.requestId
     ? `<reply request-id="${escapeXml(message.requestId)}">${escapeXml(message.text)}</reply>`
-    : `<notice>${escapeXml(message.text)}</notice>`).join("\n");
+    : `<notice${message.urgency === "attention" ? ` urgency="attention"` : ""}>${escapeXml(message.text)}</notice>`).join("\n");
   return `<subagent-message agent-id="${escapeXml(agentId)}">\n${body}\n</subagent-message>`;
 }
 
@@ -54,7 +60,7 @@ export function formatSubagentMessages(agentId: string, messages: readonly Child
 export function formatHeldMessages(messages: readonly ChildMessage[]): string {
   if (!messages.length) return "";
   return "\n\n--- Messages received during wait ---\n" + messages.map(message =>
-    `${message.requestId ? `[reply ${message.requestId}]` : "[notice]"} ${message.text}`).join("\n");
+    `${message.requestId ? `[reply ${message.requestId}]` : message.urgency === "attention" ? "[attention]" : "[notice]"} ${message.text}`).join("\n");
 }
 
 /** Card payload is persisted/external text; never let it supply terminal controls. */
@@ -69,11 +75,12 @@ export function renderSubagentMessageCard(
   outputPad = 0,
 ): Component | undefined {
   if (!data || typeof data.text !== "string") return undefined;
-  const kind = data.requestId ? `reply ${cleanCardText(data.requestId)}` : "notice";
+  const attention = !data.requestId && data.urgency === "attention";
+  const kind = data.requestId ? `reply ${cleanCardText(data.requestId)}` : attention ? "attention" : "notice";
   return createNotificationCard({
     identity: "subagent_message",
     summary: cleanCardText(data.label),
-    marker: { label: kind, tone: data.requestId ? "accent" : "muted" },
+    marker: { label: kind, tone: data.requestId ? "accent" : attention ? "warning" : "muted" },
     textBody: cleanCardText(data.text),
     bodyTone: "muted",
   }, { expanded, outputPad }, theme);
@@ -145,6 +152,7 @@ export function createParentDelivery(options: {
     const data: SubagentMessageEntryData = {
       agentId: record.id, label: record.id,
       requestId: message.requestId, text: message.text, at: message.at,
+      ...(message.urgency === "attention" ? { urgency: "attention" as const } : {}),
     };
     try { pi.appendEntry(SUBAGENT_MESSAGE_TYPE, data); } catch { options.onFailure(); }
     const entries = pending.get(record.id) ?? [];
@@ -152,7 +160,11 @@ export function createParentDelivery(options: {
     if (!entry) { entry = { runId: message.runId, messages: [] }; entries.push(entry); }
     entry.messages.push(message);
     pending.set(record.id, entries);
+    // Held first, then detached: each ending wait takes the messages into its result.
+    const woke = message.urgency === "attention" && waiting(record.id, message.runId)
+      && coordinator.detachWaits({ sourceId: "agent", taskId: record.id, runId: message.runId }, "message") > 0;
     schedule(record.id);
+    return woke;
   });
   // A wait ending (completed, released or cancelled) may leave held messages.
   const offWaits = coordinator.subscribeWaits(() => { for (const agentId of pending.keys()) schedule(agentId); });

@@ -15,7 +15,7 @@ export interface AgentDetails {
   executionConfig?: import("../../runtime-tasks/execution-config.ts").AgentExecutionConfig;
   cost?: number; agentId?: string; error?: string;
   /** Present only when a foreground launch was detached; renders the detach provenance. */
-  detachReason?: "manual" | "timeout";
+  detachReason?: "manual" | "timeout" | "message";
 }
 export function fgPreservingNestedStyles(theme: Theme, color: string, text: string): string {
   const styleStart = theme.fg(color, "").replace(/\u001b\[(?:0|39)m/g, "");

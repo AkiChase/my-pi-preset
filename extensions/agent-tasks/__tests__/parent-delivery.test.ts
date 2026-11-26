@@ -310,3 +310,108 @@ void it("agent_manage wait appends messages of the waited execution to its resul
     assert.equal(f.messages().length, 0);
   } finally { await f.close(); }
 });
+
+const urgent = (channel: NonNullable<RunOptions["parentChannel"]>, value: string) => channel.send(value, null, "attention");
+
+void it("attention ends a foreground subagent_run wait; the agent continues in the background and still notifies", async () => {
+  const f = await factory();
+  try {
+    const launch = f.execute("subagent_run", { subagent_type: "general-purpose", description: "fg", prompt: "fg", execution: "foreground" }, "fg-call");
+    await tick();
+    const run = f.runs.at(-1)!;
+    const channel = run.options.parentChannel!;
+    assert.equal(channel.send("ordinary note", null).ok, true);
+    const sent = urgent(channel, "wrong module, continuing unless told otherwise");
+    assert.equal(sent.ok && sent.value.woke, true);
+    const result = await launch;
+    assert.match(text(result), /sent an attention message, so this wait ended early/);
+    assert.match(text(result), /--- Messages received during wait ---\n\[notice\] ordinary note\n\[attention\] wrong module/);
+    assert.equal((result.details as { detachReason?: string }).detachReason, "message");
+    const record = f.registry.getRecord(run.id)!;
+    assert.equal(record.status, "running", "ending the wait never stops the agent");
+    assert.equal(record.isBackground, true);
+    assert.deepEqual(record.executionConfig?.differences?.find(d => d.field === "mode"), { field: "mode", requested: "foreground", actual: "background", reason: "attention-detach" });
+    assert.deepEqual(f.cards().map(entry => (entry.data as { urgency?: string }).urgency), [undefined, "attention"]);
+    await hold();
+    assert.equal(f.messages().length, 0, "held messages were returned by the tool call only");
+    run.finish("late final");
+    await hold(); await hold();
+    assert.ok(f.sent.some(message => message.customType === "subagent-notification" && message.content.includes("late final")), "completion is still notified");
+  } finally { await f.close(); }
+});
+
+void it("attention ends agent_manage wait with wait_outcome message and leaves the target running", async () => {
+  const f = await factory();
+  try {
+    const { id, channel, run } = await f.background();
+    const waiting = f.manage({ action: "wait", agent_id: id });
+    await tick();
+    channel.send("info stays held", null);
+    await hold();
+    assert.equal(f.coordinator.countWaits({ sourceId: "agent", taskId: id, runId: "1" }), 1, "info never ends the wait");
+    urgent(channel, "need a decision");
+    const result = await waiting;
+    assert.equal(result.details.runtimeManagement.wait_outcome, "message");
+    assert.match(text(result), /Wait ended early by an attention message/);
+    assert.match(text(result), /\[notice\] info stays held\n\[attention\] need a decision/);
+    assert.equal(f.registry.getRecord(id)!.status, "running");
+    await hold();
+    assert.equal(f.messages().length, 0);
+    run.finish("done");
+    const again = await f.manage({ action: "wait", agent_id: id });
+    assert.equal(again.details.runtimeManagement.wait_outcome, "completed");
+    assert.match(text(again), /done/);
+  } finally { await f.close(); }
+});
+
+void it("attention ends a reply wait; the question stays open and a later reply is delivered", async () => {
+  const f = await factory();
+  try {
+    const { id, channel } = await f.background();
+    const waiting = f.execute("subagent_message", { agent_id: id, message: "q?", reply: "wait" }, "ask");
+    await tick();
+    const requestId = /request_id="(req_\w+)"/.exec(f.steers.at(-1)!)![1]!;
+    urgent(channel, "before answering: scope is larger");
+    const result = await waiting;
+    assert.match(text(result), /ended early by an attention message.*\n?.*question stays open/s);
+    assert.match(text(result), /\[attention\] before answering: scope is larger/);
+    assert.equal(f.registry.getRecord(id)!.mailbox!.getRequest(requestId)?.state, "pending");
+    channel.send("the answer", requestId);
+    await hold();
+    assert.equal(f.messages().length, 1);
+    assert.match(f.messages()[0]!.content, /<reply request-id="req_\w+">the answer<\/reply>/);
+  } finally { await f.close(); }
+});
+
+void it("attention without a wait is delivered like a notice and reports no wake", async () => {
+  const f = await factory();
+  try {
+    const { channel } = await f.background();
+    const sent = urgent(channel, "heads up");
+    assert.equal(sent.ok && sent.value.woke, false);
+    await hold();
+    assert.match(f.messages()[0]!.content, /<notice urgency="attention">heads up<\/notice>/);
+  } finally { await f.close(); }
+});
+
+void it("attention racing completion yields one wait result and delivers the message once", async () => {
+  const f = await factory();
+  try {
+    const { id, channel, run } = await f.background();
+    const waiting = f.manage({ action: "wait", agent_id: id });
+    await tick();
+    run.finish("finished");
+    urgent(channel, "racing");
+    const result = await waiting;
+    await hold(); await hold();
+    const inResult = text(result).includes("[attention] racing") ? 1 : 0;
+    const delivered = f.messages().filter(message => message.content.includes("racing")).length;
+    assert.equal(inResult + delivered, 1);
+  } finally { await f.close(); }
+});
+
+void it("message card marks attention notices", () => {
+  const theme = { fg: (_color: never, value: string) => value, bg: (_color: never, value: string) => value, bold: (value: string) => value } as unknown as Theme;
+  const rendered = renderSubagentMessageCard({ agentId: "a", label: "explore", requestId: null, text: "look", at: 0, urgency: "attention" }, false, theme)!.render(80).join("\n");
+  assert.match(rendered, /subagent_message.*explore.*attention/);
+});

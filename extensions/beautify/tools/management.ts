@@ -26,6 +26,7 @@ export function managementContract(group: ManagementGroup): RetrievalContract {
     if (m.action === "stop" && !m.error_code) stats = `stop · observed ${m.raw_status ?? m.status ?? "unknown"}`;
     if (m.wait_outcome === "waiting") stats = "waiting";
     if (m.wait_outcome === "released" || m.wait_outcome === "cancelled") stats = `wait ${m.wait_outcome === "released" ? "released by user" : "cancelled"} · target unchanged`;
+    if (m.wait_outcome === "message") stats = "wait ended by attention message · target running";
     const expandedRows = group === "process" ? [
       ...(m.range ? ["Log range (bytes)", ...Object.entries(m.range).map(([key, value]) => `  ${key}: ${value}`)] : []),
       ...(m.stats && Object.keys(m.stats).length ? ["Statistics", ...Object.entries(m.stats).map(([key, value]) => `  ${key}: ${value}`)] : []),
