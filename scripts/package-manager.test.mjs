@@ -16,6 +16,13 @@ const execute = promisify(execFile);
 const manager = process.env.PNPM_TEST_BIN || process.env.npm_execpath;
 const nativeOptions = { skip: !manager && "Requires an already selected pnpm entry (PNPM_TEST_BIN or npm_execpath)", timeout: 30_000 };
 
+function assertNoLockedSdkPackages(lock) {
+  // pnpm's package/snapshot keys use two-space indentation. Nested peer declarations
+  // are metadata, not installed packages, and must not trigger this guard.
+  const entries = lock.split(/\r?\n/).filter(line => /^ {2}['"]?\/?@earendil-works\//.test(line));
+  assert.deepEqual(entries, [], "Pi SDK packages must remain host-provided, not locked as installed packages");
+}
+
 function fixture(t, packageOverrides = {}) {
   const cwd = mkdtempSync(join(tmpdir(), "preset-package-manager-"));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
@@ -56,8 +63,26 @@ test("keeps SDK peers host-provided and peer installation disabled", () => {
   }
   const lock = readFileSync(join(root, "pnpm-lock.yaml"), "utf8");
   assert.match(lock, /autoInstallPeers: false/);
-  assert.doesNotMatch(lock, /@earendil-works\//);
+  assertNoLockedSdkPackages(lock);
   assert.doesNotMatch(existsSync(join(root, ".npmrc")) ? readFileSync(join(root, ".npmrc"), "utf8") : "", /auto-install-peers/);
+});
+
+test("SDK lock guard permits peer metadata but rejects actual package and snapshot entries", () => {
+  assertNoLockedSdkPackages(`packages:
+  third-party@1.0.0:
+    peerDependencies:
+      '@earendil-works/pi-ai': '*'
+    peerDependenciesMeta:
+      '@earendil-works/pi-ai':
+        optional: true
+snapshots:
+  third-party@1.0.0: {}
+`);
+  for (const section of ["packages", "snapshots"]) {
+    for (const key of ["'@earendil-works/pi-ai@1.0.0'", '"@earendil-works/pi-tui@1.0.0"', "@earendil-works/pi-agent-core@1.0.0", "'/@earendil-works/pi-coding-agent@1.0.0'"]) {
+      assert.throws(() => assertNoLockedSdkPackages(`${section}:\n  ${key}: {}\n`), /must remain host-provided/);
+    }
+  }
 });
 
 test("check retains only the explicit typecheck and test sequence", () => {
@@ -94,7 +119,12 @@ test("run executes a check with missing dependencies without fetching or install
   writeFileSync(join(options.cwd, "check.cjs"), 'require("node:fs").writeFileSync("checked", "done");\n');
   const packageBefore = readFileSync(join(options.cwd, "package.json"), "utf8");
   const configBefore = readFileSync(join(options.cwd, "pnpm-workspace.yaml"), "utf8");
-  const result = await invoke(["--registry", `http://127.0.0.1:${server.address().port}`, "run", "check"], options);
+  const registry = `http://127.0.0.1:${server.address().port}`;
+  // `run` rejects --registry in pnpm 10. Configure the fixture registry through
+  // the supported environment setting, retaining the zero-request assertion.
+  options.env.npm_config_registry = registry;
+  assert.equal((await invoke(["config", "get", "registry"], options)).stdout.trim(), registry);
+  const result = await invoke(["run", "check"], options);
   assert.equal(readFileSync(join(options.cwd, "checked"), "utf8"), "done");
   assert.equal(requests, 0, result.stdout + result.stderr);
   assert.equal(existsSync(join(options.cwd, "node_modules")), false);
