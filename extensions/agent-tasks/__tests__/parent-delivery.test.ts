@@ -311,6 +311,7 @@ void it("agent_manage wait appends messages of the waited execution to its resul
   } finally { await f.close(); }
 });
 
+const outcomeOf = (result: { details: unknown }) => (result.details as { runtimeManagement: { wait_outcome?: string } }).runtimeManagement.wait_outcome;
 const urgent = (channel: NonNullable<RunOptions["parentChannel"]>, value: string) => channel.send(value, null, "attention");
 
 void it("attention ends a foreground subagent_run wait; the agent continues in the background and still notifies", async () => {
@@ -351,7 +352,7 @@ void it("attention ends agent_manage wait with wait_outcome message and leaves t
     assert.equal(f.coordinator.countWaits({ sourceId: "agent", taskId: id, runId: "1" }), 1, "info never ends the wait");
     urgent(channel, "need a decision");
     const result = await waiting;
-    assert.equal(result.details.runtimeManagement.wait_outcome, "message");
+    assert.equal(outcomeOf(result), "message");
     assert.match(text(result), /Wait ended early by an attention message/);
     assert.match(text(result), /\[notice\] info stays held\n\[attention\] need a decision/);
     assert.equal(f.registry.getRecord(id)!.status, "running");
@@ -359,7 +360,7 @@ void it("attention ends agent_manage wait with wait_outcome message and leaves t
     assert.equal(f.messages().length, 0);
     run.finish("done");
     const again = await f.manage({ action: "wait", agent_id: id });
-    assert.equal(again.details.runtimeManagement.wait_outcome, "completed");
+    assert.equal(outcomeOf(again), "completed");
     assert.match(text(again), /done/);
   } finally { await f.close(); }
 });

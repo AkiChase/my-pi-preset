@@ -16,6 +16,12 @@ export function createAgentManagement(options: {
   owns: (record: AgentRecord) => boolean;
   format: (record: AgentRecord, verbose?: boolean) => string;
   cancelNotice: (id: string) => void; reconsider: (record: AgentRecord) => void;
+  /**
+   * Nested owners only: end a wait when the waited execution sends an attention
+   * notice. The top-level delivery layer does this itself and returns the held
+   * messages; nested messages are delivered to the waiting session separately.
+   */
+  wakeOnAttention?: boolean;
 }): RuntimeTaskCapability {
   const { manager, coordinator, source } = options;
   return {
@@ -62,17 +68,21 @@ export function createAgentManagement(options: {
       }
       if (params.action !== "wait") return taskResult("Unsupported subagent action.", { ...meta(), error_code: "unsupported" });
       const lease = registerAgentWait(manager, coordinator, run, "retrieval", signal, () => { if (currentTarget()) options.reconsider(record); }, currentTarget);
+      const offAttention = options.wakeOnAttention ? manager.subscribeParentMessages((sender, accepted) => {
+        if (sender !== record || accepted.deliveredToWaiter || accepted.message.urgency !== "attention" || accepted.message.runId !== identity.runId) return;
+        return lease.detach("message");
+      }) : undefined;
       try {
         if (!lease.settled) try { onUpdate?.(taskResult("Waiting for subagent final answer.", { ...meta(), wait_outcome: "waiting" })); } catch { /* optional presentation sink */ }
         const outcome = await lease.result;
         if (!options.active()) return taskResult("Subagent activation is closed.", { ...meta(), error_code: "closed", wait_outcome: "cancelled" });
         if (outcome.kind === "detached" && outcome.reason === "message") {
-          return taskResult(`kind=subagent agent_id=${record.id}\nWait ended early by an attention message from the agent; it is still running. Decide whether to steer it with subagent_message, stop it, or wait again.`, { ...meta({ ...record }), wait_outcome: "message" });
+          return taskResult(`kind=subagent agent_id=${record.id}\nWait ended early by an attention message from the agent; it is still running. Decide whether to steer it with subagent_message, stop it, or wait again.${options.wakeOnAttention ? " The message is delivered to you separately." : ""}`, { ...meta({ ...record }), wait_outcome: "message" });
         }
         if (outcome.kind !== "completed") return taskResult(`Wait ${outcome.kind === "detached" ? "released by user" : "cancelled"}; target unchanged.`, { ...meta(), wait_outcome: outcome.kind === "detached" ? "released" : "cancelled" });
         if (currentTarget()) options.cancelNotice(record.id);
         return taskResult(`kind=subagent agent_id=${record.id}\n${options.format(outcome.value, params.verbose)}`, { ...meta(outcome.value), wait_outcome: "completed" });
-      } finally { if (!lease.settled) lease.dispose(); }
+      } finally { offAttention?.(); if (!lease.settled) lease.dispose(); }
     },
   };
 }

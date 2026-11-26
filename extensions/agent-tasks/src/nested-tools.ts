@@ -94,16 +94,16 @@ export interface NestedAgentManager {
     ctx: ExtensionContext,
     type: string,
     prompt: string,
-    options: Omit<NestedSpawnOptions, "isBackground">,
+    options: Omit<NestedSpawnOptions, "isBackground"> & { wake?: AbortSignal },
     /** Fires synchronously after spawn, before the session exists — where the transcript is attached. */
     onSpawned?: (id: string) => void,
-  ): Promise<{ id: string; record: AgentRecord }>;
+  ): Promise<{ id: string; record: AgentRecord; detached?: boolean }>;
   getRecord(id: string): AgentRecord | undefined;
   hydratePersistentChildren?(parentAgentId: string): AgentRecord[];
   /** Optional lifecycle subscription supplied by AgentManager; test doubles may omit it. */
   subscribe?(listener: () => void): () => void;
-  subscribeParentMessages?(listener: (record: AgentRecord, accepted: { message: ChildMessage; deliveredToWaiter: boolean }) => void): () => void;
-  resume(id: string, prompt: string, signal?: AbortSignal): Promise<AgentRecord | undefined>;
+  subscribeParentMessages?(listener: (record: AgentRecord, accepted: { message: ChildMessage; deliveredToWaiter: boolean }) => boolean | void): () => void;
+  resume(id: string, prompt: string, signal?: AbortSignal, options?: { wake?: AbortSignal; onStartedRun?: (runId: string) => void }): Promise<AgentRecord | undefined>;
   resumePersistent?(pi: ExtensionAPI, ctx: ExtensionContext, id: string, prompt: string, signal?: AbortSignal): AgentRecord | undefined;
 }
 
@@ -164,25 +164,29 @@ function formatRecord(record: AgentRecord, position: ResultPosition): string {
  * Delivers grandchildren's mailbox messages into exactly one live parent-agent
  * session. Nested delivery deliberately has no root entry/card path: the root
  * session neither sees nor wakes for a grandchild's message.
+ *
+ * A held execution may also register wakers: an attention notice is held first,
+ * then every waker of that execution runs so the waiting tool call returns it.
  */
 function createNestedDelivery(manager: NestedAgentManager, parentAgentId: string) {
   // Schema-only test doubles intentionally omit the runtime manager surface.
   // They cannot receive messages, so use an inert delivery rather than making
   // tool-definition construction itself an observable manager effect.
   if (typeof manager.getRecord !== "function") {
-    return { hold() {}, take(): readonly ChildMessage[] { return []; }, release() {}, dispose() {} };
+    return { hold() {}, take(): readonly ChildMessage[] { return []; }, release() {}, wake(): () => void { return () => {}; }, dispose() {} };
   }
   const ownerRunId = manager.getRecord(parentAgentId)?.runId;
   const held = new Map<string, ChildMessage[]>();
   const key = (id: string, runId: string) => `${id}\u0000${runId}`;
   const waiting = new Set<string>();
+  const wakers = new Map<string, Set<() => void>>();
   let disposed = false;
   let offState: (() => void) | undefined;
   const owner = (): AgentRecord | undefined => {
     const record = manager.getRecord(parentAgentId);
     return record?.status === "running" && record.runId === ownerRunId && record.session ? record : undefined;
   };
-  const dispose = () => { if (!disposed) { disposed = true; offMessages(); offState?.(); held.clear(); waiting.clear(); } };
+  const dispose = () => { if (!disposed) { disposed = true; offMessages(); offState?.(); held.clear(); waiting.clear(); wakers.clear(); } };
   const deliver = (child: AgentRecord, messages: readonly ChildMessage[]) => {
     const parent = owner();
     if (!parent || !messages.length) return;
@@ -211,7 +215,14 @@ function createNestedDelivery(manager: NestedAgentManager, parentAgentId: string
     if (waiting.has(identity)) {
       const messages = held.get(identity) ?? [];
       messages.push(accepted.message); held.set(identity, messages);
-    } else deliver(record, [accepted.message]);
+      if (accepted.message.urgency !== "attention") return false;
+      const wake = [...wakers.get(identity) ?? []];
+      wakers.delete(identity);
+      for (const callback of wake) { try { callback(); } catch { /* isolate one waiter */ } }
+      return wake.length > 0;
+    }
+    deliver(record, [accepted.message]);
+    return false;
   }) ?? (() => {});
   offState = manager.subscribe?.(() => { if (!owner()) dispose(); });
   return {
@@ -222,19 +233,30 @@ function createNestedDelivery(manager: NestedAgentManager, parentAgentId: string
       const messages = held.get(identity) ?? []; held.delete(identity); return messages;
     },
     release,
+    /** Register a one-shot attention waker for a held execution; returns its removal. */
+    wake(record: AgentRecord, runId: string, callback: () => void): () => void {
+      const identity = key(record.id, runId);
+      const set = wakers.get(identity) ?? new Set<() => void>();
+      set.add(callback); wakers.set(identity, set);
+      return () => { const current = wakers.get(identity); current?.delete(callback); if (current?.size === 0) wakers.delete(identity); };
+    },
     dispose,
   };
 }
 
-function nestedWait(waiter: { promise: Promise<ReplyWaitOutcome>; cancel(): void }, signal: AbortSignal | undefined): Promise<ReplyWaitOutcome | { kind: "released" }> {
-  if (!signal) return waiter.promise;
-  if (signal.aborted) return Promise.resolve({ kind: "released" });
+function nestedWait(waiter: { promise: Promise<ReplyWaitOutcome>; cancel(): void }, signal: AbortSignal | undefined, woken: Promise<void>): Promise<ReplyWaitOutcome | { kind: "released" } | { kind: "woken" }> {
+  if (signal?.aborted) return Promise.resolve({ kind: "released" });
   return new Promise(resolve => {
     const abort = () => resolve({ kind: "released" });
-    signal.addEventListener("abort", abort, { once: true });
-    void waiter.promise.then(value => { signal.removeEventListener("abort", abort); resolve(value); });
+    signal?.addEventListener("abort", abort, { once: true });
+    void woken.then(() => { signal?.removeEventListener("abort", abort); resolve({ kind: "woken" }); });
+    void waiter.promise.then(value => { signal?.removeEventListener("abort", abort); resolve(value); });
   });
 }
+
+/** Result head of a nested foreground wait that an attention notice moved to the background. */
+const NESTED_ATTENTION_DETACH = "The nested agent sent an attention message, so this wait ended early and it continues in the background. " +
+  "Read the message below; steer it with subagent_message, stop it with agent_manage, or wait again with agent_manage. Collect its result with agent_manage before you finish.";
 
 /** Build child-safe orchestration tools scoped to one parent agent instance. */
 export function createNestedSubagentTools(context: NestedToolContext): ToolDefinition[] {
@@ -305,17 +327,34 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
           return textResult(`Nested agent not found or not owned by this parent: "${params.resume}".`, true);
         }
         if (existing.status === "running" || existing.status === "queued") return errorResult("Nested agent is still active; wait or send a message instead.");
-        const resumed = existing.session
-          ? await context.manager.resume(params.resume, params.prompt, signal)
-          : context.manager.resumePersistent
-            ? context.manager.resumePersistent(context.pi, ctx, params.resume, params.prompt, signal)
-            : undefined;
-        return resumed
-          ? (() => {
-            const identity = launchMetadata("subagent", resumed.id, resumed.runId ?? "1", "foreground");
-            return { ...textResult(`${launchText(identity)}\n${agentExecutionSummary(resumed.executionConfig)}${formatRecord(resumed, "inline")}`, resumed.status === "error"), details: { runtimeLaunch: identity, executionConfig: copyAgentExecutionConfig(resumed.executionConfig) } };
-          })()
-          : textResult(`Failed to resume nested agent "${params.resume}".`, true);
+        // A live-session resume waits inline like a foreground launch: messages
+        // are held for its result and an attention notice can background it.
+        const wake = existing.session && context.canCollectBackground?.() !== false ? new AbortController() : undefined;
+        let unwake = () => {};
+        let heldRunId: string | undefined;
+        let resumed: AgentRecord | undefined;
+        try {
+          resumed = existing.session
+            ? await context.manager.resume(params.resume, params.prompt, signal, {
+              wake: wake?.signal,
+              onStartedRun: runId => {
+                heldRunId = runId;
+                deliveryFor().hold(existing, runId);
+                if (wake) unwake = deliveryFor().wake(existing, runId, () => wake.abort());
+              },
+            })
+            : context.manager.resumePersistent
+              ? context.manager.resumePersistent(context.pi, ctx, params.resume, params.prompt, signal)
+              : undefined;
+        } finally { unwake(); }
+        const held = heldRunId ? deliveryFor().take(existing, heldRunId) : [];
+        if (!resumed) return textResult(`Failed to resume nested agent "${params.resume}".`, true);
+        if (heldRunId && (resumed.status === "running" || resumed.status === "queued")) {
+          const identity = launchMetadata("subagent", resumed.id, resumed.runId ?? "1", "background");
+          return { ...textResult(`${launchText(identity)}\n${agentExecutionSummary(resumed.executionConfig)}${NESTED_ATTENTION_DETACH}${formatHeldMessages(held)}`), details: { runtimeLaunch: identity, executionConfig: copyAgentExecutionConfig(resumed.executionConfig) } };
+        }
+        const identity = launchMetadata("subagent", resumed.id, resumed.runId ?? "1", "foreground");
+        return { ...textResult(`${launchText(identity)}\n${agentExecutionSummary(resumed.executionConfig)}${formatRecord(resumed, "inline")}${formatHeldMessages(held)}`, resumed.status === "error"), details: { runtimeLaunch: identity, executionConfig: copyAgentExecutionConfig(resumed.executionConfig) } };
       }
 
       if (context.depth >= context.maxSubagentDepth) {
@@ -492,19 +531,33 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
           return { ...textResult(`${launchText(identity)}\n${overrideNoteFor(context.manager.getRecord(id))}Nested agent started in background.`), details: { runtimeLaunch: identity, executionConfig: copyAgentExecutionConfig(context.manager.getRecord(id)?.executionConfig) } };
         }
 
-        const { record } = await context.manager.spawnAndWait(
-          context.pi,
-          ctx,
-          resolvedType,
-          params.prompt,
-          { ...options, signal },
-          (id) => {
-            attachTranscript(id);
-            const child = context.manager.getRecord(id);
-            if (child?.runId) deliveryFor().hold(child, child.runId);
-          },
-        );
+        // Only an owner that can collect background work may have its wait
+        // ended by an attention notice; otherwise the notice stays held.
+        const wake = context.canCollectBackground?.() !== false ? new AbortController() : undefined;
+        let unwake = () => {};
+        let spawned;
+        try {
+          spawned = await context.manager.spawnAndWait(
+            context.pi,
+            ctx,
+            resolvedType,
+            params.prompt,
+            { ...options, signal, wake: wake?.signal },
+            (id) => {
+              attachTranscript(id);
+              const child = context.manager.getRecord(id);
+              if (!child?.runId) return;
+              deliveryFor().hold(child, child.runId);
+              if (wake) unwake = deliveryFor().wake(child, child.runId, () => wake.abort());
+            },
+          );
+        } finally { unwake(); }
+        const { record, detached } = spawned;
         const held = deliveryFor().take(record, record.runId);
+        if (detached) {
+          const identity = launchMetadata("subagent", record.id, record.runId ?? "1", "background");
+          return { ...textResult(`${launchText(identity)}\n${overrideNoteFor(record)}${NESTED_ATTENTION_DETACH}${formatHeldMessages(held)}`), details: { runtimeLaunch: identity, executionConfig: copyAgentExecutionConfig(record.executionConfig) } };
+        }
         const identity = launchMetadata("subagent", record.id, record.runId ?? "1", "foreground");
         return { ...textResult(`${launchText(identity)}\n${overrideNoteFor(record)}${formatRecord(record, "inline")}${formatHeldMessages(held)}`, record.status === "error"), details: { runtimeLaunch: identity, executionConfig: copyAgentExecutionConfig(record.executionConfig) } };
       } catch (err) {
@@ -581,17 +634,25 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
       const marker = `<parent-request request_id="${request.requestId}" reply_tool="reply_to_parent" />`;
       const waiter = params.reply === "wait" ? record.mailbox!.waitForReply(request.requestId) : undefined;
       const headline = (state: string) => `Question ${state} for nested agent ${record.id}.\nRequest ID: ${request.requestId}`;
-      if (waiter) nestedDelivery.hold(record, runId);
+      // A reply wait ends early on an attention notice; the question stays open.
+      let woke!: () => void;
+      const woken = new Promise<void>(resolve => { woke = resolve; });
+      let unwake = () => {};
+      if (waiter) { nestedDelivery.hold(record, runId); unwake = nestedDelivery.wake(record, runId, woke); }
       let state: "queued" | "sent";
       try { state = await sendInOrder(record, [params.message, marker], runId); }
       catch (err) {
-        record.mailbox!.failRequest(request.requestId); waiter?.cancel();
+        record.mailbox!.failRequest(request.requestId); waiter?.cancel(); unwake();
         if (waiter) nestedDelivery.release(record, runId);
         return errorResult(`Failed to send the question; request ${request.requestId} was closed. ${err instanceof Error ? err.message : String(err)}`);
       }
       if (params.reply === "notify") return textResult(`${headline(state)}\nThe reply will be delivered while you continue.`);
-      const outcome = await nestedWait(waiter!, signal);
-      waiter!.cancel();
+      const outcome = await nestedWait(waiter!, signal, woken);
+      waiter!.cancel(); unwake();
+      if (outcome.kind === "woken") {
+        const held = nestedDelivery.take(record, runId);
+        return textResult(`${headline(state)}\nWait ended early by an attention message from the nested agent; it is still running. The question stays open and a later reply will be delivered to you.${formatHeldMessages(held)}`);
+      }
       if (outcome.kind === "released") {
         nestedDelivery.release(record, runId);
         return textResult(`${headline(state)}\nWait released; the question stays open and a later reply will be delivered to you.`);

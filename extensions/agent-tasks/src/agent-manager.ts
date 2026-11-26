@@ -1009,7 +1009,7 @@ export class AgentManager {
                   active: () => owner !== undefined && currentOwner() === owner,
                   owns: candidate => owns(candidate, owner),
                   format: (child, verbose) => `${child.description}: ${child.status}\n${child.result ?? child.error ?? "No output."}${verbose ? `\n${child.terminalConversation ?? (child.session ? getAgentConversation(child.session) : "")}` : ""}`,
-                  cancelNotice: () => {}, reconsider: () => {},
+                  cancelNotice: () => {}, reconsider: () => {}, wakeOnAttention: true,
                 }).execute(identity, params, signal, onUpdate, context);
               },
             };
@@ -1285,37 +1285,59 @@ export class AgentManager {
     ctx: ExtensionContext,
     type: SubagentType,
     prompt: string,
-    options: Omit<SpawnOptions, "isBackground">,
+    options: Omit<SpawnOptions, "isBackground"> & { wake?: AbortSignal },
     onSpawned?: (id: string) => void,
-  ): Promise<{ id: string; record: AgentRecord }> {
+  ): Promise<{ id: string; record: AgentRecord; detached?: boolean }> {
     // `blocking` is what maxConcurrentForeground bounds, also set by the
     // root subagent_run tool when preparing its coordinator launch lease. onSpawned rides on the options rather than on a field of this
     // manager: a queued spawn starts at drain time, long after any install/
     // restore pair around this call would have put the field back — and it now
     // fires after an await (worktree creation) even on the immediate path.
+    const { wake, ...spawnOptions } = options;
     const id = this.spawn(pi, ctx, type, prompt, {
-      ...options,
+      ...spawnOptions,
       isBackground: false,
       blocking: true,
       onSpawned,
     });
-    const run = this.getRun(id)!;
+    return { id, ...await this.awaitForeground(id, wake) };
+  }
+
+  /**
+   * Await a foreground run. When `wake` fires first (an attention notice to an
+   * owner that can collect background work), the run moves to the background
+   * like a detached launch and the live record is returned unconsumed.
+   */
+  private async awaitForeground(id: string, wake?: AbortSignal): Promise<{ record: AgentRecord; detached?: boolean }> {
+    const run = this.runs.get(id)!;
+    if (wake) {
+      const woken = await new Promise<boolean>(resolve => {
+        const onWake = () => resolve(true);
+        wake.addEventListener("abort", onWake, { once: true });
+        if (wake.aborted) onWake();
+        void run.terminal.then(() => { wake.removeEventListener("abort", onWake); resolve(false); });
+      });
+      // Completion wins a tie: a resolved terminal is returned as an ordinary result.
+      if (woken && this.runs.get(id) === run && !run.terminalResolved && this.detachRun(run.identity, "message")) {
+        return { record: this.agents.get(id)!, detached: true };
+      }
+    }
     const outcome = await run.terminal;
     this.consumeRun(run.identity);
-    return { id, record: outcome };
+    return { record: outcome };
   }
 
   /**
    * Resume an existing agent session with a new prompt.
    */
   async resume(
-    id: string, prompt: string, signal?: AbortSignal, options: ResumeOptions = {},
+    id: string, prompt: string, signal?: AbortSignal, options: ResumeOptions & { wake?: AbortSignal; onStartedRun?: (runId: string) => void } = {},
   ): Promise<AgentRecord | undefined> {
-    const record = this.resumeRun(id, prompt, signal, options);
-    if (!record || options.isBackground) return record;
-    const run = this.getRun(id)!;
-    const outcome = await run.terminal;
-    this.consumeRun(run.identity);
+    const { wake, onStartedRun, ...resumeOptions } = options;
+    const record = this.resumeRun(id, prompt, signal, resumeOptions);
+    if (!record || resumeOptions.isBackground) return record;
+    onStartedRun?.(record.runId!);
+    const { record: outcome } = await this.awaitForeground(id, wake);
     return outcome;
   }
 

@@ -832,3 +832,147 @@ void it("bounded call retention keeps snapshots immutable and terminal clocks st
     assert.equal(f.source.list()[0]!.stats.settling, false);
   } finally { cleanup.resolve({ hasChanges: false }); await f.close(); }
 });
+
+/** Live parent agent plus nested tools scoped to it; messages to the parent session are recorded. */
+async function nestedOwner(f: ReturnType<typeof fixture>, canCollectBackground = true) {
+  const parentId = f.spawn(true); await tick();
+  const parent = f.manager.getRecord(parentId)!;
+  const delivered: string[] = [];
+  parent.session!.sendCustomMessage = (async (message: { content: string }) => { delivered.push(message.content); }) as never;
+  const [run, message] = createNestedSubagentTools({ manager: f.manager, pi, parentAgentId: parentId, depth: 1,
+    maxSubagentDepth: 2, allowedSubagents: "all", configCwd: f.ctx.cwd, canCollectBackground: () => canCollectBackground });
+  const exec = (tool: typeof run, id: string, params: Record<string, unknown>) =>
+    tool!.execute(id, completeToolCall(tool!.parameters, params), undefined, undefined, f.ctx as import("@earendil-works/pi-coding-agent").ExtensionToolContext);
+  const body = (result: Awaited<ReturnType<typeof exec>>) => result.content.map(block => block.type === "text" ? block.text : "").join("\n");
+  return { parentId, delivered, run: run!, message: message!, exec, body };
+}
+
+void it("nested foreground launch: attention backgrounds it when the owner can collect, else stays held", async () => {
+  for (const collect of [true, false]) {
+    const f = fixture();
+    try {
+      f.manager.setMaxConcurrent(4);
+      const o = await nestedOwner(f, collect);
+      const launch = o.exec(o.run, "nested-fg", { subagent_type: "general-purpose", description: "child", prompt: "child" });
+      await tick();
+      const call = f.calls.at(-1)!;
+      const sent = call.options.parentChannel!.send("look at this", null, "attention");
+      assert.equal(sent.ok && sent.value.woke, collect);
+      if (collect) {
+        const result = await launch;
+        assert.match(o.body(result), /sent an attention message, so this wait ended early/);
+        assert.match(o.body(result), /\[attention\] look at this/);
+        const record = f.manager.getRecord(call.id)!;
+        assert.equal(record.status, "running");
+        assert.equal(record.resultConsumed ?? false, false, "a backgrounded run is left for agent_manage to collect");
+        assert.equal(record.executionConfig?.differences?.find(d => d.field === "mode")?.reason, "attention-detach");
+        await tick();
+        assert.deepEqual(o.delivered, [], "the attention was returned by the tool call, not delivered again");
+      } else {
+        await tick();
+        assert.equal(f.manager.getRecord(call.id)!.status, "running");
+        call.finish("child done");
+        const result = await launch;
+        assert.match(o.body(result), /child done/);
+        assert.match(o.body(result), /\[attention\] look at this/);
+      }
+    } finally { await f.close(); }
+  }
+});
+
+void it("nested foreground launch: completion racing attention returns the ordinary result", async () => {
+  const f = fixture();
+  try {
+    f.manager.setMaxConcurrent(4);
+    const o = await nestedOwner(f);
+    const launch = o.exec(o.run, "nested-race", { subagent_type: "general-purpose", description: "child", prompt: "child" });
+    await tick();
+    const call = f.calls.at(-1)!;
+    call.finish("final");
+    await f.manager.getRun(call.id)!.terminal;
+    call.options.parentChannel!.send("too late", null, "attention");
+    const result = await launch;
+    assert.match(o.body(result), /final/);
+    assert.doesNotMatch(o.body(result), /wait ended early/);
+  } finally { await f.close(); }
+});
+
+void it("nested reply wait ends on attention; the question stays open", async () => {
+  const f = fixture();
+  try {
+    f.manager.setMaxConcurrent(4);
+    const o = await nestedOwner(f, false);
+    const childId = f.manager.spawn(pi, f.ctx, "general-purpose", "child", { description: "child", isBackground: true, parentAgentId: o.parentId }); await tick();
+    const child = f.manager.getRecord(childId)!;
+    const steers: string[] = [];
+    child.session!.steer = (async (value: string) => { steers.push(value); }) as never;
+    const waiting = o.exec(o.message, "nested-ask", { agent_id: childId, message: "q?", reply: "wait" });
+    await tick();
+    const requestId = /request_id="(req_\w+)"/.exec(steers.at(-1)!)![1]!;
+    const channel = f.calls.find(call => call.id === childId)!.options.parentChannel!;
+    channel.send("plain note", null);
+    const sent = channel.send("stop, wrong file", null, "attention");
+    assert.equal(sent.ok && sent.value.woke, true, "a reply wait is interruptible even without agent_manage");
+    const result = await waiting;
+    assert.match(o.body(result), /ended early by an attention message/);
+    assert.match(o.body(result), /\[notice\] plain note\n\[attention\] stop, wrong file/);
+    assert.equal(child.mailbox!.getRequest(requestId)?.state, "pending");
+    channel.send("answer", requestId);
+    await tick();
+    assert.equal(o.delivered.length, 1);
+    assert.match(o.delivered[0]!, /<reply request-id="req_\w+">answer<\/reply>/);
+  } finally { await f.close(); }
+});
+
+void it("nested agent_manage wait ends on attention with wait_outcome message", async () => {
+  const f = fixture();
+  try {
+    f.manager.setMaxConcurrent(4);
+    const parentId = f.spawn(true); await tick();
+    const parentCall = f.calls.find(call => call.id === parentId)!;
+    const childCoordinator = new TaskCoordinator();
+    const management = parentCall.options.nestedRuntime!.management!(childCoordinator);
+    const childId = f.manager.spawn(pi, f.ctx, "general-purpose", "child", { description: "child", isBackground: true, parentAgentId: parentId }); await tick();
+    const identity = f.manager.getRun(childId)!.identity;
+    const waiting = management.execute(identity, { action: "wait" } as never, undefined, undefined, f.ctx);
+    await tick();
+    const channel = f.calls.find(call => call.id === childId)!.options.parentChannel!;
+    channel.send("info only", null);
+    await tick();
+    assert.equal(childCoordinator.countWaits(identity), 1);
+    const sent = channel.send("decide now", null, "attention");
+    assert.equal(sent.ok && sent.value.woke, true);
+    const result = await waiting;
+    assert.equal(result.details.runtimeTask.wait_outcome, "message");
+    assert.match(result.content.map(block => block.type === "text" ? block.text : "").join(""), /delivered to you separately/);
+    assert.equal(f.manager.getRecord(childId)!.status, "running");
+    childCoordinator.dispose();
+  } finally { await f.close(); }
+});
+
+void it("nested foreground resume holds messages for its result and is backgrounded by attention", async () => {
+  const f = fixture();
+  try {
+    f.manager.setMaxConcurrent(4);
+    const o = await nestedOwner(f);
+    const launch = o.exec(o.run, "nested-first", { subagent_type: "general-purpose", description: "child", prompt: "child" });
+    await tick();
+    const call = f.calls.at(-1)!;
+    call.finish("first answer");
+    await launch;
+    const resume = o.exec(o.run, "nested-resume", { prompt: "again", resume: call.id });
+    await tick();
+    assert.equal(f.manager.getRecord(call.id)!.runId, "2");
+    const channel = call.options.parentChannel!;
+    channel.send("noted", null);
+    await tick();
+    assert.deepEqual(o.delivered, [], "info is held during a foreground resume");
+    channel.send("needs you", null, "attention");
+    const result = await resume;
+    assert.match(o.body(result), /wait ended early/);
+    assert.match(o.body(result), /\[notice\] noted\n\[attention\] needs you/);
+    assert.equal(f.manager.getRecord(call.id)!.status, "running");
+    f.resumes.at(-1)!.finish();
+    await f.manager.getRun(call.id)!.terminal;
+  } finally { await f.close(); }
+});
