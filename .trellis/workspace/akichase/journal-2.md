@@ -497,3 +497,41 @@ subagent_run 手动转后台（含前台 resume）在文本中注明用户操作
 ### Next Steps
 
 - 无待实施项；未 push、更新个人安装、部署资源或 reload。真实在线模型、managed-provider 端到端与 TUI 为 NOT_RUN，无独立审查。
+
+
+## Session 73: 统一 Session Name 与 Recap 模型模式收尾
+<!-- trellis-session: v=2 fp=3f722e9368396103 -->
+
+**Date**: 2026-11-26
+**Task**: 统一 Session Name 与 Recap 模型模式收尾
+**Branch**: `main`
+
+### Summary
+
+两个插件默认跟随主会话，支持独立模型及思考等级；保留 Recap 已有独立配置。用户接受已披露的验证限制并授权归档收尾。
+
+### Main Changes
+
+- 两个配置菜单统一提供 Follow main session、Set model、Set thinking；切回跟随保留独立值，菜单取消不保存，请求参数按发起时捕获。
+- 已归档 11-26-session-assist-model-modes 并清除当前绑定；任务未建立 PR，按 never-PR-backed CLI 选项处理 main/base_branch 自引用。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `65d10a7` | feat(session-assist): support follow and custom model modes |
+| `3888508` | docs(task): record session-assist verification checkpoint |
+| `0eb18c4e14da3d94e2da97a5466a5e8ebca633af` | chore(task): archive 11-26-session-assist-model-modes |
+
+### Testing
+
+- [OK] 专项自然退出 156/156 PASS，最终类型检查 PASS，独立只读审查无实质功能问题；文档示例/链接及 git diff --check PASS。
+- [OK] 全量 1943 项中 1941 PASS、2 FAIL，均为 scripts/package-manager.test.mjs：既有 lockfile 的 SDK peers 断言及缓存 pnpm 10.33.0 不支持 fixture 的 --registry 参数；单独复现 3 PASS、2 FAIL，未掩盖失败。首次类型检查夹具遗漏必需 model 字段，修复后通过。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 既有 pnpm-lock.yaml 修改保持未提交；两个无关全量失败留待单独处理，诊断日志保留 /tmp/session-assist-model-modes.4RSQ8K。未 push，未安装依赖，未验证在线生成质量或真实终端外观。

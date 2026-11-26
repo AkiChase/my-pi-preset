@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 72
-- **Last Active**: 2026-11-24
+- **Total Sessions**: 73
+- **Last Active**: 2026-11-26
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~499 | Active |
+| `journal-2.md` | ~537 | Active |
 | `journal-1.md` | ~1975 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 73 | 2026-11-26 | 统一 Session Name 与 Recap 模型模式收尾 | `65d10a7`, `3888508`, `0eb18c4e14da3d94e2da97a5466a5e8ebca633af` | `main` |
 | 72 | 2026-11-24 | Trellis 派发指定模型与优先级统一收尾 | `c6a641d`, `fb0ecc0` | `main` |
 | 71 | 2026-11-19 | 上下文前缀稳定与 pnpm 12 项目升级收尾 | `80e9910`, `e1be11e`, `7d26d56`, `09e6975`, `2e1d9f0`, `42cfb0c` | `main` |
 | 70 | 2026-11-15 | 手动转后台对 Agent 可见 | `cdae113` | `main` |
