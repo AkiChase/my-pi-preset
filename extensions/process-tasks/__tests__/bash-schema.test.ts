@@ -189,14 +189,17 @@ void describe("bash structuredContent — the inherited output schema", () => {
         // `...originalBash` is where `outputSchema` comes from, and the override
         // has to satisfy it on every path because codemode resolves a declared
         // outputSchema to `structuredContent`.
-        const { tool } = harness(createBashToolDefinition(dir));
+        const original = createBashToolDefinition(dir);
+        const { tool } = harness(original);
         assert.equal(Reflect.get(tool, "prepareArguments"), undefined, "no inherited legacy argument conversion");
-        const schema = tool.outputSchema as { properties?: Record<string, unknown> } | undefined;
+        const schema = tool.outputSchema as { properties?: Record<string, unknown>; required?: readonly string[] } | undefined;
         assert.ok(schema, "the inherited outputSchema must still be attached");
-        assert.deepEqual(
-            Object.keys(schema.properties ?? {}).sort(),
-            ["exit_code", "full_output_path", "output", "truncated", "wall_time_seconds"]
-        );
+        assert.equal(schema, original.outputSchema, "the override preserves the SDK schema unchanged");
+        for (const field of ["output", "truncated", "exit_code", "wall_time_seconds"]) {
+            assert.ok(Object.hasOwn(schema.properties ?? {}, field), `missing output field ${field}`);
+            assert.ok(schema.required?.includes(field), `${field} must remain required`);
+        }
+        assert.ok(Object.hasOwn(schema.properties ?? {}, "full_output_path"));
     });
 
     it("returns the full shape on success, on non-zero exit, and on cancel", async () => {

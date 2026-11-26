@@ -281,9 +281,9 @@ export class MemoryPanel implements Component, Focusable {
       meta.push(theme.fg("muted", `Path: ${displayText(detail.path)}`));
       if (detail.warning) meta.push(theme.fg("warning", displayText(detail.warning)));
     }
-    let lines = new Text(meta.join("\n"), 0, 0).render(width);
+    let lines = [...new Text(meta.join("\n"), 0, 0).render(width)];
     if (!detail) {
-      lines = new Text(theme.fg("error", displayText(result?.error ?? "Memory detail unavailable.")) + "\n" + theme.fg("dim", "Press r to reload or Esc to return."), 0, 0).render(width);
+      lines = [...new Text(theme.fg("error", displayText(result?.error ?? "Memory detail unavailable.")) + "\n" + theme.fg("dim", "Press r to reload or Esc to return."), 0, 0).render(width)];
     } else if (detail.body.trim()) {
       lines.push("");
       // Sanitize external controls before host Markdown styling; the stored body is untouched.

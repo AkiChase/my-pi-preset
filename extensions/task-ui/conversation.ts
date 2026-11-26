@@ -173,7 +173,7 @@ export class ConversationRenderer {
         }
         if (!entry.failed) {
             // The parser is recursive over arbitrary model text; deep nesting can overflow.
-            try { return entry.md.render(width); } catch { entry.failed = true; }
+            try { return [...entry.md.render(width)]; } catch { entry.failed = true; }
         }
         return text.split(/\r\n|\n|\r/).flatMap(part => wrapTextWithAnsi(part, width));
     }

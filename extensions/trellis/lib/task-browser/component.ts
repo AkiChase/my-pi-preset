@@ -234,12 +234,12 @@ export class TaskBrowser {
 	}
 	private isCurrent(task: BrowserTask): boolean { return task.identity === this.current; }
 	private metadata(task: BrowserTask, width: number): string[] {
-		return new Text([
+		return [...new Text([
 			this.theme.bold(this.theme.fg("text", taskLabel(task))),
 			this.theme.fg("muted", `Path: ${safeText(task.dir)}`),
 			this.theme.fg(statusColor(task.status), `Status: ${safeText(task.status)}`),
 			...(this.isCurrent(task) ? [this.theme.fg("accent", "Current task")] : []),
-		].join("\n"), 0, 0).render(width);
+		].join("\n"), 0, 0).render(width)];
 	}
 	private documentSummary(task: BrowserTask, width: number): string[] {
 		const values = [
@@ -249,7 +249,7 @@ export class TaskBrowser {
 			...(typeof task.record.priority === "string" && task.record.priority ? [this.theme.fg("muted", `Priority: ${safeText(task.record.priority)}`)] : []),
 			...(typeof task.record.assignee === "string" && task.record.assignee ? [this.theme.fg("muted", `Assignee: ${safeText(task.record.assignee)}`)] : []),
 		];
-		return new Text(values.join(" · "), 0, 0).render(width);
+		return [...new Text(values.join(" · "), 0, 0).render(width)];
 	}
 	private detailBody(width: number, section: number): string[] {
 		const task = this.detailTask!;

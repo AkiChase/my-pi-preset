@@ -128,7 +128,7 @@ export class DetailToolCard {
                 else if (input.state?.status === "interrupted") this.component.updateResult({ content: [], isError: true });
             }
             this.component.setExpanded(expanded);
-            const rows = this.component.render(width);
+            const rows = [...this.component.render(width)];
             if (!["read", "bash", "grep", "find", "write", "edit"].includes(input.call.name)) {
                 const timing = this.timingText();
                 if (timing) rows.push(...wrap(timing, width).map(row => injected.fg(input.state?.status === "interrupted" ? "warning" : "muted", row)));

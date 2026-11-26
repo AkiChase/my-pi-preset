@@ -261,8 +261,8 @@ function renderSubagentResultBody(
 ) {
   const supplied = result.details as (AgentDetails & { runtimeLaunch?: unknown }) | undefined;
   const resultText = result.content.filter(block => block.type === "text").map(block => block.text ?? "").join("\n");
-  const compactRows = (rows: string[], width: number): string[] => {
-    if (rows.length <= 3) return rows;
+  const compactRows = (rows: readonly string[], width: number): string[] => {
+    if (rows.length <= 3) return [...rows];
     const hint = clip("… expand", width, "");
     return hint ? [...rows.slice(0, 2), theme.fg("muted", hint)] : rows.slice(0, 3);
   };

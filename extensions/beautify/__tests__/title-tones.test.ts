@@ -31,7 +31,7 @@ function foregrounds(row: string): string[] {
   }
   return cells;
 }
-function tone(rows: string[], text: string, color: "accent" | "muted") {
+function tone(rows: readonly string[], text: string, color: "accent" | "muted") {
   const row = rows.find(row => plain(row).includes(text));
   assert.ok(row, `missing ${text}: ${rows.map(plain).join("\n")}`);
   const start = Array.from(plain(row).slice(0, plain(row).indexOf(text))).length;
