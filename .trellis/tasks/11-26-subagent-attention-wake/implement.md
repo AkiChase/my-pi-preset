@@ -48,3 +48,10 @@
 - `pnpm run typecheck`：共 11 个错误，与 HEAD 基线相同，均为既有错误。
 - `pnpm run test`（隔离 `PI_SDK_DIR`、`PI_CODING_AGENT_DIR`，配置为 force-exit）：1958 条，1957 通过，1 失败。失败仍是既有的 `bash-schema` outputSchema 用例。
 - 自然退出（不使用 force-exit）的受影响套件结果见阶段 1、2。
+
+### 独立审查（trellis-check，agent_trellis_check_0_a623b7b7）
+- 结论：无阻塞问题。审查方运行的聚焦套件（自然退出）639 条全部通过；tsc 只有 11 个既有错误。
+- 发现 1（低）：`subagent_message` guidance 为顶层和嵌套共用，对嵌套场景的描述不准确。已修复：`messageToolGuidance` 增加 `nested` 选项，嵌套文案写明 D4、D5 的例外。
+- 发现 2（低，需决定）：`urgency` 比 PRD 字面要求更严格，notice 必须填 info 或 attention，reply 必须填 "null"。决定保留：项目约定控制字段必须给出明确的哨兵值，guidance 和测试与此一致。R1 的“默认语义”指 info 行为，不代表可以省略该字段。
+- 发现 3（信息）：嵌套 live resume 原先根据记录状态推断是否已转后台。已修复：`resume` 通过 `onDetached` 回传 `awaitForeground` 的 detached 标志。
+- 修复后复跑：`node --test extensions/agent-tasks/__tests__/*.test.ts extensions/task-ui/__tests__/*.test.ts extensions/runtime-tasks/__tests__/*.test.ts extensions/beautify/__tests__/*.test.ts`（隔离环境，自然退出），639/639 通过，exit 0；tsc 仍只有 11 个既有错误。

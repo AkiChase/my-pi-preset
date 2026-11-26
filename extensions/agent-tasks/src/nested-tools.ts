@@ -103,7 +103,7 @@ export interface NestedAgentManager {
   /** Optional lifecycle subscription supplied by AgentManager; test doubles may omit it. */
   subscribe?(listener: () => void): () => void;
   subscribeParentMessages?(listener: (record: AgentRecord, accepted: { message: ChildMessage; deliveredToWaiter: boolean }) => boolean | void): () => void;
-  resume(id: string, prompt: string, signal?: AbortSignal, options?: { wake?: AbortSignal; onStartedRun?: (runId: string) => void }): Promise<AgentRecord | undefined>;
+  resume(id: string, prompt: string, signal?: AbortSignal, options?: { wake?: AbortSignal; onStartedRun?: (runId: string) => void; onDetached?: () => void }): Promise<AgentRecord | undefined>;
   resumePersistent?(pi: ExtensionAPI, ctx: ExtensionContext, id: string, prompt: string, signal?: AbortSignal): AgentRecord | undefined;
 }
 
@@ -332,6 +332,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
         const wake = existing.session && context.canCollectBackground?.() !== false ? new AbortController() : undefined;
         let unwake = () => {};
         let heldRunId: string | undefined;
+        let detached = false;
         let resumed: AgentRecord | undefined;
         try {
           resumed = existing.session
@@ -342,6 +343,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
                 deliveryFor().hold(existing, runId);
                 if (wake) unwake = deliveryFor().wake(existing, runId, () => wake.abort());
               },
+              onDetached: () => { detached = true; },
             })
             : context.manager.resumePersistent
               ? context.manager.resumePersistent(context.pi, ctx, params.resume, params.prompt, signal)
@@ -349,7 +351,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
         } finally { unwake(); }
         const held = heldRunId ? deliveryFor().take(existing, heldRunId) : [];
         if (!resumed) return textResult(`Failed to resume nested agent "${params.resume}".`, true);
-        if (heldRunId && (resumed.status === "running" || resumed.status === "queued")) {
+        if (detached) {
           const identity = launchMetadata("subagent", resumed.id, resumed.runId ?? "1", "background");
           return { ...textResult(`${launchText(identity)}\n${agentExecutionSummary(resumed.executionConfig)}${NESTED_ATTENTION_DETACH}${formatHeldMessages(held)}`), details: { runtimeLaunch: identity, executionConfig: copyAgentExecutionConfig(resumed.executionConfig) } };
         }
@@ -601,7 +603,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
     ...messageCardRenderers,
     description: "Send guidance or a question to a running nested agent owned by this parent.",
     promptSnippet: "Send guidance or a question to a running owned child",
-    promptGuidelines: messageToolGuidance({ reply: true }),
+    promptGuidelines: messageToolGuidance({ reply: true, nested: true }),
     parameters: Type.Object({
       agent_id: Type.String(),
       message: Type.String({ minLength: 1, description: "Non-blank guidance or question for the running nested agent." }),

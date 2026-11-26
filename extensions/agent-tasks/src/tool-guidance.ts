@@ -33,7 +33,7 @@ ${options.isolation ? '  - isolation selects Git working-directory isolation: of
     Resume: ${resumeExample}`];
 }
 
-export function messageToolGuidance(options: { reply: boolean } = { reply: false }): string[] {
+export function messageToolGuidance(options: { reply: boolean; nested?: boolean } = { reply: false }): string[] {
   if (!options.reply) return [`Subagent_message usage:
   - Send additional guidance to a currently running agent within your permitted ownership scope. This does not start a new execution or resume a finished agent.
   - Provide agent_id and message as non-empty strings. Copy the real agent_id from launch/list; names, type aliases and execution_id are not accepted.
@@ -47,7 +47,7 @@ export function messageToolGuidance(options: { reply: boolean } = { reply: false
   - reply "skip" sends plain guidance. Queued means waiting for the agent session to initialize; sent means submitted to it. Neither confirms the agent has read or acted on it.
   - reply "wait" asks a question and waits in this call for the agent's reply via its reply_to_parent tool. The agent sees the question after its current tool calls finish. The wait ends on reply, when that execution ends unanswered, when the agent sends an attention message, or when the user releases it; an early end does not withdraw the question, and a later reply is delivered to you.
   - reply "notify" asks a question and returns its request_id at once; the reply is delivered to you when it arrives.
-  - Agents also send unsolicited notices while they keep working. Replies and notices arrive as <subagent-message> context; ones received while you wait on that execution are appended to that wait's result instead. An attention notice (marked urgency="attention" or [attention]) ends any wait on that execution at once; the agent keeps running, so act on it rather than waiting blindly.
+  - Agents also send unsolicited notices while they keep working. Replies and notices arrive as <subagent-message> context; ones received while you wait on that execution are appended to that wait's result instead${options.nested ? ", except agent_manage wait, after which they arrive as context" : ""}. An attention notice (marked urgency="attention" or [attention]) ends ${options.nested ? "a reply wait, an agent_manage wait, and a foreground wait when you own agent_manage" : "any wait on that execution"} at once; the agent keeps running, so act on it rather than waiting blindly.
   - An agent that needs your decision to continue ends its run and explains why; answer it with subagent_run resume. For execution progress/results use agent_manage with agent_id.
   - Examples:
     {"agent_id":"<agent_id>","message":"Also check expired verification codes; keep the scope unchanged.","reply":"skip"}

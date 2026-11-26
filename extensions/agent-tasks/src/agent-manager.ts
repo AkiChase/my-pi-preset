@@ -1331,13 +1331,15 @@ export class AgentManager {
    * Resume an existing agent session with a new prompt.
    */
   async resume(
-    id: string, prompt: string, signal?: AbortSignal, options: ResumeOptions & { wake?: AbortSignal; onStartedRun?: (runId: string) => void } = {},
+    id: string, prompt: string, signal?: AbortSignal,
+    options: ResumeOptions & { wake?: AbortSignal; onStartedRun?: (runId: string) => void; onDetached?: () => void } = {},
   ): Promise<AgentRecord | undefined> {
-    const { wake, onStartedRun, ...resumeOptions } = options;
+    const { wake, onStartedRun, onDetached, ...resumeOptions } = options;
     const record = this.resumeRun(id, prompt, signal, resumeOptions);
     if (!record || resumeOptions.isBackground) return record;
     onStartedRun?.(record.runId!);
-    const { record: outcome } = await this.awaitForeground(id, wake);
+    const { record: outcome, detached } = await this.awaitForeground(id, wake);
+    if (detached) onDetached?.();
     return outcome;
   }
 
