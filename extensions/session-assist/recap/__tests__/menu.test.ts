@@ -97,7 +97,7 @@ it("missing or incompatible thinking chains supported selection and saves both f
         // Fresh save must retain unrelated fields changed while the menu was open.
         writeFileSync(path, JSON.stringify({ ...JSON.parse(before), external: true }));
         gate.resolve("off"); await command;
-        assert.deepEqual(JSON.parse(readFileSync(path, "utf8")), { model: "fixture/plain", thinking: "off", unknown: { keep: true }, external: true });
+        assert.deepEqual(JSON.parse(readFileSync(path, "utf8")), { modelMode: "custom", model: "fixture/plain", thinking: "off", unknown: { keep: true }, external: true });
     }
 });
 it("thinking menu filters capabilities and missing models guide selection without writing", async t => {

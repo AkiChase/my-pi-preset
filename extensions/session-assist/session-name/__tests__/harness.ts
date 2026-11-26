@@ -1,5 +1,5 @@
 import { SessionManager, type ExtensionAPI, type ExtensionContext, type ExtensionCommandContext, type RegisteredCommand } from "@earendil-works/pi-coding-agent";
-import type { AssistantMessage, UserMessage } from "@earendil-works/pi-ai";
+import type { AssistantMessage, Model, ModelThinkingLevel, UserMessage } from "@earendil-works/pi-ai";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -22,10 +22,16 @@ export function harness(t: TestContext, options: { existing?: string; synchronou
     const handlers = new Map<string, ((event: unknown, ctx: ExtensionContext) => unknown)[]>();
     const commands = new Map<string, RegisteredCommand>();
     const notices: string[] = [];
-    const requests: { text: string; systemPrompt: string; signal: AbortSignal | undefined; resolve: (value: AssistantMessage) => void; reject: (value: Error) => void }[] = [];
+    const requests: { model: unknown; reasoning?: string; text: string; systemPrompt: string; signal: AbortSignal | undefined; resolve: (value: AssistantMessage) => void; reject: (value: Error) => void }[] = [];
     let selection: string | undefined | Promise<string | undefined>;
     let input: string | undefined | Promise<string | undefined>;
-    const menus: { signal?: AbortSignal }[] = [];
+    const menus: { title: string; options: string[]; signal?: AbortSignal }[] = [];
+    const selections: (string | undefined | Promise<string | undefined>)[] = [];
+    let thinking: ModelThinkingLevel = "high";
+    let auth = true, available = true;
+    const model: Model<"openai-responses"> = { id: "fake", provider: "fake", api: "openai-responses", name: "Fake", baseUrl: "http://offline.invalid", reasoning: true,
+        input: ["text"], contextWindow: 100000, maxTokens: 8192, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, thinkingLevelMap: { minimal: null, max: null, xhigh: null } };
+    const models = [model];
     const inputDialogs: { signal?: AbortSignal }[] = [];
     const emit = async (name: string, event: unknown = {}) => {
         for (const handler of handlers.get(name) ?? []) await handler(event, ctx);
@@ -38,7 +44,7 @@ export function harness(t: TestContext, options: { existing?: string; synchronou
         },
         registerCommand(name: string, command: RegisteredCommand) { commands.set(name, command); },
         appendEntry(name: string, data: unknown) { manager.appendCustomEntry(name, data); },
-        getThinkingLevel: () => "high",
+        getThinkingLevel: () => thinking,
         setSessionName(name: string) {
             manager.appendSessionInfo(name);
             if (options.reentrantSameName) manager.appendSessionInfo(name);
@@ -47,21 +53,26 @@ export function harness(t: TestContext, options: { existing?: string; synchronou
         },
     } as unknown as ExtensionAPI;
     const ctx = {
-        sessionManager: manager, model: { id: "fake", provider: "fake", api: "openai-responses" },
-        modelRegistry: { streamSimple(_model: unknown, context: { systemPrompt: string; messages: UserMessage[] }, options: { signal?: AbortSignal }) {
+        sessionManager: manager, model,
+        modelRegistry: {
+            getAvailable: () => available && auth ? models : [],
+            find: (provider: string, id: string) => available ? models.find(model => model.provider === provider && model.id === id) : undefined,
+            hasConfiguredAuth: () => auth,
+            streamSimple(_model: unknown, context: { systemPrompt: string; messages: UserMessage[] }, options: { signal?: AbortSignal; reasoning?: string }) {
             let resolve!: (value: AssistantMessage) => void;
             let reject!: (value: Error) => void;
             const promise = new Promise<AssistantMessage>((res, rej) => { resolve = res; reject = rej; });
-            requests.push({ text: String(context.messages[0].content), systemPrompt: context.systemPrompt, signal: options.signal, resolve, reject });
+            requests.push({ model: _model, reasoning: options.reasoning, text: String(context.messages[0].content), systemPrompt: context.systemPrompt, signal: options.signal, resolve, reject });
             return { result: () => promise };
         } },
         hasUI: true, mode: "tui", isIdle: () => true,
-        ui: { notify(text: string) { notices.push(text); }, select: async (_title: string, _items: string[], opts?: { signal?: AbortSignal }) => { menus.push({ signal: opts?.signal }); return selection; }, input: async (_title: string, _hint?: string, opts?: { signal?: AbortSignal }) => { inputDialogs.push({ signal: opts?.signal }); return input; } },
+        ui: { notify(text: string) { notices.push(text); }, select: async (title: string, items: string[], opts?: { signal?: AbortSignal }) => { menus.push({ title, options: items, signal: opts?.signal }); return selections.length ? selections.shift() : selection; }, input: async (_title: string, _hint?: string, opts?: { signal?: AbortSignal }) => { inputDialogs.push({ signal: opts?.signal }); return input; } },
         waitForIdle: async () => {},
     } as unknown as ExtensionCommandContext;
     register(pi);
     t.after(async () => { await emit("session_shutdown"); await flush(); });
-    return { manager, requests, notices, menus, inputDialogs, emit, ctx, pi, directory,
+    return { manager, requests, notices, menus, selections, models, model, inputDialogs, emit, ctx, pi, directory,
+        setThinking(value: ModelThinkingLevel) { thinking = value; }, setAuth(value: boolean) { auth = value; }, setAvailable(value: boolean) { available = value; },
         start: () => emit("session_start"),
         async user(text: string, source = "interactive", deliver = true) {
             await emit("input", { text, source });

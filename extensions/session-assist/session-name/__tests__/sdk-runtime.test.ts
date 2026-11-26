@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createAssistantMessageEventStream, type Model } from "@earendil-works/pi-ai";
@@ -15,28 +15,29 @@ const textOf = (content: unknown) => typeof content === "string" ? content :
 type Session = Awaited<ReturnType<typeof createAgentSession>>["session"];
 
 /** Offline actual AgentSession with a scripted provider; naming calls are recognised by their system prompt. */
-async function withSession(test: (session: Session, naming: { content: string; material: string }[], calls: () => number) => Promise<void>) {
+async function withSession(test: (session: Session, naming: { content: string; material: string; model: string; thinking?: string }[], calls: () => number) => Promise<void>, config?: Record<string, unknown>) {
     const directory = mkdtempSync(join(tmpdir(), "name-sdk-session-"));
     const previous = process.env.PI_CODING_AGENT_DIR;
     process.env.PI_CODING_AGENT_DIR = directory;
     let session: Session | undefined;
     let calls = 0;
-    const naming: { content: string; material: string }[] = [];
+    const naming: { content: string; material: string; model: string; thinking?: string }[] = [];
+    if (config) writeFileSync(join(directory, "session-name.json"), JSON.stringify(config));
     try {
         const runtime = await ModelRuntime.create({ authPath: join(directory, "auth.json"), modelsPath: null,
             modelsStorePath: join(directory, "models-store.json"), refreshOnCreate: false, allowModelNetwork: false });
         runtime.registerProvider("name-fixture", { api: "openai-responses", baseUrl: "http://offline.invalid", apiKey: "offline",
-            models: [{ id: "fixture", name: "Fixture", reasoning: true, input: ["text"], contextWindow: 400_000, maxTokens: 8192,
-                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }],
+            models: ["fixture", "next"].map(id => ({ id, name: "Fixture", reasoning: true, input: ["text"], contextWindow: 400_000, maxTokens: 8192,
+                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } })),
             streamSimple: (_model, context, options) => {
                 calls++;
                 // The SDK delivers the request system prompt as a leading system message.
                 const [system, user] = context.messages as { role: string; content: unknown }[];
                 const isNaming = system?.role === "system" && system.content === TITLE_PROMPT;
-                if (isNaming) naming.push({ content: textOf(user?.content), material: buildMaterial(session!.sessionManager, MATERIAL_BUDGET).text });
+                if (isNaming) naming.push({ content: textOf(user?.content), material: buildMaterial(session!.sessionManager, MATERIAL_BUDGET).text, model: _model.id, thinking: options?.reasoning });
                 const stream = createAssistantMessageEventStream();
                 queueMicrotask(() => {
-                    assert.equal(options?.reasoning, "high");
+                    if (!isNaming) assert.equal(options?.reasoning, "high");
                     const message = { ...reply(isNaming ? `Fixture title ${naming.length}` : "Main reply"), provider: "name-fixture", model: "fixture" };
                     stream.push({ type: "done", reason: "stop", message });
                     stream.end(message);
@@ -69,6 +70,7 @@ it("actual AgentSession names once directly from shared material and protects na
         assert.equal(calls(), 2);
         assert.equal(naming.length, 1);
         assert.equal(naming[0].content, naming[0].material);
+        assert.equal(naming[0].model, "fixture"); assert.equal(naming[0].thinking, "high");
         assert.match(naming[0].content, /^User: Name this work\nAssistant: Main reply$/);
         assert.equal(session.sessionManager.getSessionName(), "Fixture title 1");
         session.setSessionName("Manual native title"); await flush();
@@ -97,4 +99,15 @@ it("actual AgentSession keeps the two-request quota across tree navigation", asy
         for (let n = 0; n < 12; n++) { await session.prompt(`Later ${n}`); await flush(); }
         assert.equal(naming.length, 2);
     });
+});
+
+it("actual AgentSession custom naming uses its model/thinking while default follow uses the main selection", async () => {
+    await withSession(async (session, naming) => {
+        await session.prompt("Custom naming goal"); await flush();
+        assert.equal(naming[0].model, "next"); assert.equal(naming[0].thinking, undefined);
+        assert.equal(session.model?.id, "fixture"); assert.equal(session.thinkingLevel, "high");
+        await session.prompt("/session-name"); await flush();
+        assert.equal(naming[1].model, "next"); assert.equal(naming[1].thinking, undefined);
+        assert.equal(session.model?.id, "fixture"); assert.equal(session.thinkingLevel, "high");
+    }, { modelMode: "custom", model: "name-fixture/next", thinking: "off" });
 });

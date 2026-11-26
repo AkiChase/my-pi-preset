@@ -387,7 +387,7 @@ it("actual SDK model menu links missing thinking atomically and filters supporte
     assert.deepEqual(h.menus[2], ["off", "low", "medium", "high"]);
     assert.equal(readFileSync(path, "utf8"), before); assert.equal(h.placeholders.length, 0);
     selection.resolve("off"); await command;
-    assert.deepEqual(JSON.parse(readFileSync(path, "utf8")), { model: "recap-sdk/next", thinking: "off", automatic: false, unknown: true });
+    assert.deepEqual(JSON.parse(readFileSync(path, "utf8")), { modelMode: "custom", model: "recap-sdk/next", thinking: "off", automatic: false, unknown: true });
     await h.session.prompt("goal"); const manual = h.session.prompt("/recap"); await flush();
     assert.equal(h.calls.at(-1)!.model, "next"); assert.equal(h.calls.at(-1)!.options?.reasoning, undefined); h.finishRecap(); await manual;
 });
@@ -431,4 +431,24 @@ it("actual SDK Recap arriving after a peer slot keeps fixed order, peer identity
     assert.doesNotMatch(h.currentWidget!.render(120).join("\n"), /task/);
     assert.deepEqual(writes, [], "updating slots never republishes the composite or external widgets");
     assert.equal(h.mounted.get("external.widget"), thirdParty);
+});
+
+it("actual SDK follow mode captures main model/thinking and mode switches retain independent selection", async t => {
+    const h = await sdkHarness(t, { rpc: true, config: { modelMode: "follow" } });
+    await h.session.prompt("Follow mode goal"); await h.clock.tick(300000);
+    const first = h.calls.at(-1)!;
+    assert.equal(first.kind, "recap"); assert.equal(first.model, "fixture"); assert.equal(first.options?.reasoning, undefined);
+    h.session.setThinkingLevel("low");
+    h.selections.push("Set model", "2. recap-sdk/next"); await h.session.prompt("/recap config");
+    assert.equal(first.options?.signal?.aborted, false); assert.equal(first.options?.reasoning, undefined);
+    h.finishRecap(); await flush();
+    const custom = h.session.prompt("/recap"); await flush();
+    assert.equal(h.calls.at(-1)!.model, "next"); assert.equal(h.calls.at(-1)!.options?.reasoning, "high");
+    assert.equal(h.session.model?.id, "fixture"); assert.equal(h.session.thinkingLevel, "low");
+    h.finishRecap(); await custom;
+    h.selections.push("Follow main session"); await h.session.prompt("/recap config");
+    assert.deepEqual(JSON.parse(readFileSync(join(h.directory, "recap.json"), "utf8")), { modelMode: "follow", model: "recap-sdk/next", thinking: "high", automatic: true });
+    const follow = h.session.prompt("/recap"); await flush();
+    assert.equal(h.calls.at(-1)!.model, "fixture"); assert.equal(h.calls.at(-1)!.options?.reasoning, "low");
+    h.finishRecap(); await follow;
 });

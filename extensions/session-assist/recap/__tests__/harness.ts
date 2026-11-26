@@ -5,7 +5,7 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import type { AssistantMessage, Model, UserMessage } from "@earendil-works/pi-ai";
+import type { AssistantMessage, Model, ModelThinkingLevel, UserMessage } from "@earendil-works/pi-ai";
 import { SessionManager, type ExtensionAPI, type ExtensionContext, type ExtensionCommandContext, type ExtensionEvent, type RegisteredCommand } from "@earendil-works/pi-coding-agent";
 import type { TestContext } from "node:test";
 import register, { type RecapClock } from "../index.ts";
@@ -43,7 +43,8 @@ export function harness(t: TestContext, options: { initial?: boolean; config?: R
     const inputDialogs: { signal?: AbortSignal }[] = [];
     const selections: (string | undefined | Promise<string | undefined>)[] = [];
     const inputs: (string | undefined | Promise<string | undefined>)[] = [];
-    const requests: { context: { systemPrompt?: string; messages: UserMessage[] }; options: { reasoning?: string; signal?: AbortSignal; timeoutMs?: number }; resolve: (value: AssistantMessage) => void; reject: (error: Error) => void }[] = [];
+    const requests: { model: unknown; context: { systemPrompt?: string; messages: UserMessage[] }; options: { reasoning?: string; signal?: AbortSignal; timeoutMs?: number }; resolve: (value: AssistantMessage) => void; reject: (error: Error) => void }[] = [];
+    let thinking: ModelThinkingLevel = "off";
     let idle = true; let pending = false; let auth = true; let available = true;
     let wait = Promise.resolve();
     let onAppend: (() => void) | undefined; let onWidget: (() => void) | undefined; let onNotify: (() => void) | undefined;
@@ -53,6 +54,7 @@ export function harness(t: TestContext, options: { initial?: boolean; config?: R
     const pi = {
         events: { on(name: string, handler: (value: unknown) => void) { bus.on(name, handler); return () => { bus.off(name, handler); }; }, emit: (name: string, value: unknown) => { bus.emit(name, value); } },
         on(name: string, handler: (event: ExtensionEvent, ctx: ExtensionContext) => unknown) { const list = handlers.get(name) ?? []; list.push(handler); handlers.set(name, list); return () => { const index = list.indexOf(handler); if (index >= 0) list.splice(index, 1); }; },
+        getThinkingLevel: () => thinking,
         registerCommand(name: string, command: RegisteredCommand) { commands.set(name, command); },
         appendEntry(name: string, data: unknown) { manager.appendCustomEntry(name, data); onAppend?.(); },
     } as unknown as ExtensionAPI;
@@ -62,7 +64,7 @@ export function harness(t: TestContext, options: { initial?: boolean; config?: R
         find(provider: string, id: string) { return available ? models.find(model => provider === model.provider && id === model.id) : undefined; },
         hasConfiguredAuth() { return auth; },
         streamSimple(_model: unknown, context: { systemPrompt?: string; messages: UserMessage[] }, options: { signal?: AbortSignal; reasoning?: string; timeoutMs?: number }) {
-            const d = deferred<AssistantMessage>(); requests.push({ context, options, resolve: d.resolve, reject: d.reject }); return { result: () => d.promise };
+            const d = deferred<AssistantMessage>(); requests.push({ model: _model, context, options, resolve: d.resolve, reject: d.reject }); return { result: () => d.promise };
         },
     } as unknown as ExtensionContext["modelRegistry"];
     const ctx = { sessionManager: manager, model, modelRegistry: registry, mode: options.mode ?? "tui", hasUI: options.hasUI ?? true,
@@ -79,6 +81,7 @@ export function harness(t: TestContext, options: { initial?: boolean; config?: R
         async user(text = "修复目标") { await emit("input", { text, source: "interactive" }); manager.appendMessage({ role: "user", content: text, timestamp: 1 }); },
         async run() { idle = false; await emit("before_agent_start"); await emit("agent_start"); },
         async settled(aborted = false) { idle = true; await emit("agent_settled", { aborted }); },
+        setThinking(value: ModelThinkingLevel) { thinking = value; },
         setIdle(value: boolean) { idle = value; }, setPending(value: boolean) { pending = value; }, setAuth(value: boolean) { auth = value; }, setAvailable(value: boolean) { available = value; },
         setWait(value: Promise<void>) { wait = value; }, setOnAppend(value: (() => void) | undefined) { onAppend = value; }, setOnWidget(value: (() => void) | undefined) { onWidget = value; },
         setOnNotify(value: (() => void) | undefined) { onNotify = value; },

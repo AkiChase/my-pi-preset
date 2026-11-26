@@ -2,7 +2,7 @@
 
 功能参考 [@tifan/pi-recap](https://github.com/tifandotme/pi-extensions/tree/master/packages/pi-recap)，本机读取的 npm 基线为 0.4.8。该包 package.json 声明 MIT，作者 Tifan Dwi Avianto。实际安装目录未提供声明的 LICENSE 文件；没有根据元数据猜写版权年份或许可证原件。
 
-本实现独立编写，没有复制上游实现或提示词。延续单行恢复工作摘要、编辑器上方 widget 和非模型上下文 custom entry 的功能方向；按本任务重新实现显式模型/思考配置、120 秒共享请求、严格 Unicode 材料预算和公开事件空闲生命周期。无需承载未复制源码的许可证正文；如后续引入原件，必须一并保留上游实际许可证与准确来源。
+本实现独立编写，没有复制上游实现或提示词。延续单行恢复工作摘要、编辑器上方 widget 和非模型上下文 custom entry 的功能方向；按本任务重新实现跟随主会话／独立模型与思考配置、120 秒共享请求、严格 Unicode 材料预算和公开事件空闲生命周期。无需承载未复制源码的许可证正文；如后续引入原件，必须一并保留上游实际许可证与准确来源。
 
 公开 SDK 基线为 Pi 1.2.0，运行时只通过包名导入公开 extension/model/session/TUI API；不使用安装路径、AgentSession 私有订阅、工具执行循环、旧 complete fallback 或 provider payload 修改。`shared/request.ts` 只增加显式文本材料输入，命名未提供该参数时仍使用原 JSON 序列化。
 

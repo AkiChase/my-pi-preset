@@ -5,6 +5,7 @@ import { failureDetail } from "../shared/errors.ts";
 import { buildMaterial } from "../shared/material.ts";
 import { generateText, RequestCancelled } from "../shared/request.ts";
 import { DEFAULTS, loadConfig, saveConfig, type NameConfig } from "./config.ts";
+import { chooseModelConfig, displayModelValue, modelConfigSummary, resolveModelConfig } from "../shared/model-config.ts";
 import { readTitle, TITLE_PROMPT } from "./title.ts";
 
 export const STATE_TYPE = "preset.session-name.v2";
@@ -125,7 +126,7 @@ export default function registerSessionName(pi: ExtensionAPI): void {
         ownership = own && own.titleEntryId === title.id && own.title === title.name ? { ...own } :
             { titleEntryId: title.id, title: title.name, owned: false };
         try { config = loadConfig(); configWarning = false; } catch { config = { ...DEFAULTS }; configWarning = true; }
-        if (configWarning) notify(ctx, "Could not load session-name configuration; using defaults. Fix session-name.json before saving changes.", "warning");
+        if (configWarning) notify(ctx, "Could not load session-name configuration; naming paused. Fix session-name.json before generating or saving changes.", "warning");
     }
     function checkOwnership(ctx: ExtensionContext): void {
         const title = latestTitle(ctx);
@@ -162,6 +163,10 @@ export default function registerSessionName(pi: ExtensionAPI): void {
         checkOwnership(ctx);
         const chance = manual ? undefined : dueChance();
         if (!manual && (!chance || !config.automatic || (ownership.title !== null && !ownership.owned))) return;
+        if (configWarning) {
+            if (manual) notify(ctx, "Session name refresh failed: Fix session-name.json before generating; previous title kept.", "error");
+            return;
+        }
         const material = buildMaterial(ctx.sessionManager, MATERIAL_BUDGET);
         if (material.empty) {
             // No request is sent, so an automatic chance remains unstarted.
@@ -169,7 +174,7 @@ export default function registerSessionName(pi: ExtensionAPI): void {
             return;
         }
         // Without a model no request can be sent, so an automatic chance stays unstarted.
-        if (chance && !ctx.model) return;
+        if (chance && config.modelMode === "follow" && !ctx.model) return;
         cancel();
         if (chance) {
             // Persist consumption before the request: failure, cancellation or resume never re-issues it.
@@ -181,15 +186,16 @@ export default function registerSessionName(pi: ExtensionAPI): void {
         controller = requestController;
         const expectedTitle = latestTitle(ctx);
         const expectedBranch = branchIdentity(ctx.sessionManager);
-        const model = ctx.model;
+        const snapshot = { config: { ...config }, issues: [] };
         const thinking = pi.getThinkingLevel();
         const valid = () => active && epoch === requestEpoch && !requestController.signal.aborted &&
             ctx.sessionManager.getSessionId() === sessionId && branchIdentity(ctx.sessionManager) === expectedBranch &&
             buildMaterial(ctx.sessionManager, MATERIAL_BUDGET).identity === material.identity &&
             latestTitle(ctx).id === expectedTitle.id && latestTitle(ctx).name === expectedTitle.name;
         try {
-            if (!model) throw new Error("No model selected");
-            const response = await generateText({ registry: ctx.modelRegistry, model, thinking,
+            const selection = resolveModelConfig(snapshot, ctx.modelRegistry, ctx, thinking, "Session Name");
+            if (!valid()) return;
+            const response = await generateText({ registry: ctx.modelRegistry, ...selection,
                 sessionId: ctx.sessionManager.getSessionId(), systemPrompt: TITLE_PROMPT,
                 data: undefined, textMaterial: material.text, signal: requestController.signal });
             const title = readTitle(response);
@@ -259,7 +265,7 @@ export default function registerSessionName(pi: ExtensionAPI): void {
         if (!event.aborted && dueChance() && manualPending === undefined) void evaluate(ctx, false).catch(() => {});
     });
     pi.registerCommand("session-name", {
-        description: "Generate the session title, or configure automatic naming",
+        description: "Generate the session title, or configure its model and automatic naming",
         getArgumentCompletions: prefix => "config".startsWith(prefix) ? [{ value: "config", label: "config" }] : null,
         handler: async (args, ctx) => {
             if (!active) restore(ctx);
@@ -272,11 +278,20 @@ export default function registerSessionName(pi: ExtensionAPI): void {
                         if (result.kind === "error") notify(ctx, "Could not save session-name configuration; nothing changed.", "error");
                     },
                 }, async flow => {
-                    const choice = await flow.select(`Session naming (automatic ${config.automatic ? "on" : "off"}, N=${config.interval}, ${remaining()} in this session)`,
-                        ["Enable automatic naming", "Disable automatic naming", "Set interval"]);
+                    const fresh = loadConfig(undefined, { allowInvalidModel: true });
+                    const choice = await flow.select(displayModelValue(`Session naming (automatic ${fresh.automatic ? "on" : "off"}, N=${fresh.interval}, ${remaining()} in this session; ${modelConfigSummary(fresh, ctx, pi.getThinkingLevel())})`, 800),
+                        ["Follow main session", "Set model", "Set thinking", "Enable automatic naming", "Disable automatic naming", "Set interval"]);
                     const patch: Partial<NameConfig> = {};
-                    if (choice === "Set interval") {
-                        const raw = await flow.input("User inputs before the second automatic naming (1–10000)", String(config.interval));
+                    if (choice === "Follow main session") patch.modelMode = "follow";
+                    else if (choice === "Set model" || choice === "Set thinking") {
+                        const selection = await chooseModelConfig(flow, choice, fresh, ctx, "Session Name", text => notify(ctx, text, "warning"));
+                        if (!selection) return;
+                        flow.checkpoint();
+                        resolveModelConfig({ config: { ...fresh, ...selection }, issues: [] }, ctx.modelRegistry, ctx, "off", "Session Name");
+                        flow.checkpoint();
+                        Object.assign(patch, selection);
+                    } else if (choice === "Set interval") {
+                        const raw = await flow.input("User inputs before the second automatic naming (1–10000)", String(fresh.interval));
                         const interval = Number(raw);
                         if (!raw.trim() || !Number.isSafeInteger(interval) || interval < 1 || interval > 10_000) {
                             notify(ctx, "Interval must be an integer between 1 and 10000.", "error"); return;
@@ -287,6 +302,7 @@ export default function registerSessionName(pi: ExtensionAPI): void {
                     } else throw new Error("Unknown session-name configuration choice");
                     flow.checkpoint();
                     config = saveConfig(patch, undefined, flow.isCurrent);
+                    configWarning = false;
                     flow.checkpoint();
                     // Configuration never grants or returns chances; only disabling stops an automatic request.
                     if (!config.automatic) cancel();

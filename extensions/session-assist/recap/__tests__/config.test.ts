@@ -5,8 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULTS, loadConfig, parseConfig, saveConfig } from "../config.ts";
 
-it("explicit required config never falls back; validates behavioral bounds", () => {
-    const empty = parseConfig({}); assert.deepEqual(empty.config, DEFAULTS); assert.equal(empty.issues.length, 2);
+it("defaults follow the main session; explicit custom settings never fall back and behavioral bounds are validated", () => {
+    const empty = parseConfig({}); assert.deepEqual(empty.config, DEFAULTS); assert.equal(empty.issues.length, 0);
+    assert.equal(parseConfig({ model: "p/id", thinking: "off" }).config.modelMode, "custom");
+    assert.equal(parseConfig({ modelMode: "custom" }).issues.length, 2);
     for (const bad of [{ model: "no-provider", thinking: "off" }, { model: "p/id", thinking: "unknown" }, { model: "p/id", thinking: "off", automatic: null }, { model: "p/id", thinking: "off", idleMinutes: Infinity }, { model: "p/id", thinking: "off", maxContextChars: 256.5 }]) assert.ok(parseConfig(bad).issues.length);
     assert.deepEqual(parseConfig({ model: "p/path/id", thinking: "off" }).issues, []);
 });

@@ -69,13 +69,14 @@ Reusable authorized CLI/TUI procedures are in [tmux testing](tmux.md). Documenta
 Run selected commands under the same temporary agent-dir/existing SDK isolation above, without forced exit. These are verification entry points, not historical PASS claims:
 
 ```sh
-node --test extensions/session-assist/session-name/__tests__/*.test.ts extensions/session-assist/shared/__tests__/*.test.ts
+node --test extensions/session-assist/session-name/__tests__/*.test.ts extensions/session-assist/recap/__tests__/*.test.ts extensions/session-assist/shared/__tests__/*.test.ts extensions/shared/interaction/__tests__/dialog.test.ts extensions/shared/interaction/__tests__/sdk-dialog.test.ts
 node --test extensions/at-path-completion/__tests__/*.test.ts
 node --test extensions/beautify/__tests__/*.test.ts extensions/task-ui/__tests__/editor.test.ts
 node --test extensions/task-ui/__tests__/*.test.ts extensions/process-tasks/__tests__/*.test.ts
 node --test extensions/agent-tasks/__tests__/*.test.ts
 ```
 
+- Session-assist model modes: default follow and explicit custom for both consumers, preserved existing custom intent, invalid-mode/no-fallback errors, exact per-request model/thinking snapshots, custom without a main model, retained dormant values, authenticated text/supported-thinking menus, atomic linked selection and cancellation, fresh unrelated-field preservation and post-dialog auth/capability revalidation. Preserve actual SDK loading/runtime evidence plus naming quotas/title protection and Recap idle-window/persistence tests; offline providers do not establish online generation quality.
 - Session naming: actual SDK projection, conservative input counting, the two-request session quota (no third request, no refund), manual title protection and cancellation; fake providers do not prove title quality.
 - Path completion: native negative control, Tab/Enter/unique candidates, asynchronous cancellation, actual host setters/reset, editor/history/undo/paste preservation, later wrappers and safe fallback. Native fd integration uses disposable paths and temporary HOME for `~/`; verify scoped ignored paths, quoting, recursion and result limits without scanning personal home or installing fd. The guarded `tryTriggerAutocomplete(false)` seam in `compat.ts` needs actual-host semantics regression on SDK upgrades, not function-existence proof.
 - Beautify: actual loader/resolver/ToolExecutionComponent, image ownership, registered `process_manage`/`agent_manage` v2 metadata across actions/types, exact parameter/result identity matching, unknown/error fallback, partial/final state and wait release without stopping execution, mouse hit regions, terminal-column/background continuity and highlighting budgets/races. Expanded management results use returned content only, without backend I/O or consumption. Editor tests preserve the live receiver/focus/cursor/history/undo/paste and later wrappers through setter/reset failures; independent history fixtures are not the installed input-history package.

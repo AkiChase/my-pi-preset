@@ -24,8 +24,8 @@ it("manual compact terminal without before handles pre-hook failure once, attemp
     await h.emit("session_before_compact", { reason: "manual" }); await h.emit("session_compact_failed", { reason: "manual", willRetry: false, aborted: true });
     await h.clock.tick(600000); assert.equal(h.requests.length, 1);
 });
-it("automatic unavailable defaults warn once; empty session never requests; manual and restore errors have actual consequence", async t => {
-    const h = harness(t, { initial: true, config: {} }); await h.start(); await h.clock.tick(0); assert.equal(h.requests.length, 0);
+it("automatic custom mode with missing settings warns once; empty session never requests; manual and restore errors have actual consequence", async t => {
+    const h = harness(t, { initial: true, config: { modelMode: "custom" } }); await h.start(); await h.clock.tick(0); assert.equal(h.requests.length, 0);
     assert.match(h.notices[0], /model must be explicitly.*thinking must be explicitly/); assert.match(h.notices[0], /No recap was saved/);
     await h.clock.tick(600000); assert.equal(h.notices.length, 1);
     await h.command(); assert.equal(h.notices.length, 2);

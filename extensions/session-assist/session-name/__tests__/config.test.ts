@@ -11,7 +11,7 @@ it("config defaults to automatic on/N=8 and persists globally without destroying
         assert.deepEqual(loadConfig(directory), DEFAULTS);
         writeFileSync(join(directory, "session-name.json"), '{"unrelated":42}');
         saveConfig({ automatic: false, interval: 3 }, directory);
-        assert.deepEqual(loadConfig(directory), { automatic: false, interval: 3 });
+        assert.deepEqual(loadConfig(directory), { modelMode: "follow", automatic: false, interval: 3 });
         assert.equal(JSON.parse(readFileSync(join(directory, "session-name.json"), "utf8")).unrelated, 42);
         for (const value of [0, 1.5, 10001, "8"]) {
             writeFileSync(join(directory, "session-name.json"), JSON.stringify({ interval: value }));
@@ -28,7 +28,7 @@ it("single-field saves merge fresh configuration and refuse cancelled writes wit
     const path = join(directory, "session-name.json");
     try {
         writeFileSync(path, '{"automatic":false,"interval":8,"external":42}');
-        assert.deepEqual(saveConfig({ interval: 3 }, directory), { automatic: false, interval: 3 });
+        assert.deepEqual(saveConfig({ interval: 3 }, directory), { modelMode: "follow", automatic: false, interval: 3 });
         assert.equal(JSON.parse(readFileSync(path, "utf8")).external, 42);
         const before = readFileSync(path, "utf8");
         for (const limit of [0, 1, 2]) {
