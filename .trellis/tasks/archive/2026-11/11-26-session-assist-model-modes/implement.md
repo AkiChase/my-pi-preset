@@ -33,9 +33,11 @@ node --test extensions/session-assist/session-name/__tests__/*.test.ts extension
 - `task.py validate`：退出 1，未使用 implement.jsonl 为 0 curated entries；check.jsonl 六项通过，development/index 超过 32768 字节注入预算警告。审查者已直接完整读取该文件，不把片段注入或 manifest 检查当作全文阅读证据。
 
 Node v24.14.1，实际 SDK Pi 1.5.2。使用已缓存的 pnpm 10.33.0 `bin/pnpm.cjs`，临时 PATH 启动器固定此入口，`COREPACK_ENABLE_NETWORK=0`，没有执行安装或依赖下载。设置 `PI_CODING_AGENT_DIR=<owned-run>/agent`、`PI_SDK_DIR=/Users/jyxc-dz-0101322/.pi/agent/install/releases/1.5.2/node_modules`；SDK link 报告 `0 new`。全量检查还设置 `PNPM_TEST_BIN` 为同一缓存入口。
-start 给出 main 同时为 base_branch 的归档/PR 警告；本次未获归档/建 PR 授权，不切分支或绕过诊断。implement.jsonl 保留未使用的空文件，不把 task validate 空 manifest 诊断报告成完整验证通过。
+start 给出 main 同时为 base_branch 的归档/PR 警告。收尾前确认：功能提交直接位于 main，本任务从未建立 PR，task.json 的 pr_url 为 null、无独立任务分支；按 CLI 为 never-PR-backed 任务提供的 `archive --skip-branch-validation` 处理，不伪造 branch/base_branch、不改历史。implement.jsonl 保留未使用的空文件，不把 task validate 空 manifest 诊断报告成完整验证通过。
 
 完整原始日志暂保留在上述 owned run directory，用于两个仓库全量失败的后续核查；没有复制到任务 evidence/research，也没有清理其他会话材料。任务只保留 PRD/design/implement、task.json 及角色上下文，无原始输出。
 
 ## 完成边界
-本任务实施许可包括阶段本地提交，不包含 push、安装、用户配置更改、归档或 journal 收尾。只有本次 owned 临时材料在验证完成且无活跃进程使用时可按 workflow 清理；未解决诊断材料保留并说明路径。
+用户明确“好的，收尾吧”，接受交付及此前披露的验证限制，授权本任务归档、清除绑定和日志记录及对应本地提交。收尾时功能代码未发生新变化，复用最终专项、类型检查和独立审查结果，不重跑未变代码；仍不声称全量 PASS。
+归档前已检查全部六份任务文件：仅保留必要规划、实施结论、task.json 及角色上下文，无原始输出或重复审查报告。工作区只有既存 `pnpm-lock.yaml` 修改，归档/日志提交均须排除它。不包含 push、安装或个人配置更改。
+本次 owned 临时目录因两项无关仓库测试失败仍待后续处理，保留诊断日志，不宣称已清理。
