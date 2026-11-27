@@ -557,3 +557,25 @@ reply_to_parent 增加 urgency（info/attention）。attention 会立即结束�
 ### Status
 
 [OK] **Completed**
+
+
+## Session 75: Status bar latest-prompt TPS/TTFT
+<!-- trellis-session: v=2 fp=fb13a7fd73d81655 -->
+
+**Date**: 2026-11-27
+**Task**: Status bar latest-prompt TPS/TTFT
+**Branch**: `main`
+
+### Summary
+
+Added runtime-only per-prompt decode TPS and TTFT to the status-bar footer usage line (ThroughputTracker in extensions/shared/response-throughput.ts, new throughput widget slot). Scope narrowed during planning: no per-message transcript line, no averages, no persistence, no streaming estimate. Verified with typecheck, focused tests and isolated pnpm check (1972/1972). Archived task 11-27-response-throughput.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `032ba9d` | feat(status-bar): show per-prompt decode TPS and TTFT |
+
+### Status
+
+[OK] **Completed**

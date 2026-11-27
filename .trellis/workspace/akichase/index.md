@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 74
-- **Last Active**: 2026-11-26
+- **Total Sessions**: 75
+- **Last Active**: 2026-11-27
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~559 | Active |
+| `journal-2.md` | ~581 | Active |
 | `journal-1.md` | ~1975 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 75 | 2026-11-27 | Status bar latest-prompt TPS/TTFT | `032ba9d` | `main` |
 | 74 | 2026-11-26 | Subagent attention notices wake parent waits | `54d81c1` | `main` |
 | 73 | 2026-11-26 | 统一 Session Name 与 Recap 模型模式收尾 | `65d10a7`, `3888508`, `0eb18c4e14da3d94e2da97a5466a5e8ebca633af` | `main` |
 | 72 | 2026-11-24 | Trellis 派发指定模型与优先级统一收尾 | `c6a641d`, `fb0ecc0` | `main` |
