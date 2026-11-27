@@ -35,4 +35,4 @@ sdk_dir=...; agent_dir="$(mktemp -d)"; PI_SDK_DIR="$sdk_dir" PI_CODING_AGENT_DIR
 - `node --test extensions/shared/__tests__/response-throughput.test.ts extensions/__tests__/status-bar.test.ts`（无 force-exit，自然退出）：16/16 通过。
 - 隔离 `PI_CODING_AGENT_DIR=$(mktemp -d) pnpm check`：exit 0，1972/1972 通过。
 - 未做：真实 TUI 与在线 provider 的人工观察（需用户在实际会话中确认数值与样式）。
-- `pnpm-lock.yaml` 的工作区改动在本任务开始前已存在，未纳入提交。
+- `pnpm-lock.yaml` 的工作区改动在本任务开始前已存在，未纳入提交；收尾时按用户要求撤回。
