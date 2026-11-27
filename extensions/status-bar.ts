@@ -228,6 +228,23 @@ export function parseCacheStatus(status: string): { chip: string; percent: numbe
 	return { chip: `⛁ ${percent}% ${pair}${suffix}`, percent };
 }
 
+/**
+ * Rough cross-model speed bands, judged on the values the footer prints so a
+ * displayed "60" or "5.0s" never takes the color of its neighbor band.
+ */
+export function tpsColor(tps: number): ThemeColor {
+	if (tps >= 60) return "success";
+	if (tps >= 25) return "warning";
+	return "error";
+}
+
+export function ttftColor(formatted: string): ThemeColor {
+	const seconds = Number.parseFloat(formatted);
+	if (seconds <= 5) return "success";
+	if (seconds <= 10) return "warning";
+	return "error";
+}
+
 /** Hit-rate coloring, shared by the request field and the cache chip. */
 function hitRateColor(percent: number): ThemeColor {
 	if (percent >= 80) return "success";
@@ -361,10 +378,11 @@ export default function (pi: ExtensionAPI) {
 		const throughputChip = (): string => {
 			const { running, last } = throughput.snapshot();
 			if (!last) return running ? paint("dim", "⚡ …") : "";
-			const tps = `${formatTps(last.tps)} t/s`;
-			const ttft = `TTFT ${formatTtft(last.ttftMs)}`;
-			if (running) return paint("dim", `⚡${tps} · ${ttft}`);
-			return paint("accent", "⚡") + paint("text", tps) + paint("dim", " · TTFT ") + paint("text", formatTtft(last.ttftMs));
+			const tps = formatTps(last.tps);
+			const ttft = formatTtft(last.ttftMs);
+			if (running) return paint("dim", `⚡${tps}/s ttft ${ttft}`);
+			const rate = last.tps === undefined ? paint("dim", tps) : paint(tpsColor(Math.round(last.tps)), tps);
+			return paint("dim", "⚡") + rate + paint("dim", "/s ttft ") + paint(ttftColor(ttft), ttft);
 		};
 
 		const gitChip = (): string => {

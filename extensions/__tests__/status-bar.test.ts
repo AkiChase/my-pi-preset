@@ -4,7 +4,7 @@ import type { ExtensionAPI, ExtensionContext, Theme, ThemeColor } from "@earendi
 import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 import { createEventBus } from "@earendil-works/pi-coding-agent";
 import widgetDisplay from "../shared/widget-display/owner.ts";
-import statusBar from "../status-bar.ts";
+import statusBar, { tpsColor, ttftColor } from "../status-bar.ts";
 
 const colors: Partial<Record<ThemeColor, number>> = { accent: 36, text: 97, success: 32, warning: 33, dim: 90, muted: 37, borderMuted: 90, error: 31 };
 const theme = {
@@ -161,13 +161,13 @@ void it("updates TPS and TTFT only when the prompt settles and dims the previous
 		const before = f.renders;
 		f.emit("agent_settled", { aborted: false });
 		assert.ok(f.renders > before, "settling redraws the footer");
-		assert.match(stripTerminalSequences(usageLine(f)), /R900\s+│\s+⚡68 t\/s · TTFT 1\.2s\s+│\s+req 90%/);
-		assert.match(usageLine(f), /\u001b\[97m68 t\/s/, "settled value uses normal text color");
+		assert.match(stripTerminalSequences(usageLine(f)), /R900\s+│\s+⚡68\/s ttft 1\.2s\s+│\s+req 90%/);
+		assert.match(usageLine(f), /\u001b\[90m⚡\u001b\[39m\u001b\[32m68\u001b\[39m\u001b\[90m\/s ttft \u001b\[39m\u001b\[32m1\.2s/, "labels dim, values banded");
 
 		prompt(f, clock, { ttft: 500, decode: 1000, output: 200 });
-		assert.match(usageLine(f), /\u001b\[90m⚡68 t\/s · TTFT 1\.2s/, "running prompt shows the previous value dim");
+		assert.match(usageLine(f), /\u001b\[90m⚡68\/s ttft 1\.2s\u001b\[39m/, "running prompt shows the previous value dim");
 		f.emit("agent_settled", { aborted: false });
-		assert.match(stripTerminalSequences(usageLine(f)), /⚡200 t\/s · TTFT 0\.5s/);
+		assert.match(stripTerminalSequences(usageLine(f)), /⚡200\/s ttft 0\.5s/);
 	} finally {
 		f.dispose();
 	}
@@ -178,9 +178,29 @@ void it("clears the runtime-only throughput on session switch", () => withClock(
 	try {
 		prompt(f, clock, { ttft: 1000, decode: 1000, output: 100 });
 		f.emit("agent_settled", { aborted: false });
-		assert.match(stripTerminalSequences(usageLine(f)), /⚡100 t\/s/);
+		assert.match(stripTerminalSequences(usageLine(f)), /⚡100\/s/);
 		f.switchSession("another-session");
 		assert.doesNotMatch(stripTerminalSequences(usageLine(f)), /⚡/);
+	} finally {
+		f.dispose();
+	}
+}));
+
+void it("bands TPS and TTFT on the printed values", () => {
+	assert.deepEqual([60, 59, 25, 24].map(tpsColor), ["success", "warning", "warning", "error"]);
+	assert.deepEqual(["5.0s", "5.1s", "10s", "11s"].map(ttftColor), ["success", "warning", "warning", "error"]);
+});
+
+void it("colors a slow prompt and dims a missing rate", () => withClock(clock => {
+	const f = fixture(cachedRequest);
+	try {
+		prompt(f, clock, { ttft: 12_000, decode: 5000, output: 100 });
+		f.emit("agent_settled", { aborted: false });
+		assert.match(usageLine(f), /\u001b\[31m20\u001b\[39m.*\u001b\[31m12s/, "20/s and 12s are both red");
+		prompt(f, clock, { ttft: 6000, decode: 50, output: 3 });
+		f.emit("agent_settled", { aborted: false });
+		assert.match(stripTerminalSequences(usageLine(f)), /⚡–\/s ttft 6\.0s/);
+		assert.match(usageLine(f), /\u001b\[90m–\u001b\[39m.*\u001b\[33m6\.0s/, "missing rate dim, 6s yellow");
 	} finally {
 		f.dispose();
 	}
