@@ -66,6 +66,16 @@ function resolveAgentDir() {
   return process.env.PI_CODING_AGENT_DIR?.trim() || join(homedir(), ".pi", "agent");
 }
 
+// pi installs packages through its configured npm command; pnpm discovers a
+// workspace from its working directory. Run from a checkout (or any pnpm
+// project), it records <agent-dir>/npm as an importer in that project's
+// lockfile. pi therefore runs from the agent directory, or home before the
+// agent directory exists, whatever directory the installer was started from.
+function resolvePiCwd() {
+  const agentDir = resolveAgentDir();
+  return existsSync(agentDir) ? agentDir : homedir();
+}
+
 // A tool shim (a terminal app's launcher, for example) can sit earlier on PATH
 // than pi itself and hijack these calls. Prefer an explicit path when one is
 // known, so package commands always reach the real pi.
@@ -468,7 +478,7 @@ function isPinned(source) {
 // Parse `pi list`, which prints two-space indented sources with an optional
 // four-space indented install path underneath.
 function readInstalled() {
-  const result = spawnSync(PI, ["list"], { encoding: "utf8", timeout: COMMAND_TIMEOUT_MS });
+  const result = spawnSync(PI, ["list"], { cwd: resolvePiCwd(), encoding: "utf8", timeout: COMMAND_TIMEOUT_MS });
   if (result.error) {
     const detail = result.error.code === "ETIMEDOUT" ? `timed out after ${COMMAND_TIMEOUT_MS / 1000}s` : result.error.message;
     fail(`cannot run pi: ${detail}`);
@@ -581,7 +591,7 @@ function runPi(action, source) {
   const args = action === "install" ? ["install", source] : action === "remove" ? ["remove", source] : ["update", source];
   info(`running: ${PI} ${args.join(" ")}`);
   const started = Date.now();
-  const result = spawnSync(PI, args, { stdio: "inherit", timeout: COMMAND_TIMEOUT_MS });
+  const result = spawnSync(PI, args, { cwd: resolvePiCwd(), stdio: "inherit", timeout: COMMAND_TIMEOUT_MS });
   const seconds = ((Date.now() - started) / 1000).toFixed(1);
   if (result.error) {
     if (result.error.code === "ETIMEDOUT") return `timed out after ${COMMAND_TIMEOUT_MS / 1000}s`;

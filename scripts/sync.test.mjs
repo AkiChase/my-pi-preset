@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
@@ -12,11 +12,12 @@ const script = join(root, "scripts/sync.mjs");
 const SELF = "git:github.com/akichase/my-pi-preset";
 const FAKE_PI = `#!/bin/sh
 printf '%s\\n' "$*" >> "$PI_CALLS_FILE"
+[ -n "$PI_CWD_FILE" ] && pwd -P >> "$PI_CWD_FILE"
 [ "$1" = list ] && printf '%s\\n' "$PI_LIST_OUTPUT"
 exit 0
 `;
 
-function cli(t, { manifest = { packages: {} }, args = [], list = "User packages:", files = {}, prepareAgent } = {}) {
+function cli(t, { manifest = { packages: {} }, args = [], list = "User packages:", files = {}, prepareAgent, cwd, env = {} } = {}) {
  const box = mkdtempSync(join(tmpdir(), "sync-smoke-")); t.after(() => rmSync(box, { recursive: true, force: true }));
  const bin = join(box, "bin"), agent = join(box, "agent"), manifestPath = join(box, "preset.json"), calls = join(box, "calls");
  mkdirSync(bin); mkdirSync(agent); writeFileSync(join(bin, "pi"), FAKE_PI, { mode: 0o755 }); chmodSync(join(bin, "pi"), 0o755);
@@ -25,7 +26,7 @@ function cli(t, { manifest = { packages: {} }, args = [], list = "User packages:
   const target = join(agent, name); mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, value);
  }
  prepareAgent?.(agent);
- const result = spawnSync(process.execPath, [script, "--manifest", manifestPath, ...args], { encoding: "utf8", env: { ...process.env, PI_BIN: join(bin, "pi"), PI_CODING_AGENT_DIR: agent, PI_CALLS_FILE: calls, PI_LIST_OUTPUT: list } });
+ const result = spawnSync(process.execPath, [script, "--manifest", manifestPath, ...args], { cwd, encoding: "utf8", env: { ...process.env, PI_BIN: join(bin, "pi"), PI_CODING_AGENT_DIR: agent, PI_CALLS_FILE: calls, PI_LIST_OUTPUT: list, ...env } });
  return { ...result, calls: readFileSync(calls, "utf8").trim().split("\n").filter(Boolean), agent };
 }
 
@@ -171,6 +172,18 @@ test("CLI smoke applies package/config plan through the configured pi binary", t
  assert.equal(result.status, 0, result.stderr); assert.deepEqual(result.calls, ["list", "update npm:one"]);
  assert.match(result.stderr, /reading Pi packages and configuration/);
  assert.deepEqual(JSON.parse(readFileSync(join(result.agent, "settings.json"), "utf8")), { retry: { maxRetries: 5 }, theme: "dark" });
+});
+
+test("pi runs from the agent directory, not the caller's pnpm workspace", t => {
+ const box = mkdtempSync(join(tmpdir(), "sync-cwd-")); t.after(() => rmSync(box, { recursive: true, force: true }));
+ const workspace = join(box, "workspace"), cwdFile = join(box, "cwds");
+ mkdirSync(workspace); writeFileSync(join(workspace, "pnpm-workspace.yaml"), "autoInstallPeers: false\n"); writeFileSync(cwdFile, "");
+ const result = cli(t, { cwd: workspace, env: { PI_CWD_FILE: cwdFile }, manifest: { packages: { "npm:one": "latest", "npm:two": "latest" } }, list: "User packages:\n  npm:one\n    /installed" });
+ assert.equal(result.status, 0, result.stderr);
+ assert.deepEqual(result.calls, ["list", "install npm:two", "update npm:one"]);
+ const cwds = readFileSync(cwdFile, "utf8").trim().split("\n");
+ assert.equal(cwds.length, 3);
+ for (const dir of cwds) assert.equal(dir, realpathSync(result.agent));
 });
 
 test("preset pi-btw declaration is installed by a future package sync", t => {
