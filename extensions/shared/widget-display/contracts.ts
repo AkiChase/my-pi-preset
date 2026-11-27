@@ -29,6 +29,7 @@ export const ITEMS = {
     location: { group: "location", order: 10 },
     context: { group: "context", order: 10 },
     tokens: { group: "usage", order: 10 },
+    throughput: { group: "usage", order: 15 },
     cache_metrics: { group: "usage", order: 20 },
     task_summary: { group: "usage", order: 30 },
     external_statuses: { group: "usage", order: 40 },

@@ -4,6 +4,7 @@ import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 import { createWidgetClient } from "./shared/widget-display/client.ts";
 import type { Slot } from "./shared/widget-display/contracts.ts";
+import { formatTps, formatTtft, ThroughputTracker } from "./shared/response-throughput.ts";
 
 // Metrics belong to this consumer; regional composition belongs to the shared owner.
 
@@ -262,8 +263,12 @@ export default function (pi: ExtensionAPI) {
 	let closed = false;
 	let epoch = 0;
 	let sessionId: string | undefined;
-	const slots = ["location", "context", "tokens", "cache_metrics", "task_summary", "external_statuses"] as const satisfies readonly Slot[];
+	const slots = ["location", "context", "tokens", "throughput", "cache_metrics", "task_summary", "external_statuses"] as const satisfies readonly Slot[];
 	const clients = slots.map(slot => createWidgetClient(pi, slot));
+
+	// Runtime-only throughput of the latest prompt; never persisted.
+	const throughput = new ThroughputTracker();
+	let redrawFooter: (() => void) | undefined;
 
 	// One Git snapshot/poll across metric items, fenced to the owning session.
 	let git: GitState | null = null;
@@ -301,6 +306,7 @@ export default function (pi: ExtensionAPI) {
 		let disposed = false;
 		const live = () => !disposed && !closed && ctx?.sessionManager === origin?.sessionManager && epoch === stamp;
 		const redraw = () => { if (live()) tui.requestRender(); };
+		redrawFooter = redraw;
 		let theme = initialTheme;
 		const unsubscribe = footerData.onBranchChange(() => {
 			// A ref change invalidates the counts too, so force the next render
@@ -347,6 +353,19 @@ export default function (pi: ExtensionAPI) {
 		};
 		// A label/value pair: the glyph recedes, the number carries the color.
 		const field = (label: string, value: string, token: ThemeColor): string => paint("dim", label) + paint(token, value);
+
+		/**
+		 * Latest finished prompt only. While a prompt runs the previous result is
+		 * shown dim, so the number never mixes partial and final measurements.
+		 */
+		const throughputChip = (): string => {
+			const { running, last } = throughput.snapshot();
+			if (!last) return running ? paint("dim", "⚡ …") : "";
+			const tps = `${formatTps(last.tps)} t/s`;
+			const ttft = `TTFT ${formatTtft(last.ttftMs)}`;
+			if (running) return paint("dim", `⚡${tps} · ${ttft}`);
+			return paint("accent", "⚡") + paint("text", tps) + paint("dim", " · TTFT ") + paint("text", formatTtft(last.ttftMs));
+		};
 
 		const gitChip = (): string => {
 			if (!git?.branch) return "";
@@ -443,12 +462,12 @@ export default function (pi: ExtensionAPI) {
 		};
 
 		return {
-			dispose() { if (disposed) return; disposed = true; unsubscribe(); },
+			dispose() { if (disposed) return; disposed = true; unsubscribe(); if (redrawFooter === redraw) redrawFooter = undefined; },
 			invalidate() {
 				statsCache = undefined;
 			},
 			render(width: number) {
-				if (!live()) return { location: "", context: "", tokens: "", cache_metrics: "", task_summary: "", external_statuses: "" };
+				if (!live()) return { location: "", context: "", tokens: "", throughput: "", cache_metrics: "", task_summary: "", external_statuses: "" };
 				theme = ctx?.ui.theme ?? initialTheme;
 				const sm = ctx?.sessionManager;
 				const cwd = sm?.getCwd() ?? ctx?.cwd ?? process.cwd();
@@ -490,7 +509,7 @@ export default function (pi: ExtensionAPI) {
 				const tokens = tokenParts.length ? tokenParts.join(" ") : paint("dim", `↑${NO_VALUE} ↓${NO_VALUE} $${NO_VALUE}`);
 				const requestHitRate = latestCacheHitRate === undefined ? undefined : field("req ", `${latestCacheHitRate.toFixed(0)}%`, hitRateColor(latestCacheHitRate));
 				const chips = renderChips(requestHitRate);
-				return { location: line1, context: line2, tokens, cache_metrics: chips.cache, task_summary: chips.task, external_statuses: chips.external };
+				return { location: line1, context: line2, tokens, throughput: throughputChip(), cache_metrics: chips.cache, task_summary: chips.task, external_statuses: chips.external };
 			},
 		};
 	};
@@ -503,6 +522,7 @@ export default function (pi: ExtensionAPI) {
 		ctx = context; sessionId = context.sessionManager.getSessionId();
 		if (changed) {
 			epoch++; git = null; gitFetchedAt = 0; gitInFlight = false;
+			throughput.reset();
 			shared?.model.dispose(); shared = undefined;
 		}
 		if (context.mode !== "tui") return;
@@ -534,8 +554,20 @@ export default function (pi: ExtensionAPI) {
 		if (!ctx) apply(context);
 		else if (ctx.sessionManager === context.sessionManager && sessionId === context.sessionManager.getSessionId()) ctx = context;
 	});
+	// Throughput sampling: timestamps only, the footer reads the snapshot.
+	const throughputChanged = (changed: boolean) => { if (changed) redrawFooter?.(); };
+	pi.on("agent_start", () => { if (!closed) throughputChanged(throughput.agentStart()); });
+	pi.on("before_provider_request", () => { if (!closed) throughput.providerRequest(Date.now()); return undefined; });
+	pi.on("message_start", event => { if (!closed) throughput.messageStart(event.message.role, Date.now()); });
+	pi.on("message_update", event => { if (!closed) throughput.messageUpdate(event.assistantMessageEvent.type, Date.now()); });
+	pi.on("message_end", event => {
+		if (closed || event.message.role !== "assistant") return;
+		throughput.messageEnd(event.message, Date.now());
+	});
+	pi.on("agent_settled", () => { if (!closed) throughputChanged(throughput.agentSettled()); });
 	pi.on("session_shutdown", () => {
 		closed = true; epoch++;
+		throughput.reset(); redrawFooter = undefined;
 		for (const client of clients) client.dispose();
 		shared?.model.dispose(); shared = undefined; ctx = undefined;
 	});

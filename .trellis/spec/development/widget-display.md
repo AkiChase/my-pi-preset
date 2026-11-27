@@ -14,7 +14,7 @@ Only `extensions/shared/widget-display/owner.ts`, loaded by `extensions/widget-d
 
 ## Composition
 
-Above-editor groups order Recap before Trellis. Footer groups order location → context → usage → Agent/workflow overview. The usage inline group orders tokens/cost → cache metrics → task summary → compatible external statuses. No built-in content currently uses belowEditor; retain the region capability without placeholders.
+Above-editor groups order Recap before Trellis. Footer groups order location → context → usage → Agent/workflow overview. The usage inline group orders tokens/cost → latest-prompt throughput → cache metrics → task summary → compatible external statuses. Throughput is runtime-only status-bar state (never persisted) and stays empty until the first prompt starts. No built-in content currently uses belowEditor; retain the region capability without placeholders.
 
 Block items render vertically and may return multiple lines. Preserve component wrapping, invalidation and width-safe output; do not globally truncate block output. Inline content uses the typed `kind: "inline"` factory and `renderText(width)` fragment interface; arbitrary component rows are not horizontal fragments. Explicit line breaks and external terminal controls (including BEL- and ST-terminated OSC sequences) are sanitized at the fragment boundary while supported ANSI styling is preserved. Empty detection uses visible text, so ANSI-styled whitespace does not add a separator. Separators and overflow styling use the current theme. The group owns separators and overflow, using SDK ANSI/Unicode helpers. Empty items leave no separator; empty groups occupy no rows. Group boundaries add no blank rows.
 
